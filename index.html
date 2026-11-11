@@ -172,6 +172,12 @@
     padding:max(7vh, 34px) 16px max(3vh, 16px); -webkit-user-select:none; user-select:none; touch-action:none; }
   #title .mark { text-align:center; opacity:0; transform:translateY(-10px); transition:opacity 2.4s .3s, transform 2.4s .3s; }
   #title.ready .mark { opacity:1; transform:none; }
+  /* the home page's hero: Icarus falling for ever, in front of the live bird until the first wingbeat */
+  #heroVid { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:8; pointer-events:none; background:#3a2418 center / cover no-repeat url(video/hero-poster.jpg);
+    opacity:0; transition:opacity .8s ease; }
+  #heroVid.on { opacity:1; }
+  #heroVid.gone { opacity:0; transition:opacity 1.6s ease; }
+  #title .mark h1 { display:none; }   /* (the name is all over him in the hero: no heading over it) */
   #title h1 { margin:0; font-weight:600; font-size:clamp(46px, 12vw, 150px); letter-spacing:.32em; padding-left:.32em; line-height:1; color:#ffb070;
     text-shadow:0 0 28px rgba(255,90,30,.75), 0 0 90px rgba(255,60,20,.45), 0 2px 0 rgba(0,0,0,.4); }
   #title .flyhint { position:absolute; left:50%; top:80%; transform:translateX(-50%); font-size:12px; letter-spacing:.6em; padding-left:.6em; color:#ffd8a8;
@@ -184,6 +190,10 @@
   #title .go:hover, #title .go:focus-visible { background:rgba(255,110,40,.18); border-color:#ffb070; outline:none; }
   #title .foot { display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:3.2vh; opacity:0; transition:opacity 2s 1.2s; }
   #title.ready .foot { opacity:1; }
+  /* over the hero, only SPACE TO FLY: no subtitle, no small print. The small print (sound, travel code, new life, immersive)
+     comes back with the name panel after the first wingbeat, which is the only place it is needed */
+  html #title .mark { display:none; }
+  html #title.ready:not(.asked) .foot { opacity:0; pointer-events:none; }
   #title .foot .keys { margin:0; }
   #title pre, #end pre { font-family:inherit; font-size:clamp(8px, 3vw, 18px); line-height:1.15; color:var(--ember);
     text-shadow:0 0 18px rgba(255,120,40,.65); margin:0 0 18px; }
@@ -289,6 +299,7 @@
 <div id="map"><canvas id="mapC"></canvas><div id="mapTitle"></div><div id="mapHint"></div></div>
 
 
+<video id="heroVid" muted loop playsinline preload="auto" poster="video/hero-poster.jpg" aria-hidden="true"></video>
 <div id="title" class="hidden">
   <div class="mark"><h1>ICARUS</h1><div class="sub">THE LAST EMBER</div></div>
   <div class="flyhint" id="flyHint">SPACE TO FLY</div>
@@ -8940,10 +8951,26 @@ function updatePrologue(dt) {
 // handed back exactly as he was when the game begins.
 const titleFly = { cam: { back: 88, below: 30, ahead: 60, up: 46, fov: 46 }, on: false, saved: null, held: false, v: 14, phase: 0, beat: 0, flaps: 0, asked: false, base: 0, sway: 0, emberT: 0, yaw: 0 };
 const TITLE_DAY = 0.712;
+// The hero in front of the title: the fall (tools/reel5.js), a loop sized to the screen. It plays until the first
+// wingbeat, then fades into the sky the live bird is flying in; leaving the title stops it and lets the file go.
+const heroVid = $('heroVid');
+function heroOn() {
+  if (!heroVid) return;
+  const big = Math.max(innerWidth, innerHeight) >= 1200;   // (phones get the lighter one)
+  heroVid.src = big ? 'video/hero-1728.mp4' : 'video/hero-1280.mp4';
+  heroVid.classList.remove('gone'); heroVid.classList.add('on');
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) { const pr = heroVid.play(); if (pr && pr.catch) pr.catch(() => {}); }
+}
+function heroOff() {
+  if (!heroVid || !heroVid.classList.contains('on')) return;
+  heroVid.classList.remove('on'); heroVid.classList.add('gone');
+  setTimeout(() => { if (heroVid.classList.contains('gone')) { heroVid.pause(); heroVid.removeAttribute('src'); heroVid.load(); } }, 1700);
+}
 function titleStart() {
   const p = player;
   titleFly.saved = { pos: p.pos.clone(), form: p.form, cine: p.cine, pitch: p.pitch, yaw: p.yaw, bank: p.bank, wingF: p.wingF, flame: p.flame, scale: p.scale, day: dayT, storm, grounded: p.grounded, wings: p.wings };
   titleFly.on = true; dayT = TITLE_DAY; storm = 0;
+  heroOn();
   titleFly.base = Math.max(CLOUD_SEA + 380, START.y + 520);
   Object.assign(p, { form: 'phoenix', cine: null, pitch: 0.75, yaw: titleFly.yaw, bank: 0, wingF: 0, flame: 1, scale: 1, grounded: false, wings: false });
   p.pos.set(START.x, titleFly.base, START.z);
@@ -8953,6 +8980,7 @@ function titleStart() {
   if (resumed) titleAsk();
 }
 function titleEnd() {
+  heroOff();
   if (!titleFly.on) return;
   titleFly.on = false;
   const p = player, S = titleFly.saved;
@@ -8969,7 +8997,7 @@ function titlePress(down) {
   titleFly.v = Math.min(titleFly.v + 34, 95); titleFly.beat = 1; titleFly.flaps++;
   audio.sfx.flap(0.9);
   for (const w of phoenix.wings) { w.tip.getWorldPosition(_v); for (let i = 0; i < 26; i++) emit(_v.x + rnd(1.5), _v.y + rnd(1), _v.z + rnd(1.5), rnd(7), -6 - Math.random() * 16, rnd(7), 0.7 + Math.random() * 0.9, pick(EMBER_COLS), -1); }
-  if (titleFly.flaps === 1) { $('title').classList.add('flown'); setTimeout(titleAsk, 700); }
+  if (titleFly.flaps === 1) { heroOff(); $('title').classList.add('flown'); setTimeout(titleAsk, 700); }
 }
 function titleAsk() {
   if (titleFly.asked) return;
