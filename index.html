@@ -1921,14 +1921,21 @@ function makeHuman(mask = true) {
     const shin = new THREE.Group(); shin.position.y = -0.44; thigh.add(shin);
     M(sph(0.062, 10, 8), skin, 0, 0, -0.006, shin);   // kneecap
     M(tube([[0, 0, 0], [0, -0.12, 0.016], [0, -0.28, 0.006], [0, -0.42, 0]], [0.058, 0.07, 0.05, 0.04], 12), skin, 0, 0, 0, shin);
-    strap(0.053, 0.011, -0.3, shin); strap(0.064, 0.011, -0.19, shin);
-    // the ankle is its own joint: the foot rolls from heel to toe as he walks, and points when he falls
+    // the ankle is its own joint: the foot rolls from heel to toe as he walks, and points when he falls. He goes barefoot:
+    // heel, the long arch, the ball of the foot, and five toes on a joint of their own (so they curl and spread), the big
+    // toe on the inside. The sole sits where the sandal's did, so he stands on the ground just as before.
     const foot = new THREE.Group(); foot.position.y = -0.43; shin.add(foot);
-    M(sph(0.042, 8, 6), skin, 0, 0, 0, foot);
-    M(sph(0.055, 10, 8), skin, 0, -0.025, -0.055, foot).scale.set(0.85, 0.55, 2.0);
-    M(new THREE.BoxGeometry(0.105, 0.026, 0.265), leather, 0, -0.058, -0.05, foot);
-    { const t = M(new THREE.BoxGeometry(0.1, 0.014, 0.03), leather, 0, -0.012, -0.115, foot); t.rotation.x = 0.2; }
-    strap(0.046, 0.011, 0.03, foot);
+    M(sph(0.04, 10, 8), skin, 0, -0.004, 0, foot);                                                  // ankle
+    for (const k of [-1, 1]) M(sph(0.016, 6, 5), skin, k * 0.036, -0.006, 0.004, foot);             // the two ankle bones
+    M(sph(0.04, 10, 8), skin, 0, -0.046, 0.032, foot).scale.set(0.9, 0.82, 1.05);                    // heel
+    M(sph(0.05, 12, 8), skin, s * -0.004, -0.04, -0.05, foot).scale.set(0.9, 0.58, 1.75);           // the arch and instep
+    M(sph(0.046, 10, 8), skin, s * -0.006, -0.05, -0.108, foot).scale.set(1.08, 0.6, 0.85);          // ball of the foot
+    const toes = new THREE.Group(); toes.position.set(0, -0.05, -0.13); foot.add(toes);
+    [[0.023, 0.038, 0.0158], [0.007, 0.031, 0.0122], [-0.007, 0.028, 0.0114], [-0.02, 0.025, 0.0105], [-0.031, 0.021, 0.0098]].forEach(([x, l, r], i) => {
+      const t = M(new THREE.CylinderGeometry(r * 0.85, r, l, 7).rotateX(Math.PI / 2).translate(0, 0, -l / 2), skin, -s * x, -0.002 - i * 0.0012, i * 0.004, toes);
+      M(sph(r * 0.95, 7, 5), skin, 0, 0, -l, t);   // the round of the toe
+    });
+    foot.userData.toes = toes;
     return [thigh, shin, foot];
   };
   const [armL, foreL, handL] = mkArm(-1), [armR, foreR, handR] = mkArm(1), [legL, shinL, footL] = mkLeg(-1), [legR, shinR, footR] = mkLeg(1);

@@ -159,14 +159,32 @@ function pose(u) {
     w.shoulder.rotation.z = -(0.15 + 0.85 * b); w.elbow.rotation.z = -(0.15 + 0.6 * (1 - up) * (b < 0 ? 0.3 : 1) * Math.max(0, 0.6 - b)); w.wrist.rotation.z = -(0.2 + 0.35 * Math.max(0, -b));
     w.root.rotation.y = (0.15 + 0.25 * Math.max(0, -b)) * (i === 0 ? 1 : -1);
   });
-  // arms: one thrown up toward the light, the other out, clawing; legs kicking; head turned up to the sun
-  H.armR.rotation.set(-0.4 + 0.25 * Math.sin(ph * 2), 0, 2.5 + 0.2 * Math.sin(ph * 3)); H.foreR.rotation.set(0.25 + 0.2 * Math.sin(ph * 4), 0, 0);
-  H.armL.rotation.set(0.5 + 0.3 * Math.sin(ph * 3 + 1), 0, -1.35 - 0.35 * Math.sin(ph * 2 + 0.5)); H.foreL.rotation.set(0.6 + 0.3 * Math.sin(ph * 4 + 2), 0, 0);
-  H.legL.rotation.set(-0.9 + 0.45 * Math.sin(ph * 2), 0, 0.2); H.shinL.rotation.set(1.3 + 0.4 * Math.sin(ph * 2 + 1.2), 0, 0); H.footL.rotation.set(0.6, 0, 0);
-  H.legR.rotation.set(0.35 + 0.4 * Math.sin(ph * 2 + 2.6), 0, -0.25); H.shinR.rotation.set(0.5 + 0.4 * Math.sin(ph * 2 + 3.5), 0, 0); H.footR.rotation.set(0.7, 0, 0);
-  H.chest.rotation.set(-0.25 + 0.08 * Math.sin(ph * 2), 0.1 * Math.sin(ph), 0); H.head.rotation.set(-0.6 + 0.1 * Math.sin(ph * 2), 0.35, 0);
-  if (H.scarf) H.scarf.rotation.set(-1.4 + 0.25 * Math.sin(ph * 7), 0, 0.2 * Math.sin(ph * 5));   // streaming up off him
-  if (I.setCurl) { try { I.setCurl(H.handR, 0.15); I.setCurl(H.handL, 0.55); } catch {} }
+  // every joint moving, slowly, each a beat behind the one before it — the way a body tumbles when there is nothing to hold.
+  // (whole numbers of cycles to the loop, so it closes seamlessly; knees bend negative, hips forward positive, as in the game)
+  const S = (k, o = 0) => Math.sin(ph * k + o), C = (k, o = 0) => 0.5 + 0.5 * Math.sin(ph * k + o);
+  const grasp = v => [0.2 + 0.55 * v, 0.1 + 0.85 * v, 0.14 + 0.85 * v, 0.2 + 0.85 * v, 0.26 + 0.85 * v];
+  // the right arm reaching up for the light: shoulder, elbow opening and closing, the wrist turning, the hand grasping at it
+  H.armR.rotation.set(-0.45 + 0.28 * S(2), 0.15 * S(3, 1), 2.4 + 0.28 * S(2, 0.8));
+  H.foreR.rotation.set(0.12 + 0.6 * C(2, -1.2), 0, 0.12 * S(3));
+  H.handR.rotation.set(0.35 * S(2, -2.0), 0, 0.22 * S(3, 2));
+  // the left arm flung out and back, clawing
+  H.armL.rotation.set(0.5 + 0.38 * S(2, 2), 0.12 * S(3), -1.25 - 0.38 * S(2, 2.7));
+  H.foreL.rotation.set(0.4 + 0.7 * C(2, 1.4), 0, -0.15 * S(3, 1));
+  H.handL.rotation.set(0.42 * S(2, 0.6), 0, -0.25 * S(3));
+  if (I.setCurl) { I.setCurl(H.handR, grasp(C(2, -2.4))); I.setCurl(H.handL, grasp(C(2, 0.3) * 0.8 + 0.1)); }
+  // the legs: a slow, helpless kick — hip, then knee, then ankle, then toes
+  const kick = (leg, shin, foot, base, o) => {
+    leg.rotation.set(base + 0.58 * S(3, o), 0, (leg === H.legL ? -1 : 1) * (0.14 + 0.1 * S(2, o + 1)));
+    shin.rotation.set(-(0.35 + 1.15 * C(3, o - 1.5)), 0, 0);
+    foot.rotation.set(-0.3 + 0.42 * S(3, o - 2.6), 0, 0.08 * S(2, o));
+    const toes = foot.userData.toes; if (toes) toes.rotation.set(0.32 * S(3, o - 3.2), 0, 0);
+  };
+  kick(H.legL, H.shinL, H.footL, 0.55, 0);
+  kick(H.legR, H.shinR, H.footR, 0.2, Math.PI);
+  // spine and neck: a slow twist and sway; the head turned up toward the sun
+  H.chest.rotation.set(-0.2 + 0.12 * S(2, 0.5), 0.13 * S(2, 1.5), 0.08 * S(3));
+  H.head.rotation.set(-0.55 + 0.15 * S(2, 1.0), 0.3 + 0.15 * S(2, 2.0), 0.08 * S(3, 1));
+  if (H.scarf) H.scarf.rotation.set(-1.4 + 0.25 * S(7), 0, 0.2 * S(5));   // streaming up off him
   H.group.updateMatrixWorld(true);
 }
 
