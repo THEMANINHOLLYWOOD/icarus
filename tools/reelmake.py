@@ -76,10 +76,12 @@ if TEXT:
   spaced('ICARUS', title, 418, (255, 236, 214), 30)
   spaced('THE LAST EMBER', sub, 528, (255, 176, 96), 11)
   spaced('justkeepflying.com', url, 572, (232, 220, 200), 3)
-for p in [os.path.join(OUT, f'{NAME}-share-1200x630.jpg'), os.path.join(OG, 'icarus-share.jpg')]: img.save(p, quality=90, optimize=True, progressive=True)
+SITE = os.environ.get('OG', '1') == '1'   # (OG=0: leave the site's share files alone)
+for p in [os.path.join(OUT, f'{NAME}-share-1200x630.jpg')] + ([os.path.join(OG, 'icarus-share.jpg')] if SITE else []): img.save(p, quality=90, optimize=True, progressive=True)
 # and a square still of the same moment, for posts
 Image.open(os.path.join(WORK, f'{min(pick, N - 1):05d}.png')).save(os.path.join(OUT, f'{NAME}-still-1080.jpg'), quality=92)
 # the loop for the page's own share card (small enough to serve)
-import shutil; shutil.copy(os.path.join(OUT, f'{NAME}-720.mp4'), os.path.join(OG, 'icarus-loop.mp4'))
+import shutil
+if SITE: shutil.copy(os.path.join(OUT, f'{NAME}-720.mp4'), os.path.join(OG, 'icarus-loop.mp4'))
 for f in [f'{NAME}-1080.mp4', f'{NAME}-720.mp4', f'{NAME}.gif', f'{NAME}-share-1200x630.jpg', f'{NAME}-still-1080.jpg']:
     print(f, round(os.path.getsize(os.path.join(OUT, f)) / 1e6, 2), 'MB')
