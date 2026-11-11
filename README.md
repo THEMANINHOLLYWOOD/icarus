@@ -43,4 +43,4 @@ describe what you changed and how you checked it.
 ## Licence
 
 Code: MIT. Music, voices, sound effects, video and icons: all rights reserved,
-included so the game runs. See [LICENSE](LICENSE).
+included so the game runs. See [LICENSE](LICENSE) and [MEDIA-LICENSE.md](MEDIA-LICENSE.md).
