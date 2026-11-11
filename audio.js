@@ -552,6 +552,39 @@ export function createAudio() {
       for (let i = 0; i < 5; i++) nz(brown, { t: t + 0.05 + i * rnd(0.4, 0.75), dur: rnd(0.9, 1.6), type: 'lowpass', f0: rnd(180, 340), f1: 70, a: 0.05, vol: 0.9 - i * 0.14, dest: sfxWet, pan: rnd(-0.4, 0.4), rate: 0.6 });
       tn({ t, dur: 2.2, f0: 52, f1: 28, a: 0.02, vol: 0.5 });
     },
+    // Through a ring of light: the air tearing past as he threads it, the hoop catching with a soft whoomp and a crackle,
+    // and a bell that climbs one step of the scale with every ring in the line — a fifth above it when he went through the
+    // heart, and the whole chord when the line is done.
+    ring(i = 0, perfect = false, last = false) {
+      if (!ctx) return; const t = T();
+      const steps = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24], f = 392 * Math.pow(2, steps[Math.min(i, steps.length - 1)] / 12);
+      nz(white, { t, dur: 0.42, f0: 4800, f1: 650, q: 0.8, a: 0.008, vol: 0.34 });
+      nz(pink, { t, dur: 0.55, type: 'lowpass', f0: 2800, f1: 260, a: 0.015, vol: 0.42 });
+      nz(brown, { t: t + 0.03, dur: 0.95, type: 'lowpass', f0: 170, f1: 1700, f2: 240, tf: 0.22, a: 0.04, vol: 0.6 });
+      nz(crackle, { t: t + 0.07, dur: 1.5, type: 'highpass', f0: 1400, a: 0.07, vol: 0.3, lp: 8000 });
+      smp('ignite', 0.32, 1.2 + Math.min(i, 8) * 0.03, t + 0.02);
+      tn({ t, dur: 0.5, f0: 110, f1: 52, a: 0.01, vol: perfect ? 0.45 : 0.3 });
+      bell(f, t + 0.02, perfect ? 0.13 : 0.09, sfxWet);
+      bell(f * 2, t + 0.05, 0.028, sfxWet);
+      if (perfect) bell(f * 1.5, t + 0.1, 0.07, sfxWet);
+      if (last) [1, 1.25, 1.5, 2, 2.5].forEach((m, k) => bell(f * m / 2, t + 0.3 + k * 0.085, 0.06, sfxWet));
+    },
+    // Zeus does not speak; this is how he talks. A strike on top of him: the tear, a blast of white noise, the recorded
+    // thunder twice over (one a little slower, so it is huge and wide), a sub-bass blow you feel more than hear, and a long
+    // roll away across the mountains — with everything else ducked out of its way, so nothing in the game is louder.
+    zeus(big = true) {
+      if (!ctx) return; const t = T(), k = big ? 1 : 0.75;
+      duckUntil = Math.max(duckUntil, ctx.currentTime + (big ? 3.2 : 2.2));
+      nz(white, { t, dur: 0.3, type: 'highpass', f0: 2600, f1: 800, a: 0.001, vol: 1.2 * k, lp: 11000 });
+      nz(white, { t: t + 0.02, dur: 0.9, f0: 2000, f1: 220, q: 0.45, a: 0.002, vol: 1.1 * k, dest: sfxWet });
+      for (let i = 0; i < 8; i++) nz(white, { t: t + 0.03 + i * rnd(0.02, 0.07), dur: 0.06, type: 'highpass', f0: rnd(2500, 6000), a: 0.001, vol: rnd(0.5, 0.9) * k, pan: rnd(-0.8, 0.8) });
+      smp('crack', 1.2 * k, rnd(0.92, 1.0), t, sfxWet);
+      smp('thunder', 1.3 * k, rnd(0.82, 0.9), t + 0.04, sfxWet);
+      smp('thunder', 0.9 * k, rnd(0.68, 0.74), t + 0.32, sfxWet);
+      tn({ t, dur: 2.8, f0: 70, f1: 22, tf: 0.5, a: 0.003, vol: 1.3 * k });
+      tn({ t: t + 0.05, dur: 1.4, f0: 41, f1: 24, a: 0.01, vol: 1.1 * k });
+      for (let i = 0; i < 7; i++) nz(brown, { t: t + 0.25 + i * rnd(0.35, 0.7), dur: rnd(1.2, 2.2), type: 'lowpass', f0: rnd(160, 320), f1: 55, a: 0.06, vol: (1.1 - i * 0.13) * k, dest: sfxWet, pan: rnd(-0.7, 0.7) });
+    },
     crack() {   // lightning right beside him: the tearing crack first, then everything it shakes loose
       if (!ctx) return; const t = T();
       if (smp('crack', 1, rnd(0.95, 1.05), t, sfxWet)) { tn({ t, dur: 1.4, f0: 90, f1: 26, tf: 0.3, a: 0.004, vol: 0.8 }); return; }

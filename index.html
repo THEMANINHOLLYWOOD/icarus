@@ -8,6 +8,23 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="description" content="Icarus fell. He woke on Olympus. A story game in endless ASCII country: walk as a boy, burn into a phoenix, and go looking for your father.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Icarus — The Last Ember">
+<meta property="og:title" content="Icarus — The Last Ember">
+<meta property="og:description" content="Icarus fell. He woke on Olympus. A story game in endless ASCII country: walk as a boy, burn into a phoenix, and go looking for your father.">
+<meta property="og:url" content="https://justkeepflying.com/">
+<meta property="og:image" content="https://justkeepflying.com/og/icarus-dust-share.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A phoenix made of the letters ICARUS, flying across the setting sun">
+<meta property="og:video" content="https://justkeepflying.com/og/icarus-dust-loop.mp4">
+<meta property="og:video:type" content="video/mp4">
+<meta property="og:video:width" content="720">
+<meta property="og:video:height" content="720">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Icarus — The Last Ember">
+<meta name="twitter:description" content="Icarus fell. He woke on Olympus. A story game in endless ASCII country: walk as a boy, burn into a phoenix, and go looking for your father.">
+<meta name="twitter:image" content="https://justkeepflying.com/og/icarus-dust-share.jpg">
 <title>Icarus — The Last Ember</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -52,7 +69,11 @@
   #proSub b { display:block; font-weight:400; font-size:10px; letter-spacing:.3em; text-transform:uppercase; color:var(--ember); margin-bottom:4px; }
   #proSkip { position:fixed; right:calc(18px + env(safe-area-inset-right, 0px)); bottom:calc(var(--sb) + 16px); z-index:6; font-size:9px; letter-spacing:.25em; text-transform:uppercase; color:var(--dim);
     opacity:0; transition:opacity .4s; pointer-events:none; }
-  .pro #proSkip { opacity:.55; } .pro #proSkip.hot { opacity:1; color:var(--ember); }
+  .pro #proSkip { opacity:.55; pointer-events:auto; cursor:pointer; padding:10px 0 10px 14px; } .pro #proSkip.hot { opacity:1; color:var(--ember); }
+  #proAct { position:fixed; left:50%; bottom:calc(var(--sb) + max(24vh, 120px)); transform:translateX(-50%); z-index:6; pointer-events:none; white-space:nowrap;
+    font-size:12px; letter-spacing:.5em; padding-left:.5em; color:var(--ember); text-shadow:0 0 14px rgba(255,120,40,.6), 0 0 3px #000; opacity:0; transition:opacity .5s; }
+  #proAct.show { opacity:1; animation:proPulse 1.6s ease-in-out infinite; }
+  @keyframes proPulse { 0%,100% { opacity:.55; } 50% { opacity:1; } }
   #hud > * { transition:opacity .8s; }
   .cinema #hud > *:not(#dialog):not(#warn):not(#talk) { opacity:0; }
   /* a conversation is subtitles too: their name, their words, his words small above; the place to type is one faint line */
@@ -92,16 +113,47 @@
   .mk { position:absolute; transform:translate(-50%, -100%); text-align:center; font-size:11px; white-space:nowrap; letter-spacing:.08em; }
   .mk b { display:block; font-size:17px; color:#bfe6ff; }
   .mk.lit b { color:#ffc46a; }
+  .mk.wp { transform:translate(-50%, -50%); font-size:10px; letter-spacing:.14em; text-shadow:0 0 4px #000, 0 0 10px rgba(0,0,0,.6); transition:opacity .3s; }
+  .mk.wp b { font-size:12px; color:inherit; line-height:1.1; }
+  .mk.wp.far { font-size:9px; opacity:.72; } .mk.wp.edge { opacity:.85; }
+  #who { position:fixed; left:50%; top:calc(var(--sb, 0px) + 9vh); transform:translate(-50%, -6px); z-index:7; min-width:min(380px, 88vw); max-width:92vw;
+    padding:14px 18px 12px; background:rgba(6,7,12,.78); border:1px solid rgba(255,190,140,.18); border-radius:3px; pointer-events:none;
+    font-size:11px; letter-spacing:.12em; color:var(--ink); opacity:0; transition:opacity .18s, transform .18s; backdrop-filter:blur(3px); }
+  #who.on { opacity:1; transform:translate(-50%, 0); }
+  #who h4 { margin:0 0 10px; font-weight:400; font-size:10px; letter-spacing:.4em; color:var(--dim); text-align:center; }
+  #who .r { display:grid; grid-template-columns:16px 1fr auto 64px 18px; gap:10px; align-items:center; padding:4px 0; border-top:1px solid rgba(255,255,255,.05); white-space:nowrap; }
+  #who .r:first-of-type { border-top:none; }
+  #who .r i { font-style:normal; text-align:right; color:var(--dim); } #who .r u { text-decoration:none; color:var(--dim); font-size:10px; } #who .r em { font-style:normal; text-align:center; }
+  #who .none { text-align:center; color:var(--dim); padding:6px 0 2px; }
+  #whoBtn { position:fixed; right:calc(12px + env(safe-area-inset-right, 0px)); top:calc(var(--sb, 0px) + 12px); z-index:6; height:28px; padding:0 11px; border-radius:14px;
+    border:1px solid rgba(255,200,140,.3); background:rgba(0,0,0,.45); color:#ffd8a8; font:inherit; font-size:10px; letter-spacing:.2em; display:none; cursor:pointer; }
+  .touch #whoBtn.some { display:block; }
   #title, #loading, #end { position:fixed; inset:0; z-index:9; display:flex; flex-direction:column; align-items:center; justify-content:center;
     text-align:center; padding:16px; box-sizing:border-box; }
-  #title { background:radial-gradient(ellipse at center, rgba(5,7,13,.62), rgba(5,7,13,.82)); cursor:pointer; }
+  #title { background:linear-gradient(to bottom, rgba(5,7,13,.5), rgba(5,7,13,0) 34%, rgba(5,7,13,0) 62%, rgba(5,7,13,.72)); cursor:pointer; justify-content:flex-start;
+    padding:max(7vh, 34px) 16px max(3vh, 16px); -webkit-user-select:none; user-select:none; touch-action:none; }
+  #title .mark { text-align:center; opacity:0; transform:translateY(-10px); transition:opacity 2.4s .3s, transform 2.4s .3s; }
+  #title.ready .mark { opacity:1; transform:none; }
+  #title h1 { margin:0; font-weight:600; font-size:clamp(46px, 12vw, 150px); letter-spacing:.32em; padding-left:.32em; line-height:1; color:#ffb070;
+    text-shadow:0 0 28px rgba(255,90,30,.75), 0 0 90px rgba(255,60,20,.45), 0 2px 0 rgba(0,0,0,.4); }
+  #title .flyhint { position:absolute; left:50%; top:80%; transform:translateX(-50%); font-size:12px; letter-spacing:.6em; padding-left:.6em; color:#ffd8a8;
+    text-shadow:0 0 10px rgba(255,110,40,.8), 0 0 3px #000; animation:blink 1.8s infinite; white-space:nowrap; transition:opacity .8s; pointer-events:none; }
+  #title.flown .flyhint { opacity:0; animation:none; }
+  #title #nameRow { margin:auto 0 0; opacity:0; transform:translateY(14px); transition:opacity 1.2s, transform 1.2s; pointer-events:none; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  #title.asked #nameRow { opacity:1; transform:none; pointer-events:auto; }
+  #title .go { font:inherit; font-size:12px; letter-spacing:.45em; padding:9px 18px 9px calc(18px + .45em); background:rgba(10,8,8,.35); color:#ffd8a8; border:1px solid rgba(255,170,110,.45);
+    border-radius:2px; cursor:pointer; text-shadow:0 0 8px #000; }
+  #title .go:hover, #title .go:focus-visible { background:rgba(255,110,40,.18); border-color:#ffb070; outline:none; }
+  #title .foot { display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:3.2vh; opacity:0; transition:opacity 2s 1.2s; }
+  #title.ready .foot { opacity:1; }
+  #title .foot .keys { margin:0; }
   #title pre, #end pre { font-family:inherit; font-size:clamp(8px, 3vw, 18px); line-height:1.15; color:var(--ember);
     text-shadow:0 0 18px rgba(255,120,40,.65); margin:0 0 18px; }
   #title .sub { letter-spacing:.4em; font-size:13px; margin-bottom:40px; text-shadow:0 0 8px #000; }
-  #title .go { font-size:13px; letter-spacing:.18em; animation:blink 1.6s infinite; text-shadow:0 0 8px #000; }
+
   #title .keys { margin-top:28px; font-size:11px; color:var(--dim); line-height:1.8; text-shadow:0 0 6px #000; }
   #loading { background:#05070d; font-size:13px; letter-spacing:.2em; color:var(--dim); }
-  #nameRow { margin:-14px 0 30px; pointer-events:auto; font-size:11px; letter-spacing:.3em; color:var(--dim); text-shadow:0 0 6px #000; cursor:default; }
+  #nameRow { margin:0; pointer-events:auto; font-size:11px; letter-spacing:.3em; color:var(--dim); text-shadow:0 0 6px #000; cursor:default; }
   #nameRow label { display:block; margin-bottom:6px; color:var(--ink); }
   #nameInput { background:none; border:none; border-bottom:1px solid rgba(244,234,210,.4); border-radius:0; color:var(--ember); font:inherit; font-size:22px; letter-spacing:.3em;
     text-align:center; text-transform:uppercase; width:min(320px, 72vw); padding:4px 0 6px; outline:none; -webkit-user-select:text; user-select:text; caret-color:var(--ember); }
@@ -192,23 +244,25 @@
 <div id="bars"><i></i><i></i></div>
 <div id="toast"></div>
 <div id="card"><b></b><i></i></div>
-<div id="proSub"><b></b><span></span></div><div id="proSkip"></div>
+<div id="proSub"><b></b><span></span></div><div id="proSkip"></div><div id="proAct"></div>
+<div id="who"></div><button id="whoBtn" type="button"></button>
 <div id="map"><canvas id="mapC"></canvas><div id="mapTitle"></div><div id="mapHint"></div></div>
 
 
 <div id="title" class="hidden">
-<pre> ___ ____    _    ____  _   _ ____
-|_ _/ ___|  / \  |  _ \| | | / ___|
- | | |     / _ \ | |_) | | | \___ \
- | | |___ / ___ \|  _ &lt;| |_| |___) |
-|___\____/_/   \_\_| \_\\___/|____/</pre>
-  <div class="sub">THE LAST EMBER</div>
-  <div id="nameRow"><label for="nameInput">what is your name?</label><input id="nameInput" maxlength="12" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go"></div>
-  <div class="go">[ click or press any key to begin ]</div>
-  <div class="keys">sound on · microphone on · M opens the map</div>
-  <div class="keys hidden" id="newGame" style="margin-top:14px; pointer-events:auto; cursor:pointer">[ N — start a new life ]</div>
-  <div class="keys hidden" id="xrRow" style="margin-top:16px; pointer-events:auto; cursor:pointer; color:#ffc46a; letter-spacing:.25em">[ ◎ FLY WITH YOUR BODY · IMMERSIVE ]</div>
-  <div class="keys" id="codeRow" style="margin-top:14px; pointer-events:auto; opacity:.7">your travel code · <b id="codeShow" style="letter-spacing:.2em; user-select:all; cursor:text"></b> · <u id="codeUse" style="cursor:pointer">come back with yours</u></div>
+  <div class="mark"><h1>ICARUS</h1><div class="sub">THE LAST EMBER</div></div>
+  <div class="flyhint" id="flyHint">SPACE TO FLY</div>
+  <div id="nameRow">
+    <label for="nameInput" id="nameAsk">what is your name?</label>
+    <input id="nameInput" maxlength="12" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go">
+    <button class="go" id="goBtn" type="button">BEGIN</button>
+  </div>
+  <div class="foot">
+    <div class="keys" id="titleKeys">sound on · microphone on · M opens the map</div>
+    <div class="keys hidden" id="newGame" style="pointer-events:auto; cursor:pointer">[ N — start a new life ]</div>
+    <div class="keys hidden" id="xrRow" style="pointer-events:auto; cursor:pointer; color:#ffc46a; letter-spacing:.25em">[ ◎ FLY WITH YOUR BODY · IMMERSIVE ]</div>
+    <div class="keys" id="codeRow" style="pointer-events:auto; opacity:.7">your travel code · <b id="codeShow" style="letter-spacing:.2em; user-select:all; cursor:text"></b> · <u id="codeUse" style="cursor:pointer">come back with yours</u></div>
+  </div>
 </div>
 
 <div id="turn"><div class="ph"></div><b>TURN YOUR PHONE</b><i>icarus flies sideways</i></div>
@@ -311,6 +365,9 @@ const INTRO = [
   { text: 'Why am I me?', say: '[almost a whisper] Why am I me?', voice: 'hero', clip: 'whyme', title: '' },
   { text: 'I have to find my dad.', say: '[steadier, getting up] I have to find my dad.', voice: 'hero', clip: 'find', title: '' },
 ];
+// his first words on the mountain (Zeus has none: he speaks in lightning — see zeusSpeaks)
+const WHERE = { text: 'Where am I? … Where am I?', say: '[dazed, frightened, barely above a breath] Where am I?', voice: 'hero', clip: 'where', title: '' };
+const ZEUS = (big = false, pause = 1.3) => ({ zeus: true, big, pause, text: '' });
 const LET_GO = { text: 'I have to let go.', say: '[a long breath out] I have to let go.', voice: 'hero', clip: 'letgo' };
 const OH_NO = { text: 'Oh fuck.', say: '[sharp, panicked] Oh fuck.', voice: 'hero', clip: 'ohno' };
 const GODS_INTRO = [
@@ -1683,10 +1740,30 @@ function tube(pts, radii, sides = 10, ringCols = null, sn = 1, sb = 1) {
 
 // Icarus: a boy in a short chiton and sandals, a torn red cloak, the harness of his father's wings still strapped across
 // his chest and a few wax-stuck feathers left on his arms. Jointed from the hips so he can crouch, burn, tumble and face-plant.
+// Lit like a painting rather than a photograph: three flat bands of light (lit, half, shadow) the way the Zelda games
+// are, and a thin dark line around every part of him, drawn as the back faces of a slightly fattened copy. The glyphs
+// read that as clean shapes and a crisp outline.
+const TOON_RAMP = (() => { const t = new THREE.DataTexture(new Uint8Array([140, 140, 140, 255, 190, 190, 190, 255, 236, 236, 236, 255, 255, 255, 255, 255]), 4, 1, THREE.RGBAFormat);
+  t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; return t; })();
+const INK = (() => {
+  const m = new THREE.MeshBasicMaterial({ color: 0x150b07, side: THREE.BackSide });
+  m.customProgramCacheKey = () => 'ink';
+  m.onBeforeCompile = sh => { sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += normal * 0.012;'); };
+  return m;
+})();
+function inkOutline(root) {
+  const list = [];
+  root.traverse(o => { if (o.isMesh && !(o.material instanceof THREE.MeshBasicMaterial) && !o.userData.noInk && o.geometry.type !== 'PlaneGeometry' && o.geometry.attributes.normal) list.push(o); });
+  for (const o of list) {
+    o.geometry.computeBoundingSphere();
+    if (o.geometry.boundingSphere.radius * Math.max(o.scale.x, o.scale.y, o.scale.z) < 0.045) continue;   // (not the small things: eyes, lids, brows, ears)
+    const ink = new THREE.Mesh(o.geometry, INK); ink.userData.ink = true; ink.castShadow = false; o.add(ink);
+  }
+}
 function makeHuman(mask = true) {
   const g = new THREE.Group();
   const rig = new THREE.Group(); rig.position.y = 1.0; g.add(rig);
-  const L = (c, o) => { const m = new THREE.MeshLambertMaterial({ color: c, ...o }); return mask ? heroMask(m) : m; };
+  const L = (c, o) => { const m = new THREE.MeshToonMaterial({ color: c, gradientMap: TOON_RAMP, ...o }); return mask ? heroMask(m) : m; };
   const skin = L(0xd9a57a), cloth = L(0xf2ead8), clothIn = L(0xd9ceb6, { side: THREE.DoubleSide }), leather = L(0x6a4a30), hair = L(0x2a1a12),
     bronze = L(0xc8a050), wax = L(0xf6f2e6, { side: THREE.DoubleSide }), sashMat = L(0xd24a1e, { side: THREE.DoubleSide });
   const M = (geo, mat, x = 0, y = 0, z = 0, parent = rig) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
@@ -1722,8 +1799,11 @@ function makeHuman(mask = true) {
   { const nose = M(new THREE.ConeGeometry(0.024, 0.07, 5), skin, 0, 0.085, -0.148, head); nose.rotation.x = -1.2; }
   for (const s of [-1, 1]) {
     M(sph(0.03, 6, 5), skin, s * 0.133, 0.09, 0.005, head).scale.set(0.5, 1, 0.8);
-    M(sph(0.017, 6, 4), new THREE.MeshBasicMaterial({ color: 0x1a1410 }), s * 0.052, 0.112, -0.129, head);
-    lids.push(M(sph(0.021, 7, 5, ), skin, s * 0.052, 0.118, -0.127, head)); lids[lids.length - 1].scale.set(1, 0.05, 0.6);
+    // eyes that read from a distance: a white, and a large dark iris with a point of light in it
+    M(sph(0.026, 12, 8), new THREE.MeshBasicMaterial({ color: 0xf2ece0 }), s * 0.054, 0.11, -0.124, head).scale.set(1.05, 0.82, 0.45);
+    M(sph(0.0165, 10, 8), new THREE.MeshBasicMaterial({ color: 0x24160e }), s * 0.052, 0.108, -0.134, head).scale.set(0.95, 1.1, 0.5);
+    M(sph(0.0045, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffffff }), s * 0.048, 0.114, -0.1405, head);
+    lids.push(M(sph(0.028, 10, 6), skin, s * 0.054, 0.12, -0.122, head)); lids[lids.length - 1].scale.set(1.05, 0.05, 0.6);
     M(new THREE.BoxGeometry(0.055, 0.013, 0.02), hair, s * 0.052, 0.148, -0.132, head);
   }
   M(new THREE.SphereGeometry(0.157, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), hair, 0, 0.105, 0.012, head).scale.set(0.95, 1.06, 1.04);
@@ -1800,6 +1880,7 @@ function makeHuman(mask = true) {
   const scarf = M(new THREE.PlaneGeometry(0.11, 0.52).translate(0, -0.26, 0), sashMat, 0, 0, 0, sashHold);
   rig.traverse(o => { if (o.isMesh) o.castShadow = true; });
   const mats = [skin, cloth, clothIn, leather, hair, bronze, wax, cMat, sashMat];
+  inkOutline(rig);
   return { group: g, rig, chest, head, mouth, lids, legL, legR, shinL, shinR, footL, footR, armL, armR, foreL, foreR, handL, handR, scarf, cape, capeLen, capeBase: Float32Array.from(capeGeo.attributes.position.array),
     mats, base: mats.map(m => m.color.clone()), baseE: mats.map(m => m.emissive.clone()) };
 }
@@ -1851,7 +1932,8 @@ function makeFireMat(tint, k) {
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uTint; uniform float uTintK;')
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>
         { float L = dot(gl_FragColor.rgb, vec3(0.35, 0.5, 0.15));
-          vec3 t = uTint * L * 1.9 + vec3(max(L - 1.5, 0.0) * 0.45);
+          vec3 deep = uTint * L * 1.75, gold = mix(uTint, vec3(1.0, 0.76, 0.36), 0.7) * L * 1.45;
+          vec3 t = mix(deep, gold, smoothstep(0.9, 1.75, L)) + vec3(max(L - 1.95, 0.0) * 0.4);
           gl_FragColor.rgb = mix(gl_FragColor.rgb, t, uTintK); }
         gl_FragColor.a = 0.5;`);
     // uv.x runs root→tip along each feather, uv.y is the feather's own number: tips shiver and flare, each out of step with the next
@@ -2038,7 +2120,7 @@ scene.add(human.group, phoenix.group);
 const MAN_SCALE = 1.88 / 2.09;
 // the half-form: a man hanging under the phoenix's own wings, six metres a side
 const WING_S = 0.6, PHX_S = 1.55;
-human.wings = new THREE.Group(); human.wings.position.set(0, 0.62, 0.2); human.wings.visible = false;
+human.wings = new THREE.Group(); human.wings.position.set(0, 0.6, 0.07); human.wings.visible = false;   // (on his shoulders, over the arms that are strapped to them)
 human.wingParts = [-1, 1].map(side => { const w = makeWing(); w.root.scale.x = side < 0 ? 1 : -1; human.wings.add(w.root); return w; });
 human.rig.add(human.wings);
 // fire streaming off the wingtips
@@ -2747,6 +2829,17 @@ function witness(text) {
   if (story.events.length > 40) story.events.shift();
   saveSoon();
 }
+function setManWingsLR(fL, fR, foldL, foldR, sweepL, sweepR, open, pitch) {
+  human.wings.visible = open > 0.01;
+  human.wings.scale.setScalar(WING_S * (0.12 + 0.88 * backOut(Math.min(1, open))));
+  human.wings.rotation.x = -human.rig.rotation.x + pitch;
+  human.wings.rotation.z = -human.rig.rotation.z * 0.5;
+  human.wingParts.forEach((w, i) => {
+    const f = i === 0 ? fL : fR, fold = i === 0 ? foldL : foldR, sweep = i === 0 ? sweepL : sweepR;
+    w.shoulder.rotation.z = -f; w.elbow.rotation.z = -fold; w.wrist.rotation.z = -fold * 0.6;
+    w.root.rotation.y = sweep * (i === 0 ? 1 : -1); w.elbow.rotation.y = sweep * 0.3 * (i === 0 ? 1 : -1); w.wrist.rotation.y = sweep * 0.5;
+  });
+}
 function setManWings(f, fold, sweep, open, pitch) {
   human.wings.visible = open > 0.01;
   human.wings.scale.setScalar(WING_S * (0.12 + 0.88 * backOut(Math.min(1, open))));
@@ -2787,7 +2880,7 @@ function loseWings() {
 function landWinged(hs, vy, water) {
   const p = player, kmh = Math.round(Math.hypot(hs, vy) * 3.6);
   p.wings = false; p.fallTop = p.pos.y;
-  setManWings(0, 0, 0, 0, 0);
+  p.wingStow = 1;   // (they fold away over the next half second: see updateHuman)
   if (p.quick && !water) {   // the swoop: hit the ground rolling
     p.quick = false; p.rollT = ROLL_T; p.vel.y = 0;
     const sp = Math.min(hs, 16) / (hs || 1); p.vel.x *= sp; p.vel.z *= sp;
@@ -3031,19 +3124,48 @@ function updateHuman(dt) {
     human.legL.rotation.x = lerp(human.legL.rotation.x, up * 0.75 + Math.sin(time * 3) * 0.06, damp(6, dt));
     human.legR.rotation.x = lerp(human.legR.rotation.x, up * 0.5 - Math.sin(time * 3) * 0.06, damp(6, dt));
     human.shinL.rotation.x = human.shinR.rotation.x = -0.2 - up * 0.5;
-    human.armL.rotation.set(0, 0, -0.45 - up * 0.6); human.armR.rotation.set(0, 0, 0.45 + up * 0.6);
-    human.foreL.rotation.x = human.foreR.rotation.x = 0.4;
     human.head.rotation.x = lerp(human.head.rotation.x, lerp(0.7, -0.1, up), damp(5, dt));
     human.scarf.rotation.x = 1.6 + Math.sin(time * 14) * 0.2;
-    const beat = flare > 0.1 ? Math.sin(time * 9) * 0.3 * flare : Math.sin(time * 1.3) * 0.03;
-    setManWings(0.2 + up * 0.28 + beat - tuck * 0.15, 0.05 + tuck * 0.55, tuck * 0.85, p.wingOpen, up * 0.4 - tuck * 0.2);
+    // The wings are worked like wings. Held out, they only breathe and trim. When he brakes — or the ground comes up —
+    // they beat: a hard, fast downstroke with the hand spread wide, a slower upstroke with the wrist folded to slip back
+    // through the air; harder braking, quicker strokes. In a turn the inside wing drops and half-folds and the outside one
+    // lifts; diving, both sweep back. His arms reach up and out along them, holding on.
+    const work = Math.max(flare, near * 0.85);
+    p.wbRate = lerp(p.wbRate || 0, work > 0.12 ? 1.5 + work * 1.7 : 0, damp(3, dt));
+    p.wbPh = ((p.wbPh || 0) + dt * p.wbRate) % 1;
+    const amp = clamp((p.wbRate - 0.3) / 1.2, 0, 1) * Math.min(1, 0.4 + work), ph = p.wbPh, down = ph < 0.4, u = down ? ph / 0.4 : (ph - 0.4) / 0.6;
+    const ease = x => x * x * (3 - 2 * x);
+    const stroke = amp * (down ? lerp(0.95, -0.6, ease(u)) : lerp(-0.6, 0.95, ease(u)));
+    const wfold = amp * (down ? 0 : Math.sin(u * Math.PI) * 0.85);
+    if (amp > 0.15 && down && !p.wbDown) {
+      audio.sfx.flap(0.45 + amp * 0.5);
+      for (const sd of [-1, 1]) { human.wings.localToWorld(_v.set(sd * 9, -0.4, 0.6)); for (let i = 0; i < 6; i++) emit(_v.x, _v.y, _v.z, rnd(3), -3 - Math.random() * 5, rnd(3), 0.6, pick(EMBER)); }
+    }
+    p.wbDown = down;
+    const breathe = Math.sin(time * 1.3) * 0.035 + Math.sin(time * 3.1) * 0.015, dihedral = 0.17 + up * 0.16 - tuck * 0.2, b = clamp(ix, -1, 1);
+    const fL = dihedral + stroke + breathe + b * 0.22, fR = dihedral + stroke + breathe - b * 0.22;
+    const foldL = 0.05 + tuck * 0.6 + wfold + Math.max(0, -b) * 0.3, foldR = 0.05 + tuck * 0.6 + wfold + Math.max(0, b) * 0.3;
+    const sweepBase = tuck * 0.85 - (down ? 0.12 : -0.08) * amp;
+    setManWingsLR(fL, fR, foldL, foldR, sweepBase, sweepBase, p.wingOpen, up * 0.45 - tuck * 0.2 + stroke * 0.08);
+    // his arms lie along the leading edge of each wing (that is where the straps are): out to the sides, sweeping with
+    // every stroke, drawn in against his ribs when he dives
+    const reach = lerp(1.62 + stroke * 0.55, 0.42, tuck);
+    human.armL.rotation.set(0.05, 0, -reach - b * 0.15); human.armR.rotation.set(0.05, 0, reach - b * 0.15);
+    human.foreL.rotation.x = human.foreR.rotation.x = 0.12 + wfold * 0.85 + tuck * 0.9;
     if (Math.random() < 0.5) {
       human.wings.localToWorld(_v.set((Math.random() < 0.5 ? -1 : 1) * 12.5, 0, 0.6));
       emit(_v.x, _v.y, _v.z, rnd(1), rnd(1), rnd(1), 0.6, EMBER[0]);
     }
     return;
   }
-  if (human.wings.visible) setManWings(0, 0, 0, 0, 0);
+  if (human.wings.visible) {
+    // down: the wings fold in against his back and burn away, rather than vanishing
+    p.wingStow = Math.max(0, (p.wingStow ?? 0) - dt * 2.2);
+    if (p.wingStow <= 0 || p.tumble) {
+      setManWings(0, 0, 0, 0, 0);
+      for (let i = 0; i < 40; i++) emit(p.pos.x + rnd(1.2), p.pos.y + 1.6 + rnd(0.5), p.pos.z + rnd(1.2), rnd(3), 1 + Math.random() * 3, rnd(3), 0.7, pick(EMBER));
+    } else { const k = p.wingStow; setManWings(0.55 * k, 0.2 + 1.1 * (1 - k), 0.95 * (1 - k), Math.max(0.02, k), 0.25); }
+  }
   if (p.tumble) { skydive(dt); return; }
   p.skyK = 0;
   bodyLanguage(dt, hs, swimming);
@@ -3649,7 +3771,8 @@ function paintPeer(P) {
   const c = new THREE.Color(PEER_COLS[P.slot]);
   A.fire.userData.tint.value.copy(c);
   A.cape.color.copy(c).multiplyScalar(0.55); A.cape.emissive.copy(c).multiplyScalar(0.22);
-  if (P.label) P.label.style.color = `#${c.getHexString()}`;
+  P.css = `#${c.getHexString()}`;
+  if (P.label) P.label.style.color = P.css;
 }
 function avatarOf(P) {
   if (P.av) return P.av;
@@ -3691,10 +3814,57 @@ function updatePeers(dt) {
       if (Math.random() < 0.5) emit(P.pos.x + rnd(1), P.pos.y + rnd(0.5), P.pos.z + rnd(1), rnd(3) - P.s.vx * 0.3, rnd(2), rnd(3) - P.s.vz * 0.3, 0.4, pick(EMBER));
     } else animPeer(P, A.man, dt, sp);
     // their name over them; what they just said, under it
-    const d = camera.position.distanceTo(P.pos), said = now - P.saidT < 5500 ? P.said : '';
-    placeMarker(P.label, P.pos.x, P.pos.y + (bird ? 5 : 2.6), P.pos.z, d < (said ? 400 : 2500), said ? '“' : '✦', said ? `${P.name}: ${said}` : `${P.name}${d > 60 ? ' · ' + fmtDist(d) : ''}`, !!said);
+    const d = camera.position.distanceTo(P.pos), said = now - P.saidT < 5500 && d < 400 ? P.said : '';
+    placeWaypoint(P, d, said, bird);
   }
 }
+// Wherever they are, there is a small mark for them in their own colour: over them when they are in view, and when
+// they are not, waiting at the edge of the screen with an arrow pointing the way (like a waypoint). Near, it says their
+// name; far, their name and how far; speaking, what they said.
+const WP_ARROWS = ['→', '↗', '↑', '↖', '←', '↙', '↓', '↘'];
+function placeWaypoint(P, d, said, bird) {
+  const el = P.label;
+  if (state === 'title' || state === 'prologue' || state === 'map' || state === 'photo') { el.style.display = 'none'; return; }
+  _v.set(P.pos.x, P.pos.y + (bird ? 5 : 2.6), P.pos.z).project(camera);
+  let x = _v.x, y = _v.y;
+  const behind = _v.z > 1;
+  if (behind) { x = -x; y = -y; if (Math.abs(x) < 1e-3 && Math.abs(y) < 1e-3) y = -1; }
+  const mx = 1 - 46 / innerWidth * 2, my = 1 - 40 / innerHeight * 2, edge = behind || Math.abs(x) > mx || Math.abs(y) > my;
+  if (edge) { const m = Math.max(Math.abs(x) / mx, Math.abs(y) / my, 1e-4); x /= m; y /= m; }
+  el.style.display = '';
+  el.style.left = ((x * 0.5 + 0.5) * innerWidth) + 'px'; el.style.top = ((-y * 0.5 + 0.5) * innerHeight) + 'px';
+  el.className = 'mk peer wp' + (edge ? ' edge' : '') + (d > 900 && !said ? ' far' : '') + (said ? ' lit' : '');
+  const glyph = edge ? WP_ARROWS[(Math.round(Math.atan2(y, x) / (Math.PI / 4)) + 8) % 8] : said ? '“' : '◆';
+  el.firstChild.textContent = glyph;
+  el.lastChild.textContent = said ? `${P.name}: ${said}` : d > 40 ? `${P.name} · ${fmtDist(d)}` : P.name;
+}
+// Hold Tab: everyone who is here right now, in their colours, with how far away they are and which way to turn.
+const who = { open: false, t: 0, pinned: false };
+function whoList() {
+  const now = performance.now(), me = realm === 'under' ? 1 : 0;
+  return [...NET.peers.values()].filter(P => P.s && now - P.s.t < 15000).map(P => {
+    const dx = P.pos.x - player.pos.x, dz = P.pos.z - player.pos.z, there = P.realm === me;
+    camera.getWorldDirection(_n);
+    const rel = wrapAngle(Math.atan2(dx, dz) - Math.atan2(_n.x, _n.z));
+    return { P, d: there ? Math.hypot(dx, P.pos.y - player.pos.y, dz) : Infinity, there, arrow: WP_ARROWS[(Math.round((Math.PI / 2 + rel) / (Math.PI / 4)) % 8 + 8) % 8] };
+  }).sort((a, b) => a.d - b.d);
+}
+function updateWho(dt) {
+  const el = $('who'), show = (who.open || who.pinned) && state !== 'title' && state !== 'loading' && state !== 'prologue';
+  el.classList.toggle('on', show);
+  const list = NET.peers.size ? whoList() : [];
+  const btn = $('whoBtn'); btn.classList.toggle('some', list.length > 0 && state === 'play'); btn.textContent = `◆ ${list.length + 1}`;
+  if (!show || (who.t -= dt) > 0) return;
+  who.t = 0.25;
+  const esc = t => String(t).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+  const row = (col, name, form, dist, arrow) => `<div class="r"><b style="color:${col}">◆</b><span style="color:${col}">${esc(name)}</span><u>${form}</u><i>${dist}</i><em>${arrow}</em></div>`;
+  const formOf = P => P.form === 'p' ? 'phoenix' : 'on foot';
+  let h = `<h4>IN THE SKY · ${list.length + 1}</h4>` + row('#ff1206', `${heroName} (you)`, player.form === 'phoenix' ? 'phoenix' : 'on foot', realm === 'under' ? 'below' : '', '·');
+  for (const w of list) h += row(w.P.css || '#bfe6ff', w.P.name, formOf(w.P), w.there ? fmtDist(w.d) : (w.P.realm ? 'below' : 'above'), w.there ? w.arrow : '');
+  if (!list.length) h += `<div class="none">${NET.on || NET.ch ? 'nobody else is flying right now' : 'not connected'}</div>`;
+  el.innerHTML = h;
+}
+$('whoBtn').addEventListener('click', e => { e.stopPropagation(); who.pinned = !who.pinned; who.t = 0; });
 // a body on its feet, from nothing but how fast it is going and whether it is on the ground
 function animPeer(P, H, dt, sp) {
   H.group.position.copy(P.pos); H.group.rotation.y = P.yaw;
@@ -3951,6 +4121,16 @@ function updatePhoenix(dt) {
 // Death loops: the body hits, the world goes dark — and he drops out of the sky onto the summit, face first.
 const death = { phase: '', t: 0 }, wake = START.clone();
 let camShake = 0;
+// Delete: give up, and be put back on top of Olympus. It is a death like any other — the thunder brings him back — only
+// chosen. From the underworld too: he comes back up to the mountain.
+function respawnTop() {
+  const p = player;
+  if (state !== 'play' || p.cine || story.phase === 'summit' && p.grounded) return;
+  if (realm === 'under') setRealm('over', START.x, START.z);
+  p.form = 'human'; p.wings = false; p.tumble = false; p.climb = null; p.riding = false; setManWings(0, 0, 0, 0, 0);
+  p.fallCause = ''; toast('BACK TO OLYMPUS');
+  die('smite', 0);
+}
 function die(how, kmh) {
   if (state !== 'play') return;
   const p = player, drop = Math.round(p.fallTop - p.pos.y);
@@ -3984,7 +4164,7 @@ function updateDeath(dt) {
       resetPose(); setBurn(0); human.group.rotation.y = Math.PI * 0.15; p.spin.set(1.2, 0, 0.4); p.skyK = 0.45;
       camera.position.set(wake.x + 4.5, wake.y + 1.2, wake.z - 8);
       death.phase = 'drop'; death.t = 0; f.style.opacity = 0;
-      spawnBolt(wake.x + 26, wake.y, wake.z + 32);   // every time he is put back, it is with thunder
+      zeusAt(wake.x + 26, wake.y, wake.z + 32);   // every time he is put back, it is with Zeus's thunder
     }
   } else if (death.phase === 'drop') {
     p.vel.y = Math.max(p.vel.y - 30 * dt, -62);
@@ -3998,6 +4178,7 @@ function updateDeath(dt) {
       human.armL.rotation.set(-2.6, 0, -0.5); human.armR.rotation.set(-2.6, 0, 0.5);
       audio.sfx.impact(); camShake = 1.3;
       for (let i = 0; i < 90; i++) emit(p.pos.x + rnd(1), p.pos.y + 0.2, p.pos.z + rnd(1), rnd(10), Math.random() * 7, rnd(10), 1.4, [1, 1, 1]);
+      if (death.first) { death.yaw0 = human.group.rotation.y; zeusAt(p.pos.x + 11, p.pos.y, p.pos.z + 14, true); }
     }
   } else if (death.phase === 'down') {
     if (death.t > 1.3) {
@@ -4007,6 +4188,19 @@ function updateDeath(dt) {
       human.armL.rotation.set(lerp(-2.6, 0, k), 0, lerp(-0.5, 0, k)); human.armR.rotation.set(lerp(-2.6, 0, k), 0, lerp(0.5, 0, k));
       human.legL.rotation.x = human.legR.rotation.x = Math.sin(k * Math.PI) * 0.8;
     }
+    if (death.first && death.t > 2.6) {
+      // up, and lost: turning on the spot, a hand going to his head, looking for anything he knows
+      const u = death.t - 2.6, hand = smoothstep(0.2, 0.9, u) * (1 - smoothstep(3.4, 4.2, u));
+      if (!death.asked) { death.asked = true; say([WHERE, ZEUS(), INTRO[0], INTRO[3], N('wind', 'The wind is going somewhere. Go with it.')]); }
+      human.group.rotation.y = death.yaw0 + Math.sin(u * 0.75) * 0.75 * smoothstep(0, 1, u);
+      human.head.rotation.y = Math.sin(u * 1.7 + 0.6) * 0.55; human.head.rotation.x = 0.12 + Math.sin(u * 1.1) * 0.1;
+      human.armR.rotation.set(-2.3 * hand, 0, 0.45 * hand); human.foreR.rotation.x = -1.5 * hand;
+      human.armL.rotation.set(0.15 * Math.sin(u * 2), 0, -0.12);
+      human.rig.rotation.z = Math.sin(u * 2.3) * 0.035; human.rig.rotation.x = 0.06 * hand;
+      human.legL.rotation.x = Math.sin(u * 2.6) * 0.12 * smoothstep(1, 2, u); human.legR.rotation.x = -human.legL.rotation.x;
+      if (death.t > 7.4) { death.first = false; respawn(); }
+      return;
+    }
     if (death.t > 2.7) respawn();
   }
 }
@@ -4015,8 +4209,8 @@ function respawn() {
   p.vel.set(0, 0, 0); p.grounded = true; p.tumble = false; p.fallTop = p.pos.y; p.safeT = 0;
   checkpoint.copy(p.pos); resetPose(); saveSoon();
   camYaw = human.group.rotation.y; state = 'play'; death.phase = '';
-  if (flags.deaths === 1) say([THUNDER[2], 'The fall doesn\'t keep you. You wake where Zeus set you down, face in the snow. The gods saw that, by the way.']);
-  else if (flags.deaths > 1 && Math.random() < 0.4 && realm === 'over') say([THUNDER[2]]);
+  if (flags.deaths === 1) say([ZEUS(), 'The fall doesn\'t keep you. You wake where Zeus set you down, face in the snow. The gods saw that, by the way.']);
+  else if (flags.deaths > 1 && Math.random() < 0.4 && realm === 'over') say([ZEUS()]);
 }
 
 function nearestBeacon(onlyUnlit) {
@@ -5438,6 +5632,18 @@ function updateRain(dt) {
   for (let i = 0, k = Math.ceil(10 * rainAmt); i < k; i++) { const x = P.x + rnd(26), z = P.z + rnd(26), g = groundAt(x, z, P.y + 3); if (Math.abs(g - P.y) < 30) emit(x, g + 0.1, z, rnd(1.6), 1.2 + Math.random() * 2.2, rnd(1.6), 0.22 + Math.random() * 0.15, [0.26, 0.31, 0.4], -12); }
 }
 // Zeus puts him down: a bolt right beside where he arrives, and the crack of it at once
+// Zeus has no voice. When he has something to say, it lands beside you.
+function zeusAt(x, y, z, big = false) {
+  strike(x, y, z, 1); audio.sfx.zeus(big);
+  flash = Math.max(flash, big ? 1 : 0.65); camShake = Math.max(camShake, big ? 1.7 : 1.1);
+  postMat.uniforms.uFlashCol.value.setRGB(0.85, 0.9, 1.15);
+}
+function zeusSpeaks(big = false) {
+  if (realm !== 'over') return;
+  const p = player, a = Math.random() * 6.28, d = big ? 14 + Math.random() * 8 : 28 + Math.random() * 40;
+  const x = p.pos.x + Math.cos(a) * d, z = p.pos.z + Math.sin(a) * d;
+  zeusAt(x, Math.max(terrainAt(x, z), WATER), z, big);
+}
 function spawnBolt(x, y, z) {
   strike(x, y, z, 1); audio.sfx.crack(); flash = Math.max(flash, 0.55); camShake = Math.max(camShake, 0.9);
 }
@@ -5448,7 +5654,7 @@ function updateStorm(dt) {
   // the first night is a storm on the mountain; below the clouds it is only the flicker of it, and the Titans walking
   // (the storm is Zeus's, and it stays on his mountain: under the clouds the night is over and the sky is clean)
   const first = story.phase === 'summit' || story.phase === 'leap', above = p.pos.y > CLOUD_SEA - 150;
-  const want = realm === 'over' && above && (first || story.titans === 'march') ? 1 : 0;
+  const want = realm === 'over' && above && !titleFly.on && (first || story.titans === 'march') ? 1 : 0;
   storm = lerp(storm, want, damp(want < storm ? 0.6 : 0.25, dt));
   // the first time he comes down out of it, the dark goes with the storm: the sun comes up while he watches
   if (flags.firstNight && !flags.dawn && realm === 'over' && p.form === 'phoenix' && !p.cine && p.pos.y < CLOUD_SEA - 60) flags.dawn = 1;
@@ -5769,6 +5975,7 @@ function updateDialog(dt) {
     const cur = dlg.cur = dlg.queue.shift(); dlg.shown = 0; dlg.hold = 0; cur.age = 0; cur.page = 0;
     if (cur.end) { showEnd(); dlg.cur = null; return; }
     if (cur.bolt && realm === 'over') { const a = Math.random() * 6.28, d = 40 + Math.random() * 90; strike(player.pos.x + Math.cos(a) * d, player.pos.y, player.pos.z + Math.sin(a) * d, 0.8); }
+    if (cur.zeus) zeusSpeaks(cur.big);
     if (cur.voice) {
       if (cur.voice === 'daedalus') audio.sting('ending');
       fetchVoice(cur.voice, cur.say || cur.text, true, cur.clip).then(buf => { if (dlg.cur === cur && buf && cur.age < 4.5) { cur.voiceDur = playVoice(buf); cur.age = 0; cur.voiceEnd = cur.voiceDur + 0.4; } });
@@ -5776,6 +5983,7 @@ function updateDialog(dt) {
   }
   const cur = dlg.cur;
   if (!cur) { box.classList.add('hidden'); return; }
+  if (cur.zeus) { box.classList.add('hidden'); if ((cur.age += dt) > cur.pause) dlg.cur = null; return; }   // (the lightning was the line)
   box.classList.remove('hidden');
   box.classList.toggle('thought', cur.voice === 'hero');
   cur.age += dt / Math.max(timeK, 0.05);
@@ -5980,6 +6188,12 @@ function meet(g) {
   toast(`${story.met.size} / ${gods.length} GODS`);
   saveSoon();
 }
+// Zeus never has a voice: when he answers, the words come with a bolt where he is (on his throne he *is* the bolt) and
+// his thunder, written out a little slower than anyone else's, as if the storm were saying them.
+const voiceless = g => g && g.id === 'zeus';
+function zeusLine(g) {
+  if (g.bolt && realm === 'over') zeusAt(g.x, g.gy, g.z, false); else zeusSpeaks(false);
+}
 function showGodLine(g, text, buf) {
   const dur = playVoice(buf);
   talk.text = text; talk.shown = 0; talk.rate = dur ? text.length / Math.max(0.6, dur * 0.92) : 38; talk.speaking = 'god'; talk.hold = 0; talk.idle = 0;
@@ -5992,10 +6206,11 @@ function fallbackNext(auto) {
   const text = g.lines[talk.idx++], tok = talk.token;
   if (talk.idx === 2) reveal(g);
   talk.text = ''; $('talk').classList.add('wait');
-  Promise.race([fetchVoice(g.id, text, true, '', 'quick'), sleep(3000).then(() => null)]).then(async buf => {
+  Promise.race([voiceless(g) ? Promise.resolve(null) : fetchVoice(g.id, text, true, '', 'quick'), sleep(3000).then(() => null)]).then(async buf => {
     while (talk.intro && talk.token === tok) await sleep(80);
     if (talk.token !== tok) return;
     $('talk').classList.remove('wait'); showGodLine(g, text, buf);
+    if (voiceless(g)) { zeusLine(g); talk.rate = 22; }
   });
 }
 const ago = t => { const m = (Date.now() - t) / 60000; return m < 2 ? 'just now' : m < 60 ? `${Math.round(m)} minutes ago` : m < 1440 ? `${Math.round(m / 60)} hours ago` : `${Math.round(m / 1440)} days ago`; };
@@ -6049,6 +6264,7 @@ async function godSay(playerText, o = {}) {
   talk.busy = false; $('talk').classList.remove('wait');
   // the words are on screen at once; the voice joins as soon as it exists, and never on top of his own
   showGodLine(g, shown, null); talk.rate = 30;
+  if (voiceless(g)) { zeusLine(g); talk.rate = 22; saveSoon(); return; }
   fetchVoice(g.id, text, true, '', 'quick').then(buf => {
     if (!buf || talk.token !== tok || talk.text !== shown) return;
     setTimeout(() => {
@@ -6588,13 +6804,60 @@ function updateJet(dt) {
   });
   jetRib.commit();
 }
-// rings
+// ── rings of light
+// A line of them is strung across the sky ahead of him now and then. Each one is a gold hoop with light running round it;
+// the next one in the line breathes brighter, and a thread of sparks points the way to it. Line up on it and the air
+// itself eases him in. Fly through (through: across its face, inside the rim) and it catches: the hoop goes up in flame,
+// white at the heart and red at the edges, tongues licking upward, and burns on behind him for a few seconds before it
+// falls to embers. Through the very middle is perfect, and the bell that rings for each one climbs a step at a time.
 const HOOP_N = 16, HOOP_R = 15;
-const hoopMesh = new THREE.InstancedMesh(new THREE.TorusGeometry(HOOP_R, 0.75, 8, 40), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.9, 0.7) }), HOOP_N);
+const hoopGeo = new THREE.TorusGeometry(HOOP_R, 0.8, 12, 72);
+const hoopState = new THREE.InstancedBufferAttribute(new Float32Array(HOOP_N * 2), 2);   // x: seconds burning (−1: not yet), y: how much it is "next"
+hoopState.setUsage(THREE.DynamicDrawUsage); hoopGeo.setAttribute('aRing', hoopState);
+const hoopMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+hoopMat.customProgramCacheKey = () => 'hoop';
+hoopMat.onBeforeCompile = sh => {
+  sh.uniforms.uTime = worldFx.uTime;
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 aRing; uniform float uTime; varying vec2 vRing; varying vec2 vU; varying float vTongue;')
+    .replace('#include <begin_vertex>', `#include <begin_vertex>
+      vRing = aRing; vU = uv; vTongue = 0.0;
+      if (aRing.x >= 0.0) {
+        float b = aRing.x, k = smoothstep(0.0, 0.2, b) * (1.0 - smoothstep(4.2, 6.2, b));
+        float a = uv.x * 6.2832;
+        float t1 = sin(a * 9.0 + uTime * 7.0) * sin(a * 4.0 - uTime * 5.3), t2 = sin(a * 17.0 - uTime * 11.0);
+        float tongue = max(0.0, t1 * 0.75 + t2 * 0.35);
+        vTongue = tongue * k;
+        transformed += normal * k * (0.55 + 1.1 * tongue);
+        transformed.y += k * tongue * tongue * 3.2 * (0.6 + 0.4 * sin(uTime * 13.0 + a * 3.0));
+      }`);
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uTime; varying vec2 vRing; varying vec2 vU; varying float vTongue;')
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        float a = vU.x * 6.2832;
+        vec3 col;
+        if (vRing.x < 0.0) {
+          // gold, with light running round it; the next one breathes
+          float run = pow(0.5 + 0.5 * sin(a * 3.0 - uTime * 3.2), 6.0);
+          float breathe = vRing.y * (0.55 + 0.45 * sin(uTime * 5.5));
+          col = vec3(2.3, 1.75, 0.62) * (0.7 + 0.7 * run + 0.9 * breathe) + vec3(1.0, 0.9, 0.7) * run * vRing.y;
+        } else {
+          // on fire: white-hot where the tongues rise, orange in the body, red at the edges; dying to embers
+          float b = vRing.x, live = 1.0 - smoothstep(3.8, 6.2, b);
+          float flick = 0.8 + 0.2 * sin(uTime * 31.0 + a * 13.0) + 0.15 * sin(uTime * 17.0 - a * 7.0);
+          float edge = abs(vU.y - 0.5) * 2.0;
+          vec3 hot = vec3(2.2, 1.05, 0.28), body = vec3(1.7, 0.3, 0.04), rim = vec3(0.95, 0.07, 0.02), ember = vec3(0.45, 0.05, 0.015);
+          col = mix(body, hot, clamp(vTongue * 1.1 + (1.0 - smoothstep(0.0, 0.35, b)) * 0.9, 0.0, 1.0));
+          col = mix(col, rim, smoothstep(0.55, 1.0, edge) * 0.6);
+          col = mix(ember * (0.6 + 0.4 * flick), col * flick, live);
+        }
+        diffuseColor.rgb = col;
+      }`);
+};
+const hoopMesh = new THREE.InstancedMesh(hoopGeo, hoopMat, HOOP_N);
 hoopMesh.frustumCulled = false; hoopMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(hoopMesh);
-const hoops = Array.from({ length: HOOP_N }, () => ({ alive: false, x: 0, y: 0, z: 0, yaw: 0, pop: 0 }));
-const trail = { left: 0, got: 0, n: 0, coolT: 6 };
-const SCALE = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.5];
+const hoops = Array.from({ length: HOOP_N }, () => ({ alive: false, x: 0, y: 0, z: 0, yaw: 0, pop: 0, burn: -1, miss: -1, nextK: 0 }));
+const trail = { left: 0, got: 0, n: 0, coolT: 6, prev: new THREE.Vector3(), prevOk: false, sparkT: 0 };
+const FIRE_COLS = [[1, 0.85, 0.5], [1, 0.55, 0.15], [1, 0.32, 0.08], [0.95, 0.18, 0.05]];
 function spawnTrail() {
   const p = player, n = 6 + Math.floor(Math.random() * 4);
   let yaw = p.yaw + rnd(0.5), x = p.pos.x, y = p.pos.y, z = p.pos.z; const bend = rnd(0.2), wave = Math.random() * 6;
@@ -6602,38 +6865,97 @@ function spawnTrail() {
     const step = i ? 150 : 420;
     yaw += bend + rnd(0.08); x -= Math.sin(yaw) * step; z -= Math.cos(yaw) * step;
     y = clamp(p.pos.y + Math.sin(wave + i * 0.8) * 55 - i * 6, Math.max(height(x, z), WATER) + 45, (realm === 'under' ? UNDER.ceil : SKY_LIMIT) - 160);
-    Object.assign(hoops[i], { alive: true, x, y, z, yaw, pop: 0 });
+    Object.assign(hoops[i], { alive: true, x, y, z, yaw, pop: -i * 0.14, burn: -1, miss: -1, nextK: 0 });   // (they open one after another, down the line)
   }
   for (let i = n; i < HOOP_N; i++) hoops[i].alive = false;
-  trail.left = n; trail.got = 0; trail.n = n;
+  trail.left = n; trail.got = 0; trail.n = n; trail.prevOk = false;
+  audio.sfx.whoosh?.(false);
+}
+const nextHoop = () => hoops.find(h => h.alive && h.burn < 0 && h.miss < 0);
+function passHoop(h, perfect) {
+  const p = player;
+  h.burn = 0; trail.left--; trail.got++; questEvent.hoops = (questEvent.hoops || 0) + 1;
+  p.surge = (p.surge || 0) + (perfect ? 48 : 32); p.flame = Math.min(1, p.flame + (perfect ? 0.1 : 0.06));
+  const last = trail.left <= 0 && trail.got === trail.n;
+  audio.sfx.ring(trail.got - 1, perfect, last);
+  // the hoop goes up: a ring of flame thrown outward, and the air it pushes
+  const c = Math.cos(h.yaw), sn = Math.sin(h.yaw);
+  for (let i = 0; i < (perfect ? 150 : 100); i++) {
+    const a = Math.random() * 6.28, cx = Math.cos(a), cy = Math.sin(a), out = 6 + Math.random() * 14;
+    emit(h.x + cx * c * HOOP_R, h.y + cy * HOOP_R, h.z - cx * sn * HOOP_R, cx * c * out + dir3.x * 22 + rnd(3), cy * out + rnd(3), -cx * sn * out + dir3.z * 22 + rnd(3), 0.6 + Math.random() * 0.7, pick(FIRE_COLS), 1.5);
+  }
+  shock(h.x, h.y, h.z, perfect ? 0xfff0c0 : 0xffa040, perfect ? 46 : 32, 0.55, true);
+  flash = Math.max(flash, perfect ? 0.24 : 0.12); camShake = Math.max(camShake, perfect ? 0.35 : 0.18);
+  if (perfect) toast('✦ THROUGH THE HEART ✦');
+  if (last) { toast(`${trail.n} RINGS · THE WHOLE LINE`); audio.sting('godMet'); p.flame = 1; witness(`threaded a line of ${trail.n} rings of light without missing one`); }
 }
 function updateHoops(dt) {
-  const p = player;
-  for (const h of hoops) {
-    if (!h.alive) continue;
-    const dx = p.pos.x - h.x, dy = p.pos.y - h.y, dz = p.pos.z - h.z;
-    if (dx * dx + dy * dy + dz * dz < (HOOP_R + 3) ** 2) {
-      h.alive = false; trail.left--; trail.got++; questEvent.hoops = (questEvent.hoops || 0) + 1;
-      p.speed += 34; p.flame = Math.min(1, p.flame + 0.06);
-      chime([SCALE[Math.min(SCALE.length - 1, trail.got - 1)]], 0.05);
-      for (let i = 0; i < 60; i++) { const a = Math.random() * 6.28; emit(h.x + Math.cos(a) * Math.cos(h.yaw) * HOOP_R, h.y + Math.sin(a) * HOOP_R, h.z - Math.cos(a) * Math.sin(h.yaw) * HOOP_R, rnd(6) + dir3.x * 40, rnd(6), rnd(6) + dir3.z * 40, 0.7, [1.2, 0.95, 0.4], 0); }
-      if (trail.left <= 0 && trail.got === trail.n) { toast(`${trail.n} RINGS · THE WHOLE LINE`); audio.sting('godMet'); p.flame = 1; witness(`threaded a line of ${trail.n} rings of light without missing one`); }
+  const p = player, P = p.pos;
+  // through, not near: his path this frame has to cross the hoop's face inside the rim
+  if (trail.prevOk && trail.prev.distanceToSquared(P) < 200 * 200) for (const h of hoops) {
+    if (!h.alive || h.burn >= 0 || h.miss >= 0) continue;
+    const nx = Math.sin(h.yaw), nz = Math.cos(h.yaw);
+    const d1 = (trail.prev.x - h.x) * nx + (trail.prev.z - h.z) * nz, d2 = (P.x - h.x) * nx + (P.z - h.z) * nz;
+    if (d1 === d2 || (d1 > 0) === (d2 > 0)) continue;
+    const f = d1 / (d1 - d2), cx = lerp(trail.prev.x, P.x, f) - h.x, cy = lerp(trail.prev.y, P.y, f) - h.y, cz = lerp(trail.prev.z, P.z, f) - h.z;
+    const r = Math.hypot(cx, cy, cz);
+    if (r < HOOP_R + 1.2) passHoop(h, r < 4.5);
+  }
+  trail.prev.copy(P); trail.prevOk = true;
+  // the boost from a ring arrives as a surge, not a kick
+  if (p.surge > 0) { const add = Math.min(p.surge, dt * 150); p.speed += add; p.surge -= add; }
+  const nh = nextHoop();
+  if (!nh || state !== 'play' || p.cine) return;
+  const tx = nh.x - P.x, ty = nh.y - P.y, tz = nh.z - P.z, dist = Math.hypot(tx, ty, tz) || 1;
+  const fx = -Math.sin(p.yaw) * Math.cos(p.pitch), fy = Math.sin(p.pitch), fz = -Math.cos(p.yaw) * Math.cos(p.pitch);
+  const cosA = (tx * fx + ty * fy + tz * fz) / dist;
+  // gone past it: that one folds away, and the next one becomes the one
+  if (cosA < -0.2 && dist < 260) { nh.miss = 0; trail.left--; return; }
+  // lined up and close: the air eases him into the middle of it (his own hands always win)
+  const [ax, ay] = axes(), mine = 1 - Math.min(1, Math.hypot(ax, ay)) * 0.75;
+  const k = smoothstep(0.86, 0.985, cosA) * smoothstep(460, 110, dist) * smoothstep(6, 26, dist) * mine;
+  if (k > 0.001) {
+    const wantYaw = Math.atan2(-tx, -tz), wantPitch = Math.atan2(ty, Math.hypot(tx, tz));
+    p.yaw += wrapAngle(wantYaw - p.yaw) * damp(3 * k, dt);
+    p.pitch += (clamp(wantPitch, -1.1, 1.1) - p.pitch) * damp(4 * k, dt);
+  }
+  // and a thread of sparks drawn from him to it, so he always knows which way
+  if (dist < 900 && (trail.sparkT -= dt) <= 0) {
+    trail.sparkT = 0.035;
+    for (let i = 0; i < 2; i++) {
+      const u = 0.12 + Math.random() * 0.85;
+      emit(P.x + tx * u + rnd(0.8), P.y + ty * u + rnd(0.8), P.z + tz * u + rnd(0.8), tx / dist * 6, ty / dist * 6, tz / dist * 6, 0.45 + Math.random() * 0.3, [1, 0.82, 0.4], 0, 0.5);
     }
   }
 }
 function updateCurrents(dt) {
   const p = player;
   // a new line of rings appears ahead when he has been flying a while with none to chase
-  const any = hoops.some(h => h.alive);
+  const any = hoops.some(h => h.alive);   // (burning ones count: the next line waits until the last has burned out)
   if (any && !hoops.some(h => h.alive && (h.x - p.pos.x) ** 2 + (h.z - p.pos.z) ** 2 < 2600 * 2600)) { for (const h of hoops) h.alive = false; trail.coolT = 4; }
   if (!any && p.form === 'phoenix' && state === 'play' && !p.cine && !p.riding && story.phase !== 'summit' && story.phase !== 'leap' && (trail.coolT -= dt) <= 0) { spawnTrail(); trail.coolT = 14 + Math.random() * 12; }
+  const nh = nextHoop(), A = hoopState.array;
   hoops.forEach((h, i) => {
-    if (!h.alive) { _mat.makeScale(0, 0, 0); hoopMesh.setMatrixAt(i, _mat); return; }
-    h.pop = Math.min(1, h.pop + dt * 2);
-    _mat.compose(_p.set(h.x, h.y + Math.sin(time * 1.2 + i) * 1.5, h.z), _q.setFromAxisAngle(UP, h.yaw), _s.setScalar(backOut(h.pop) * (1 + Math.sin(time * 3 + i) * 0.03)));
+    if (!h.alive) { _mat.makeScale(0, 0, 0); hoopMesh.setMatrixAt(i, _mat); A[i * 2] = -1; A[i * 2 + 1] = 0; return; }
+    h.pop = Math.min(1, h.pop + dt * 2.2);
+    h.nextK = lerp(h.nextK, h === nh ? 1 : 0, damp(4, dt));
+    let sc = backOut(clamp(h.pop, 0, 1)) * (1 + Math.sin(time * 3 + i) * 0.03 + h.nextK * 0.05 * Math.sin(time * 5.5));
+    if (h.burn >= 0) {
+      h.burn += dt; sc *= 1 + 0.12 * smoothstep(0, 0.25, h.burn) - 0.5 * smoothstep(4.5, 6.4, h.burn);
+      // it burns on: flame running up off the hoop, thinning as it dies
+      const live = 1 - smoothstep(3.5, 6, h.burn), c = Math.cos(h.yaw), sn = Math.sin(h.yaw);
+      for (let j = 0; j < Math.round(9 * live); j++) {
+        const a = Math.random() * 6.28, cx = Math.cos(a), cy = Math.sin(a);
+        emit(h.x + cx * c * HOOP_R, h.y + cy * HOOP_R, h.z - cx * sn * HOOP_R, rnd(1.2), 4 + Math.random() * 8, rnd(1.2), 0.5 + Math.random() * 0.6, pick(FIRE_COLS), 3, 1.6 + Math.random() * 1.6);
+      }
+      if (h.burn > 6.5) h.alive = false;
+    }
+    if (h.miss >= 0) { h.miss += dt; sc *= 1 - smoothstep(0, 0.6, h.miss); if (h.miss > 0.6) h.alive = false; }
+    A[i * 2] = h.burn; A[i * 2 + 1] = h.nextK;
+    _mat.compose(_p.set(h.x, h.y + Math.sin(time * 1.2 + i) * 1.5, h.z), _q.setFromAxisAngle(UP, h.yaw), _s.setScalar(Math.max(0.0001, sc)));
     hoopMesh.setMatrixAt(i, _mat);
   });
-  hoopMesh.instanceMatrix.needsUpdate = true;
+  hoopMesh.instanceMatrix.needsUpdate = true; hoopState.needsUpdate = true;
   updateJet(dt);
   // every temple he comes to has a river in the air leaving it for the next one, which is raised a long flight away
   if ((jet.checkT -= dt) > 0 || realm !== 'over' || state !== 'play' || story.phase === 'summit' || story.phase === 'leap') return;
@@ -7213,7 +7535,9 @@ function updateMap(dt) {
     if (m.k === 'met') mark(m.x, m.z, '⌂', near ? `${(godById[m.g]?.name || m.g).toUpperCase()} · ${m.mine ? 'YOU' : m.n}` : '', m.mine ? '#ffc46a' : '#e8c890');
     else if (V.s > 0.1) mark(m.x, m.z, '†', '', 'rgba(255,120,90,.5)');
   }
-  for (const t of WORLD.trav) if (t.n !== heroName) mark(t.x, t.z, '✧', near ? `${t.n} · ${agoISO(t.seen)}` : t.n, '#bfe6ff');
+  const here = new Set();
+  for (const P of NET.peers.values()) if (P.s && performance.now() - P.s.t < 15000 && P.realm === (realm === 'under' ? 1 : 0)) { here.add(P.name); mark(P.pos.x, P.pos.z, '◆', P.name, P.css || '#bfe6ff'); }
+  for (const t of WORLD.trav) if (t.n !== heroName && !here.has(t.n)) mark(t.x, t.z, '✧', near ? `${t.n} · ${agoISO(t.seen)}` : t.n, 'rgba(191,230,255,.6)');
   // him
   const P = player.pos, px = sx(P.x), py = sy(P.z), yaw = player.form === 'human' ? human.group.rotation.y : player.yaw, pulse = 5 + (Math.sin(time * 3) * 0.5 + 0.5) * 6;
   x.strokeStyle = 'rgba(255,138,58,.7)'; x.lineWidth = 1; x.beginPath(); x.arc(px, py, pulse, 0, 6.283); x.stroke();
@@ -7403,6 +7727,7 @@ const camTarget = new THREE.Vector3(), camWant = new THREE.Vector3(), lookAt = n
 function updateCamera(dt) {
   const p = player;
   if (state === 'photo') { camera.position.copy(photo.pos); camera.rotation.set(photo.pitch, photo.yaw, photo.roll, 'YXZ'); camera.fov = photo.fov; camera.updateProjectionMatrix(); return; }
+  if (state === 'title' && titleFly.on) return;   // (the title flies its own lens: updateTitle)
   if (state === 'title' || state === 'loading') {
     const a = time * 0.035;
     camera.position.set(p.pos.x + Math.sin(a) * 110, p.pos.y + 34, p.pos.z + Math.cos(a) * 110);
@@ -7505,7 +7830,7 @@ function joyShow(x, y, dx = 0, dy = 0, hot = false) {
 }
 const pinchDist = () => { const [a, b] = [...looks.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 canvas.addEventListener('pointerdown', e => {
-  if (state === 'prologue') return proSkip();
+  if (state === 'prologue') return proPress(true);
   if (state === 'end') return closeEnd();
   if (state === 'talk') { if (e.pointerType === 'touch' && !live()) fallbackNext(); return; }   // "tap to continue" means anywhere
   try { canvas.setPointerCapture(e.pointerId); } catch {}
@@ -7554,6 +7879,7 @@ function pointerEnd(e) {
   }
 }
 canvas.addEventListener('pointerup', pointerEnd);
+for (const ev of ['pointerup', 'pointercancel']) canvas.addEventListener(ev, () => { if (state === 'prologue') proPress(false); });
 canvas.addEventListener('pointercancel', pointerEnd);
 canvas.addEventListener('wheel', e => { e.preventDefault(); if (state === 'photo') photo.fov = clamp(photo.fov * Math.pow(1.08, Math.sign(e.deltaY)), 8, 110); else zoom(Math.pow(1.1, Math.sign(e.deltaY))); }, { passive: false });
 document.addEventListener('gesturestart', e => e.preventDefault());
@@ -7567,7 +7893,8 @@ const pro = { on: false, t: 0, skipT: -9, scene: null, pov: false, falling: fals
   pos: new THREE.Vector3(), yaw: 0, pitch: 0, roll: 0, speed: 38, vy: 0, flap: 0, dPos: new THREE.Vector3(), dPass: 0, fx: null };
 const PRO_C = { x: 0, y: 60, z: 150 };   // the middle of the Labyrinth, on its plateau above the sea
 const PRO_SUN = new THREE.Vector3(-0.16, 0.6, -0.78).normalize();
-const PRO_TA = 7.5, PRO_CLIMB = 22.5, PRO_FAIL = 34.6;   // the cut into his eyes; the moment he stops listening; the moment the wax goes
+const PRO_TA = 7.5, PRO_CLIMB = 22.5, PRO_FAIL = 34.6;
+const PRO_JUMP = 3.2;   // on the parapet: the story waits here until the player jumps   // the cut into his eyes; the moment he stops listening; the moment the wax goes
 const PLUME = { deep: [0.44, 0.42, 0.39], root: [0.56, 0.55, 0.52], mid: [0.66, 0.65, 0.63], hot: [0.71, 0.705, 0.69], tip: [0.74, 0.74, 0.74] };
 const PRO_LINES = [
   { t: 2.0, who: 'Daedalus', clip: 'pd1', text: 'Now, Icarus. Jump! Don\'t look down!' },
@@ -7760,17 +8087,34 @@ function startPrologue() {
   pro.son = makeFlier({ ...hero, mat: plumeMat(still, true), wing: 0.28 });
   pro.me = makeFlier({ ...hero, mat: plumeMat(fx, true), wing: 0.34 }); pro.me.body.visible = false; pro.me.group.visible = false;
   pro.sc.add(pro.dad.group, pro.son.group, pro.me.group);
-  Object.assign(pro, { on: true, t: 0, skipT: -9, pov: false, falling: false, hitT: 0, li: 0, subT: 0, yaw: 0, pitch: 0, roll: 0, speed: 38, vy: 0, flap: 0, dPass: 0, speedNow: 0, vyNow: 0, slow: 1, dd: 999 });
+  Object.assign(pro, { on: true, t: 0, skipT: -9, pov: false, falling: false, hitT: 0, li: 0, subT: 0, yaw: 0, pitch: 0, roll: 0, speed: 38, vy: 0, flap: 0, dPass: 0, speedNow: 0, vyNow: 0, slow: 1, dd: 999,
+    rt: 0, jumped: false, held: false, imp: 0, c: 0, waitT: 0, nagT: 0, act: '' });
   pro.lines = PRO_LINES.map(l => ({ ...l, buf: null, ready: false })); pro.lines.forEach(l => proClip(l.clip).then(b => { l.buf = b; l.ready = true; }));
   state = 'prologue'; document.body.classList.add('pro'); document.body.classList.remove('cinema');
-  $('proSkip').textContent = TOUCH ? 'tap — skip' : 'space — skip';
+  $('proSkip').textContent = TOUCH ? 'tap here to skip' : 'esc — skip';
   camera.position.set(70, 430, PRO_C.z + 150); camera.fov = 40; camera.updateProjectionMatrix();
   setTimeout(() => { if (state === 'prologue') titleCard('CRETE', 'the labyrinth of Daedalus', 2700); }, 500);
 }
 function proSkip() {
   if (!pro.on || pro.t < 0.8) return;
   if (time - pro.skipT < 3) return endPrologue(true);
-  pro.skipT = time; $('proSkip').textContent = TOUCH ? 'tap again to skip' : 'space again to skip'; $('proSkip').classList.add('hot');
+  pro.skipT = time; $('proSkip').textContent = TOUCH ? 'tap again to skip' : 'esc again to skip'; $('proSkip').classList.add('hot');
+}
+// The player's one input over Crete: Space (or a finger on the glass). On the tower it is the jump. Over the sea it is
+// up — held, or beaten again and again like a wing — and the story only goes on while he is going up: nobody makes him
+// fly too high but the person holding it.
+function proPress(down) {
+  if (!pro.on) return;
+  if (down) {
+    if (!pro.jumped && pro.t >= 2.0) { pro.jumped = true; audio.sfx.jump(); }
+    if (pro.t >= PRO_CLIMB - 1 && !pro.falling) { pro.imp = 1; audio.sfx.flap(0.55); }
+  }
+  pro.held = !!down;
+}
+function proAct(text) {
+  if (pro.act === text) return;
+  pro.act = text; const el = $('proAct');
+  if (text) { el.textContent = text; el.classList.add('show'); } else el.classList.remove('show');
 }
 // The voices over Crete are in the air with the people saying them. Each line comes from where its speaker is: off to the
 // side, ahead or behind; quieter and duller with distance (air takes the top off a far voice first); bent in pitch as they
@@ -7815,7 +8159,7 @@ function proPlace(v, dt) {
 function proHush() { stopVoice(); for (const s of pro.srcs || []) try { s.stop(); } catch {} pro.srcs = []; pro.vox = []; }
 function endPrologue(skipped) {
   if (!pro.on) return;
-  pro.on = false; proHush();
+  pro.on = false; proHush(); proAct('');
   document.body.classList.remove('pro'); $('proSub').classList.remove('show'); $('proSkip').classList.remove('hot'); $('card').classList.remove('show');
   pro.sc.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
   pro.sc = pro.dad = pro.son = pro.me = pro.sky = pro.halo = pro.disc = pro.feathers = pro.fp = null;
@@ -7831,8 +8175,25 @@ function updatePrologue(dt) {
   // the moment his father reaches for him and misses is the one moment that runs slow
   const near = pro.falling && !pro.hitT && (pro.dPass ? pro.t - pro.dPass < 0.24 : pro.dd < 30);
   pro.slow = lerp(pro.slow, near ? 0.2 : 1, damp(near ? 9 : 4, dt)); dt *= pro.slow;
-  const t = pro.t += dt, C = PRO_C, dad = pro.dad, son = pro.son, me = pro.me;
-  pro.fx.uTime.value = t; pro.seaU.uTime.value = t;
+  pro.rt += dt;
+  // how fast the story goes: not at all on the parapet until he jumps; on the climb, only as fast as he is climbing
+  let rate = 1;
+  if (pro.t >= PRO_CLIMB - 1 && pro.t < PRO_FAIL) {
+    pro.imp = Math.max(0, pro.imp - dt * 1.5);
+    const want = Math.max(pro.held ? 1 : 0, pro.imp);
+    pro.c = lerp(pro.c, want, damp(want > pro.c ? 4 : 2.2, dt));
+    if (pro.t >= PRO_CLIMB) rate = pro.c;
+  }
+  const t = pro.t = !pro.jumped ? Math.min(PRO_JUMP, pro.t + dt) : pro.t + dt * rate, C = PRO_C, dad = pro.dad, son = pro.son, me = pro.me;
+  pro.fx.uTime.value = pro.rt; pro.seaU.uTime.value = pro.rt;
+  // what he is being asked to do, and his father asking again if he stands there
+  const waiting = !pro.jumped && t >= PRO_JUMP - 0.4;
+  proAct(waiting ? (TOUCH ? 'TAP  —  JUMP' : 'SPACE  —  JUMP')
+    : t >= PRO_CLIMB - 0.6 && t < PRO_FAIL - 1.2 && pro.c < 0.45 ? (TOUCH ? 'HOLD  —  HIGHER' : 'HOLD SPACE  —  HIGHER') : '');
+  if (waiting && (pro.waitT += dt) > 6 && pro.rt - pro.nagT > 9) {
+    pro.nagT = pro.rt; const L1 = pro.lines.find(l => l.clip === 'pd1');
+    if (L1 && L1.buf) { const d = proSay(L1.buf, 'dad'); $('proSub').firstChild.textContent = L1.who; $('proSub').lastChild.textContent = L1.text; $('proSub').classList.add('show'); pro.subT = d + 0.5; }
+  }
   // what is said
   const L = pro.lines[pro.li];
   if (L && t >= L.t && L.ready) {
@@ -7849,7 +8210,7 @@ function updatePrologue(dt) {
     // the tower: two figures on the parapet with their wings spread, then gone
     const leap = (F, x, t0, ph) => {
       const tau = t - t0, g = F.group;
-      if (tau < 0) { g.position.set(C.x + x, C.y + 52.5, C.z - 8.2); g.rotation.set(1.22, 0, 0); flierFlap(F, t * 1.6 + ph, 0.1, 0.5); return; }
+      if (tau < 0) { g.position.set(C.x + x, C.y + 52.5, C.z - 8.2); g.rotation.set(1.22, 0, 0); flierFlap(F, pro.rt * 1.6 + ph, 0.1, 0.5); return; }
       const s = 38 * (tau - (1 - Math.exp(-1.4 * tau)) / 1.4);
       g.position.set(C.x + x * (1 + tau * 0.35), C.y + 52.5 - 15 * (1 - Math.exp(-1.2 * tau)) + 2.4 * tau + Math.sin(tau * 5.2 + ph) * 0.35, C.z - 8.2 - s);
       g.rotation.set(lerp(1.22, 0.06, smoothstep(0, 0.9, tau)), 0, Math.sin(tau * 1.3 + ph) * 0.08);
@@ -7874,8 +8235,8 @@ function updatePrologue(dt) {
     pro.yaw += om * dt;
     if (!fall) {
       pro.roll = lerp(pro.roll, om * 1.75, damp(2.5, dt));
-      pro.pitch = lerp(pro.pitch, t < PRO_CLIMB ? 0.04 + 0.26 * proBump(t, 7.5, 8.2, 11.2, 12.6) + Math.sin(t * 0.7) * 0.02 : 0.62, damp(t < PRO_CLIMB ? 2 : 0.9, dt));
-      pro.speed = lerp(pro.speed, t < PRO_CLIMB ? 38 : 58, damp(0.8, dt));
+      pro.pitch = lerp(pro.pitch, t < PRO_CLIMB ? 0.04 + 0.26 * proBump(t, 7.5, 8.2, 11.2, 12.6) + Math.sin(t * 0.7) * 0.02 : lerp(0.04 + Math.sin(pro.rt * 0.7) * 0.02, 0.62, pro.c), damp(t < PRO_CLIMB ? 2 : 0.9 + pro.c * 1.5, dt));
+      pro.speed = lerp(pro.speed, t < PRO_CLIMB ? 38 : lerp(40, 58, pro.c), damp(0.8, dt));
       const cp = Math.cos(pro.pitch);
       _v.set(-Math.sin(pro.yaw) * cp, Math.sin(pro.pitch), -Math.cos(pro.yaw) * cp).multiplyScalar(pro.speed);
       pro.vy = _v.y;
@@ -7916,7 +8277,7 @@ function updatePrologue(dt) {
     const maze = proBump(t, 8.9, 9.9, 12.4, 13.5);
     let yaw = pro.yaw + maze * 1.5, pitch = pro.pitch - maze * 0.62;
     if (lookDad > 0.001) { yaw += wrapAngle(Math.atan2(-toDad.x, -toDad.z) - yaw) * lookDad; pitch = lerp(pitch, Math.atan2(toDad.y, Math.hypot(toDad.x, toDad.z)), lookDad); }
-    const beat = fall ? 9 + Math.sin(t * 3) * 3 : t > PRO_CLIMB ? 7.2 : 5.2, was = Math.sin(pro.flap);
+    const beat = fall ? 9 + Math.sin(t * 3) * 3 : t > PRO_CLIMB ? lerp(5.2, 7.4, pro.c) : 5.2, was = Math.sin(pro.flap);
     pro.flap += dt * beat;
     if (!fall && was < 0.6 && Math.sin(pro.flap) >= 0.6) audio.sfx.flap(t > PRO_CLIMB ? 0.75 : 0.5);
     camera.position.copy(pro.pos); camera.position.y += fall ? 0 : Math.sin(pro.flap - 0.5) * 0.14;
@@ -7966,6 +8327,85 @@ function updatePrologue(dt) {
   if (pro.hitT && t > pro.hitT + 0.55) endPrologue(false);
 }
 
+// ───────────────────────── the title: the bird, flown before anything else is asked ─────────────────────────
+// Above the clouds at sunset the red bird is climbing toward the sun, and whoever has just arrived can fly it: Space (or a
+// click, or a finger) is a wingbeat that throws him upward in a shower of embers; held, he keeps beating and climbing.
+// After the first one the game asks who they are. The player is borrowed for this — put in the sky as the bird — and
+// handed back exactly as he was when the game begins.
+const titleFly = { cam: { back: 88, below: 30, ahead: 60, up: 46, fov: 46 }, on: false, saved: null, held: false, v: 14, phase: 0, beat: 0, flaps: 0, asked: false, base: 0, sway: 0, emberT: 0, yaw: 0 };
+const TITLE_DAY = 0.712;
+function titleStart() {
+  const p = player;
+  titleFly.saved = { pos: p.pos.clone(), form: p.form, cine: p.cine, pitch: p.pitch, yaw: p.yaw, bank: p.bank, wingF: p.wingF, flame: p.flame, scale: p.scale, day: dayT, storm, grounded: p.grounded, wings: p.wings };
+  titleFly.on = true; dayT = TITLE_DAY; storm = 0;
+  titleFly.base = Math.max(CLOUD_SEA + 380, START.y + 520);
+  Object.assign(p, { form: 'phoenix', cine: null, pitch: 0.75, yaw: titleFly.yaw, bank: 0, wingF: 0, flame: 1, scale: 1, grounded: false, wings: false });
+  p.pos.set(START.x, titleFly.base, START.z);
+  trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
+  $('flyHint').textContent = TOUCH ? 'TAP TO FLY' : 'SPACE TO FLY';
+  setTimeout(() => $('title').classList.add('ready'), 60);
+  if (resumed) titleAsk();
+}
+function titleEnd() {
+  if (!titleFly.on) return;
+  titleFly.on = false;
+  const p = player, S = titleFly.saved;
+  Object.assign(p, { form: S.form, cine: S.cine, pitch: S.pitch, yaw: S.yaw, bank: S.bank, wingF: S.wingF, flame: S.flame, scale: S.scale, grounded: S.grounded, wings: S.wings });
+  p.pos.copy(S.pos); dayT = S.day; storm = S.storm;
+  trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
+}
+// a wingbeat: thrown upward, embers off both wings
+function titlePress(down) {
+  if (!titleFly.on) return;
+  titleFly.held = !!down;
+  if (!down) return;
+  initAudio();
+  titleFly.v = Math.min(titleFly.v + 34, 95); titleFly.beat = 1; titleFly.flaps++;
+  audio.sfx.flap(0.9);
+  for (const w of phoenix.wings) { w.tip.getWorldPosition(_v); for (let i = 0; i < 26; i++) emit(_v.x + rnd(1.5), _v.y + rnd(1), _v.z + rnd(1.5), rnd(7), -6 - Math.random() * 16, rnd(7), 0.7 + Math.random() * 0.9, pick(EMBER_COLS), -1); }
+  if (titleFly.flaps === 1) { $('title').classList.add('flown'); setTimeout(titleAsk, 700); }
+}
+function titleAsk() {
+  if (titleFly.asked) return;
+  titleFly.asked = true; $('title').classList.add('asked', 'flown');
+  if (resumed) { $('nameAsk').textContent = nameInput.value ? `welcome back, ${nameInput.value.toLowerCase()}` : 'welcome back'; $('goBtn').textContent = TOUCH ? 'CONTINUE' : 'ENTER — CONTINUE'; }
+  else $('goBtn').textContent = TOUCH ? 'BEGIN' : 'ENTER — BEGIN';
+  if (!TOUCH) setTimeout(() => { if (state === 'title' && document.activeElement !== nameInput) nameInput.focus({ preventScroll: true }); }, 400);
+}
+const EMBER_COLS = [[1, 0.3, 0.08], [1, 0.45, 0.12], [0.95, 0.18, 0.05], [1, 0.6, 0.25]];
+function updateTitle(dt) {
+  const T = titleFly, p = player;
+  if (!T.on) return;
+  dayT = TITLE_DAY; storm = 0;
+  // he flies at the sun (found once the sky has been worked out, then followed)
+  if (sunDir.lengthSq() > 0.5) { const sy = Math.atan2(-sunDir.x, -sunDir.z); T.yaw += wrapAngle(sy - T.yaw) * (T.yawSet ? damp(0.5, dt) : 1); T.yawSet = true; }
+  // he climbs: a steady glide-climb, thrown faster by each beat, faster still while the wings are held working
+  if (T.held && (T.beatT = (T.beatT || 0) - dt) <= 0) { T.beatT = 0.42; T.v = Math.min(T.v + 16, 95); T.beat = 1; audio.sfx.flap(0.65); }
+  T.v = lerp(T.v, T.held ? 40 : 14, damp(0.9, dt));
+  p.pos.y += T.v * dt;
+  if (p.pos.y > T.base + 1200) p.pos.y = T.base;   // (a long way up: begin again from the cloud tops)
+  // the wings: slow, wide strokes in the glide; a hard, fast one on the beat
+  T.beat = Math.max(0, T.beat - dt * 1.6);
+  T.phase += dt * (2.6 + T.beat * 9 + (T.held ? 4 : 0));
+  const f = Math.sin(T.phase) * (0.42 + T.beat * 0.55), fold = 0.15 + Math.max(0, -Math.sin(T.phase)) * (0.3 + T.beat * 0.3);
+  setWings(f, fold, 0.12 - T.beat * 0.25, 1.1); p.wingF = f;
+  T.sway += dt;
+  p.yaw = T.yaw + Math.sin(T.sway * 0.37) * 0.22; p.bank = Math.sin(T.sway * 0.37 + 0.6) * 0.32; p.pitch = 0.72 + T.beat * 0.25;
+  // the air going past: embers off the wings, and sparks in the air streaming down past him
+  if ((T.emberT -= dt) <= 0) {
+    T.emberT = 0.03;
+    for (const w of phoenix.wings) { w.tip.getWorldPosition(_v); emit(_v.x + rnd(0.6), _v.y, _v.z + rnd(0.6), rnd(1.5), -2 - Math.random() * 4, rnd(1.5), 0.6 + Math.random() * 0.6, pick(EMBER_COLS), -0.5); }
+    const a = Math.random() * 6.28, r = 7 + Math.random() * 30;
+    emit(p.pos.x + Math.cos(a) * r, p.pos.y + 18 + Math.random() * 30, p.pos.z + Math.sin(a) * r, 0, -(T.v * 1.4 + 18), 0, 1.6, [0.75, 0.42, 0.24], 0, 0.5);
+  }
+  // the lens: below and behind him, looking up past him into the sun
+  const fx = -Math.sin(T.yaw), fz = -Math.cos(T.yaw), sx = Math.cos(T.yaw), sz = -Math.sin(T.yaw), sw = Math.sin(T.sway * 0.23) * 3.5;
+  const K = T.cam;
+  camera.position.set(p.pos.x - fx * K.back + sx * sw * K.back / 30, p.pos.y - K.below, p.pos.z - fz * K.back + sz * sw * K.back / 30);
+  lookAt.set(p.pos.x + fx * K.ahead, p.pos.y + K.up, p.pos.z + fz * K.ahead);
+  camera.lookAt(lookAt); camera.fov = K.fov * fovK(); camera.updateProjectionMatrix();
+}
+
 // ───────────────────────── input & flow ─────────────────────────
 // The first thing the game asks is who is playing. The hero is drawn in the letters of that name.
 const nameInput = $('nameInput');
@@ -7973,16 +8413,21 @@ try { nameInput.value = localStorage.getItem('icarus.name') || ''; } catch {}
 setName(nameInput.value, false);
 let nameAsked = !!nameInput.value;
 nameInput.addEventListener('input', () => setName(nameInput.value));
-nameInput.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { nameAsked = true; nameInput.blur(); begin(); } });
+nameInput.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Enter') { nameAsked = true; nameInput.blur(); begin(); }
+  else if (e.code === 'Space' && !nameInput.value.trim()) { e.preventDefault(); if (!e.repeat) titlePress(true); }
+});
+nameInput.addEventListener('keyup', e => { if (e.code === 'Space') titlePress(false); });
 $('nameRow').addEventListener('click', e => e.stopPropagation());
 function begin() {
   if (state !== 'title') return;
   if (!nameAsked) {   // asked once: answer, or go on as Icarus
     nameAsked = true; nameInput.focus();
-    $('title').querySelector('.go').textContent = TOUCH ? '[ type your name — or tap again to go as Icarus ]' : '[ type your name and press enter — or click again to go as Icarus ]';
-    return;
+    titleAsk(); return;
   }
   nameInput.blur();
+  titleEnd();
   state = 'play'; flags.beganAt = time;
   initAudio();
   $('title').classList.add('hidden');
@@ -7992,10 +8437,10 @@ function begin() {
   [LET_GO, OH_NO].forEach(l => fetchVoice('hero', l.say, false, l.clip));
   if (resumed) setTimeout(() => story.phase !== 'summit' && story.phase !== 'leap' ? audio.song(0) : audio.omen(), 1800);
   if (resumed && TOUCH) setTimeout(ctlChoose, 1200);
-  if (resumed) { $('hud').classList.remove('hidden'); setTimeout(() => spawnBolt(player.pos.x + 24, Math.max(terrainAt(player.pos.x + 24, player.pos.z + 30), WATER), player.pos.z + 30), 250); }
+  if (resumed) { $('hud').classList.remove('hidden'); setTimeout(() => zeusAt(player.pos.x + 24, Math.max(terrainAt(player.pos.x + 24, player.pos.z + 30), WATER), player.pos.z + 30), 250); }
   if (resumed) setTimeout(() => say([realm === 'under' ? 'The dark again. The dead are still walking.' : story.phase === 'summit' ? 'The mountain again. It always starts here.' : 'You wake where you last stood. Olympus remembers you — and so do they.']), 900);
   else {
-    [...WAKE, ...THUNDER, ...INTRO].forEach(l => fetchVoice(l.voice, l.say || l.text, false, l.clip));
+    [...WAKE, WHERE, ...INTRO].forEach(l => fetchVoice(l.voice, l.say || l.text, false, l.clip));
     startPrologue();
   }
   startMic();
@@ -8008,19 +8453,28 @@ function firstNight(seen) {
   dayT = 0.93; storm = 1; story.titans = ''; flags.firstNight = true;
   audio.omen();
   if (TOUCH) setTimeout(ctlChoose, 2500);
-  state = 'dead'; death.phase = 'drop'; death.t = 0; wake.copy(START);
+  state = 'dead'; death.phase = 'drop'; death.t = 0; wake.copy(START); death.first = true; death.asked = false;
   p.pos.set(START.x, START.y + 330, START.z); p.vel.set(0, -18, 0); p.grounded = false; p.spin.set(1.2, 0, 0.4); p.skyK = 0.3;
   resetPose(); human.group.rotation.y = 0; camera.rotation.order = 'XYZ';
   camera.position.set(START.x + 4.5, START.y + 1.2, START.z - 8); lookAt.copy(p.pos);
-  spawnBolt(START.x + 30, START.y, START.z + 40);
-  setTimeout(() => say([...(seen ? [] : WAKE), THUNDER[0], INTRO[0], THUNDER[1], INTRO[1], INTRO[2], INTRO[3], N('wind', 'The wind is going somewhere. Go with it.')]), 500);
+  zeusAt(START.x + 30, START.y, START.z + 40, true);
+  if (!seen) setTimeout(() => say(WAKE), 500);
 }
-$('title').addEventListener('click', begin);
+// the title: a press anywhere is a wingbeat (held, it keeps beating); the button, or Enter, begins
+$('title').addEventListener('pointerdown', e => { if (e.target.closest('#nameRow, .foot')) return; e.preventDefault(); titlePress(true); });
+for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) $('title').addEventListener(ev, () => titlePress(false));
+$('goBtn').addEventListener('click', e => { e.stopPropagation(); nameAsked = true; begin(); });
 addEventListener('keydown', e => {
   if (e.target instanceof HTMLInputElement) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
-  if (state === 'title') { if (e.code === 'KeyN' && resumed) return newGame(); if (!e.metaKey && !e.ctrlKey) begin(); return; }
-  if (state === 'prologue') { if (!e.repeat && ['Space', 'Enter', 'Escape'].includes(e.code)) proSkip(); return; }
+  if (state === 'title') {
+    if (e.code === 'KeyN' && resumed) return newGame();
+    if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { if (!e.repeat) titlePress(true); return; }
+    if (e.code === 'Enter') { nameAsked = true; return begin(); }
+    if (titleFly.asked && /^(Key[A-Z]|Digit\d)$/.test(e.code) && !e.metaKey && !e.ctrlKey) nameInput.focus({ preventScroll: true });   // (typing goes to the name)
+    return;
+  }
+  if (state === 'prologue') { if (e.repeat) return; if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) proPress(true); else if (['Enter', 'Escape'].includes(e.code)) proSkip(); return; }
   if (state === 'end') { if (!e.repeat) closeEnd(); return; }
   if (state === 'talk') {
     if (e.code === 'Escape') endTalk();
@@ -8046,6 +8500,7 @@ addEventListener('keydown', e => {
     case 'Enter': dlgAdvance(); break;
     case 'KeyG': applyTier((tierIdx + 2) % 3, true); break;
     case 'KeyT': asciiOn = !asciiOn; resize(); break;
+    case 'Delete': case 'Backspace': if (!e.repeat) respawnTop(); break;   // (the Mac's "delete" key is Backspace)
     case 'BracketLeft': cellIdx = Math.max(0, cellIdx - 1); resize(); break;
     case 'BracketRight': cellIdx = Math.min(CELLS.length - 1, cellIdx + 1); resize(); break;
     case 'KeyM': openMap(); break;
@@ -8053,14 +8508,16 @@ addEventListener('keydown', e => {
     case 'KeyP': setMuted(!muted); break;
   }
 });
-addEventListener('keyup', e => keys[e.code] = false);
+addEventListener('keydown', e => { if (e.code === 'Tab' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); if (!e.repeat) { who.open = true; who.t = 0; } } }, true);
+addEventListener('keyup', e => { if (e.code === 'Tab') who.open = false; });
+addEventListener('keyup', e => { keys[e.code] = false; if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { if (state === 'prologue') proPress(false); if (state === 'title') titlePress(false); } });
+$('proSkip').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); proSkip(); });
 addEventListener('blur', () => {
   for (const k in keys) keys[k] = false;
   dragging = false; looks.clear(); taps.clear(); joy = null; stick.x = stick.y = 0;
 });
 if (TOUCH) {
-  $('title').querySelector('.go').textContent = '[ tap to begin ]';
-  $('title').querySelector('.keys').innerHTML = 'drag to move · tap to burn · pinch all the way out for the map<br>sound on · headphones recommended';
+  $('titleKeys').innerHTML = 'drag to move · tap to burn · pinch all the way out for the map<br>sound on · headphones recommended';
 }
 
 // ───────────────────────── per-frame updates ─────────────────────────
@@ -8266,7 +8723,7 @@ function xrMove(ev) {
   if (ev === 'flap') { audio.sfx.flap(0.9); return; }
   if (state === 'title') return;
   if (state === 'end') { if (['clap', 'pinch', 'push'].includes(ev) && endReady) closeEnd(); return; }
-  if (state === 'prologue') { if (ev === 'clap' || ev === 'pinch') proSkip(); return; }
+  if (state === 'prologue') { if (ev === 'push') proSkip(); else if (['clap', 'pinch', 'flap', 'leap'].includes(ev)) { proPress(true); setTimeout(() => proPress(false), 200); } return; }
   if (state === 'talk') { if (ev === 'push') endTalk(); else if ((ev === 'clap' || ev === 'pinch') && !live()) fallbackNext(); return; }
   if (state !== 'play') return;
   const p = player, act = spaceAction(), kind = act && act.kind;
@@ -8308,7 +8765,8 @@ function xrHud(dt, sc) {
   const tst = vis('toast'); if (tst) lines.push(['', tst]);
   // what a move will do here
   const act = state === 'play' && spaceAction();
-  const hint = state === 'talk' ? 'speak aloud · push both palms out to leave'
+  const hint = state === 'prologue' ? (pro.act ? pro.act.replace(/SPACE|TAP/, 'CLAP').replace('HOLD  —', 'FLAP  —').replace('HOLD CLAP', 'FLAP') : 'push both palms out to skip')
+    : state === 'talk' ? 'speak aloud · push both palms out to leave'
     : !act ? '' : act.kind === 'talk' || act.kind === 'kindle' || act.kind === 'animal' ? `hold out a palm: ${act.label}`
     : act.kind === 'swoop' ? 'push both palms out: land' : act.kind === 'jump' ? 'clap, or throw both hands up: jump'
     : act.kind === 'ignite' ? 'clap, or throw both hands up: JUMP' : act.kind === 'rebirth' ? 'throw your arms out: catch fire' : `clap: ${act.label}`;
@@ -8355,6 +8813,7 @@ function tick(dt) {
   else if (state === 'warp') updateWarp(dt);
   updateGodDirector(dt);
   updateCinemaState(dt);
+  if (state === 'title') updateTitle(dt);
   streamChunks(Math.floor(player.pos.x / CHUNK), Math.floor(player.pos.z / CHUNK), BUILD_BUDGET);
   updateModels(dt);
   applyMirror(dt);
@@ -8373,7 +8832,7 @@ function tick(dt) {
   updateParticles(dt);
   updateDialog(dt);
   updateTalk(dt);
-  updateHUD(dt);
+  updateHUD(dt); updateWho(dt);
   chart(dt); try { updateWorld(dt); } catch (e) { if (!WORLD.err) { WORLD.err = String(e); console.warn('world', e); } } updateQuests(dt); updateMap(dt);
   updateAudio(dt);
   sky.position.copy(camera.position); stars.position.copy(camera.position);
@@ -8405,15 +8864,12 @@ setTimeout(() => {
     const h = godById.hermes;
     spawnGod(h, MYKONOS.x, MYKONOS.z + 5, true, true); h.pinned = true; h.place = 'HERMES';
   }
-  if (resumed) {
-    $('title').querySelector('.go').textContent = TOUCH ? '[ tap to continue ]' : '[ click or press any key to continue ]';
-    $('newGame').classList.remove('hidden');
-  }
+  if (resumed) $('newGame').classList.remove('hidden');
   $('loading').classList.add('hidden');
   $('title').classList.remove('hidden');
   state = 'title';
-  if (!nameAsked && !TOUCH) { nameInput.focus(); $('title').querySelector('.go').textContent = '[ type your name and press enter ]'; }
-  window.__icarus = { fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  titleStart();
+  window.__icarus = { respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);
