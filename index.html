@@ -1924,11 +1924,14 @@ const hdr = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
 const mix3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 // The bird's fire takes a colour: yours burns red; everyone else's burns in a colour of their own (uTintK 0 would be the
 // fire's own gold and orange). The brightest parts still go white-hot, so it reads as fire whatever the colour.
+// how the air is moving over the feathers, set each frame from his flight: 0 still … 1 fast; flex: the load bending the tips
+const featherFx = { uAir: { value: 0 }, uFlex: { value: 0 } };
 function makeFireMat(tint, k) {
   const m = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
   m.userData.tint = { value: new THREE.Color(tint) }; m.userData.tintK = { value: k };
   m.onBeforeCompile = sh => {
     sh.uniforms.uTime = worldFx.uTime; sh.uniforms.uTint = m.userData.tint; sh.uniforms.uTintK = m.userData.tintK;
+    sh.uniforms.uAir = featherFx.uAir; sh.uniforms.uFlex = featherFx.uFlex;
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uTint; uniform float uTintK;')
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>
         { float L = dot(gl_FragColor.rgb, vec3(0.35, 0.5, 0.15));
@@ -1937,9 +1940,14 @@ function makeFireMat(tint, k) {
           gl_FragColor.rgb = mix(gl_FragColor.rgb, t, uTintK); }
         gl_FragColor.a = 0.5;`);
     // uv.x runs root→tip along each feather, uv.y is the feather's own number: tips shiver and flare, each out of step with the next
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime;')
+    // …and the air moves them: the faster he goes, the faster and harder the trailing edges flutter (a ripple running out
+    // along each feather); slow, they lift and settle in long, lazy breaths; under load the tips bend up together
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime, uAir, uFlex;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
-        transformed.y += sin(uTime * 13.0 + uv.y * 40.0 + uv.x * 5.0) * 0.08 * uv.x * uv.x;`)
+        { float w = uv.x * uv.x;
+          transformed.y += sin(uTime * (7.0 + 17.0 * uAir) - uv.x * 5.5 + uv.y * 40.0) * (0.025 + 0.085 * uAir) * w
+                         + sin(uTime * 2.2 + uv.y * 11.0) * 0.06 * w * (1.0 - uAir * 0.65)
+                         + uFlex * w * 0.32; }`)
       .replace('#include <color_vertex>', `#include <color_vertex>
         vColor.rgb *= 1.0 + uv.x * (0.28 + 0.28 * sin(uTime * 9.0 + uv.y * 55.0));`);
   };
@@ -2636,6 +2644,56 @@ function resetPose() {
   setCurl(human.handL, RELAX, 1); setCurl(human.handR, RELAX, 1);
   human.legL.rotation.set(0, 0, 0); human.legR.rotation.set(0, 0, 0); human.armL.rotation.set(0, 0, 0); human.armR.rotation.set(0, 0, 0);
   human.shinL.rotation.set(0, 0, 0); human.shinR.rotation.set(0, 0, 0); human.foreL.rotation.set(0, 0, 0); human.foreR.rotation.set(0, 0, 0);
+}
+// One wing, joint by joint. (f: the shoulder's lift; fold: the elbow; wfold: the wrist; sweep: forward/back; stretch)
+function setWingSide(i, f, fold, wfold, sweep, stretch) {
+  const w = phoenix.wings[i], sd = i === 0 ? 1 : -1;
+  w.shoulder.rotation.z = -f; w.elbow.rotation.z = -fold; w.wrist.rotation.z = -wfold;
+  w.root.rotation.y = sweep * sd; w.elbow.rotation.y = sweep * 0.35; w.wrist.rotation.y = sweep * 0.5 + wfold * 0.45;
+  w.shoulder.scale.x = stretch;
+}
+// The bird's wings in flight. A beat is a stroke that runs out along the wing like a whip — the shoulder leads, the elbow
+// follows a moment later, the wrist later still — fast and spread on the way down, slower on the way up with the wrist
+// folded to slip back through the air, the whole wing reaching forward as it falls and drawing back as it rises. Beats
+// swell in and die away rather than switching on and off; between them the wing holds a gull's shape and trims itself,
+// each side on its own. Fast, the wings sweep back and flatten; slow, they spread wide; in a turn the inside wing dips
+// and flexes and the outside one lifts; diving, they fold into a teardrop a little at a time. Every joint is eased toward
+// where it is going, so nothing ever snaps.
+const WR = { t: -9, th: 0, A: 0, beat: 0, j: [new Float32Array(5), new Float32Array(5)] };
+function flyWings(dt, o) {
+  const p = player, now = time;
+  if (now - WR.t > 0.25) for (let i = 0; i < 2; i++) {   // (coming back from some other pose: start from where the wings are)
+    const w = phoenix.wings[i], sd = i === 0 ? 1 : -1;
+    WR.j[i].set([-w.shoulder.rotation.z, -w.elbow.rotation.z, -w.wrist.rotation.z, w.root.rotation.y * sd, w.shoulder.scale.x]);
+  }
+  WR.t = now;
+  const sp = clamp((p.speed - 30) / 110, 0, 1), dive = o.dive, bank = clamp(p.bank, -1.2, 1.2);
+  // how hard the wings are working: a beat he just took, a steady drive when boosting or climbing hard
+  WR.beat = Math.max(0, WR.beat - dt / 0.7);
+  const want = Math.max(WR.beat > 0 ? 0.6 + WR.beat * 0.4 : 0, o.boost ? 0.75 : 0, o.climb * 0.55) * (1 - dive * 0.9);
+  WR.A = lerp(WR.A, want, damp(want > WR.A ? 7 : 3.2, dt));
+  const hz = lerp(1.55, 2.4, Math.max(o.boost ? 1 : 0, o.climb * 0.6));
+  WR.th = (WR.th + dt * hz * Math.PI * 2) % (Math.PI * 2);
+  const A = WR.A, th = WR.th, warp = t => t + 0.38 * Math.sin(t);   // (the downstroke takes less of the cycle than the upstroke)
+  const stroke = Math.cos(warp(th)), lagE = Math.cos(warp(th - 0.55)), lagW = Math.cos(warp(th - 1.0));
+  const upE = Math.max(0, -Math.sin(th - 0.5)), upW = Math.max(0, -Math.sin(th - 0.95));
+  for (let i = 0; i < 2; i++) {
+    const sd = i === 0 ? 1 : -1, ph = i * 1.9;
+    const trim = Math.sin(now * 1.3 + ph) * 0.026 + Math.sin(now * 3.7 + ph * 0.6) * 0.012;   // a gliding wing is never quite still
+    const inside = bank * sd;                                                                // + for the wing on the inside of the turn
+    const f = 0.24 - sp * 0.1 - dive * 0.06 + trim - inside * 0.17 + A * (0.95 * stroke + 0.12);
+    const fold = lerp(-0.34 + sp * 0.12 + Math.max(0, inside) * 0.16, 0.78, dive) + A * (0.42 * upE + 0.18 * lagE * 0.4);
+    const wfold = fold * 0.6 + A * 0.55 * upW;
+    const sweep = 0.04 + sp * 0.22 + dive * 0.86 - A * 0.2 * Math.sin(th) + (o.boost ? 0.08 : 0);
+    const stretch = 1.12 - dive * 0.35 + (1 - sp) * 0.06 + A * 0.14 * Math.max(0, -stroke);
+    const J = WR.j[i], k = damp(16, dt);
+    J[0] = lerp(J[0], f, k); J[1] = lerp(J[1], fold, k); J[2] = lerp(J[2], wfold, k); J[3] = lerp(J[3], sweep, damp(10, dt)); J[4] = lerp(J[4], stretch, damp(10, dt));
+    setWingSide(i, J[0], J[1], J[2], J[3], J[4]);
+  }
+  p.wingF = (WR.j[0][0] + WR.j[1][0]) / 2;
+  // the air over the feathers
+  featherFx.uAir.value = lerp(featherFx.uAir.value, clamp((p.speed - 25) / 120, 0, 1) * (1 - dive * 0.3) + dive * 0.4, damp(3, dt));
+  featherFx.uFlex.value = lerp(featherFx.uFlex.value, clamp(Math.abs(bank) * 0.6 + o.climb * 0.5 + A * 0.3 * -stroke, -0.4, 1), damp(5, dt));
 }
 function setWings(f, fold, sweep, stretch) {
   phoenix.wings.forEach((w, i) => {
@@ -4075,13 +4133,14 @@ function updatePhoenix(dt) {
   p.flapCD -= dt;
   if (pin > 0.2 && p.flapCD <= 0) {
     p.flapCD = boost ? 0.5 : 0.72; p.flapPhase = 0;
+    if (WR.A < 0.25) WR.th = 0; WR.beat = 1;   // (a beat from still air starts at the top of the stroke)
     p.speed += 12; p.vy = Math.min(p.vy + 8, 16); p.flame -= 0.005;
     audio.sfx.flap(boost ? 1 : 0.75);
     for (const side of [-1, 1]) {
       _v.set(side * 7.5, 0, 0.8).applyEuler(phoenix.group.rotation).add(p.pos);
       for (let i = 0; i < 8; i++) emit(_v.x, _v.y, _v.z, rnd(5), -4 - Math.random() * 6, rnd(5), 0.5 + Math.random() * 0.4, pick(EMBER));
     }
-  } else if (p.flapCD < -2.4 && !diving) { p.flapCD = 0; p.flapPhase = 0; p.vy += 4; audio.sfx.flap(0.4); }   // one lazy beat to hold the glide
+  } else if (p.flapCD < -2.4 && !diving) { p.flapCD = 0; p.flapPhase = 0; p.vy += 4; audio.sfx.flap(0.4); if (WR.A < 0.25) WR.th = 0; WR.beat = Math.max(WR.beat, 0.55); }   // one lazy beat to hold the glide
 
   // the sky limit: linger above it and the sun takes your wings
   const roof = SKY_LIMIT + perks.sun * 320;
@@ -4093,17 +4152,10 @@ function updatePhoenix(dt) {
   if (!p.riding) p.flame -= (dt / 85 * (boost ? 2.8 : 1) + heat * dt / 6) / (1 + 0.4 * perks.ember);
   if (p.flame <= 0) { p.flame = 0; burnOut('ember'); return; }
 
-  // wings: a long glide pose, one huge stroke per beat, swept right back in a dive
+  // the wings (see flyWings)
   p.flapPhase = Math.min(1, p.flapPhase + dt / 0.55);
   const dive = smoothstep(-0.2, -0.8, p.pitch);
-  if (p.flapPhase < 1) {
-    const s = Math.sin(p.flapPhase * Math.PI * 2);
-    setWings(0.06 + 0.95 * s, Math.max(0, s) * 0.7, 0, 1.12 + Math.max(0, -s) * 0.28);
-  } else {
-    // the glide: shoulders high, hands low, like a gull — so the wing reads from behind and not just from above
-    setWings(0.24 + Math.sin(time * 1.4) * 0.04 + (boost ? Math.sin(time * 14) * 0.05 : 0) - dive * 0.04, lerp(-0.34, 0.75, dive) + Math.sin(time * 1.4 + 1) * 0.03,
-      (boost ? 0.35 : 0.05) + dive * 0.9, 1.12 - dive * 0.35);
-  }
+  flyWings(dt, { boost, dive, climb: clamp(pin, 0, 1) });
 
   const n = boost || dive > 0.5 ? 4 : 2;
   for (let i = 0; i < n; i++) {
@@ -8869,7 +8921,7 @@ setTimeout(() => {
   $('title').classList.remove('hidden');
   state = 'title';
   titleStart();
-  window.__icarus = { respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  window.__icarus = { WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);
