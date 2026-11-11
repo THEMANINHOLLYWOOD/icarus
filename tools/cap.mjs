@@ -10,9 +10,9 @@ http.createServer(async (req, res) => {
   // (any of this machine's own dev servers may send frames)
   const o = req.headers.origin || '', cors = { 'Access-Control-Allow-Origin': /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(o) ? o : 'http://localhost:8123', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
   if (req.method === 'OPTIONS') return res.writeHead(204, cors).end();
-  const m = req.url.match(/^\/f\/([A-Za-z0-9_.-]{1,40})$/);
+  const u = new URL(req.url, 'http://x'), m = u.pathname.match(/^\/f\/([A-Za-z0-9_.-]{1,40})$/), append = u.searchParams.get('a') === '1';   // (?a=1: add to the file — big frames arrive in pieces)
   if (req.method !== 'POST' || !m) return res.writeHead(404, cors).end();
   const chunks = []; for await (const c of req) chunks.push(c);
-  fs.writeFileSync(path.join(out, m[1]), Buffer.concat(chunks));
+  (append ? fs.appendFileSync : fs.writeFileSync)(path.join(out, m[1]), Buffer.concat(chunks));
   res.writeHead(200, cors).end('ok');
 }).listen(8124, '127.0.0.1', () => console.log('capture on 8124 ->', out));

@@ -26,6 +26,8 @@
 <meta name="twitter:description" content="Icarus fell. He woke on Olympus. A story game in endless ASCII country: walk as a boy, burn into a phoenix, and go looking for your father.">
 <meta name="twitter:image" content="https://justkeepflying.com/og/icarus-dust-share.jpg">
 <title>Icarus — The Last Ember</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
@@ -37,6 +39,27 @@
     touch-action:none; overscroll-behavior:none; -webkit-user-select:none; user-select:none;
     -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
   canvas { display:block; width:100vw; height:100vh; cursor:grab; touch-action:none; }
+  /* iPhone Safari: the page is let scroll by one swipe, just so Safari will fold its bar away; the game stays put */
+  html.scrollfs, html.scrollfs body { height:auto; overflow-x:hidden; overflow-y:visible; touch-action:pan-y; }
+  html.scrollfs body { min-height:calc(100vh + 240px); }
+  html.scrollfs canvas { position:fixed; left:0; top:0; }
+  #fsHint { position:fixed; inset:0; z-index:40; display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    background:rgba(5,7,13,.5); touch-action:pan-y; color:#ffd8a8; text-align:center; -webkit-user-select:none; user-select:none; }
+  #fsHint.on { display:flex; }
+  #fsHint b { font-size:30px; line-height:1; animation:fsUp 1.4s ease-in-out infinite; text-shadow:0 0 14px rgba(255,120,40,.8); }
+  #fsHint span { font-size:12px; letter-spacing:.45em; padding-left:.45em; text-shadow:0 0 8px #000; }
+  #fsHint i { font-style:normal; font-size:9px; letter-spacing:.2em; color:var(--dim); margin-top:10px; }
+  #fsHint u { pointer-events:auto; color:var(--dim); font-size:9px; letter-spacing:.2em; margin-top:4px; }
+  @keyframes fsUp { 0%,100% { transform:translateY(8px); opacity:.5; } 50% { transform:translateY(-8px); opacity:1; } }
+  /* a short landscape phone: the title gets smaller and tighter, so the question and the footer fit under the bird */
+  @media (max-height: 500px) {
+    html #title { padding-top:max(3vh, 10px); padding-bottom:max(2vh, 8px); }
+    html #title h1 { font-size:min(11vw, 19vh); }
+    html #title .sub { font-size:10px; }
+    html #title #nameRow { flex-direction:row; gap:16px; } html #nameRow label { margin:0; } html #nameInput { font-size:17px; padding:2px 0 4px; width:min(220px, 28vw); } html #title .go { padding:6px 14px 6px calc(14px + .45em); font-size:11px; }
+    html #title .foot { margin-top:1.4vh; gap:2px; } html #title .foot .keys { font-size:9px; line-height:1.5; } html #titleKeys { display:none; }
+    html #title .flyhint { top:76%; }
+  }
   canvas.drag { cursor:grabbing; }
   .hidden { display:none !important; }
   #hud { position:fixed; inset:0; z-index:6; pointer-events:none; text-shadow:0 0 6px rgba(0,0,0,.9), 0 0 2px #000; }
@@ -125,6 +148,21 @@
   #who .r:first-of-type { border-top:none; }
   #who .r i { font-style:normal; text-align:right; color:var(--dim); } #who .r u { text-decoration:none; color:var(--dim); font-size:10px; } #who .r em { font-style:normal; text-align:center; }
   #who .none { text-align:center; color:var(--dim); padding:6px 0 2px; }
+  #micBtn { position:fixed; left:calc(12px + env(safe-area-inset-left, 0px)); bottom:54px; z-index:6; width:34px; height:34px; border-radius:17px; padding:0;
+    border:1px solid rgba(255,200,140,.35); background:rgba(0,0,0,.45); color:#ffd8a8; cursor:pointer; display:none; align-items:center; justify-content:center; opacity:.7; }
+  #micBtn.on { display:flex; } #micBtn.muted { color:rgba(244,234,210,.45); border-color:rgba(255,255,255,.18); } #micBtn.talk { opacity:1; box-shadow:0 0 0 2px rgba(255,140,60,.55); }
+  #micBtn svg { width:16px; height:16px; }
+  #primer { position:fixed; inset:0; z-index:12; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; text-align:center; padding:0 24px;
+    background:#05070d; color:var(--ink); pointer-events:none; }
+  #primer.on { display:flex; animation:fadeIn 1.2s ease; }
+  #primer b { font-weight:400; font-size:clamp(15px, 2.4vw, 22px); letter-spacing:.42em; padding-left:.42em; color:#ffd8a8; }
+  #primer span { font-size:12px; letter-spacing:.18em; color:var(--dim); max-width:520px; line-height:1.9; }
+  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  #tut { position:fixed; left:50%; top:calc(var(--sb, 0px) + 19vh); transform:translate(-50%, -6px); z-index:6; pointer-events:none; display:flex; align-items:center; gap:14px;
+    font-size:11px; letter-spacing:.32em; color:var(--ink); text-shadow:0 0 8px #000, 0 0 2px #000; opacity:0; transition:opacity .6s, transform .6s; white-space:nowrap; }
+  #tut.on { opacity:1; transform:translate(-50%, 0); }
+  #tut kbd { font:inherit; font-size:11px; letter-spacing:.18em; padding:5px 10px 5px calc(10px + .18em); border:1px solid rgba(255,190,130,.55); border-radius:3px; color:#ffd8a8; background:rgba(10,8,8,.35); }
+  #tut.done kbd { border-color:rgba(190,255,220,.8); color:#bfffd8; }
   #whoBtn { position:fixed; right:calc(12px + env(safe-area-inset-right, 0px)); top:calc(var(--sb, 0px) + 12px); z-index:6; height:28px; padding:0 11px; border-radius:14px;
     border:1px solid rgba(255,200,140,.3); background:rgba(0,0,0,.45); color:#ffd8a8; font:inherit; font-size:10px; letter-spacing:.2em; display:none; cursor:pointer; }
   .touch #whoBtn.some { display:block; }
@@ -245,7 +283,9 @@
 <div id="toast"></div>
 <div id="card"><b></b><i></i></div>
 <div id="proSub"><b></b><span></span></div><div id="proSkip"></div><div id="proAct"></div>
-<div id="who"></div><button id="whoBtn" type="button"></button>
+<div id="fsHint"><b>↑</b><span>SWIPE UP · FULL SCREEN</span><i>for no browser at all: Share → Add to Home Screen</i><u id="fsKeep">keep the bar</u></div>
+<div id="primer"><b>YOU WILL SPEAK FOR HIM</b><span>his father, the gods and the world hear your voice — allow the microphone<br>(no microphone? you can tap instead)</span></div><div id="tut"><kbd></kbd><span></span></div>
+<div id="who"></div><button id="micBtn" type="button" aria-label="Microphone"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15"/><path class="x" d="M2 2l12 12" style="display:none"/></svg></button><button id="whoBtn" type="button"></button>
 <div id="map"><canvas id="mapC"></canvas><div id="mapTitle"></div><div id="mapHint"></div></div>
 
 
@@ -261,6 +301,7 @@
     <div class="keys" id="titleKeys">sound on · microphone on · M opens the map</div>
     <div class="keys hidden" id="newGame" style="pointer-events:auto; cursor:pointer">[ N — start a new life ]</div>
     <div class="keys hidden" id="xrRow" style="pointer-events:auto; cursor:pointer; color:#ffc46a; letter-spacing:.25em">[ ◎ FLY WITH YOUR BODY · IMMERSIVE ]</div>
+    <div class="keys hidden" id="homeTip" style="opacity:.6">for full screen with no browser: Share → Add to Home Screen</div>
     <div class="keys" id="codeRow" style="pointer-events:auto; opacity:.7">your travel code · <b id="codeShow" style="letter-spacing:.2em; user-select:all; cursor:text"></b> · <u id="codeUse" style="cursor:pointer">come back with yours</u></div>
   </div>
 </div>
@@ -677,7 +718,25 @@ function treeKind(x, z, y, r) {
   if (wet < -0.15) return r() < 0.5 ? 'olive' : r() < 0.6 ? 'cypress' : 'oak';
   return r() < 0.4 ? 'oak' : r() < 0.55 ? 'pine' : r() < 0.6 ? 'cypress' : 'birch';
 }
+// Trees go in before the villages are laid out, so each one is remembered (which vertices, which solids) and any
+// that a house or chapel later lands on are taken away again: nothing grows through a roof.
+let TREES = null, CLEAR = null;
 function growTree(acc, x, y, z, r, s, kind) {
+  if (!TREES || !acc.fast) return growTree0(acc, x, y, z, r, s, kind);
+  const rec = { x, z, v0: acc.n, s0: SOLIDS ? SOLIDS.length : 0 };
+  growTree0(acc, x, y, z, r, s, kind);
+  rec.v1 = acc.n; rec.s1 = SOLIDS ? SOLIDS.length : 0; TREES.push(rec);
+}
+function clearTrees() {
+  if (!TREES || !CLEAR?.length) return;
+  const P = fastBuf.P;
+  for (const t of TREES) {
+    if (!CLEAR.some(c => (t.x - c.x) ** 2 + (t.z - c.z) ** 2 < c.r * c.r)) continue;
+    for (let v = t.v0 + 1; v < t.v1; v++) { P[v * 3] = P[t.v0 * 3]; P[v * 3 + 1] = P[t.v0 * 3 + 1]; P[v * 3 + 2] = P[t.v0 * 3 + 2]; }   // (folded to a point: nothing drawn)
+    for (let k = t.s0; k < t.s1; k++) if (SOLIDS[k]) SOLIDS[k].y1 = -1e9;
+  }
+}
+function growTree0(acc, x, y, z, r, s, kind) {
   if (kind === 'snag') return _snag(acc, x, y, z, r, s);
   const jr = k => (r() - 0.5) * 2 * k;
   kind = kind || treeKind(x, z, y, r);
@@ -921,11 +980,11 @@ function buildChunk(cx, cz) {
 
   // trees, rocks, sheep
   const rng = mulberry32((cx * 73856093) ^ (cz * 19349663) ^ 0x5bd1e995);
-  const acc = fastAcc(), solids = SOLIDS = [];
+  const acc = fastAcc(), solids = SOLIDS = [], rooms = ROOMS = []; TREES = []; CLEAR = [];
   if (realm === 'under') {
     underDeco(cx, cz, rng, acc, group);
     if (acc.n) { const m = new THREE.Mesh(accToGeo(acc), decoMat); m.castShadow = m.receiveShadow = true; group.add(m); }
-    group.userData.solids = solids; SOLIDS = null;
+    group.userData.solids = solids; SOLIDS = null; group.userData.rooms = rooms; ROOMS = null; TREES = CLEAR = null;
     scene.add(group);
     return group;
   }
@@ -958,7 +1017,7 @@ function buildChunk(cx, cz) {
   growForest(acc, x0, z0, mulberry32((cx * 83492791) ^ (cz * 49979687) ^ 0x2545f491));
   buildFeatures(cx, cz, rng, acc, group);
   if (acc.n) { const m = new THREE.Mesh(accToGeo(acc), decoMat); m.castShadow = m.receiveShadow = true; group.add(m); }
-  group.userData.solids = solids; SOLIDS = null;
+  clearTrees(); group.userData.solids = solids; SOLIDS = null; group.userData.rooms = rooms; ROOMS = null; TREES = CLEAR = null;
   scene.add(group);
   return group;
 }
@@ -967,7 +1026,7 @@ const chunks = new Map();
 // ───────────────────────── things that do not move for him ─────────────────────────
 // Every tree, rock, house and hanging stone is a short upright cylinder the game can ask about. Chunks keep their own;
 // the sky islands, the temples and the columns under the sea are few enough to ask one by one.
-let SOLIDS = null;   // while a chunk is being built: the list its solids go on
+let SOLIDS = null, ROOMS = null;   // (and the rooms in it that can be walked into)   // while a chunk is being built: the list its solids go on
 // soft: leaves, something a burning bird goes through at a price. t: the radius of the trunk inside it, for a man on foot.
 function solid(x, z, r, y0, y1, what, soft = false, t = 0, yb = y0) { if (SOLIDS) SOLIDS.push({ x, z, r, y0, y1, what, soft, t, yb }); }
 const _hit = { nx: 0, ny: 0, nz: 0, soft: false, what: '', core: 0 };
@@ -2240,14 +2299,14 @@ rt.depthTexture = new THREE.DepthTexture(4, 4);
 const postMat = new THREE.ShaderMaterial({
   uniforms: { tScene: { value: rt.texture }, tDepth: { value: rt.depthTexture }, tGlyph: { value: glyphs.tex }, uRes: { value: new THREE.Vector2() },
     uCell: { value: new THREE.Vector2() }, uAscii: { value: 1 }, uTotal: { value: glyphs.total }, uGA: { value: glyphs.A }, uGB: { value: glyphs.B }, uEdgeIdx: { value: glyphs.edge },
-    tPrev: { value: null }, uPersist: { value: 0 }, tTitle: { value: null }, uTitleT: { value: -1 },
+    tPrev: { value: null }, uPersist: { value: 0 }, tTitle: { value: null }, uTitleT: { value: -1 }, uSunUV: { value: new THREE.Vector2(0.5, 0.8) }, uRays: { value: 0 },
     tName: { value: null }, uNameN: { value: 7 },
     uNear: { value: 0.3 }, uFar: { value: 14000 }, uEdge: { value: 1 }, uFlash: { value: 0 }, uFlashCol: { value: new THREE.Color(1, 0.75, 0.45) }, uHeat: { value: 0 }, uGlow: { value: 0 },
     uTint: { value: new THREE.Color(1, 1, 1) }, uFade: { value: 1 }, uWarp: { value: 0 }, uSpeed: { value: 0 }, uTime: worldFx.uTime },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tScene, tDepth, tGlyph, tName, tPrev; uniform vec2 uRes, uCell; uniform vec3 uTint, uFlashCol; uniform float uNameN;
-    uniform float uAscii, uTotal, uNear, uFar, uEdge, uFlash, uHeat, uGlow, uFade, uWarp, uSpeed, uTime, uPersist, uTitleT; uniform sampler2D tTitle;
+    uniform float uAscii, uTotal, uNear, uFar, uEdge, uFlash, uHeat, uGlow, uFade, uWarp, uSpeed, uTime, uPersist, uTitleT, uRays; uniform vec2 uSunUV; uniform sampler2D tTitle;
     // ── the name, on fire. A texture of the word stretched to fill the screen; flames are the word's own shape pulled upward
     //    by moving noise; then a ragged front burns through it, leaving a glowing edge, char, and then nothing but sparks.
     float hT(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 45758.5453); }
@@ -2394,6 +2453,18 @@ const postMat = new THREE.ShaderMaterial({
         vec3 wc = mix(vec3(0.45, 1.0, 0.72), vec3(1.0, 0.6, 0.88), 0.5 + 0.5 * sin(wa * 5.0 + 1.0));
         col = mix(col, vec3(0.9, 1.0, 0.95), uWarp * uWarp * 0.75) + (wc * ws * (0.4 + wr * 2.0) + 0.15) * uWarp;
       }
+      if (uRays > 0.003) {
+        // light shafts: walk from this pixel toward the sun, adding up how much open, bright sky is on the way, so the
+        // sun pours through every gap in the cloud and between the peaks, fanning out across the frame
+        vec2 dr = (uSunUV - vUv) / 26.0, ur = vUv; float acc = 0.0, wr = 1.0;
+        for (int i = 0; i < 26; i++) {
+          ur += dr; vec2 cu = clamp(ur, 0.002, 0.998);
+          float open = step(0.99995, texture2D(tDepth, cu).r);
+          acc += open * smoothstep(0.55, 1.4, dot(texture2D(tScene, cu).rgb, vec3(0.33))) * wr; wr *= 0.94;
+        }
+        float near = 1.0 - smoothstep(0.0, 0.95, length((vUv - uSunUV) * vec2(uRes.x / uRes.y, 1.0)));
+        col += vec3(1.0, 0.8, 0.52) * (acc / 9.0) * uRays * (0.3 + 0.7 * near);
+      }
       vec2 q = vUv - 0.5;
       col *= 1.0 - 0.4 * pow(length(q) * 1.35, 2.6);
       col *= uFade;
@@ -2507,7 +2578,7 @@ function updateAudio(dt) {
     speed: isH ? Math.hypot(p.vel.x, p.vel.y, p.vel.z) : p.speed, vy: isH ? p.vel.y : dir3.y * p.speed + p.vy,
     grounded: isH && p.grounded, diving: !isH && p.pitch < -0.3, boost: !isH && boosting(), flame: p.flame, realm,
     summit: over && isH && p.pos.y > CLOUD_SEA + 200, sky: over ? smoothstep(CLOUD_SEA - 150, CLOUD_SEA + 250, p.pos.y) : 0,
-    water: gnd < WATER ? clamp(1 - (p.pos.y - WATER) / 45, 0, 1) : 0, skim: skim.s, sub: SEA.murk, rain: rainAmt, burning: !!p.cine, falling: isH && !p.grounded && !p.wings && p.vel.y < -8,
+    water: gnd < WATER ? clamp(1 - (p.pos.y - WATER) / 45, 0, 1) : 0, skim: skim.s, sub: SEA.murk, rain: Math.min(1, rainAmt * 1.4), burning: !!p.cine, falling: isH && !p.grounded && !p.wings && p.vel.y < -8,
     wind: clamp(gust * 0.6 + cloudIn + (windLead ? 0.3 : 0) + storm * 0.6, 0, 1),
   });
 }
@@ -2708,7 +2779,7 @@ function setWings(f, fold, sweep, stretch) {
 // for a man hanging under its wings (to land) — and the winged man back for the bird.
 const COST = { ignite: 0.05, wings: 0.04, rebirth: 0.1 };
 const stats = { crashes: 0, perfect: 0, toldWings: false, toldCrash: false, dove: false };
-const ROLL_ALT = 30, ROLL_T = 0.85;   // press SPACE this close to anything and he swoops in, rolls, and stands
+const ROLL_ALT = 30, ROLL_T = 1.15;   // press SPACE this close to anything and he swoops in, rolls, and stands
 function spaceAction() {
   if (player.sub) return null;   // in the water there is nothing to do but keep going
   const p = player;
@@ -2758,7 +2829,7 @@ function pressSpace() {
   p.flame -= cost; p.wings = false; p.sliding = false;
   // the first time, he turns to face the drop: the jump goes out over it, not back onto the snow
   if (!flags.morphed && p.grounded) human.group.rotation.y = Math.atan2(MOUNT.x - EDGE.x, MOUNT.z - EDGE.z);
-  p.cine = { type: p.grounded ? 'ignite' : 'igniteAir', t: 0, quick: flags.morphed };
+  p.cine = { type: p.grounded ? 'ignite' : 'igniteAir', t: 0, quick: flags.morphed }; netFx(p.grounded ? 'ignite' : 'rebirth');
   if (story.phase === 'leap' && !flags.titled) { p.cine.title = true; audio.song(SONG_DROP); }
 }
 
@@ -2873,7 +2944,7 @@ function updateCine(dt) {
   p.pos.y = Math.max(p.pos.y, floorAt() + 5);
   if (k >= 1) {
     p.cine = null; p.scale = 1; fireLight.intensity = 0;
-    if (!flags.morphed) { cinema.autoT = 20; witness('threw himself off the mountain top, burned alive in mid-air, and came out of the fire as a phoenix'); }   // his first sight of himself: let the cameras have it
+    if (!flags.morphed) { flags.wideT = 7; witness('threw himself off the mountain top, burned alive in mid-air, and came out of the fire as a phoenix'); TUT.later = ['flight', 2, time + 9]; }   // his first sight of himself: very wide, then in behind him
     if (story.phase === 'leap' || story.phase === 'summit') { story.phase = 'gods'; say(GODS_INTRO, '', true); flags.flapHintT = 16; if (!story.titans) startTitans(); saveSoon(); }
     else if (!flags.morphed) flags.flapHintT = 10;
     flags.morphed = true;
@@ -2918,7 +2989,7 @@ function openWings(quick) {
   human.rig.rotation.x = -1.0;
   for (let i = 0; i < 90; i++)
     emit(p.pos.x + rnd(2.5), p.pos.y + rnd(1), p.pos.z + rnd(2.5), rnd(6) + p.vel.x * 0.5, rnd(6) + p.vel.y * 0.5, rnd(6) + p.vel.z * 0.5, 0.5 + Math.random() * 0.6, i % 3 ? pick(EMBER) : pick(ASH));
-  flash = 0.22; if (quick) audio.sfx.swoop(); else audio.sfx.wingsOpen();
+  flash = 0.22; if (quick) audio.sfx.swoop(); else audio.sfx.wingsOpen(); netFx(quick ? 'swoop' : 'wings');
   if (!quick && !stats.toldWings) {
     stats.toldWings = true;
     say([`Your wings will stop you — but they need time. ${TOUCH ? 'Drag up' : 'Hold W'} to brake harder, and touch down soft.`], '', true);
@@ -2942,7 +3013,7 @@ function landWinged(hs, vy, water) {
   if (p.quick && !water) {   // the swoop: hit the ground rolling
     p.quick = false; p.rollT = ROLL_T; p.vel.y = 0;
     const sp = Math.min(hs, 16) / (hs || 1); p.vel.x *= sp; p.vel.z *= sp;
-    audio.sfx.roll(); camShake = 0.25;
+    audio.sfx.roll(); camShake = 0.25; netFx('roll');
     if (Math.random() < 0.5) witness('swooped in low and rolled out of the landing on his shoulder');
     return;
   }
@@ -2962,7 +3033,7 @@ function landWinged(hs, vy, water) {
     return;
   }
   p.landT = 0.5; p.vel.x *= 0.4; p.vel.z *= 0.4;
-  if (water) { audio.sfx.splash(false); ripple(p.pos.x, p.pos.z, 1.4); } else audio.sfx.land(clamp(Math.hypot(hs, vy) / 30, 0.2, 1));
+  if (water) { audio.sfx.splash(false); ripple(p.pos.x, p.pos.z, 1.4); } else { audio.sfx.land(clamp(Math.hypot(hs, vy) / 30, 0.2, 1)); netFx('land'); }
   if (hs < 13 && vy > -6.5) {
     stats.perfect++; p.flame = Math.min(1, p.flame + 0.2);
     chime([783.99, 1174.66], 0.07); toast('PERFECT LANDING');
@@ -2970,8 +3041,18 @@ function landWinged(hs, vy, water) {
   }
   saveSoon();
 }
+// down: the wings fold in against his back and burn away, rather than vanishing (rolling or walking, whichever comes first)
+function stowWings(dt) {
+  const p = player;
+  p.wingStow = Math.max(0, (p.wingStow ?? 0) - dt * 2.8);
+  if (p.wingStow <= 0 || p.tumble) {
+    setManWings(0, 0, 0, 0, 0);
+    for (let i = 0; i < 40; i++) emit(p.pos.x + rnd(1.2), p.pos.y + 1.6 + rnd(0.5), p.pos.z + rnd(1.2), rnd(3), 1 + Math.random() * 3, rnd(3), 0.7, pick(EMBER));
+  } else { const k = p.wingStow; setManWings(0.55 * k, 0.2 + 1.1 * (1 - k), 0.95 * (1 - k), Math.max(0.02, k), 0.25); }
+}
 function updateRoll(dt) {
   const p = player;
+  if (human.wings.visible) stowWings(dt);
   p.rollT -= dt;
   const u = 1 - Math.max(0, p.rollT) / ROLL_T, e = u * u * (3 - 2 * u), s = Math.sin(u * Math.PI);
   const drag = Math.pow(0.12, dt);
@@ -2980,12 +3061,25 @@ function updateRoll(dt) {
   const g = groundAt(p.pos.x, p.pos.z, p.pos.y + 0.5);
   if (g < p.pos.y - 2.5) { p.rollT = 0; p.grounded = false; p.fallTop = p.pos.y; resetPose(); return; }   // rolled off an edge
   p.pos.y = Math.max(g, WATER - 1.1); p.fallTop = p.pos.y;
-  // one tucked forward somersault, then up onto his feet
-  human.rig.rotation.set(-Math.PI * 2 * e, 0, 0); human.rig.position.y = 1.0 - s * 0.55;
-  human.legL.rotation.x = human.legR.rotation.x = s * 1.7; human.shinL.rotation.x = human.shinR.rotation.x = -s * 2.0;
-  human.armL.rotation.set(s * 1.4, 0, -0.2); human.armR.rotation.set(s * 1.4, 0, 0.2);
-  human.foreL.rotation.x = human.foreR.rotation.x = s * 1.3; human.head.rotation.x = -s * 0.5;
-  if (Math.random() < 0.8) emit(p.pos.x + rnd(0.7), p.pos.y + 0.2, p.pos.z + rnd(0.7), rnd(2), 1 + Math.random() * 2, rnd(2), 0.6, pick(ASH));
+  // A shoulder roll, the way a parkour runner takes a drop: reach for the ground and tuck the head (the first fifth),
+  // go over diagonally — right shoulder to left hip — tight as a ball (the middle), come up already in a crouch, a hand
+  // pushing off the ground, and rise out of it still moving. The roll itself is fast; the getting up is not.
+  const H = human, R = H.rig;
+  const a = smoothstep(0.08, 0.68, u), turn = a * a * (3 - 2 * a);                 // how far round he has gone
+  const tuck = smoothstep(0.05, 0.25, u) * (1 - smoothstep(0.55, 0.78, u));      // balled up
+  const crouch = smoothstep(0.6, 0.72, u) * (1 - smoothstep(0.8, 1, u));         // landed in a crouch, then standing
+  const reach = smoothstep(0, 0.12, u) * (1 - smoothstep(0.18, 0.3, u));         // hands to the ground first
+  R.rotation.set(-Math.PI * 2 * turn, 0, Math.sin(turn * Math.PI) * 0.55);       // over the shoulder, not the head
+  R.position.y = 1.0 - tuck * 0.58 - crouch * 0.38 - reach * 0.2;
+  H.chest.rotation.set(0.5 * tuck + 0.3 * crouch, 0, Math.sin(turn * Math.PI) * 0.25);
+  H.head.rotation.set(0.8 * tuck + 0.3 * reach - 0.2 * crouch, Math.sin(turn * Math.PI) * 0.3, 0);   // chin to chest
+  H.legL.rotation.x = 1.9 * tuck + 1.45 * crouch; H.legR.rotation.x = 1.75 * tuck + 0.9 * crouch;
+  H.shinL.rotation.x = -2.2 * tuck - 2.0 * crouch; H.shinR.rotation.x = -2.0 * tuck - 1.4 * crouch;
+  H.footL.rotation.x = 0.5 * tuck + 0.6 * crouch; H.footR.rotation.x = 0.4 * tuck + 0.3 * crouch;
+  H.armL.rotation.set(-1.2 * reach + 1.1 * tuck + 0.7 * crouch, 0, -0.25 - 0.3 * crouch); H.armR.rotation.set(-1.4 * reach + 1.3 * tuck - 0.4 * crouch, 0, 0.3 + 0.5 * crouch);
+  H.foreL.rotation.x = 0.4 * reach + 1.3 * tuck + 0.5 * crouch; H.foreR.rotation.x = 0.3 * reach + 1.2 * tuck + 0.2 * crouch;   // (the right hand pushes off the ground on the way up)
+  setCurl(H.handL, tuck > 0.3 ? FIST : RELAX, 0.4); setCurl(H.handR, crouch > 0.3 ? OPEN : tuck > 0.3 ? FIST : RELAX, 0.4);
+  if (u > 0.12 && u < 0.7 && Math.random() < 0.9) emit(p.pos.x + rnd(0.5), p.pos.y + 0.15, p.pos.z + rnd(0.5), rnd(2) - p.vel.x * 0.1, 1 + Math.random() * 2.5, rnd(2) - p.vel.z * 0.1, 0.7, pick(ASH));
   if (p.rollT <= 0) { p.rollT = 0; resetPose(); p.landT = 0.3; saveSoon(); }
 }
 function updateStumble(dt) {
@@ -3151,7 +3245,7 @@ function updateHuman(dt) {
       else {
         if (p.vel.y < -4 && !inWater) p.land = { t: 0, T: clamp(0.22 - p.vel.y * 0.012, 0.25, 0.55), d: clamp((-p.vel.y - 3) / 16, 0.2, 1) };
         if (inWater) { audio.sfx.splash(p.vel.y < -25); ripple(p.pos.x, p.pos.z, 2); for (let i = 0; i < 50; i++) emit(p.pos.x + rnd(1), WATER + 0.3, p.pos.z + rnd(1), rnd(5), 3 + Math.random() * 7, rnd(5), 0.9, [0.5, 0.6, 0.7], -14); }
-        else if (p.vel.y < -5 && state === 'play') audio.sfx.land(clamp(-p.vel.y / 30, 0.15, 1));
+        else if (p.vel.y < -5 && state === 'play') { audio.sfx.land(clamp(-p.vel.y / 30, 0.15, 1)); netFx('land'); }
         if (p.vel.y < -18) for (let i = 0; i < 40; i++) emit(p.pos.x, p.pos.y + 0.3, p.pos.z, rnd(8), Math.random() * 5, rnd(8), 0.8, pick(ASH));
       }
       p.vel.y = 0;
@@ -3196,7 +3290,7 @@ function updateHuman(dt) {
     const stroke = amp * (down ? lerp(0.95, -0.6, ease(u)) : lerp(-0.6, 0.95, ease(u)));
     const wfold = amp * (down ? 0 : Math.sin(u * Math.PI) * 0.85);
     if (amp > 0.15 && down && !p.wbDown) {
-      audio.sfx.flap(0.45 + amp * 0.5);
+      audio.sfx.flap(0.45 + amp * 0.5); netFx('beat');
       for (const sd of [-1, 1]) { human.wings.localToWorld(_v.set(sd * 9, -0.4, 0.6)); for (let i = 0; i < 6; i++) emit(_v.x, _v.y, _v.z, rnd(3), -3 - Math.random() * 5, rnd(3), 0.6, pick(EMBER)); }
     }
     p.wbDown = down;
@@ -3216,14 +3310,7 @@ function updateHuman(dt) {
     }
     return;
   }
-  if (human.wings.visible) {
-    // down: the wings fold in against his back and burn away, rather than vanishing
-    p.wingStow = Math.max(0, (p.wingStow ?? 0) - dt * 2.2);
-    if (p.wingStow <= 0 || p.tumble) {
-      setManWings(0, 0, 0, 0, 0);
-      for (let i = 0; i < 40; i++) emit(p.pos.x + rnd(1.2), p.pos.y + 1.6 + rnd(0.5), p.pos.z + rnd(1.2), rnd(3), 1 + Math.random() * 3, rnd(3), 0.7, pick(EMBER));
-    } else { const k = p.wingStow; setManWings(0.55 * k, 0.2 + 1.1 * (1 - k), 0.95 * (1 - k), Math.max(0.02, k), 0.25); }
-  }
+  if (human.wings.visible) stowWings(dt);
   if (p.tumble) { skydive(dt); return; }
   p.skyK = 0;
   bodyLanguage(dt, hs, swimming);
@@ -3254,6 +3341,15 @@ function skydive(dt) {
   H.shinL.rotation.x = -0.9 * e - (0.6 + Math.cos(time * 12) * 0.5) * w + b1; H.shinR.rotation.x = -0.9 * e - (0.6 - Math.cos(time * 12) * 0.5) * w + b2;
   H.footL.rotation.x = H.footR.rotation.x = 0.55 * e;
   H.scarf.rotation.x = 2.6 + Math.sin(time * 20) * 0.3;
+  // the ground coming: arms thrown forward over the head, knees up — the body knows, even if it is too late
+  const alt = p.pos.y - groundAt(p.pos.x, p.pos.z, p.pos.y), br = smoothstep(Math.max(10, -p.vel.y * 0.55), 3, alt);
+  if (br > 0.01) {
+    H.armL.rotation.x = lerp(H.armL.rotation.x, -2.5, br); H.armR.rotation.x = lerp(H.armR.rotation.x, -2.3, br);
+    H.armL.rotation.z = lerp(H.armL.rotation.z, -0.35, br); H.armR.rotation.z = lerp(H.armR.rotation.z, 0.35, br);
+    H.foreL.rotation.z = lerp(H.foreL.rotation.z, -0.5, br); H.foreR.rotation.z = lerp(H.foreR.rotation.z, 0.5, br);
+    H.legL.rotation.x = lerp(H.legL.rotation.x, 0.9, br); H.legR.rotation.x = lerp(H.legR.rotation.x, 0.5, br);
+    H.head.rotation.x = lerp(H.head.rotation.x, 0.5, br);
+  }
 }
 
 // ───────────────────────── how he moves ─────────────────────────
@@ -3469,7 +3565,7 @@ function jump() {
   if (sprint) { p.vel.x *= 1.14; p.vel.z *= 1.14; }
   p.jumpKind = sprint ? 'sprint' : hs > 3 ? 'run' : 'stand'; p.jumpLead = Math.sin(body.ph) > 0 ? 1 : -1;
   body.exert = Math.min(1, body.exert + 0.04);
-  audio.sfx.jump();
+  audio.sfx.jump(); netFx('jump');
   for (let i = 0; i < 14; i++) emit(p.pos.x + rnd(0.4), p.pos.y + 0.1, p.pos.z + rnd(0.4), rnd(2), Math.random() * 2, rnd(2), 0.6, pick(ASH), -4);
 }
 // climbing: a rock face too steep to walk up, or the trunk of a tree
@@ -3757,6 +3853,8 @@ function netJoin() {
   ch.on('broadcast', { event: 'say' }, ({ payload: m }) => gotSay(m));
   ch.on('broadcast', { event: 'hit' }, ({ payload: m }) => gotHit(m));
   ch.on('broadcast', { event: 'ev' }, ({ payload: m }) => gotEvent(m));
+  ch.on('broadcast', { event: 'rtc' }, ({ payload: m }) => gotRtc(m));
+  ch.on('broadcast', { event: 'fx' }, ({ payload: m }) => gotFx(m));
   ch.subscribe((status, err) => {
     NET.log.push([Math.round(performance.now() / 100) / 10, status, err ? String(err.message || err).slice(0, 120) : '']); if (NET.log.length > 20) NET.log.shift();
     if (ch !== NET.ch) return;
@@ -3892,7 +3990,8 @@ function placeWaypoint(P, d, said, bird) {
   el.style.display = '';
   el.style.left = ((x * 0.5 + 0.5) * innerWidth) + 'px'; el.style.top = ((-y * 0.5 + 0.5) * innerHeight) + 'px';
   el.className = 'mk peer wp' + (edge ? ' edge' : '') + (d > 900 && !said ? ' far' : '') + (said ? ' lit' : '');
-  const glyph = edge ? WP_ARROWS[(Math.round(Math.atan2(y, x) / (Math.PI / 4)) + 8) % 8] : said ? '“' : '◆';
+  const glyph = edge ? WP_ARROWS[(Math.round(Math.atan2(y, x) / (Math.PI / 4)) + 8) % 8] : said ? '“' : P.talking ? '◉' : '◆';
+  if (P.talking) el.classList.add('lit');
   el.firstChild.textContent = glyph;
   el.lastChild.textContent = said ? `${P.name}: ${said}` : d > 40 ? `${P.name} · ${fmtDist(d)}` : P.name;
 }
@@ -3981,6 +4080,139 @@ function knocked(P) {
   p.fallCause = 'collide';
   witness(`flew straight into another flier, ${P.name}, in mid-air, and both of them fell out of the sky as men`);
 }
+// ───────────────────────── proximity voice ─────────────────────────
+// Anyone near enough to see is near enough to hear. Two players close together are joined directly, browser to browser,
+// and each hears the other's real voice from where they are: louder close, gone past a hundred-odd metres, from the left
+// or the right. The connection is made through the world channel (one offer, one answer, nothing else) and dropped again
+// once they drift apart. The microphone button (or V) mutes you: nobody hears you, and the world stops listening.
+const VC = { pcs: new Map(), muted: false, t: 0, ice: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }], ok: !!window.RTCPeerConnection, talk: 0 };
+try { VC.muted = localStorage.getItem('icarus.muted') === '1'; } catch {}
+const VC_NEAR = 130, VC_FAR = 200;
+const vcTrack = () => (mic.stream && !VC.muted ? mic.stream.getAudioTracks()[0] : null) || null;
+function vcSig(to, m) { if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'rtc', payload: { i: NET.id, to, ...m } }); }
+const iceDone = pc => new Promise(res => {
+  if (pc.iceGatheringState === 'complete') return res();
+  const t = setTimeout(res, 2000);
+  pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); } });
+});
+function vcNew(id, answering = false) {
+  vcClose(id);
+  const pc = new RTCPeerConnection({ iceServers: VC.ice });
+  // (the caller opens the one audio channel; the answerer takes up the caller's once the offer is in — see gotRtc)
+  const tr = answering ? null : pc.addTransceiver('audio', { direction: 'sendrecv' });
+  const V = { pc, tr, id, el: null, g: null, pan: null, an: null, buf: null, level: 0, live: false, born: performance.now() };
+  const t = vcTrack(); if (t && tr) tr.sender.replaceTrack(t).catch(() => {});
+  pc.ontrack = e => {
+    if (!AC || V.g) return;
+    const stream = e.streams[0] || new MediaStream([e.track]);
+    V.el = new Audio(); V.el.muted = true; V.el.srcObject = stream; V.el.play?.().catch(() => {});   // (some browsers only let a remote stream flow once it is attached to an element)
+    const src = AC.createMediaStreamSource(stream);
+    V.g = AC.createGain(); V.g.gain.value = 0; V.pan = AC.createStereoPanner ? AC.createStereoPanner() : null;
+    V.an = AC.createAnalyser(); V.an.fftSize = 512; V.buf = new Float32Array(V.an.fftSize);
+    src.connect(V.an); if (V.pan) src.connect(V.g).connect(V.pan).connect(audio.voiceBus); else src.connect(V.g).connect(audio.voiceBus);
+  };
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'connected') V.live = true;
+    if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) { V.live = false; if (pc.connectionState !== 'disconnected') vcClose(id); }
+  };
+  VC.pcs.set(id, V);
+  return V;
+}
+function vcClose(id) {
+  const V = VC.pcs.get(id); if (!V) return;
+  VC.pcs.delete(id);
+  try { V.pc.close(); } catch {}
+  try { V.g?.disconnect(); V.pan?.disconnect(); if (V.el) { V.el.srcObject = null; } } catch {}
+}
+async function vcCall(id) {
+  if (!VC.ok || !AC) return;
+  const V = vcNew(id);
+  try {
+    await V.pc.setLocalDescription(await V.pc.createOffer()); await iceDone(V.pc);
+    if (VC.pcs.get(id) === V) vcSig(id, { k: 'offer', sdp: V.pc.localDescription.sdp });
+  } catch (e) { vcClose(id); }
+}
+async function gotRtc(m) {
+  if (!m || !ok(m.i) || m.to !== NET.id || !VC.ok || !AC || typeof m.sdp !== 'string' || m.sdp.length > 30000) return;
+  const P = NET.peers.get(m.i); if (!P || flood(P)) return;
+  try {
+    if (m.k === 'offer') {
+      const V = vcNew(m.i, true);
+      await V.pc.setRemoteDescription({ type: 'offer', sdp: m.sdp });
+      V.tr = V.pc.getTransceivers()[0]; if (V.tr) { V.tr.direction = 'sendrecv'; const t = vcTrack(); if (t) await V.tr.sender.replaceTrack(t); }
+      await V.pc.setLocalDescription(await V.pc.createAnswer()); await iceDone(V.pc);
+      if (VC.pcs.get(m.i) === V) vcSig(m.i, { k: 'answer', sdp: V.pc.localDescription.sdp });
+    } else if (m.k === 'answer') {
+      const V = VC.pcs.get(m.i);
+      if (V && V.pc.signalingState === 'have-local-offer') await V.pc.setRemoteDescription({ type: 'answer', sdp: m.sdp });
+    }
+  } catch (e) { vcClose(m.i); }
+}
+// every frame: who should be joined, how loud each voice is and from which side, and who is talking
+function vcUpdate(dt) {
+  if (!VC.ok || !AC) return;
+  const me = realm === 'under' ? 1 : 0, now = performance.now();
+  if ((VC.t -= dt) <= 0) {
+    VC.t = 0.6;
+    for (const P of NET.peers.values()) {
+      if (!P.s) continue;
+      const fresh = now - P.s.t < 15000 && P.realm === me, d = player.pos.distanceTo(P.pos), V = VC.pcs.get(P.id);
+      if (fresh && d < VC_NEAR && !V && NET.id < P.id && NET.on && state !== 'title' && (P.vcNext || 0) < now) { P.vcNext = now + 15000; vcCall(P.id); }   // (the lower id calls, so two never call each other at once)
+      else if (V && (!fresh || d > VC_FAR)) vcClose(P.id);
+      else if (V && !V.live && now - V.born > 15000) vcClose(P.id);   // (never connected: let it try again later)
+    }
+    for (const id of [...VC.pcs.keys()]) if (!NET.peers.has(id)) vcClose(id);
+  }
+  camera.getWorldDirection(_n); const rx = -_n.z, rz = _n.x, rl = Math.hypot(rx, rz) || 1;
+  let talk = 0;
+  for (const V of VC.pcs.values()) {
+    const P = NET.peers.get(V.id); if (!P || !V.g) continue;
+    const d = player.pos.distanceTo(P.pos), dx = P.pos.x - camera.position.x, dz = P.pos.z - camera.position.z, l = Math.hypot(dx, dz) || 1;
+    const vol = Math.pow(clamp(1 - Math.max(0, d - 6) / (VC_NEAR - 6), 0, 1), 1.5) * (state === 'title' ? 0 : 1);
+    V.g.gain.setTargetAtTime(vol * 1.4, AC.currentTime, 0.08);
+    if (V.pan) V.pan.pan.setTargetAtTime(clamp((dx * rx + dz * rz) / (l * rl), -0.9, 0.9), AC.currentTime, 0.08);
+    V.an.getFloatTimeDomainData(V.buf); let e = 0; for (let i = 0; i < V.buf.length; i += 4) e += V.buf[i] * V.buf[i];
+    V.level = lerp(V.level, Math.sqrt(e / (V.buf.length / 4)), damp(12, dt)); P.talking = V.level > 0.02 && vol > 0.02;
+    if (P.talking) talk = 1;
+  }
+  // and the button: shown once there is a microphone; lit while someone near you is talking
+  const b = $('micBtn');
+  b.classList.toggle('on', !!mic.stream && state !== 'title' && state !== 'prologue');
+  b.classList.toggle('muted', VC.muted); b.querySelector('.x').style.display = VC.muted ? '' : 'none';
+  b.classList.toggle('talk', !!talk);
+}
+function setMicMuted(m) {
+  VC.muted = m; try { localStorage.setItem('icarus.muted', m ? '1' : '0'); } catch {}
+  for (const t of mic.stream?.getAudioTracks() || []) t.enabled = !m;   // (and the world stops listening)
+  if (m && mic.rec) { try { mic.rec.abort(); } catch {} mic.rec = null; }
+  if (!m) startMic();
+  for (const V of VC.pcs.values()) V.tr?.sender.replaceTrack(vcTrack()).catch(() => {});
+  toast(m ? 'MIC OFF · NOBODY CAN HEAR YOU' : 'MIC ON · PEOPLE NEAR YOU CAN HEAR YOU');
+}
+$('micBtn').addEventListener('click', e => { e.stopPropagation(); setMicMuted(!VC.muted); $('micBtn').blur(); });
+
+// ── the sounds other players make, heard from where they are
+const FX_KINDS = { flap: () => audio.sfx.flap(0.8), beat: () => audio.sfx.flap(0.6), jump: () => audio.sfx.jump(), land: () => audio.sfx.land(0.6), ignite: () => audio.sfx.ignite(),
+  rebirth: () => audio.sfx.rebirth(), wings: () => audio.sfx.wingsOpen(), swoop: () => audio.sfx.swoop(), roll: () => audio.sfx.roll(), impact: () => audio.sfx.impact(), ring: () => audio.sfx.ring(2, false, false) };
+function netFx(k) {
+  if (!NET.on || !NET.ch) return;
+  const now = performance.now(); if (now - (NET.fxT || 0) < 140) return;
+  // only worth sending if someone is near enough to hear it
+  let near = false; for (const P of NET.peers.values()) if (P.s && now - P.s.t < 15000 && P.pos.distanceTo(player.pos) < 180) { near = true; break; }
+  if (!near) return;
+  NET.fxT = now;
+  NET.ch.send({ type: 'broadcast', event: 'fx', payload: { i: NET.id, k, x: Math.round(player.pos.x), y: Math.round(player.pos.y), z: Math.round(player.pos.z) } });
+}
+function gotFx(m) {
+  if (!m || !ok(m.i) || !FX_KINDS[m.k] || !AC) return;
+  const P = NET.peers.get(m.i); if (!P || flood(P) || P.realm !== (realm === 'under' ? 1 : 0) || state === 'title') return;
+  const x = num(m.x, -1e6, 1e6), y = num(m.y, -2000, 20000), z = num(m.z, -1e6, 1e6), d = Math.hypot(x - player.pos.x, y - player.pos.y, z - player.pos.z);
+  if (d > 170) return;
+  const dx = x - camera.position.x, dz = z - camera.position.z, l = Math.hypot(dx, dz) || 1;
+  camera.getWorldDirection(_n); const rx = -_n.z, rz = _n.x, rl = Math.hypot(rx, rz) || 1;
+  audio.at(Math.pow(clamp(1 - d / 170, 0, 1), 1.6), clamp((dx * rx + dz * rz) / (l * rl), -0.9, 0.9), FX_KINDS[m.k]);
+}
+
 // ── speech, carried to whoever is near enough to hear it
 function netSay(text, bytes, loud = 0.4) {
   if (!NET.on || !text && !bytes) return;
@@ -4001,6 +4233,7 @@ function gotSay(m) {
   for (const g of [...gods, ...others, hades]) if (g.active && !g.bolt && Math.hypot(g.x - P.pos.x, g.z - P.pos.z) < 30 + loud * 80) g.yaw += wrapAngle(Math.atan2(-(P.pos.x - g.x), -(P.pos.z - g.z)) - g.yaw) * 0.5;
   if (text && d < 60 && (NET.heard.get(P.id) || 0) < time) { NET.heard.set(P.id, time + 40); witness(`heard another flier, ${P.name}, say “${text.slice(0, 80)}”`); }
   if (!m.a || typeof m.a !== 'string' || m.a.length > 210000 || !AC) return;
+  if (VC.pcs.get(P.id)?.live) return;   // (their real voice is already here, live)
   try {
     const bin = atob(m.a), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
     AC.decodeAudioData(u.buffer, buf => {
@@ -4030,7 +4263,7 @@ function gotEvent(m) {
 function updateNet(dt) {
   if (!NET.sb && API.mp && state !== 'title' && state !== 'loading' && state !== 'prologue') netStart();
   if (NET.on && NET.ch && NET.ch.state === 'closed') { NET.on = false; if (!NET.retry) NET.retry = setTimeout(() => { NET.retry = 0; netJoin(); }, 1500); }
-  netSend(dt); updatePeers(dt); netCollide();
+  netSend(dt); updatePeers(dt); netCollide(); vcUpdate(dt);
   const n = [...NET.peers.values()].filter(P => P.s && performance.now() - P.s.t < 15000).length;
   if (n !== NET.count) { NET.count = n; if (n > 0 && !NET.warned) { NET.warned = true; toast(n === 1 ? 'SOMEONE ELSE IS FLYING' : `${n} OTHERS ARE FLYING`); } }
 }
@@ -4135,7 +4368,7 @@ function updatePhoenix(dt) {
     p.flapCD = boost ? 0.5 : 0.72; p.flapPhase = 0;
     if (WR.A < 0.25) WR.th = 0; WR.beat = 1;   // (a beat from still air starts at the top of the stroke)
     p.speed += 12; p.vy = Math.min(p.vy + 8, 16); p.flame -= 0.005;
-    audio.sfx.flap(boost ? 1 : 0.75);
+    audio.sfx.flap(boost ? 1 : 0.75); netFx('flap');
     for (const side of [-1, 1]) {
       _v.set(side * 7.5, 0, 0.8).applyEuler(phoenix.group.rotation).add(p.pos);
       for (let i = 0; i < 8; i++) emit(_v.x, _v.y, _v.z, rnd(5), -4 - Math.random() * 6, rnd(5), 0.5 + Math.random() * 0.4, pick(EMBER));
@@ -4195,20 +4428,57 @@ function die(how, kmh) {
   state = 'dead'; death.phase = 'impact'; death.t = 0; flags.deaths++;
   worldMark('fall', player.pos.x, player.pos.y, player.pos.z);
   for (const q of quests) if (q.kind === 'climb' && !q.done) q.v = 0;
-  audio.sfx.impact(); audio.sting('death'); camShake = 1; stopVoice(); dlg.queue.length = 0; dlg.cur = null;
+  audio.sfx.impact(); audio.sting('death'); camShake = 1; stopVoice(); dlg.queue.length = 0; dlg.cur = null; netFx('impact');
   for (let i = 0; i < 70; i++) emit(p.pos.x, p.pos.y + 0.3, p.pos.z, rnd(9), Math.random() * 6, rnd(9), 1.2, pick(ASH));
-  resetPose(); setManWings(0, 0, 0, 0, 0);
-  human.rig.rotation.set(-1.45, 0, 0.3); human.rig.position.y = 0.25;
-  human.armL.rotation.set(0, 0, -1.4); human.armR.rotation.set(0, 0, 0.6); human.legL.rotation.x = 0.3;
+  // how he hit: how hard, which way he was going, and whether he comes down on his face or his back
+  { const v = p.form === 'phoenix' ? _v.copy(dir3).multiplyScalar(p.speed) : _v.copy(p.vel);
+    const hs = Math.hypot(v.x, v.z), sp = Math.min(1, Math.hypot(v.x, v.y, v.z) / 60);
+    death.imp = { sp, back: Math.random() < 0.35, side: Math.random() < 0.5 ? -1 : 1, vx: hs > 0.5 ? v.x / hs : 0, vz: hs > 0.5 ? v.z / hs : 0, slide: Math.min(hs, 40) * 0.35 };
+    if (hs > 0.5) human.group.rotation.y = Math.atan2(-v.x, -v.z); }
+  resetPose(); setManWings(0, 0, 0, 0, 0); impactPose(0);
   p.vel.set(0, 0, 0); p.tumble = false; p.wings = false; p.stumbleT = 0; p.rollT = 0; p.landT = 0; p.fallCause = ''; p.climb = null; p.trip = null; p.land = null;
   saveSoon();
+}
+// The hit, frame by frame: flattened and flung (the first tenth of a second), a bounce that whips through him with the
+// limbs lagging behind the body, a slide along the ground, then limp — sprawled, uneven, his head fallen to one side.
+function impactPose(t) {
+  const H = human, I = death.imp || { sp: 0.6, back: false, side: 1, slide: 0 }, sd = I.side, A = 0.35 + 0.65 * I.sp;
+  const bounce = A * 0.42 * Math.exp(-7 * Math.max(0, t - 0.06)) * Math.max(0, Math.sin(Math.max(0, t - 0.06) * 11));   // up off the ground, twice, smaller
+  const whip = A * Math.exp(-5 * t) * Math.sin(t * 17);                                                                   // what the limbs do behind the body
+  const flat = 1 - smoothstep(0, 0.08, t) * 0.4;
+  const R = H.rig;
+  R.position.y = 0.2 + bounce * (1 - smoothstep(0.5, 0.9, t)) - (1 - flat) * 0.06;
+  R.rotation.set(I.back ? 1.48 : -1.5, 0, sd * (0.25 + whip * 0.5 + smoothstep(0.2, 0.7, t) * 0.18));
+  H.chest.rotation.set((I.back ? -0.2 : 0.25) * whip, sd * 0.2 * smoothstep(0.3, 0.8, t), 0);
+  H.head.rotation.set((I.back ? -0.3 : 0.4) + whip * 0.5, sd * (0.15 + 0.85 * smoothstep(0.25, 0.75, t)), 0);   // lolls, then rests to one side
+  // arms: flung out with the hit, then fallen where they landed — one up past the head, one down by the side
+  H.armL.rotation.set(-0.4 - whip * 1.2 - (sd > 0 ? 1.6 : 0.2) * smoothstep(0.1, 0.6, t), 0, -1.2 - whip * 0.6 + smoothstep(0.1, 0.6, t) * 0.4);
+  H.armR.rotation.set(-0.3 + whip * 1.1 - (sd < 0 ? 1.6 : 0.2) * smoothstep(0.1, 0.6, t), 0, 1.0 + whip * 0.7 - smoothstep(0.1, 0.6, t) * 0.5);
+  H.foreL.rotation.set(0.4 + Math.abs(whip) * 0.6, 0, -0.2); H.foreR.rotation.set(0.7 - whip * 0.5, 0, 0.3);
+  // legs: one bent up, one out straight, both bouncing
+  H.legL.rotation.set((sd > 0 ? 0.6 : 0.1) + whip * 0.8, 0, -0.25 - whip * 0.3); H.legR.rotation.set((sd < 0 ? 0.55 : 0.05) - whip * 0.7, 0, 0.3 + whip * 0.3);
+  H.shinL.rotation.x = -(sd > 0 ? 1.1 : 0.3) - Math.abs(whip) * 0.5; H.shinR.rotation.x = -(sd < 0 ? 1.0 : 0.25) - Math.abs(whip) * 0.4;
+  H.footL.rotation.x = 0.4; H.footR.rotation.x = 0.25;
+  setCurl(H.handL, RELAX, 0.5); setCurl(H.handR, RELAX, 0.5);
 }
 function updateDeath(dt) {
   const p = player, f = $('fade');
   death.t += dt;
   if (death.phase === 'impact') {
-    if (death.t > 0.55 && f.style.opacity !== '1') { f.textContent = ''; f.style.opacity = 1; }
-    if (death.t > 1.25) {
+    if (death.t < 1.0) {
+      impactPose(death.t);
+      // the slide: carried on along the ground the way he was going, ploughing up dirt or snow
+      const I = death.imp, k = I ? Math.exp(-4.5 * death.t) : 0;
+      if (I && I.slide > 0.5 && k > 0.03) {
+        player.pos.x += I.vx * I.slide * k * dt * 4; player.pos.z += I.vz * I.slide * k * dt * 4;
+        player.pos.y = groundAt(player.pos.x, player.pos.z, player.pos.y + 2);
+        if (Math.random() < k * 2) emit(player.pos.x + rnd(0.6), player.pos.y + 0.15, player.pos.z + rnd(0.6), -I.vx * 3 + rnd(2), 1 + Math.random() * 2.5, -I.vz * 3 + rnd(2), 0.9, pick(ASH));
+      }
+      if (death.t > 0.06 && !death.thud) { death.thud = true; audio.sfx.thud?.(); }
+    }
+    if (death.t > 0.95 && f.style.opacity !== '1') { f.textContent = ''; f.style.opacity = 1; }
+    if (death.t > 1.7) {
+      death.thud = false;
       // back to the top: high above the summit, already falling (below the water there is no mountain: he drops in where he first came through)
       if (realm === 'under') { const [x, z] = dryNear(UNDER.arrive.x, UNDER.arrive.z); wake.set(x, terrainAt(x, z), z); } else wake.copy(START);
       p.pos.set(wake.x, wake.y + (realm === 'under' ? 150 : 230), wake.z); p.vel.set(0, -12, 0);
@@ -4250,7 +4520,12 @@ function updateDeath(dt) {
       human.armL.rotation.set(0.15 * Math.sin(u * 2), 0, -0.12);
       human.rig.rotation.z = Math.sin(u * 2.3) * 0.035; human.rig.rotation.x = 0.06 * hand;
       human.legL.rotation.x = Math.sin(u * 2.6) * 0.12 * smoothstep(1, 2, u); human.legR.rotation.x = -human.legL.rotation.x;
-      if (death.t > 7.4) { death.first = false; respawn(); }
+      if (death.t > 7.4) {
+        death.first = false; respawn(); TUT.later = ['ground', 1, time + 4.5];
+        if (flags.micLater) { flags.micLater = false; startMic(); }
+        // (on a phone: how to steer, asked once the microphone question has been answered, not on top of it)
+        if (TOUCH) { const t0 = performance.now(), wait = () => (mic.stream || mic.denied || performance.now() - t0 > 12000) ? ctlChoose() : setTimeout(wait, 300); setTimeout(wait, 600); }
+      }
       return;
     }
     if (death.t > 2.7) respawn();
@@ -4317,6 +4592,8 @@ function updateStory(dt) {
 const _e = new THREE.Euler();
 G.unitBox = new THREE.BoxGeometry(1, 1, 1).toNonIndexed();
 G.ico = new THREE.IcosahedronGeometry(1, 1).toNonIndexed();
+G.ico0 = new THREE.IcosahedronGeometry(1, 0).toNonIndexed();   // (for the small things: an eye, a knuckle, a curl, a horn's last turn)
+const icoFor = (a, b, c) => Math.max(a, b, c) < 0.13 ? G.ico0 : G.ico;
 G.robe = new THREE.CylinderGeometry(0.32, 0.8, 1.9, 10).translate(0, 0.95, 0).toNonIndexed();
 function box(acc, w, h, d, x, y, z, rgb, rx = 0, ry = 0, rz = 0) {
   _mat.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(rx, ry, rz)), _s.set(w, h, d));
@@ -4324,54 +4601,119 @@ function box(acc, w, h, d, x, y, z, rgb, rx = 0, ry = 0, rz = 0) {
 }
 function blob(acc, sx, sy, sz, x, y, z, rgb, rx = 0) {
   _mat.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(rx, 0, 0)), _s.set(sx, sy, sz));
-  addGeo(acc, G.ico, _mat, rgb);
+  addGeo(acc, icoFor(sx, sy, sz), _mat, rgb);
 }
 const newAcc = () => ({ pos: [], nor: [], col: [] });
+const _ua = new THREE.Vector3();
+function seg(acc, ax, ay, az, bx, by, bz, rx, rgb, rz = rx, over = 1.12) {
+  _ua.set(bx - ax, by - ay, bz - az); const L = _ua.length() || 1e-4; _ua.multiplyScalar(1 / L);
+  _mat.compose(_p.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2), _q.setFromUnitVectors(UP, _ua), _s.set(rx, L / 2 * over, rz));
+  addGeo(acc, Math.max(rx, rz) < 0.06 ? G.ico0 : G.ico, _mat, rgb);
+}
+function blobE(acc, sx, sy, sz, x, y, z, rgb, rx = 0, ry = 0, rz = 0) { _mat.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(rx, ry, rz)), _s.set(sx, sy, sz)); addGeo(acc, icoFor(sx, sy, sz), _mat, rgb); }
+const mixc = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 
 // four-legged animals, facing -z
 function quad(o) {
+  // Built the way the animal is built: a deep ribcage forward and round quarters behind, a paler belly; forelegs that
+  // come down straight through a knee, hind legs that slope back to the hock and then forward to the hoof; a neck that
+  // is thick where it leaves the shoulders; a skull, a long face narrowing to the nose, eyes set to the side with light
+  // in them, leaf-shaped ears with their insides showing. Antlers branch, ram's horns spiral, a fox's tail is a brush.
   const acc = newAcc(), c = col(o.c), c2 = col(o.c2 || o.c), c3 = col(o.c3 || '#e8e0cc');
   acc.leg = [];
-  const { L, H, W, leg } = o, by = leg + H / 2;
-  blob(acc, W * 0.5, H * 0.52, L * 0.5, 0, by, 0, c);
-  blob(acc, W * 0.56, H * 0.6, L * 0.3, 0, by - H * 0.03, -L * 0.24, c);    // chest
-  blob(acc, W * 0.54, H * 0.55, L * 0.3, 0, by + H * 0.03, L * 0.26, c);    // haunch
-  if (o.hump) blob(acc, W * 0.5, H * 0.32, L * 0.25, 0, leg + H * 0.92, -L * 0.18, c);
+  const belly = o.belly ? col(o.belly) : mixc(c, [0.95, 0.9, 0.8], 0.2), hoof = mixc(c2, [0.05, 0.04, 0.03], 0.6), nose = col(o.nose || '#191412');
+  const inner = o.inner ? col(o.inner) : mixc(c, [0.9, 0.62, 0.58], 0.45), snout = o.snout ? col(o.snout) : null;
+  const { L, H, W, leg } = o, by = leg + H / 2, paw = !!o.paw;
+  blob(acc, W * 0.5, H * 0.5, L * 0.5, 0, by, 0, c);
+  blob(acc, W * 0.56, H * 0.6, L * 0.3, 0, by - H * 0.04, -L * 0.24, c);     // the ribcage
+  blob(acc, W * 0.54, H * 0.56, L * 0.3, 0, by + H * 0.03, L * 0.26, c);     // the quarters
+  blob(acc, W * 0.4, H * 0.28, L * 0.4, 0, by - H * 0.27, -L * 0.04, belly);  // the belly
+  blob(acc, W * 0.34, H * 0.36, L * 0.14, 0, by - H * 0.1, -L * 0.43, belly);  // the breast
+  if (o.rump) blob(acc, W * 0.42, H * 0.4, L * 0.1, 0, by + H * 0.06, L * 0.47, col(o.rump));
+  const hk = o.hump === true ? 1 : o.hump || 0, topY = z => by + H * 0.48 + H * 0.22 * hk * Math.exp(-(((z + L * 0.18) / (L * 0.24)) ** 2));
+  if (hk) blob(acc, W * 0.5, H * (0.18 + 0.16 * hk), L * 0.28, 0, leg + H * (0.76 + 0.16 * hk), -L * 0.18, c);   // the hump over the shoulders
+  if (o.bristle) for (let k = 0; k < 11; k++) { const z = -L * 0.38 + k * L * 0.065; box(acc, 0.05, 0.16 + 0.05 * Math.sin(k * 1.7), 0.07, 0, topY(z) + 0.02, z, c2, 0.35); }
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
     LEG = [leg * 1.05, sz * L * 0.36, sx * sz];
-    box(acc, W * 0.24, leg * 0.62, W * 0.28, sx * W * 0.3, leg * 0.74, sz * L * 0.36, c);
-    box(acc, W * 0.14, leg * 0.5, W * 0.15, sx * W * 0.3, leg * 0.3, sz * L * 0.37, c2);
-    box(acc, W * 0.17, leg * 0.1, W * 0.2, sx * W * 0.3, leg * 0.05, sz * L * 0.37 - W * 0.02, [c2[0] * 0.5, c2[1] * 0.5, c2[2] * 0.5]);
+    const x = sx * W * 0.3, z = sz * L * 0.36, fore = sz < 0;
+    let fz;
+    if (fore) {
+      seg(acc, x, leg + H * 0.2, z - L * 0.02, x, leg * 0.5, z + 0.01, W * 0.17, c, W * 0.2);    // shoulder to knee, muscled
+      blob(acc, W * 0.1, W * 0.11, W * 0.11, x, leg * 0.5, z + 0.01, c2);                     // the knee
+      seg(acc, x, leg * 0.5, z + 0.01, x, leg * 0.1, z - 0.005, W * 0.075, c2);                // the cannon
+      fz = z - 0.005;
+    } else {
+      seg(acc, x, leg + H * 0.22, z - L * 0.04, x, leg * 0.48, z + L * 0.09, W * 0.19, c, W * 0.23);   // the gaskin, sloping back
+      blob(acc, W * 0.09, W * 0.12, W * 0.1, x, leg * 0.48, z + L * 0.095, c2);                       // the hock
+      seg(acc, x, leg * 0.48, z + L * 0.09, x, leg * 0.1, z + L * 0.01, W * 0.075, c2);              // and down again, angled forward
+      fz = z + L * 0.01;
+    }
+    if (paw) { blob(acc, W * 0.12, leg * 0.07 + W * 0.05, W * 0.16, x, leg * 0.05 + W * 0.03, fz - W * 0.05, c2); }
+    else { blob(acc, W * 0.085, W * 0.08, W * 0.085, x, leg * 0.13, fz, c2); box(acc, W * 0.15, leg * 0.09, W * 0.17, x, leg * 0.045, fz - W * 0.02, hoof); }
     LEG = null;
   }
   const nk = o.neck, ny = by + H * 0.2, nz = -L * 0.44;
-  box(acc, W * 0.36, nk, W * 0.4, 0, ny + nk * 0.38, nz - nk * 0.18, c, -0.6);
   const [hw, hh, hd] = o.head, hy = ny + nk * 0.78, hz = nz - nk * 0.42;
-  blob(acc, hw * 0.55, hh * 0.55, hd * 0.4, 0, hy, hz, c);
-  box(acc, hw * 0.65, hh * 0.6, hd * 0.55, 0, hy - hh * 0.12, hz - hd * 0.42, o.snout ? col(o.snout) : c);
-  box(acc, hw * 0.12, hh * 0.12, hw * 0.08, -hw * 0.28, hy + hh * 0.08, hz - hd * 0.2, col('#111'));
-  box(acc, hw * 0.12, hh * 0.12, hw * 0.08, hw * 0.28, hy + hh * 0.08, hz - hd * 0.2, col('#111'));
-  if (o.ears) for (const s of [-1, 1]) box(acc, hw * 0.16, hh * 0.55 * (o.earL || 1), hw * 0.1, s * hw * 0.3, hy + hh * 0.5 * (o.earL || 1), hz + hd * 0.1, c, 0, 0, s * 0.3);
+  blob(acc, W * 0.32, H * 0.36, W * 0.36, 0, by + H * 0.12, -L * 0.36, c);   // where the neck leaves the shoulders
+  seg(acc, 0, by + H * 0.08, -L * 0.33, 0, hy - hh * 0.12, hz + hd * 0.12, W * 0.24, c, W * 0.28);
+  seg(acc, 0, by - H * 0.08, -L * 0.4, 0, hy - hh * 0.35, hz + hd * 0.02, W * 0.15, belly, W * 0.17);   // the paler throat
+  if (o.mane) { const m = col(o.mane);
+    seg(acc, 0, by + H * 0.38, -L * 0.26, 0, hy + hh * 0.4, hz + hd * 0.22, W * 0.06, m, W * 0.15);
+    blobE(acc, hw * 0.12, hh * 0.25, hd * 0.12, 0, hy + hh * 0.45, hz - hd * 0.08, m, -0.5); }   // and the forelock
+  // the head
+  blob(acc, hw * 0.52, hh * 0.52, hd * 0.36, 0, hy, hz, c);
+  const mz = hz - hd * 0.78, my = hy - hh * 0.2, face = snout || c;
+  seg(acc, 0, hy - hh * 0.02, hz - hd * 0.1, 0, my, mz, hw * 0.3, face, hw * 0.34);
+  blob(acc, hw * 0.24, hh * 0.18, hd * 0.2, 0, my - hh * 0.12, mz + hd * 0.14, snout || mixc(c, belly, 0.5));   // the jaw
+  blob(acc, hw * 0.22, hh * 0.16, hw * 0.12, 0, my + hh * 0.02, mz - hd * 0.07, snout ? mixc(snout, nose, 0.4) : nose);   // the nose
+  if (o.beard) seg(acc, 0, my - hh * 0.2, mz + hd * 0.2, 0, my - hh * 0.75, mz + hd * 0.28, hw * 0.1, col(o.beard), hw * 0.08);
+  for (const sd of [-1, 1]) {
+    blob(acc, hw * 0.11, hh * 0.12, hw * 0.1, sd * hw * 0.4, hy + hh * 0.08, hz - hd * 0.18, col('#120e0c'));
+    box(acc, hw * 0.04, hh * 0.04, hw * 0.035, sd * hw * 0.5, hy + hh * 0.13, hz - hd * 0.2, [1.8, 1.8, 1.7]);   // a glint
+  }
+  if (o.ears) for (const sd of [-1, 1]) {
+    if (o.roundEars) { blob(acc, hw * 0.15, hw * 0.15, hw * 0.08, sd * hw * 0.38, hy + hh * 0.44, hz + hd * 0.06, c); continue; }
+    const eL = hh * 0.55 * (o.earL || 1), ex = sd * hw * 0.3 + sd * eL * 0.22, ey = hy + hh * 0.36 + eL * 0.45, ez = hz + hd * 0.12;
+    blobE(acc, hw * 0.13, eL * 0.5, hw * 0.045, ex, ey, ez, c, 0.25, 0, -sd * 0.45);
+    blobE(acc, hw * 0.08, eL * 0.36, hw * 0.03, ex - sd * hw * 0.01, ey - eL * 0.02, ez - hw * 0.035, inner, 0.25, 0, -sd * 0.45);
+  }
   const hs = o.hs || 1;
-  if (o.horns === 'antler') for (const s of [-1, 1]) {
-    box(acc, 0.06 * hs, 0.9 * hs, 0.06 * hs, s * (hw * 0.25 + 0.18 * hs), hy + hh * 0.4 + 0.4 * hs, hz + 0.05, c3, 0.15, 0, s * -0.45);
-    box(acc, 0.05 * hs, 0.4 * hs, 0.05 * hs, s * (hw * 0.25 + 0.34 * hs), hy + hh * 0.4 + 0.75 * hs, hz - 0.08 * hs, c3, -0.5, 0, s * -0.2);
-    box(acc, 0.05 * hs, 0.35 * hs, 0.05 * hs, s * (hw * 0.25 + 0.14 * hs), hy + hh * 0.4 + 0.45 * hs, hz - 0.12 * hs, c3, -0.7, 0, 0);
-    box(acc, 0.05 * hs, 0.3 * hs, 0.05 * hs, s * (hw * 0.25 + 0.46 * hs), hy + hh * 0.4 + 0.95 * hs, hz + 0.05, c3, 0.3, 0, s * -0.7);
+  if (o.horns === 'antler') for (const sd of [-1, 1]) {
+    const r = 0.042 * hs; let px = sd * hw * 0.25, py = hy + hh * 0.42, pz = hz + 0.04;
+    seg(acc, sd * hw * 0.3, py + 0.02, pz, sd * hw * 0.42, py + 0.1 * hs, pz - 0.22 * hs, r * 0.7, c3);   // the brow tine
+    [[0.16, 0.26, 0.1], [0.14, 0.32, 0.02], [0.08, 0.3, -0.08], [0.02, 0.24, -0.1]].forEach(([dx, dy, dz], i) => {
+      const qx = px + sd * dx * hs, qy = py + dy * hs, qz = pz + dz * hs;
+      seg(acc, px, py, pz, qx, qy, qz, r * (1 - i * 0.16), c3);
+      if (i < 3) seg(acc, qx, qy, qz, qx + sd * 0.03 * hs, qy + (0.22 - i * 0.03) * hs, qz - 0.17 * hs, r * 0.68 * (1 - i * 0.14), c3);   // a tine off each joint
+      px = qx; py = qy; pz = qz;
+    });
   }
-  if (o.horns === 'ram') for (const s of [-1, 1]) {
-    box(acc, 0.12 * hs, 0.38 * hs, 0.12 * hs, s * hw * 0.42, hy + hh * 0.45, hz + 0.08, c3, 0.9, 0, s * 0.5);
-    box(acc, 0.12 * hs, 0.34 * hs, 0.12 * hs, s * (hw * 0.55 + 0.1 * hs), hy + hh * 0.2, hz + 0.26 * hs, c3, 2.2, 0, s * 0.6);
-    box(acc, 0.1 * hs, 0.3 * hs, 0.1 * hs, s * (hw * 0.6 + 0.1 * hs), hy - hh * 0.2, hz + 0.1 * hs, c3, -2.6, 0, s * 0.5);
+  if (o.horns === 'ram') for (const sd of [-1, 1]) {   // one and a half turns of a spiral, back, down and forward past the cheek
+    const R0 = 0.2 * hs, cx = sd * hw * 0.45, cy = hy + hh * 0.42 - R0, cz = hz + hd * 0.12;
+    let prev = null;
+    for (let k = 0; k <= 14; k++) {
+      const a = k / 14 * Math.PI * 1.65, R = R0 * (1 - k * 0.035), pt = [cx + sd * k * 0.014 * hs, cy + Math.cos(a) * R, cz + Math.sin(a) * R];
+      if (prev) seg(acc, ...prev, ...pt, (0.085 - k * 0.0035) * hs, c3);
+      prev = pt;
+    }
   }
-  if (o.horns === 'bull') for (const s of [-1, 1]) {
-    box(acc, 0.55 * hs, 0.1 * hs, 0.1 * hs, s * (hw * 0.35 + 0.25 * hs), hy + hh * 0.42, hz, c3, 0, 0, s * -0.3);
-    box(acc, 0.08 * hs, 0.32 * hs, 0.08 * hs, s * (hw * 0.35 + 0.52 * hs), hy + hh * 0.42 + 0.2 * hs, hz, c3, 0, 0, s * 0.3);
-    if (o.vines) for (let k = 0; k < 3; k++) blob(acc, 0.08, 0.08, 0.08, s * (hw * 0.35 + 0.12 * hs + k * 0.14 * hs), hy + hh * 0.5 + (k % 2) * 0.05, hz + 0.04, col('#4a8a2a'));
+  if (o.horns === 'bull') for (const sd of [-1, 1]) {
+    const b = [sd * hw * 0.35, hy + hh * 0.42, hz], m = [sd * (hw * 0.35 + 0.42 * hs), hy + hh * 0.46, hz - 0.04], t = [sd * (hw * 0.35 + 0.58 * hs), hy + hh * 0.42 + 0.32 * hs, hz - 0.12];
+    seg(acc, ...b, ...m, 0.085 * hs, c3); seg(acc, ...m, ...t, 0.055 * hs, c3);
+    if (o.vines) for (let k = 0; k < 3; k++) blob(acc, 0.08, 0.08, 0.08, sd * (hw * 0.35 + 0.12 * hs + k * 0.14 * hs), hy + hh * 0.5 + (k % 2) * 0.05, hz + 0.04, col('#4a8a2a'));
   }
-  if (o.horns === 'tusk') for (const s of [-1, 1]) box(acc, 0.05, 0.05, 0.28, s * hw * 0.3, hy - hh * 0.32, hz - hd * 0.8, c3, -0.6);
-  if (o.mane) box(acc, W * 0.12, nk * 1.05, W * 0.3, 0, ny + nk * 0.5, nz - nk * 0.05, col(o.mane), -0.6);
-  if (o.tail) box(acc, W * 0.12, o.tail, W * 0.12, 0, by + H * 0.05 - o.tail * 0.3, L * 0.52, o.tailC ? col(o.tailC) : c2, 0.45);
+  if (o.horns === 'tusk') for (const sd of [-1, 1]) seg(acc, sd * hw * 0.24, hy - hh * 0.32, mz + hd * 0.1, sd * hw * 0.34, hy - hh * 0.02, mz - hd * 0.05, 0.035, c3);
+  if (o.tail) {
+    const tc = o.tailC ? col(o.tailC) : c2, ty = by + H * 0.3, tz = L * 0.5;
+    if (o.bushy) {   // a brush: thick, carried low, the tip a different colour
+      seg(acc, 0, ty, tz, 0, ty - o.tail * 0.45, tz + o.tail * 0.55, W * 0.15, c, W * 0.19);
+      blob(acc, W * 0.15, W * 0.15, o.tail * 0.18, 0, ty - o.tail * 0.62, tz + o.tail * 0.74, o.tailC ? tc : c2, 0.7);
+    } else if (o.tail > 0.5) {   // long hair from a short dock
+      seg(acc, 0, ty, tz - 0.02, 0, ty - 0.12, tz + 0.18, W * 0.08, c);
+      seg(acc, 0, ty - 0.08, tz + 0.14, 0, ty - o.tail, tz + o.tail * 0.32, W * (o.tuft ? 0.05 : 0.12), tc, W * (o.tuft ? 0.05 : 0.09));
+      if (o.tuft) blob(acc, W * 0.09, W * 0.16, W * 0.09, 0, ty - o.tail, tz + o.tail * 0.32, c2);
+    } else blobE(acc, W * 0.13, o.tail * 0.6, W * 0.08, 0, ty + o.tail * 0.12, tz + 0.03, tc, 0.6);   // a flag
+  }
   if (o.bell) blob(acc, 0.09, 0.1, 0.09, 0, ny - 0.05, nz - 0.08, col('#e8c060'));
   return { geo: accToGeo(acc), eye: hy };
 }
@@ -4384,16 +4726,24 @@ function perchBird(o) {
   const legH = o.legs ? 0.38 * s : 0.08 * s, by = base + legH + 0.42 * s;
   if (o.legs) for (const x of [-0.12, 0.12]) box(acc, 0.05 * s, legH, 0.05 * s, x * s, base + legH / 2, 0, col('#c8a040'));
   blob(acc, 0.42 * s, (o.owl ? 0.55 : 0.42) * s, (o.owl ? 0.45 : 0.75) * s, 0, by, 0, c);
-  for (const sx of [-1, 1]) box(acc, 0.1 * s, 0.36 * s, 0.78 * s, sx * 0.38 * s, by + 0.02 * s, 0.08 * s, c2, 0.15);
+  for (const sx of [-1, 1]) {
+    blobE(acc, 0.12 * s, 0.3 * s, 0.6 * s, sx * 0.36 * s, by + 0.04 * s, 0.1 * s, c2, 0.12);
+    for (let i = 0; i < 3; i++) box(acc, 0.05 * s, 0.07 * s, 0.42 * s, sx * (0.34 - i * 0.03) * s, by + (0.06 - i * 0.07) * s, (0.6 + i * 0.05) * s, mixc(c2, [0, 0, 0], 0.15 + i * 0.08), 0.22);
+  }
   if (!o.fan) box(acc, 0.3 * s, 0.05 * s, 0.55 * s, 0, by - 0.05 * s, 0.62 * s, c2, -0.3);
   let hy = by + 0.45 * s, hz = -0.42 * s;
   if (o.owl) { hy = by + 0.58 * s; hz = -0.05 * s; }
   if (o.swan) {
-    for (let k = 0; k < 6; k++) box(acc, 0.12 * s, 0.28 * s, 0.12 * s, 0, by + 0.22 * s + k * 0.22 * s, -0.42 * s - Math.sin(k * 0.65) * 0.2 * s, c, -0.3 + k * 0.1);
+    let prev = null;
+    for (let k = 0; k <= 8; k++) { const t = k / 8, pt = [0, by + 0.2 * s + t * 1.35 * s, -0.4 * s + 0.2 * s * Math.sin(t * Math.PI) - 0.1 * s * t];
+      if (prev) seg(acc, ...prev, ...pt, (0.12 - t * 0.035) * s, c); prev = pt; }
     hy = by + 1.55 * s; hz = -0.5 * s;
   }
   blob(acc, (o.owl ? 0.36 : 0.22) * s, (o.owl ? 0.32 : 0.22) * s, (o.owl ? 0.3 : 0.26) * s, 0, hy, hz, o.head ? col(o.head) : c);
   box(acc, 0.07 * s, 0.07 * s, 0.24 * s, 0, hy - 0.04 * s, hz - (o.owl ? 0.3 : 0.28) * s, bk, 0.3);
+  if (!o.swan) box(acc, 0.05 * s, 0.1 * s, 0.05 * s, 0, hy - 0.12 * s, hz - (o.owl ? 0.4 : 0.39) * s, bk, -0.3);   // the hook of the beak
+  for (const sx of [-1, 1]) { blob(acc, 0.05 * s, 0.05 * s, 0.03 * s, sx * (o.owl ? 0.13 : 0.12) * s, hy + 0.05 * s, hz - (o.owl ? 0.28 : 0.15) * s, col('#120e0c'));
+    box(acc, 0.018 * s, 0.018 * s, 0.01 * s, sx * (o.owl ? 0.14 : 0.135) * s, hy + 0.065 * s, hz - (o.owl ? 0.31 : 0.18) * s, [1.8, 1.8, 1.7]); }
   if (o.owl) for (const sx of [-1, 1]) {
     box(acc, 0.06 * s, 0.2 * s, 0.06 * s, sx * 0.2 * s, hy + 0.3 * s, hz, c2, 0, 0, sx * -0.3);
     blob(acc, 0.1 * s, 0.1 * s, 0.04 * s, sx * 0.13 * s, hy + 0.04 * s, hz - 0.27 * s, col('#f0e0a0'));
@@ -4425,31 +4775,70 @@ function ringsInto(acc, ys, rs, rgb, o = {}) {
 // robed figures: mortals at 6 ft, gods at 12. `attr` is the thing they carry or wear; `glow` lights the eyes of a god unmasked.
 function divine(o) {
   const acc = newAcc(), robe = col(o.robe), trim = col(o.trim), skin = col(o.skin), hair = col(o.hair), w = o.broad ? 1.3 : 1, gold = col('#f4cc5a');
-  const eye = o.glow ? (o.cold ? [0.9, 1.6, 3.0] : [3.0, 2.4, 1.1]) : col('#1a1410');
+  const eye = o.glow ? (o.cold ? [0.9, 1.6, 3.0] : [3.0, 2.4, 1.1]) : col('#2a1c14');
+  const lips = [skin[0] * 0.82, skin[1] * 0.55, skin[2] * 0.52], strap = col('#6a4a2a');
   // the robe falls in deep pleats from the belt; the chest above it is flatter and plainer
   ringsInto(acc, [0, 0.28, 0.95, 1.5, 1.92], [0.86 * w, 0.76 * w, 0.52 * w, 0.4 * w, 0.35 * w], robe, { pleat: 0.09, pf: 9, sides: 27 });
   ringsInto(acc, [1.88, 2.1, 2.36, 2.52, 2.58], [0.35 * w, 0.37 * w, 0.42 * w, 0.33 * w, 0.12], robe, { sz: 0.68, sides: 14 });
   ringsInto(acc, [1.84, 1.96], [0.37 * w, 0.37 * w], trim, { sz: 0.8, sides: 14 });   // belt
-  // a mantle slung from one shoulder across the chest, its tail hanging down the back
+  // a border at the hem with a key pattern running round it in gold
+  ringsInto(acc, [0, 0.17], [0.95 * w, 0.9 * w], trim, { sides: 27 });
+  for (let k = 0; k < 40; k++) {
+    const a = k / 40 * 6.2832, r = 0.935 * w, ry = -a - Math.PI / 2, tx = -Math.sin(a) * 0.04, tz = Math.cos(a) * 0.04;
+    box(acc, 0.022, 0.1, 0.02, Math.cos(a) * r, 0.085, Math.sin(a) * r, gold, 0, ry, 0);
+    box(acc, 0.08, 0.02, 0.02, Math.cos(a) * r + tx, k % 2 ? 0.13 : 0.04, Math.sin(a) * r + tz, gold, 0, ry, 0);
+  }
+  // sandalled feet under the hem
+  for (const sd of [-1, 1]) { box(acc, 0.13, 0.08, 0.26, sd * 0.17, 0.04, -0.95 * w - 0.03, skin); box(acc, 0.15, 0.025, 0.28, sd * 0.17, 0.012, -0.95 * w - 0.03, strap);
+    box(acc, 0.14, 0.03, 0.035, sd * 0.17, 0.07, -0.95 * w - 0.1, strap); }
+  // a mantle slung from one shoulder across the chest, its tail hanging down the back, pinned with gold
   box(acc, 0.19, 1.02, 0.62 * w, -0.03, 2.17, 0, trim, 0, 0, 0.79);
   box(acc, 0.34 * w, 1.55, 0.07, -0.26 * w, 1.72, 0.3 * w, trim, 0.1);
-  for (const s of [-1, 1]) {
-    blob(acc, 0.16 * w, 0.14, 0.16 * w, s * 0.43 * w, 2.46, 0, s < 0 ? trim : robe);
-    box(acc, 0.15 * w, 0.5, 0.15 * w, s * 0.5 * w, 2.18, 0, s < 0 ? trim : skin, 0, 0, s * 0.12);
-    box(acc, 0.12 * w, 0.46, 0.12 * w, s * 0.54 * w, 1.84, -0.1, skin, 0.5);
-    blob(acc, 0.085 * w, 0.1, 0.085 * w, s * 0.55 * w, 1.6, -0.22, skin);
-    box(acc, 0.045, 0.035, 0.03, s * 0.08, 2.88, -0.2, eye);
-    box(acc, 0.075, 0.018, 0.03, s * 0.08, 2.93, -0.2, hair);
+  for (const sd of [-1, 1]) blob(acc, 0.045, 0.045, 0.025, sd * 0.28 * w, 2.5, -0.17 * w, gold);
+  // arms that are arms: a round shoulder, the upper arm (under the mantle on one side), forearm, a hand and its thumb
+  for (const sd of [-1, 1]) {
+    blob(acc, 0.17 * w, 0.15, 0.17 * w, sd * 0.43 * w, 2.46, 0, sd < 0 ? trim : robe);
+    seg(acc, sd * 0.47 * w, 2.42, 0, sd * 0.53 * w, 2.0, -0.03, 0.095 * w, sd < 0 ? trim : skin);
+    seg(acc, sd * 0.53 * w, 2.0, -0.03, sd * 0.55 * w, 1.68, -0.2, 0.075 * w, skin, 0.07 * w);
+    blob(acc, 0.065 * w, 0.1, 0.08 * w, sd * 0.55 * w, 1.6, -0.23, skin);
+    blob(acc, 0.028, 0.055, 0.028, sd * 0.5 * w, 1.63, -0.29, skin);
+    if (o.glow && sd > 0) seg(acc, sd * 0.49 * w, 2.26, -0.01, sd * 0.5 * w, 2.2, -0.015, 0.1 * w, gold);   // an armlet
   }
-  box(acc, 0.14, 0.16, 0.14, 0, 2.62, 0, skin);
+  // the head: the straight brow running into a straight nose, as the sculptors cut it; cheekbones, a mouth, ears
+  seg(acc, 0, 2.5, 0.01, 0, 2.76, -0.02, 0.075, skin);
   blob(acc, 0.2, 0.25, 0.21, 0, 2.84, 0, skin);
   blob(acc, 0.15, 0.13, 0.15, 0, 2.72, -0.05, skin);
-  box(acc, 0.04, 0.09, 0.05, 0, 2.82, -0.215, skin);
-  blob(acc, 0.24, 0.2, 0.24, 0, 2.99, 0.04, hair);
-  if (!o.broad) { box(acc, 0.34, 0.95, 0.12, 0, 2.5, 0.18, hair); for (const s of [-1, 1]) blob(acc, 0.09, 0.3, 0.1, s * 0.19, 2.7, 0.08, hair); }
-  if (o.beard) { blob(acc, 0.17, 0.2, 0.11, 0, 2.63, -0.15, hair); box(acc, 0.2, 0.04, 0.05, 0, 2.76, -0.2, hair); }
+  // (the features go in a layer of their own, which is not inked: an outline round every one of them scribbles on the face)
+  const fa = newAcc();
+  box(fa, 0.26, 0.035, 0.07, 0, 2.915, -0.17, skin);
+  box(fa, 0.045, 0.13, 0.06, 0, 2.845, -0.205, skin, -0.22);
+  blob(fa, 0.036, 0.024, 0.03, 0, 2.787, -0.226, skin);
+  box(fa, 0.09, 0.018, 0.03, 0, 2.748, -0.2, lips); box(fa, 0.072, 0.016, 0.03, 0, 2.73, -0.196, lips);
+  for (const sd of [-1, 1]) {
+    blob(fa, 0.06, 0.04, 0.05, sd * 0.1, 2.81, -0.16, skin);
+    blob(acc, 0.03, 0.065, 0.045, sd * 0.205, 2.85, 0, skin);
+    if (o.glow) box(fa, 0.055, 0.028, 0.03, sd * 0.08, 2.875, -0.196, eye);
+    else { box(fa, 0.058, 0.03, 0.025, sd * 0.08, 2.875, -0.195, [1.45, 1.4, 1.32]); box(fa, 0.028, 0.03, 0.022, sd * 0.078, 2.875, -0.2, eye); }
+    box(fa, 0.075, 0.018, 0.03, sd * 0.08, 2.93, -0.2, hair, 0, 0, sd * -0.12);
+  }
+  // hair in rows of round curls, a fringe of them over the forehead
+  blob(acc, 0.23, 0.19, 0.23, 0, 2.99, 0.04, hair);
+  [[3.06, 0.2, 2.5], [2.98, 0.225, 2.2], [2.89, 0.225, 1.75]].forEach(([y, R, span], row) => {
+    for (let k = 0, n = 13 - row; k < n; k++) { const a = -span + k / (n - 1) * span * 2; blob(acc, 0.062, 0.058, 0.062, Math.sin(a) * R, y, 0.03 + Math.cos(a) * R, hair); }
+  });
+  for (let k = 0; k < 6; k++) blob(acc, 0.05, 0.045, 0.05, -0.14 + k * 0.056, 3.0 - Math.abs(k - 2.5) * 0.008, -0.17 + Math.abs(k - 2.5) * 0.012, hair);
+  if (!o.broad) {   // long hair, falling down the back and over the shoulders
+    seg(acc, 0, 2.95, 0.16, 0, 2.08, 0.22, 0.17, hair, 0.075);
+    for (const sd of [-1, 1]) seg(acc, sd * 0.17, 2.86, 0.03, sd * 0.22, 2.42, -0.05, 0.055, hair);
+  }
+  if (o.beard) {   // a sculpted beard: curls in rows under the jaw, and a moustache
+    blob(acc, 0.15, 0.17, 0.1, 0, 2.64, -0.13, hair);
+    for (let row = 0; row < 5; row++) { const y = 2.75 - row * 0.065, wd = 0.17 - row * 0.022, n = 6 - Math.floor(row / 2);
+      for (let k = 0; k < n; k++) { const x = -wd + k / (n - 1) * wd * 2; blob(acc, 0.045, 0.042, 0.04, x, y, -0.19 - 0.03 * (1 - Math.abs(x) / 0.2) - row * 0.008, hair); } }
+    for (const sd of [-1, 1]) seg(acc, sd * 0.015, 2.77, -0.215, sd * 0.1, 2.745, -0.19, 0.022, hair);
+  }
   if (o.glow && o.attr !== 'crown' && o.attr !== 'hat' && o.attr !== 'wings') for (let k = 0; k < 12; k++) {   // laurel
-    const a = k / 12 * 6.28; box(acc, 0.04, 0.1, 0.07, Math.cos(a) * 0.245, 3.05, 0.04 + Math.sin(a) * 0.245, o.cold ? [0.5, 0.7, 1.4] : gold, 0.5, -a, 0);
+    const a = k / 12 * 6.28; blobE(fa, 0.022, 0.07, 0.04, Math.cos(a) * 0.262, 3.06 + (k % 2) * 0.02, 0.04 + Math.sin(a) * 0.262, o.cold ? [0.5, 0.7, 1.4] : gold, 0.9, -a, (k % 2 ? 0.5 : -0.5));
   }
   const hx = 0.62 * w;
   switch (o.attr) {
@@ -4470,7 +4859,13 @@ function divine(o) {
       for (const s of [-1, 1]) box(acc, 0.06, 0.6, 0.06, hx + s * 0.24, 3.8, -0.05, [0.5, 0.9, 2.4]);
       for (let k = 0; k < 7; k++) { const a = k / 7 * 6.28; box(acc, 0.05, 0.3, 0.05, Math.cos(a) * 0.2, 3.2, 0.04 + Math.sin(a) * 0.2, col('#2a2c3a')); } break;   // an iron crown
   }
-  return { geo: accToGeo(acc), eye: 2.85 };
+  return { geo: accToGeo(acc), face: accToGeo(fa), eye: 2.85 };
+}
+// a robed figure as a mesh: cel-shaded, inked, its face drawn on a layer of its own
+function robedMesh(look) {
+  const mesh = new THREE.Mesh(look.geo, new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: TOON_RAMP }));
+  if (look.face) { const f = new THREE.Mesh(look.face, mesh.material); f.userData.noInk = true; f.castShadow = true; mesh.add(f); }
+  inkOutline(mesh); return mesh;
 }
 // legs that walk: each leg's vertices know their hip, and swing about it in the vertex shader
 function patchWalk(mat) {
@@ -4491,17 +4886,17 @@ function patchWalk(mat) {
 
 // ───────────────────────── wildlife ─────────────────────────
 const SPECIES = [
-  { id: 'deer', n: 50, herd: [3, 6], speed: 1.6, flee: 15, h: [-25, 420], o: { L: 1.3, H: 0.65, W: 0.45, leg: 0.85, neck: 0.6, head: [0.24, 0.26, 0.42], c: '#9a6a3e', c2: '#6a4a2e', tail: 0.15, ears: true } },
-  { id: 'stag', n: 14, herd: [1, 2], speed: 1.4, flee: 16, h: [-25, 460], o: { L: 1.45, H: 0.7, W: 0.5, leg: 0.95, neck: 0.65, head: [0.26, 0.28, 0.44], c: '#8a5a32', c2: '#5a3a22', c3: '#d8c8a0', horns: 'antler', tail: 0.15, ears: true } },
+  { id: 'deer', n: 50, herd: [3, 6], speed: 1.6, flee: 15, h: [-25, 420], o: { L: 1.3, H: 0.65, W: 0.45, leg: 0.85, neck: 0.6, head: [0.24, 0.26, 0.42], c: '#9a6a3e', c2: '#6a4a2e', tail: 0.15, tailC: '#f2ebdd', ears: true, earL: 1.35, belly: '#e6d6b8', rump: '#efe6d4' } },
+  { id: 'stag', n: 14, herd: [1, 2], speed: 1.4, flee: 16, h: [-25, 460], o: { L: 1.45, H: 0.7, W: 0.5, leg: 0.95, neck: 0.65, head: [0.26, 0.28, 0.44], c: '#8a5a32', c2: '#5a3a22', c3: '#d8c8a0', horns: 'antler', tail: 0.15, tailC: '#efe6d4', ears: true, belly: '#d8c4a0', rump: '#e8dcc4' } },
   { id: 'horse', n: 34, herd: [3, 6], speed: 2, flee: 16, h: [-25, 300], tints: [[1, 1, 1], [0.45, 0.42, 0.4], [1.9, 1.8, 1.7], [1.4, 1.1, 0.8]], o: { L: 1.9, H: 0.85, W: 0.6, leg: 1.05, neck: 0.85, head: [0.3, 0.32, 0.62], c: '#6a4428', c2: '#3a2a1e', mane: '#2a1e16', tail: 0.8, tailC: '#2a1e16', ears: true } },
-  { id: 'goat', n: 36, herd: [2, 5], speed: 1.2, flee: 9, h: [140, 1500], o: { L: 0.9, H: 0.5, W: 0.38, leg: 0.55, neck: 0.35, head: [0.2, 0.22, 0.36], c: '#e2ddd2', c2: '#8a8276', c3: '#a89a80', horns: 'ram', hs: 0.6, tail: 0.12, ears: true } },
-  { id: 'wolf', n: 24, herd: [2, 4], speed: 2.4, flee: 0, h: [-20, 600], o: { L: 1.15, H: 0.5, W: 0.36, leg: 0.6, neck: 0.32, head: [0.26, 0.26, 0.46], c: '#7a7a78', c2: '#5a5a58', tail: 0.6, ears: true } },
-  { id: 'boar', n: 20, herd: [1, 3], speed: 1.5, flee: 12, h: [-25, 400], o: { L: 1.1, H: 0.62, W: 0.5, leg: 0.38, neck: 0.2, head: [0.34, 0.34, 0.5], c: '#4a3a2e', c2: '#2e241c', horns: 'tusk', tail: 0.15, hump: true, snout: '#6a5040' } },
-  { id: 'rabbit', n: 60, herd: [1, 3], speed: 2, flee: 11, hop: true, h: [-25, 380], o: { L: 0.35, H: 0.26, W: 0.22, leg: 0.12, neck: 0.1, head: [0.15, 0.15, 0.18], c: '#a89070', c2: '#8a7458', ears: true, earL: 2.4, tail: 0.07, tailC: '#f4f0e8' } },
-  { id: 'bear', n: 8, herd: [1, 1], speed: 1.2, flee: 0, h: [0, 650], o: { L: 1.7, H: 0.95, W: 0.85, leg: 0.6, neck: 0.3, head: [0.45, 0.42, 0.55], c: '#5a3e28', c2: '#3e2a1a', ears: true, hump: true, tail: 0.08 } },
-  { id: 'fox', n: 14, herd: [1, 1], speed: 2, flee: 12, h: [-25, 450], o: { L: 0.75, H: 0.32, W: 0.24, leg: 0.32, neck: 0.22, head: [0.2, 0.2, 0.34], c: '#d0702a', c2: '#3a2a20', tail: 0.5, tailC: '#f0e8dc', ears: true } },
+  { id: 'goat', n: 36, herd: [2, 5], speed: 1.2, flee: 9, h: [140, 1500], o: { L: 0.9, H: 0.5, W: 0.38, leg: 0.55, neck: 0.35, head: [0.2, 0.22, 0.36], c: '#e2ddd2', c2: '#8a8276', c3: '#a89a80', horns: 'ram', hs: 0.6, tail: 0.12, ears: true, beard: '#cfc6b6' } },
+  { id: 'wolf', n: 24, herd: [2, 4], speed: 2.4, flee: 0, h: [-20, 600], o: { L: 1.15, H: 0.5, W: 0.36, leg: 0.6, neck: 0.32, head: [0.26, 0.26, 0.46], c: '#7a7a78', c2: '#5a5a58', tail: 0.6, ears: true, paw: true, bushy: true, belly: '#c4c0b8', inner: '#3a3634' } },
+  { id: 'boar', n: 20, herd: [1, 3], speed: 1.5, flee: 12, h: [-25, 400], o: { L: 1.1, H: 0.62, W: 0.5, leg: 0.38, neck: 0.2, head: [0.34, 0.34, 0.5], c: '#4a3a2e', c2: '#2e241c', horns: 'tusk', tail: 0.15, hump: true, snout: '#6a5040', bristle: true, ears: true, inner: '#3a2a22' } },
+  { id: 'rabbit', n: 60, herd: [1, 3], speed: 2, flee: 11, hop: true, h: [-25, 380], o: { L: 0.35, H: 0.26, W: 0.22, leg: 0.12, neck: 0.1, head: [0.15, 0.15, 0.18], c: '#a89070', c2: '#8a7458', ears: true, earL: 2.4, tail: 0.07, tailC: '#f4f0e8', paw: true, belly: '#e8dcc6' } },
+  { id: 'bear', n: 8, herd: [1, 1], speed: 1.2, flee: 0, h: [0, 650], o: { L: 1.7, H: 0.95, W: 0.85, leg: 0.6, neck: 0.3, head: [0.52, 0.48, 0.58], c: '#5a3e28', c2: '#3e2a1a', ears: true, roundEars: true, hump: 0.35, tail: 0.08, paw: true, snout: '#8a6a4a' } },
+  { id: 'fox', n: 14, herd: [1, 1], speed: 2, flee: 12, h: [-25, 450], o: { L: 0.75, H: 0.32, W: 0.24, leg: 0.32, neck: 0.22, head: [0.2, 0.2, 0.34], c: '#d0702a', c2: '#3a2a20', tail: 0.5, tailC: '#f0e8dc', ears: true, paw: true, bushy: true, belly: '#f2ebe0', inner: '#2a1e18' } },
 ];
-const animalMat = patchWalk(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+const animalMat = patchWalk(new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: TOON_RAMP }));
 let animalK = 1;
 function placeHerd(herd, minR, maxR) {
   const sp = herd.sp, P = player.pos;
@@ -4653,11 +5048,11 @@ const GOD_DEFS = [
 ];
 const LOOKS = {
   ram: () => quad({ L: 1.15, H: 0.62, W: 0.48, leg: 0.62, neck: 0.4, head: [0.26, 0.28, 0.42], c: '#c4beb2', c2: '#4a4440', c3: '#e0d4b8', horns: 'ram', hs: 1, tail: 0.14, ears: true, bell: true }),
-  stag: () => quad({ L: 1.5, H: 0.72, W: 0.5, leg: 1.0, neck: 0.7, head: [0.26, 0.28, 0.46], c: '#f6f4ee', c2: '#dcd6c8', c3: '#f4cc5a', horns: 'antler', hs: 1.4, tail: 0.16, ears: true }),
-  wolf: () => quad({ L: 1.35, H: 0.58, W: 0.42, leg: 0.7, neck: 0.36, head: [0.3, 0.3, 0.52], c: '#e8ac3a', c2: '#a8742a', tail: 0.75, ears: true }),
+  stag: () => quad({ L: 1.5, H: 0.72, W: 0.5, leg: 1.0, neck: 0.7, head: [0.26, 0.28, 0.46], c: '#f6f4ee', c2: '#dcd6c8', c3: '#f4cc5a', horns: 'antler', hs: 1.4, tail: 0.16, ears: true, belly: '#ffffff', inner: '#f0c8c0' }),
+  wolf: () => quad({ L: 1.35, H: 0.58, W: 0.42, leg: 0.7, neck: 0.36, head: [0.3, 0.3, 0.52], c: '#e8ac3a', c2: '#a8742a', tail: 0.75, ears: true, paw: true, bushy: true, belly: '#f6dca0', tailC: '#fff0c0' }),
   horse: () => quad({ L: 2.1, H: 0.95, W: 0.66, leg: 1.15, neck: 0.95, head: [0.32, 0.34, 0.68], c: '#f6f4f0', c2: '#d8d4cc', mane: '#9cd0e8', tail: 0.95, tailC: '#9cd0e8', ears: true }),
-  boar: () => quad({ L: 1.35, H: 0.78, W: 0.6, leg: 0.44, neck: 0.22, head: [0.42, 0.42, 0.6], c: '#22201e', c2: '#141210', c3: '#f4ecd8', horns: 'tusk', tail: 0.18, hump: true, snout: '#3a3230' }),
-  bull: () => quad({ L: 2.1, H: 1.05, W: 0.85, leg: 0.8, neck: 0.36, head: [0.52, 0.5, 0.64], c: '#3a2a22', c2: '#24180f', c3: '#e6dcc4', horns: 'bull', hs: 1.2, tail: 0.75, hump: true, vines: true }),
+  boar: () => quad({ L: 1.35, H: 0.78, W: 0.6, leg: 0.44, neck: 0.22, head: [0.42, 0.42, 0.6], c: '#22201e', c2: '#141210', c3: '#f4ecd8', horns: 'tusk', tail: 0.18, hump: true, snout: '#3a3230', bristle: true, ears: true }),
+  bull: () => quad({ L: 2.1, H: 1.05, W: 0.85, leg: 0.8, neck: 0.36, head: [0.52, 0.5, 0.64], c: '#3a2a22', c2: '#24180f', c3: '#e6dcc4', horns: 'bull', hs: 1.2, tail: 0.75, hump: true, vines: true, tuft: true, ears: true }),
   swan: () => perchBird({ s: 1.3, c: '#f8f6f2', c2: '#e6e2da', beak: '#e8822a', swan: true }),
   owl: () => perchBird({ s: 0.85, c: '#8a8478', c2: '#6a6458', beak: '#c8a040', owl: true, rock: true }),
   peacock: () => perchBird({ s: 1.0, c: '#1f5aa8', c2: '#2a6a5a', beak: '#c8c0a0', fan: true, legs: true }),
@@ -4716,8 +5111,10 @@ const gods = GOD_DEFS.map(d => {
   for (const kind of forms) {
     const look = kind === 'animal' ? LOOKS[d.look]() : divine(kind === 'god' ? { ...DIVINE[d.id], glow: true } : PERSON[d.id]);
     const S = kind === 'animal' ? 1.3 : (kind === 'god' ? GOD_H : MAN_H - 0.06) / DIVINE_H;
-    const mesh = new THREE.Mesh(look.geo, patchWalk(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
+    const mesh = new THREE.Mesh(look.geo, patchWalk(new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: TOON_RAMP })));
     mesh.castShadow = true; mesh.userData = { S, eye: look.eye * S };
+    if (look.face) { const f = new THREE.Mesh(look.face, mesh.material); f.userData.noInk = true; f.castShadow = true; mesh.add(f); }
+    if (kind !== 'animal') inkOutline(mesh);
     if (kind === 'god') { mesh.userData.halo = new THREE.Mesh(haloGeo, haloMat); mesh.userData.halo.position.set(0, 3.4, 0.04); mesh.userData.halo.rotation.x = Math.PI / 2; mesh.add(mesh.userData.halo); }
     group.add(mesh); shapes[kind] = mesh;
   }
@@ -4726,7 +5123,7 @@ const gods = GOD_DEFS.map(d => {
     const a = newAcc();
     box(a, 0.7, 0.55, 0.45, 0, 0.28, 0, col('#2e2e30')); box(a, 1.1, 0.25, 0.5, 0, 0.66, 0, col('#3a3a3c')); box(a, 0.3, 0.2, 0.3, 0.62, 0.66, 0, col('#3a3a3c'));
     for (let k = 0; k < 8; k++) { const an = k / 8 * 6.28; blob(a, 0.35, 0.3, 0.35, 2.2 + Math.cos(an) * 0.9, 0.3, Math.sin(an) * 0.9, col('#6a625a')); }
-    forge = new THREE.Mesh(accToGeo(a), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+    forge = new THREE.Mesh(accToGeo(a), new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: TOON_RAMP }));
     forge.castShadow = true; forge.position.z = -1.6; group.add(forge);
   }
   group.visible = false; scene.add(group);
@@ -5119,24 +5516,132 @@ const waterfallMat = new THREE.ShaderMaterial({
 const windmills = new Set(), waterfalls = new Set();
 const rotXZ = (dx, dz, r) => [dx * Math.cos(r) + dz * Math.sin(r), -dx * Math.sin(r) + dz * Math.cos(r)];
 
+// The Cyclades, done properly. A house is a whitewashed cube with a lip of cornice and a parapet round its flat roof,
+// a blue door under a round arch, windows with blue shutters folded open, often a stair up the outside to the roof
+// terrace, a chimney with a cap, pots by the door — sometimes a pergola heavy with bougainvillea, sometimes a second
+// storey with a blue dome. Chapels are bigger, barrel-roofed, domed at the back, with a bell gable over the door, and
+// they are open: walk in and there is a marble floor, a gold icon wall, an altar, benches, and candles burning.
+G.archTop = new THREE.CylinderGeometry(1, 1, 1, 16, 1, false, -Math.PI / 2, Math.PI).rotateX(-Math.PI / 2).toNonIndexed();   // a half-round, flat side down, along z
+const BEAM = col('#6b4a2c'), TERRA = col('#b5603a'), DARKIN = col('#2b2622'), GOLDLEAF = col('#d9b25a'), MARBLEF = col('#e9e3d6'), BRONZE = col('#9a7238'), POTLEAF = col('#3f7a34');
+const BOUG = [col('#c2187a'), col('#d6338f'), col('#a5126a'), col('#e04aa0')];
+const FLAME = [2.6, 1.5, 0.55];
+function cyBuilder(acc, x, y, z, ry) {
+  const P = (dx, dy, dz) => { const [ox, oz] = rotXZ(dx, dz, ry); return [x + ox, y + dy, z + oz]; };
+  const B = (w, h, d, dx, dy, dz, c, rx = 0, rz = 0) => { const [px, py, pz] = P(dx, dy, dz); box(acc, w, h, d, px, py, pz, c, rx, ry, rz); };
+  const A = (rw, rh, len, dx, dy, dz, c, turn = 0) => { const [px, py, pz] = P(dx, dy, dz); _mat.compose(_p.set(px, py, pz), _q.setFromEuler(_e.set(0, ry + turn, 0)), _s.set(rw, rh, len)); addGeo(acc, G.archTop, _mat, c); };
+  const O = (sx, sy, sz, dx, dy, dz, c) => { const [px, py, pz] = P(dx, dy, dz); blob(acc, sx, sy, sz, px, py, pz, c); };
+  return { P, B, A, O };
+}
 function house(acc, rng, x, y, z, big = 1, dome = 0.2) {
-  const w = (4 + rng() * 4) * big, d = (4 + rng() * 4) * big, h = (3.2 + rng() * 2.6) * big, ry = Math.floor(rng() * 4) * Math.PI / 2 + (rng() - 0.5) * 0.3;
-  const at = (dx, dz) => { const [ox, oz] = rotXZ(dx, dz, ry); return [x + ox, z + oz]; };
-  box(acc, w, h + 2, d, x, y + h / 2 - 1, z, WHITE, 0, ry, 0);
-  box(acc, w + 0.5, 0.35, d + 0.5, x, y + h, z, WHITE, 0, ry, 0);
-  solid(x, z, Math.max(w, d) * 0.56, y - 2, y + h + 0.5, 'a house');
-  let [px, pz] = at(rng() * w * 0.4 - w * 0.2, d / 2 + 0.06);
-  box(acc, 1.1, 2.1, 0.14, px, y + 1.05, pz, BLUE, 0, ry, 0);
-  for (const s of [-1, 1]) { [px, pz] = at(s * (w / 2 + 0.06), 0); box(acc, 0.14, 0.9, 1.0, px, y + h * 0.6, pz, BLUE, 0, ry, 0); }
+  const w = (4.5 + rng() * 4) * big, d = (4.5 + rng() * 4) * big, h = (3.2 + rng() * 2.2) * big, ry = Math.floor(rng() * 4) * Math.PI / 2 + (rng() - 0.5) * 0.3;
+  const { B, A, O, P } = cyBuilder(acc, x, y, z, ry);
+  // the cube, a cornice lip under the roof, and the parapet round it
+  B(w, h + 2, d, 0, h / 2 - 1, 0, WHITE);
+  B(w + 0.22, 0.2, d + 0.22, 0, h - 0.12, 0, WHITE);
+  for (const sd of [-1, 1]) { B(w + 0.2, 0.5, 0.26, 0, h + 0.25, sd * (d / 2), WHITE); B(0.26, 0.5, d + 0.2, sd * (w / 2), h + 0.25, 0, WHITE); }
+  // the door: blue, under a round arch, with a white step
+  const dx0 = (rng() - 0.5) * w * 0.4;
+  B(1.1, 1.95, 0.14, dx0, 0.98, d / 2 + 0.05, BLUE); A(0.55, 0.5, 0.14, dx0, 1.95, d / 2 + 0.05, BLUE);
+  B(1.6, 0.18, 0.6, dx0, 0.09, d / 2 + 0.3, WHITE);
+  // windows: a dark opening, a blue shutter folded back either side
+  for (const sd of [-1, 1]) if (rng() < 0.85) {
+    const wz = (rng() - 0.5) * d * 0.4, wy = h * 0.58;
+    B(0.1, 0.95, 0.75, sd * (w / 2 + 0.03), wy, wz, DARKIN);
+    for (const k of [-1, 1]) B(0.08, 0.95, 0.4, sd * (w / 2 + 0.18), wy, wz + k * 0.6, BLUE, 0, 0);
+  }
+  if (rng() < 0.7) { const wx = (rng() - 0.5) * w * 0.4; B(0.75, 0.9, 0.1, wx, h * 0.58, -d / 2 - 0.03, DARKIN); for (const k of [-1, 1]) B(0.4, 0.9, 0.08, wx + k * 0.6, h * 0.58, -d / 2 - 0.15, BLUE); }
+  // a stair up the outside to the roof, with its low wall
+  if (rng() < 0.55) {
+    const sd = rng() < 0.5 ? -1 : 1, n = Math.max(4, Math.round(h / 0.36)), run = Math.min(d - 0.6, n * 0.42), step = run / n;
+    for (let k = 0; k < n; k++) { const sh = (k + 1) * (h / n); B(0.95, sh, step + 0.02, sd * (w / 2 + 0.5), sh / 2, -d / 2 + 0.3 + (k + 0.5) * step, WHITE); }
+    B(0.16, h + 0.6, run, sd * (w / 2 + 0.98), (h + 0.6) / 2 - 0.2, -d / 2 + 0.3 + run / 2, WHITE);
+  }
+  // the chimney, a little white house of its own
+  if (rng() < 0.6) { const cx = (rng() - 0.5) * w * 0.6, cz = (rng() - 0.5) * d * 0.6; B(0.55, 1.1, 0.55, cx, h + 0.55, cz, WHITE); B(0.85, 0.12, 0.85, cx, h + 1.15, cz, WHITE); B(0.4, 0.3, 0.4, cx, h + 1.33, cz, WHITE); }
+  // pots by the door
+  for (const k of [-1, 1]) if (rng() < 0.6) { B(0.42, 0.45, 0.42, dx0 + k * 1.15, 0.23, d / 2 + 0.45, TERRA); O(0.35, 0.4, 0.35, dx0 + k * 1.15, 0.65, d / 2 + 0.45, POTLEAF); }
+  // a pergola, and the bougainvillea over it
+  if (rng() < 0.4) {
+    const pz = d / 2 + 1.5, pw = w * 0.8;
+    for (const k of [-1, 1]) B(0.18, 2.7, 0.18, k * (pw / 2 - 0.1), 1.35, pz, BEAM);
+    B(pw, 0.15, 0.15, 0, 2.7, pz, BEAM);
+    for (let k = 0; k < 4; k++) B(0.12, 0.12, 1.6, -pw / 2 + 0.2 + k * (pw - 0.4) / 3, 2.78, d / 2 + 0.75, BEAM);
+    for (let k = 0; k < 9; k++) O(0.55 + rng() * 0.5, 0.4 + rng() * 0.3, 0.55 + rng() * 0.5, (rng() - 0.5) * pw, 2.85 + rng() * 0.3, d / 2 + 0.2 + rng() * 1.4, BOUG[Math.floor(rng() * BOUG.length)]);
+    for (let k = 0; k < 4; k++) O(0.35, 0.7, 0.35, (rng() < 0.5 ? -1 : 1) * (pw / 2 - 0.1), 1.9 + rng() * 0.6, pz + (rng() - 0.5) * 0.3, BOUG[Math.floor(rng() * BOUG.length)]);
+  }
+  solid(x, z, Math.max(w, d) * 0.56, y - 2, y + h + 0.5, 'a house'); CLEAR?.push({ x, z, r: Math.max(w, d) * 0.75 + 4.5 });
+  // a second storey, set back, sometimes crowned with a blue dome
   if (rng() < 0.45) {
-    const w2 = w * (0.45 + rng() * 0.25), d2 = d * (0.45 + rng() * 0.25), h2 = 2.6 * big;
-    [px, pz] = at((rng() - 0.5) * (w - w2), (rng() - 0.5) * (d - d2));
-    box(acc, w2, h2, d2, px, y + h + h2 / 2, pz, WHITE, 0, ry, 0);
-    box(acc, w2 + 0.4, 0.3, d2 + 0.4, px, y + h + h2, pz, WHITE, 0, ry, 0);
-    if (rng() < dome * 2) { const r = Math.min(w2, d2) * 0.42; _mat.compose(_p.set(px, y + h + h2 + 0.1, pz), _q.identity(), _s.set(r, r * 1.1, r)); addGeo(acc, G.dome, _mat, DOMEBLUE); }
+    const w2 = w * (0.45 + rng() * 0.25), d2 = d * (0.45 + rng() * 0.25), h2 = 2.6 * big, ox = (rng() - 0.5) * (w - w2), oz = (rng() - 0.5) * (d - d2);
+    B(w2, h2, d2, ox, h + h2 / 2, oz, WHITE);
+    B(w2 + 0.4, 0.22, d2 + 0.4, ox, h + h2 - 0.1, oz, WHITE);
+    B(0.8, 1.6, 0.1, ox, h + 0.85, oz + d2 / 2 + 0.03, BLUE); A(0.4, 0.38, 0.1, ox, h + 1.65, oz + d2 / 2 + 0.03, BLUE);
+    if (rng() < dome * 2) { const r = Math.min(w2, d2) * 0.42, [px, py, pz] = P(ox, h + h2 + 0.1, oz); _mat.compose(_p.set(px, py, pz), _q.identity(), _s.set(r, r * 1.1, r)); addGeo(acc, G.dome, _mat, DOMEBLUE); }
   } else if (rng() < dome) {
     const r = Math.min(w, d) * 0.36; _mat.compose(_p.set(x, y + h + 0.15, z), _q.identity(), _s.set(r, r * 1.1, r)); addGeo(acc, G.dome, _mat, DOMEBLUE);
   }
+}
+// A chapel you can walk into. Its door faces +z (turned by ry).
+function chapel(acc, rng, x, y, z, ry, grand = false) {
+  const w = grand ? 9.5 : 7, d = grand ? 15 : 10.5, h = grand ? 6.2 : 5, t = 0.45, dw = grand ? 2.4 : 1.9, dh = grand ? 3.3 : 2.7;
+  const { B, A, O, P } = cyBuilder(acc, x, y, z, ry);
+  // a white plinth it stands on, the floor, a step to the door
+  B(w + 1.2, 1.6, d + 1.2, 0, -0.65, 0, WHITE); B(w - 2 * t, 0.12, d - 2 * t, 0, 0.21, 0, MARBLEF);
+  B(dw + 1.2, 0.2, 1.2, 0, 0.05, d / 2 + 0.9, WHITE);
+  // the walls (the front one open in the middle), and the lintel over the door
+  B(t, h, d, -w / 2 + t / 2, h / 2, 0, WHITE); B(t, h, d, w / 2 - t / 2, h / 2, 0, WHITE); B(w, h, t, 0, h / 2, -d / 2 + t / 2, WHITE);
+  const sw = (w - dw) / 2;
+  for (const k of [-1, 1]) B(sw, h, t, k * (dw / 2 + sw / 2), h / 2, d / 2 - t / 2, WHITE);
+  B(dw, h - dh, t, 0, dh + (h - dh) / 2, d / 2 - t / 2, WHITE);
+  A(dw / 2 + 0.15, 0.55, 0.08, 0, dh, d / 2 + 0.02, BLUE);   // the blue painted arch round the doorway
+  for (const k of [-1, 1]) B(0.08, dh, dw / 2, k * (dw / 2 + dw / 4 + 0.05), dh / 2, d / 2 + dw / 4, BLUE);   // the two door leaves, standing open
+  // the barrel roof, and the dome on its drum at the back
+  A(w / 2 + 0.25, grand ? 2.2 : 1.7, d + 0.3, 0, h - 0.02, 0, WHITE);
+  // from inside: a white ceiling crossed with dark beams, and a bronze lamp hanging on a chain with its flames lit
+  B(w - 2 * t, 0.16, d - 2 * t, 0, h - 0.06, 0, WHITE);
+  for (let i = 0, nb = grand ? 6 : 4; i < nb; i++) B(w - 2 * t, 0.24, 0.24, 0, h - 0.26, -d / 2 + t + (i + 0.5) * (d - 2 * t) / nb, BEAM);
+  B(0.04, 1.5, 0.04, 0, h - 0.9, 0, BRONZE); O(0.42, 0.16, 0.42, 0, h - 1.7, 0, BRONZE);
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; O(0.05, 0.1, 0.05, Math.cos(a) * 0.36, h - 1.52, Math.sin(a) * 0.36, FLAME); }
+  const dz = -d / 2 + w * 0.42, dr = w * 0.3;
+  { const [px, py, pz] = P(0, h + 1.2, dz); _mat.compose(_p.set(px, py, pz), _q.identity(), _s.set(dr * 1.05, 2.0, dr * 1.05)); addGeo(acc, G.islandTop, _mat, WHITE);
+    _mat.compose(_p.set(px, py + 1.0, pz), _q.identity(), _s.set(dr, dr * 1.15, dr)); addGeo(acc, G.dome, _mat, DOMEBLUE); }
+  B(0.14, 1.1, 0.14, 0, h + 2.2 + dr * 1.15 + 0.5, dz, WHITE); B(0.6, 0.14, 0.14, 0, h + 2.2 + dr * 1.15 + 0.75, dz, WHITE);
+  // the bell gable over the front: two arched openings with a bell in each, a cross on top
+  const gw = w * 0.62, gh = grand ? 3 : 2.5, gy = h + (grand ? 1.2 : 0.9);
+  B(gw, gh, t, 0, gy + gh / 2, d / 2 - t / 2, WHITE);
+  for (const k of [-1, 1]) {
+    B(0.75, 1.05, t + 0.06, k * gw * 0.22, gy + gh * 0.48, d / 2 - t / 2, DARKIN); A(0.375, 0.36, t + 0.06, k * gw * 0.22, gy + gh * 0.48 + 0.52, d / 2 - t / 2, DARKIN);
+    O(0.24, 0.3, 0.24, k * gw * 0.22, gy + gh * 0.5, d / 2 - t / 2, BRONZE);
+  }
+  A(gw / 2, 0.6, t, 0, gy + gh, d / 2 - t / 2, WHITE);
+  B(0.12, 0.9, 0.12, 0, gy + gh + 1.05, d / 2 - t / 2, WHITE); B(0.5, 0.12, 0.12, 0, gy + gh + 1.25, d / 2 - t / 2, WHITE);
+  // windows: narrow slits, deep in the wall
+  for (const k of [-1, 1]) for (let i = 0; i < (grand ? 3 : 2); i++) B(t + 0.04, 1.3, 0.35, k * (w / 2 - t / 2), h * 0.62, -d / 2 + d * (i + 1) / ((grand ? 3 : 2) + 1), DARKIN);
+  // inside: the icon wall in gold with its dark icons, the altar, candles alight, benches
+  B(w - 2 * t - 0.4, h * 0.62, 0.1, 0, h * 0.36 + 0.2, -d / 2 + t + 0.06, GOLDLEAF);
+  for (let i = -1; i <= 1; i++) { B(0.85, 1.25, 0.06, i * (w * 0.24), h * 0.42, -d / 2 + t + 0.13, i === 0 ? col('#7a1c1c') : DARKIN); A(0.43, 0.3, 0.06, i * (w * 0.24), h * 0.42 + 0.62, -d / 2 + t + 0.13, i === 0 ? col('#7a1c1c') : DARKIN); }
+  B(1.7, 1.0, 0.85, 0, 0.7, -d / 2 + t + 1.2, WHITE); B(1.8, 0.06, 0.95, 0, 1.22, -d / 2 + t + 1.2, GOLDLEAF);
+  for (const k of [-1, 1]) {
+    B(0.5, 1.1, 0.5, k * (w / 2 - t - 0.8), 0.82, -d / 2 + t + 2.4, BRONZE);
+    for (let i = 0; i < 5; i++) { const ox = k * (w / 2 - t - 0.8) + (rng() - 0.5) * 0.35, oz = -d / 2 + t + 2.4 + (rng() - 0.5) * 0.35; B(0.05, 0.3, 0.05, ox, 1.52, oz, [1.4, 1.35, 1.2]); O(0.05, 0.09, 0.05, ox, 1.72, oz, FLAME); }
+  }
+  for (let r = 0; r < (grand ? 4 : 3); r++) for (const k of [-1, 1]) B(w * 0.3, 0.45, 0.42, k * (w * 0.22), 0.45, -d / 2 + t + 3.6 + r * 1.6, BEAM);
+  // walls you cannot walk through, a doorway you can; and the room, so the camera knows to stay inside it
+  const seg = (ax, az, bx, bz) => { const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(L / 0.7)); for (let i = 0; i <= n; i++) { const [px, , pz] = P(lerp(ax, bx, i / n), 0, lerp(az, bz, i / n)); solid(px, pz, 0.42, y - 1, y + h + 2.5, 'a chapel wall'); } };
+  seg(-w / 2 + t / 2, -d / 2, -w / 2 + t / 2, d / 2); seg(w / 2 - t / 2, -d / 2, w / 2 - t / 2, d / 2); seg(-w / 2, -d / 2 + t / 2, w / 2, -d / 2 + t / 2);
+  seg(-w / 2, d / 2 - t / 2, -dw / 2 - 0.35, d / 2 - t / 2); seg(dw / 2 + 0.35, d / 2 - t / 2, w / 2, d / 2 - t / 2);
+  solid(x, z, Math.max(w, d) * 0.62, y + h - 0.1, y + h + 4.5, 'a chapel roof');
+  CLEAR?.push({ x, z, r: Math.max(w, d) * 0.62 + 8 });
+  ROOMS?.push({ x, y, z, ry, hw: w / 2 - t - 0.25, hd: d / 2 - t - 0.25, h: h - 0.3, name: grand ? 'the church' : 'a chapel' });
+}
+// which room (if any) he is standing in
+function roomAt(x, y, z) {
+  const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+    const R = chunks.get((cx + dx) + ',' + (cz + dz))?.userData.rooms; if (!R) continue;
+    for (const r of R) { const [lx, lz] = rotXZ(x - r.x, z - r.z, -r.ry); if (Math.abs(lx) < r.hw + 0.3 && Math.abs(lz) < r.hd + 0.6 && y > r.y - 1 && y < r.y + r.h) return r; }
+  }
+  return null;
 }
 function windmill(acc, group, rng, x, y, z) {
   const ry = rng() * 6.28;
@@ -5153,11 +5658,13 @@ function windmill(acc, group, rng, x, y, z) {
 function buildVillage(acc, group, rng, x0, z0) {
   for (let i = 0, n = 8 + Math.floor(rng() * 10); i < n; i++) {
     const x = x0 + (rng() - 0.5) * 70, z = z0 + (rng() - 0.5) * 70, h = height(x, z);
+    if (Math.hypot(x - x0, z - z0) < 15) continue;   // (the chapel's ground)
     if (h < WATER + 2 || Math.abs(height(x + 4, z) - h) + Math.abs(height(x, z + 4) - h) > 3.2) continue;
     house(acc, rng, x, h, z, 1, 0.12);
   }
   const hc = height(x0, z0);
-  if (hc > WATER + 2) house(acc, rng, x0, hc, z0, 1.35, 0.9);   // the chapel, almost always domed
+  if (hc > WATER + 2 && Math.abs(height(x0 + 6, z0) - hc) + Math.abs(height(x0, z0 + 8) - hc) < 2.5) chapel(acc, rng, x0, hc, z0, Math.floor(rng() * 4) * Math.PI / 2);   // the chapel: you can go in
+  else if (hc > WATER + 2) house(acc, rng, x0, hc, z0, 1.35, 0.9);
   if (rng() < 0.85) {
     let bx = x0, bz = z0, bh = -1e9;
     for (let k = 0; k < 6; k++) { const a = rng() * 6.28, x = x0 + Math.cos(a) * 55, z = z0 + Math.sin(a) * 55, h = height(x, z); if (h > bh) { bh = h; bx = x; bz = z; } }
@@ -5177,10 +5684,12 @@ function buildIsland(acc, group, rng, x, z, o = {}) {
     // a whole white town ringed round a bare plaza, where someone can stand and wait
     _mat.compose(_p.set(x, top - 0.05, z), _q.identity(), _s.set(r * 0.3, 0.2, r * 0.3)); addGeo(acc, G.islandTop, _mat, col('#e6dfcc'));
     for (let i = 0; i < 16; i++) {
-      const a = i / 16 * 6.28 + rng() * 0.25, d = r * (0.44 + rng() * 0.38);
+      const a = i / 16 * 6.28 + rng() * 0.25, d = r * (0.46 + rng() * 0.36);
+      if (Math.abs(Math.cos(a) * d) < 9 && Math.sin(a) * d < -r * 0.15) continue;   // (the church's ground)
       house(acc, rng, x + Math.cos(a) * d, top, z + Math.sin(a) * d, 0.95, 0.35);
     }
     windmill(acc, group, rng, x + r * 0.76, top, z - r * 0.32); windmill(acc, group, rng, x - r * 0.7, top, z + r * 0.5);
+    chapel(acc, rng, x, top, z - r * 0.29, 0, true);   // the church, on the plaza, its door to the square
   } else for (let i = 0, n = 1 + Math.floor(rng() * 4); i < n; i++) {
     const a = rng() * 6.28, d = rng() * r * 0.55;
     house(acc, rng, x + Math.cos(a) * d, top, z + Math.sin(a) * d, 0.85, 0.5);
@@ -5308,7 +5817,7 @@ scene.add(pyreMesh, ceilMesh, rootMesh, soulMesh, ...pyreLights);
 // Hades. Not one of the Twelve, never disguised, and the only one who will say it.
 const hades = (() => {
   const look = divine({ robe: '#262a44', trim: '#3d62ff', skin: '#c4cade', hair: '#10111c', beard: true, attr: 'bident', glow: true, cold: true });
-  const S = GOD_H * 1.12 / DIVINE_H, mesh = new THREE.Mesh(look.geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  const S = GOD_H * 1.12 / DIVINE_H, mesh = robedMesh(look);
   mesh.castShadow = true; mesh.scale.setScalar(S); mesh.userData = { S, eye: look.eye * S };
   const group = new THREE.Group(); group.add(mesh); group.visible = false; scene.add(group);
   return { id: 'hades', name: 'Hades', disguise: 'Hades', look: 'hades', group, forms: ['god'], shapes: { god: mesh }, formIdx: 0, wantForm: 0, morph: null, eye: look.eye * S,
@@ -5658,7 +6167,7 @@ function strike(x, y, z, big = 0.6) {
   const d = Math.hypot(x - camera.position.x, z - camera.position.z);
   flash = Math.max(flash, (0.18 + big * 0.3) * smoothstep(3500, 200, d));   // (most of the light is in the world now: the hills themselves go white) postMat.uniforms.uFlashCol.value.setRGB(0.75, 0.85, 1.1);
   camShake = Math.max(camShake, big * smoothstep(500, 50, d));
-  setTimeout(() => audio.sfx.thunder(), Math.min(4000, d / 0.34));
+  setTimeout(() => { audio.sfx.thunder(); if (d < 700) audio.sfx.crack(); }, Math.min(4000, d / 0.34));
 }
 // Rain: hard, slanting, and all round the lens wherever the storm is. Each streak is the same drop falling through a box that
 // travels with the camera, so there is always as much of it as there should be.
@@ -5666,8 +6175,22 @@ const RAIN_N = TOUCH ? 800 : 1900, rainPos = new Float32Array(RAIN_N * 6), rainS
 const rainMat = new THREE.LineBasicMaterial({ color: 0xa8bcd8, transparent: true, opacity: 0, fog: false, depthWrite: false });
 const rainMesh = (() => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(rainPos, 3)); const m = new THREE.LineSegments(g, rainMat); m.frustumCulled = false; m.visible = false; m.renderOrder = 4; scene.add(m); return m; })();
 let rainAmt = 0;
+// inside the cloud layer it is always storming: rain all round, the cloud lit from inside by lightning that is mostly
+// heard, now and then a bolt dropping out of it to the ground far below
+let cloudBoltT = 2;
+function cloudStorm(dt, k) {
+  if (k < 0.3 || state !== 'play' || (cloudBoltT -= dt) > 0) return;
+  cloudBoltT = 1.4 + Math.random() * 3.5;
+  const c = camera.position, d = 120 + Math.random() * 900, a = Math.random() * 6.28;
+  skyFlash = Math.max(skyFlash, 0.55 + Math.random() * 0.4); flash = Math.max(flash, 0.16 + Math.random() * 0.2);
+  postMat.uniforms.uFlashCol.value.setRGB(0.8, 0.88, 1.1);
+  if (Math.random() < 0.35) { const x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d; strike(x, Math.max(terrainAt(x, z), WATER), z, 0.6); }
+  else setTimeout(() => d < 400 ? audio.sfx.crack() : audio.sfx.thunder(), Math.min(2600, d / 0.34));
+}
 function updateRain(dt) {
-  const c = camera.position, want = realm === 'over' && storm > 0.3 && c.y > CLOUD_SEA - 150 && state !== 'title' && state !== 'loading' ? storm : 0;
+  const c = camera.position, inCloud = realm === 'over' ? smoothstep(170, 40, Math.abs(c.y - CLOUD_SEA)) : 0;
+  const want = state === 'title' || state === 'loading' ? 0 : Math.max(realm === 'over' && storm > 0.3 && c.y > CLOUD_SEA - 150 ? storm : 0, inCloud * 0.9);
+  cloudStorm(dt, inCloud);
   rainAmt = lerp(rainAmt, want, damp(want > rainAmt ? 1.2 : 0.7, dt));
   rainMesh.visible = rainAmt > 0.02;
   if (!rainMesh.visible) return;
@@ -5713,7 +6236,7 @@ function updateStorm(dt) {
   if (flags.dawn === 1) { dayT = (dayT + dt / DAY_LEN * 42) % 1; if (dayT > 0.27 && dayT < 0.6) flags.dawn = 2; }
   updateRain(dt);
   if (storm > 0.15 && (strikeT -= dt * (0.5 + storm)) <= 0 && state !== 'title' && state !== 'loading') {
-    strikeT = storm > 0.8 ? 0.7 + Math.random() * 2.4 : 1.6 + Math.random() * 4.5;
+    strikeT = storm > 0.8 ? 0.5 + Math.random() * 1.8 : 1.6 + Math.random() * 4.5;
     const a = Math.random() * 6.28, d = 120 + Math.random() * 900, x = p.pos.x + Math.cos(a) * d, z = p.pos.z + Math.sin(a) * d;
     strike(x, Math.max(terrainAt(x, z), WATER), z, 0.4 + Math.random() * 0.4);
   }
@@ -5767,7 +6290,7 @@ const OTHER_DEFS = [
 const others = OTHER_DEFS.map(d => {
   const look = divine({ ...(d.titan ? STONE : d.look), glow: !!d.titan || !!d.look?.glow, cold: d.titan ? d.id.charCodeAt(0) % 2 === 0 : d.look?.cold, attr: d.titan ? d.attr : d.look?.attr });
   const S = d.titan ? d.size : MAN_H * d.size / DIVINE_H;
-  const mesh = new THREE.Mesh(look.geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  const mesh = robedMesh(look);
   mesh.castShadow = !d.titan; mesh.scale.setScalar(S); mesh.userData = { S, eye: look.eye * S };
   const group = new THREE.Group(); group.add(mesh); group.visible = false; scene.add(group);
   return { ...d, other: true, group, mesh, S, forms: ['god'], shapes: { god: mesh }, formIdx: 0, wantForm: 0, morph: null, eye: d.titan ? look.eye * S * 0.62 : look.eye * S, reach: d.titan ? 30 + S * 1.3 : 0,
@@ -5954,7 +6477,7 @@ function updateCinemaState(dt) {
   cinema.idle = flying && !steering ? cinema.idle + dt : 0;
   if (flying && cinema.autoT > 0) cinema.autoT -= dt;
   const alt = p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER);
-  const want = flying && (cinema.manual || cinema.autoT > 0 || cinema.idle > 6) && !(alt < ROLL_ALT * 1.5 && !cinema.manual && cinema.autoT <= 0);
+  const want = flying && (cinema.manual || cinema.autoT > 0 || cinema.idle > 6 && TUT.cineOpen) && !(alt < ROLL_ALT * 1.5 && !cinema.manual && cinema.autoT <= 0);
   if (want && !cinema.on) { cinema.on = true; cinema.last = ''; newShot(); }
   if (!want && cinema.on) cinema.on = false;
   document.body.classList.toggle('cinema', cinema.on || state === 'talk' || state === 'end');
@@ -6488,11 +7011,14 @@ function heard(text) {
   if (state === 'play') spoke(text);   // anything else he says, he has said out loud, and whoever is near has heard it
 }
 function startMic() {
-  if (mic.denied) return;
+  if (mic.denied || VC.muted) return;
   startEar();
   if (mic.rec) return;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR || mic.mode === 'vad') { mic.mode = 'vad'; return; }
+  // (iPhone and iPad Safari take the microphone again for their own speech recognition, and ask again each time it is
+  // restarted; there the one stream the ear already has is recorded and transcribed instead: one question, ever)
+  const appleTouch = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!SR || mic.mode === 'vad' || appleTouch) { mic.mode = 'vad'; return; }
   const r = new SR();
   r.continuous = true; r.interimResults = true; r.lang = 'en-US';
   r.onresult = e => { for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript; if (e.results[i].isFinal) heard(t); else overheard(t); } };
@@ -6509,7 +7035,8 @@ function startMic() {
 const ear = { on: false, level: 0, loud: 0, scareT: -9, scareR: 0, ringT: 0, lastEnd: 0, lastDur: 0, voicedAt: 0, wordsAt: 0, sent: 0, sentAt: 0, toldT: -99 };
 async function startEar() {
   if (mic.stream || mic.denied || !AC || !navigator.mediaDevices?.getUserMedia) return;
-  try { mic.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+  try { mic.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    for (const V of VC.pcs.values()) V.tr?.sender.replaceTrack(vcTrack()).catch(() => {}); }
   catch { if (mic.mode !== 'sr') mic.denied = true; return; }
   const an = AC.createAnalyser(); an.fftSize = 1024;
   AC.createMediaStreamSource(mic.stream).connect(an);
@@ -6929,7 +7456,7 @@ function passHoop(h, perfect) {
   h.burn = 0; trail.left--; trail.got++; questEvent.hoops = (questEvent.hoops || 0) + 1;
   p.surge = (p.surge || 0) + (perfect ? 48 : 32); p.flame = Math.min(1, p.flame + (perfect ? 0.1 : 0.06));
   const last = trail.left <= 0 && trail.got === trail.n;
-  audio.sfx.ring(trail.got - 1, perfect, last);
+  audio.sfx.ring(trail.got - 1, perfect, last); netFx('ring');
   // the hoop goes up: a ring of flame thrown outward, and the air it pushes
   const c = Math.cos(h.yaw), sn = Math.sin(h.yaw);
   for (let i = 0; i < (perfect ? 150 : 100); i++) {
@@ -7832,6 +8359,11 @@ function updateCamera(dt) {
     camWant.y = Math.max(camWant.y, groundAt(camWant.x, camWant.z) + 1.2, WATER + 1);
     { const Tin = temples.find(T => Math.abs(p.pos.x - T.x) < T.hw + 1 && Math.abs(p.pos.z - T.z) < T.hd + 1 && Math.abs(p.pos.y - T.y) < 4);
       if (Tin) camWant.y = Math.min(camWant.y, Tin.y + Tin.H - 0.7); }   // inside a temple the lens stays under the beams
+    { const Rm = roomAt(p.pos.x, p.pos.y, p.pos.z);   // inside a chapel: the lens stays inside its walls and under its roof
+      const [plx, plz] = Rm ? rotXZ(p.pos.x - Rm.x, p.pos.z - Rm.z, -Rm.ry) : [0, 0];
+      if (Rm && plz < Rm.hd - 0.8) {   // (in the doorway the lens can still be outside, looking in)
+        let [lx, lz] = rotXZ(camWant.x - Rm.x, camWant.z - Rm.z, -Rm.ry); lx = clamp(lx, -Rm.hw + 0.3, Rm.hw - 0.3); lz = clamp(lz, -Rm.hd + 0.3, Rm.hd - 0.3);
+        const [ox, oz] = rotXZ(lx, lz, Rm.ry); camWant.x = Rm.x + ox; camWant.z = Rm.z + oz; camWant.y = clamp(camWant.y, Rm.y + 1.2, Math.min(Rm.y + 2.9, Rm.y + Rm.h - 0.6)); } }
     postMat.uniforms.uSpeed.value = lerp(postMat.uniforms.uSpeed.value, p.tumble ? 0.6 : 0, damp(3, dt));
     camera.position.lerp(camWant, damp(p.tumble ? 18 : p.grounded ? 12 : 6, dt));
     lookAt.copy(camTarget); camera.lookAt(camTarget);
@@ -7841,7 +8373,9 @@ function updateCamera(dt) {
     const y = p.yaw + camYawOff;
     // The faster he goes, the more the camera gets down behind his tail and opens the lens: the bird stays the same size
     // while the world stretches past it. It leans with him, and at full speed it shakes.
-    const rush = smoothstep(95, 290, p.speed), cd = phxDist * (1 - 0.34 * rush);
+    if (flags.wideT > 0) flags.wideT -= dt;
+    const wide = smoothstep(0, 4, flags.wideT || 0);   // (the first flight: pulled right back, the whole sky around him, then easing in)
+    const rush = smoothstep(95, 290, p.speed), cd = phxDist * (1 - 0.34 * rush) * (1 + 2.6 * wide);
     camWant.set(p.pos.x + Math.sin(y) * cd, p.pos.y + cd * lerp(0.42, 0.16, rush) - p.pitch * lerp(12, 5, rush), p.pos.z + Math.cos(y) * cd);
     if (!p.sub) {
       camWant.y = Math.max(camWant.y, groundAt(camWant.x, camWant.z) + 3, WATER + 3.2);
@@ -7851,7 +8385,7 @@ function updateCamera(dt) {
     lookAt.copy(p.pos).addScaledVector(dir3, 14 + rush * 26);
     camera.lookAt(lookAt);
     camera.rotateZ(-p.bank * (0.12 + 0.3 * rush));
-    camera.fov = lerp(camera.fov, (64 + rush * 34) * fovK(), damp(2.4, dt));
+    camera.fov = lerp(camera.fov, (64 + rush * 34 + wide * 16) * fovK(), damp(2.4, dt));
     if (rush > 0.5) { const k = (rush - 0.5) * 0.12; camera.position.x += rnd(k); camera.position.y += rnd(k); }
     postMat.uniforms.uSpeed.value = lerp(postMat.uniforms.uSpeed.value, rush, damp(3, dt));
   }
@@ -7951,9 +8485,9 @@ const PLUME = { deep: [0.44, 0.42, 0.39], root: [0.56, 0.55, 0.52], mid: [0.66, 
 const PRO_LINES = [
   { t: 2.0, who: 'Daedalus', clip: 'pd1', text: 'Now, Icarus. Jump! Don\'t look down!' },
   { t: 8.0, who: 'Daedalus', clip: 'pd0', text: 'We\'re out. We\'re out, my boy!' },
-  { t: 11.6, hero: true, clip: 'pi1', text: 'We\'re out. Dad — we\'re out!', opt: true },
+  { t: 11.6, hero: true, clip: 'pi1', text: 'We\'re out. Dad — we\'re out!', opt: true, speak: true },
   { t: 15.0, who: 'Daedalus', clip: 'pd2', text: 'Stay close to me! Not too low — the sea will drag at the feathers. Not too high — the sun will take the wax!' },
-  { t: 23.2, hero: true, clip: 'pi2', text: 'I can fly! Dad, look at me — I can fly!', opt: true },
+  { t: 23.2, hero: true, clip: 'pi2', text: 'I can fly! Dad, look at me — I can fly!', opt: true, speak: true },
   { t: 26.0, who: 'Daedalus', clip: 'pd3', text: 'Icarus! Not so high! Come down! Come back to me!' },
   { t: 30.9, hero: true, clip: 'pi3', text: 'Just a little higher. It\'s so warm.', opt: true },
   { t: 34.4, hero: true, clip: 'ohno', text: 'Oh fuck.' },
@@ -8157,6 +8691,7 @@ function proSkip() {
 // fly too high but the person holding it.
 function proPress(down) {
   if (!pro.on) return;
+  if (down) pro.sayPress = true;
   if (down) {
     if (!pro.jumped && pro.t >= 2.0) { pro.jumped = true; audio.sfx.jump(); }
     if (pro.t >= PRO_CLIMB - 1 && !pro.falling) { pro.imp = 1; audio.sfx.flap(0.55); }
@@ -8228,6 +8763,11 @@ function updatePrologue(dt) {
   const near = pro.falling && !pro.hitT && (pro.dPass ? pro.t - pro.dPass < 0.24 : pro.dd < 30);
   pro.slow = lerp(pro.slow, near ? 0.2 : 1, damp(near ? 9 : 4, dt)); dt *= pro.slow;
   pro.rt += dt;
+  if (pro.waitMic) {   // (black, and the question, until the microphone is answered — or there is none to ask)
+    pro.micT += dt;
+    if (pro.micT > 1.6 && (mic.stream || mic.denied || !navigator.mediaDevices?.getUserMedia || pro.micT > 14)) { pro.waitMic = false; $('primer').classList.remove('on'); }
+    else { postMat.uniforms.uFade.value = 0; present(pro.sc, camera); return; }
+  }
   // how fast the story goes: not at all on the parapet until he jumps; on the climb, only as fast as he is climbing
   let rate = 1;
   if (pro.t >= PRO_CLIMB - 1 && pro.t < PRO_FAIL) {
@@ -8236,25 +8776,39 @@ function updatePrologue(dt) {
     pro.c = lerp(pro.c, want, damp(want > pro.c ? 4 : 2.2, dt));
     if (pro.t >= PRO_CLIMB) rate = pro.c;
   }
+  // his lines to his father are the player's to say: the story holds on each until it is said aloud (or, with no
+  // microphone, tapped) — and then he says it too
+  const LS = pro.lines[pro.li], speaking = LS && LS.speak && !LS.spoken && pro.t >= LS.t;
+  if (speaking) {
+    rate = 0;
+    const hasMic = !!mic.stream && !VC.muted;
+    pro.sayT = (pro.sayT || 0) + dt;
+    if (hasMic && ear.level > 0.14) pro.spk = (pro.spk || 0) + dt; else pro.spk = Math.max(0, (pro.spk || 0) - dt * 0.5);
+    const pressed = pro.sayPress && (!hasMic || pro.sayT > 9);
+    if (pro.spk > 0.45 || pressed) { LS.spoken = true; pro.spk = 0; pro.sayT = 0; pro.sayPress = false; LS.said = true; }
+    $('proSub').firstChild.textContent = heroName; $('proSub').lastChild.textContent = '“' + LS.text + '”'; $('proSub').classList.add('show'); pro.subT = 0.6;
+  }
+  pro.sayPress = false;
   const t = pro.t = !pro.jumped ? Math.min(PRO_JUMP, pro.t + dt) : pro.t + dt * rate, C = PRO_C, dad = pro.dad, son = pro.son, me = pro.me;
   pro.fx.uTime.value = pro.rt; pro.seaU.uTime.value = pro.rt;
   // what he is being asked to do, and his father asking again if he stands there
   const waiting = !pro.jumped && t >= PRO_JUMP - 0.4;
-  proAct(waiting ? (TOUCH ? 'TAP  —  JUMP' : 'SPACE  —  JUMP')
+  proAct(speaking ? (mic.stream && !VC.muted && pro.sayT < 9 ? 'SAY IT  ALOUD' : TOUCH ? 'TAP  —  SAY IT' : 'SPACE  —  SAY IT')
+    : waiting ? (TOUCH ? 'TAP  —  JUMP' : 'SPACE  —  JUMP')
     : t >= PRO_CLIMB - 0.6 && t < PRO_FAIL - 1.2 && pro.c < 0.45 ? (TOUCH ? 'HOLD  —  HIGHER' : 'HOLD SPACE  —  HIGHER') : '');
   if (waiting && (pro.waitT += dt) > 6 && pro.rt - pro.nagT > 9) {
     pro.nagT = pro.rt; const L1 = pro.lines.find(l => l.clip === 'pd1');
     if (L1 && L1.buf) { const d = proSay(L1.buf, 'dad'); $('proSub').firstChild.textContent = L1.who; $('proSub').lastChild.textContent = L1.text; $('proSub').classList.add('show'); pro.subT = d + 0.5; }
   }
   // what is said
-  const L = pro.lines[pro.li];
-  if (L && t >= L.t && L.ready) {
+  const L = pro.lines[pro.li], unsaid = L && L.speak && !L.spoken;   // (a line the player has to say waits for them)
+  if (L && t >= L.t && L.ready && !unsaid) {
     pro.li++;
     if (L.buf || !L.opt) {   // (his own new lines wait for their recordings; until then the moment plays without them)
       const dur = !L.buf ? 1.2 + L.text.length * 0.055 : proSay(L.buf, L.hero ? 'hero' : 'dad');
       $('proSub').firstChild.textContent = L.hero ? heroName : L.who; $('proSub').lastChild.textContent = L.text; $('proSub').classList.add('show'); pro.subT = dur + 0.5;
     }
-  } else if (L && t >= L.t + 2.5) pro.li++;   // a clip that never loaded does not hold the scene up
+  } else if (L && t >= L.t + 2.5 && !unsaid) pro.li++;   // a clip that never loaded does not hold the scene up
   if (pro.subT > 0 && (pro.subT -= dt / Math.max(pro.slow, 0.05)) <= 0) $('proSub').classList.remove('show');
   for (const v of pro.vox || []) proPlace(v, dt);
 
@@ -8411,7 +8965,7 @@ function titlePress(down) {
   if (!titleFly.on) return;
   titleFly.held = !!down;
   if (!down) return;
-  initAudio();
+  initAudio(); goFull();
   titleFly.v = Math.min(titleFly.v + 34, 95); titleFly.beat = 1; titleFly.flaps++;
   audio.sfx.flap(0.9);
   for (const w of phoenix.wings) { w.tip.getWorldPosition(_v); for (let i = 0; i < 26; i++) emit(_v.x + rnd(1.5), _v.y + rnd(1), _v.z + rnd(1.5), rnd(7), -6 - Math.random() * 16, rnd(7), 0.7 + Math.random() * 0.9, pick(EMBER_COLS), -1); }
@@ -8458,7 +9012,90 @@ function updateTitle(dt) {
   camera.lookAt(lookAt); camera.fov = K.fov * fovK(); camera.updateProjectionMatrix();
 }
 
+// ───────────────────────── first lessons ─────────────────────────
+// The controls are taught where they are first needed and nowhere else, one at a time, by the thing itself: walking and
+// jumping on the mountain after he lands; on the first flight, climbing and diving, turning, speed, the wings, then the
+// map, who else is flying, and last of all the cinematic camera (which stays locked until then). Each one goes as soon as
+// it has been done (or after a few seconds, if it is only something to know). A returning player is not taught again.
+const TUT = { q: [], cur: null, t: 0, gap: 0, done: 0, cineOpen: false, walk0: null, moved: 0 };
+try { TUT.done = +(localStorage.getItem('icarus.tut') || 0); } catch {}
+TUT.cineOpen = TUT.done >= 2;
+const K = (desk, touch) => TOUCH ? touch : desk;
+const LESSONS = {
+  ground: () => [
+    { key: K('W A S D', 'LEFT THUMB'), say: 'walk', until: () => TUT.moved > 4, max: 14 },
+    { key: K('SPACE', 'TAP'), say: 'jump', until: () => player.vel.y > 2 && !player.grounded, max: 12 },
+  ],
+  flight: () => [
+    { key: K('W  /  S', 'DRAG ↑ ↓'), say: 'climb and dive', until: () => Math.abs(axes()[1]) > 0.4, max: 12 },
+    { key: K('A  /  D', 'DRAG ← →'), say: 'turn', until: () => Math.abs(axes()[0]) > 0.4, max: 12 },
+    ...(TOUCH ? [] : [{ key: 'SHIFT', say: 'faster', until: () => boosting(), max: 10 }]),
+    { key: K('SPACE', 'TAP'), say: 'open your wings — to land', max: 5 },
+    { key: K('M', 'PINCH OUT'), say: 'your map', until: () => mapV.open, max: 6 },
+    { key: K('TAB', '◆  TOP RIGHT'), say: 'who else is flying', until: () => who.open || who.pinned, max: 6 },
+    ...(TOUCH ? [{ key: '◉  BOTTOM LEFT', say: 'your microphone', max: 5 }] : [{ key: 'V', say: 'your microphone', max: 5 }]),
+    { key: K('C', 'HANDS OFF'), say: 'the cinematic camera', open: true, until: () => cinema.manual, max: 7 },
+  ],
+};
+function teach(set, level) {
+  if (TUT.done >= level) return;
+  TUT.q.push(...LESSONS[set]().map(l => ({ ...l, level })));
+}
+function updateLessons(dt) {
+  const el = $('tut');
+  if (TUT.later && time >= TUT.later[2]) { teach(TUT.later[0], TUT.later[1]); TUT.later = null; }
+  if (state !== 'play' || player.cine) { el.classList.remove('on'); return; }
+  const P = player.pos;
+  if (TUT.walk0 && player.grounded) { TUT.moved += P.distanceTo(TUT.walk0); TUT.walk0.copy(P); } else TUT.walk0 = P.clone();
+  if (!TUT.cur) {
+    if ((TUT.gap -= dt) > 0 || !TUT.q.length) return;
+    TUT.cur = TUT.q.shift(); TUT.t = 0;
+    if (TUT.cur.open) TUT.cineOpen = true;
+    el.firstChild.textContent = TUT.cur.key; el.lastChild.textContent = TUT.cur.say; el.classList.remove('done'); el.classList.add('on');
+    return;
+  }
+  const L = TUT.cur;
+  L.t = (L.t || 0) + dt;
+  const did = L.until && L.until();
+  if (did && !L.ok) { L.ok = true; L.end = L.t + 0.8; el.classList.add('done'); audio.sfx.ui(); }
+  if (L.t > (L.end ?? L.max)) {
+    el.classList.remove('on'); TUT.cur = null; TUT.gap = 0.9;
+    if (!TUT.q.length) { TUT.done = Math.max(TUT.done, L.level); try { localStorage.setItem('icarus.tut', TUT.done); } catch {} }
+  }
+}
+
 // ───────────────────────── input & flow ─────────────────────────
+// ───────────────────────── full screen on phones ─────────────────────────
+// Nothing should stand between the player and the sky. Android (and iPad) can simply go full screen on the first touch,
+// turned sideways. iPhone Safari will not let a page do that — but it folds its own bar away when the page scrolls, so
+// there the page is made one swipe tall: a hint asks for the swipe, the bar goes, the game holds still, and if the bar ever
+// comes back the hint does too. From the Home Screen it opens as an app, with no browser at all.
+const UA = navigator.userAgent, IPHONE = /iPhone|iPod/.test(UA);
+const STANDALONE = navigator.standalone === true || matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
+const FS = { scroll: TOUCH && IPHONE && !STANDALONE, kept: false, t: 0 };
+if (FS.scroll) { document.documentElement.classList.add('scrollfs'); $('homeTip').classList.remove('hidden'); }
+function goFull() {   // (a real full screen where there is one: needs a touch to be allowed)
+  if (!TOUCH || FS.scroll || STANDALONE || document.fullscreenElement) return;
+  const el = document.documentElement, rq = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!rq) return;
+  try { const pr = rq.call(el, { navigationUI: 'hide' }); pr && pr.then && pr.then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {}); } catch {}
+}
+function fsCheck() {
+  if (!FS.scroll) return;
+  const land = innerWidth > innerHeight, big = Math.max(screen.width, screen.height), small = Math.min(screen.width, screen.height);
+  const full = innerWidth >= big - 4 && innerHeight >= small - 4;    // Safari's bar is folded away
+  if (full) FS.snooze = false;
+  const show = land && !full && !FS.kept && !FS.snooze && state !== 'loading';
+  $('fsHint').classList.toggle('on', show);
+}
+if (FS.scroll) {
+  for (const ev of ['resize', 'scroll', 'orientationchange']) addEventListener(ev, () => { fsCheck(); setTimeout(fsCheck, 250); }, { passive: true });
+  visualViewport?.addEventListener('resize', fsCheck);
+  setInterval(fsCheck, 800);
+  $('fsKeep').addEventListener('click', e => { e.stopPropagation(); FS.kept = true; fsCheck(); });
+  $('fsHint').addEventListener('click', () => { FS.snooze = true; fsCheck(); });   // (a tap, not a swipe: they would rather play now)
+}
+
 // The first thing the game asks is who is playing. The hero is drawn in the letters of that name.
 const nameInput = $('nameInput');
 try { nameInput.value = localStorage.getItem('icarus.name') || ''; } catch {}
@@ -8495,7 +9132,10 @@ function begin() {
     [...WAKE, WHERE, ...INTRO].forEach(l => fetchVoice(l.voice, l.say || l.text, false, l.clip));
     startPrologue();
   }
-  startMic();
+  // the voice is asked for before the story starts — the prologue holds on black until it is answered — so the system's
+  // "may this page use the microphone?" never lands in the middle of the opening
+  if (resumed) startMic();
+  else { pro.waitMic = true; pro.micT = 0; $('primer').classList.add('on'); startMic(); }
 }
 // The first night. A storm is breaking on the summit; he comes down out of it, hits the snow in front of the house of Zeus,
 // and the thunder tells him to get up. (`seen`: he has just watched how he got here, so nobody needs to tell him.)
@@ -8504,7 +9144,6 @@ function firstNight(seen) {
   $('hud').classList.remove('hidden');
   dayT = 0.93; storm = 1; story.titans = ''; flags.firstNight = true;
   audio.omen();
-  if (TOUCH) setTimeout(ctlChoose, 2500);
   state = 'dead'; death.phase = 'drop'; death.t = 0; wake.copy(START); death.first = true; death.asked = false;
   p.pos.set(START.x, START.y + 330, START.z); p.vel.set(0, -18, 0); p.grounded = false; p.spin.set(1.2, 0, 0.4); p.skyK = 0.3;
   resetPose(); human.group.rotation.y = 0; camera.rotation.order = 'XYZ';
@@ -8548,11 +9187,12 @@ addEventListener('keydown', e => {
   switch (e.code) {
     case 'Space': pressSpace(); break;
     case 'KeyH': if (cam.on || cam.loading) stopCam(); else startCam(); break;
-    case 'KeyC': cinema.manual = !cinema.manual; toast(cinema.manual ? 'CINEMATIC CAMERA' : 'FOLLOW CAMERA'); break;
+    case 'KeyC': if (!TUT.cineOpen) break; cinema.manual = !cinema.manual; toast(cinema.manual ? 'CINEMATIC CAMERA' : 'FOLLOW CAMERA'); break;
     case 'Enter': dlgAdvance(); break;
     case 'KeyG': applyTier((tierIdx + 2) % 3, true); break;
     case 'KeyT': asciiOn = !asciiOn; resize(); break;
-    case 'Delete': case 'Backspace': if (!e.repeat) respawnTop(); break;   // (the Mac's "delete" key is Backspace)
+    case 'Delete': case 'Backspace': if (!e.repeat) respawnTop(); break;
+    case 'KeyV': if (!e.repeat && mic.stream) setMicMuted(!VC.muted); break;   // (the Mac's "delete" key is Backspace)
     case 'BracketLeft': cellIdx = Math.max(0, cellIdx - 1); resize(); break;
     case 'BracketRight': cellIdx = Math.min(CELLS.length - 1, cellIdx + 1); resize(); break;
     case 'KeyM': openMap(); break;
@@ -8884,7 +9524,7 @@ function tick(dt) {
   updateParticles(dt);
   updateDialog(dt);
   updateTalk(dt);
-  updateHUD(dt); updateWho(dt);
+  updateHUD(dt); updateWho(dt); updateLessons(dt);
   chart(dt); try { updateWorld(dt); } catch (e) { if (!WORLD.err) { WORLD.err = String(e); console.warn('world', e); } } updateQuests(dt); updateMap(dt);
   updateAudio(dt);
   sky.position.copy(camera.position); stars.position.copy(camera.position);
@@ -8893,6 +9533,16 @@ function tick(dt) {
   postMat.uniforms.uFlash.value = flash;
   dreadT -= dt; postMat.uniforms.uFade.value = lerp(postMat.uniforms.uFade.value, dreadT > 0 && state === 'talk' ? 0.24 : 1, damp(dreadT > 0 ? 10 : 2.5, dt));
   postMat.uniforms.uHeat.value = heat * (0.85 + Math.sin(time * 20) * 0.15);
+  // where the sun is on screen, and how strongly it should pour through: facing it, in daylight, out of the storm — and
+  // most of all the first time he comes out under the clouds into the morning
+  { camera.updateMatrixWorld(); _v.copy(camera.position).addScaledVector(sunDir, 800).project(camera);
+    camera.getWorldDirection(_n);
+    const face = _n.dot(sunDir), up = smoothstep(-0.04, 0.12, sunDir.y), clear = 1 - Math.min(1, storm * 1.3) * (camera.position.y > CLOUD_SEA - 150 ? 1 : 0.4);
+    if (flags.dawn && !flags.raysT) flags.raysT = time;
+    const morning = flags.raysT ? 1 + 1.4 * smoothstep(40, 0, time - flags.raysT) : 1;
+    const want = _v.z < 1 && realm === 'over' && state !== 'title' ? smoothstep(0.15, 0.85, face) * up * clear * 0.75 * morning : 0;
+    if (Number.isFinite(_v.x) && Number.isFinite(_v.y)) postMat.uniforms.uSunUV.value.set(_v.x * 0.5 + 0.5, _v.y * 0.5 + 0.5);
+    postMat.uniforms.uRays.value = lerp(postMat.uniforms.uRays.value, want, damp(2, dt)); }
   present(scene, camera);
   if (photo.snap) {   // the picture is taken straight off the frame that was just drawn
     photo.snap = false;
@@ -8921,7 +9571,7 @@ setTimeout(() => {
   $('title').classList.remove('hidden');
   state = 'title';
   titleStart();
-  window.__icarus = { WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  window.__icarus = { quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);

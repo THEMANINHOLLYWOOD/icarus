@@ -896,6 +896,15 @@ export function createAudio() {
       if (ctx && reverb) { try { reverb.buffer = makeIR(); } catch {} }
     },
     duck(seconds = 1) { if (ctx) duckUntil = Math.max(duckUntil, ctx.currentTime + Math.max(0, seconds)); },
+    // play any of the sounds above as if from somewhere else: quieter, and from one side (another player's wings, say)
+    at(vol, pan, fn) {
+      if (!ctx || vol <= 0.01) return;
+      const g = gain(Math.min(1, vol)), pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      if (pn) { pn.pan.value = Math.max(-1, Math.min(1, pan || 0)); chain(g, pn, sfxBus); } else g.connect(sfxBus);
+      const real = sfxBus; sfxBus = g;
+      try { fn(); } finally { sfxBus = real; }
+      setTimeout(() => { try { g.disconnect(); pn && pn.disconnect(); } catch {} }, 6000);
+    },
     update, sfx, sting, song: songStart, songStop, omen: omenStart, omenStop, get songOn() { return !!(song && song.on); }, get reverbIn() { return revIn; },
     stats: () => ({ live, made, intensity, mode, step: stepN, samples: Object.keys(samples) }),
   };
