@@ -117,6 +117,8 @@
   #mapTitle { top:calc(var(--st) + 18px); } #mapHint { bottom:calc(var(--sb) + 18px); }
   /* phones: sideways, please; a stick that is only there while you touch it; the tilt horizon; how to fly */
   #turn { display:none; }
+  .xrdev #turn { display:none !important; }
+  #xrBtn { position:fixed; left:54px; bottom:12px; z-index:6; height:34px; padding:0 14px; border-radius:17px; border:1px solid rgba(255,200,140,.45); background:rgba(0,0,0,.5); color:#ffd8a8; font:11px 'IBM Plex Mono', Menlo, monospace; letter-spacing:.2em; cursor:pointer; }
   @media (orientation: portrait) { .touch #turn { position:fixed; inset:0; z-index:20; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; background:#05060a; color:#ffd8a8; letter-spacing:.3em; font-size:12px; text-align:center; } }
   #turn .ph { width:34px; height:60px; border:2px solid #ffb060; border-radius:7px; animation:turnPh 2.2s ease-in-out infinite; }
   #turn i { font-style:normal; opacity:.55; letter-spacing:.18em; font-size:10px; }
@@ -205,6 +207,8 @@
   <div class="go">[ click or press any key to begin ]</div>
   <div class="keys">sound on · microphone on · M opens the map</div>
   <div class="keys hidden" id="newGame" style="margin-top:14px; pointer-events:auto; cursor:pointer">[ N — start a new life ]</div>
+  <div class="keys hidden" id="xrRow" style="margin-top:16px; pointer-events:auto; cursor:pointer; color:#ffc46a; letter-spacing:.25em">[ ◎ FLY WITH YOUR BODY · IMMERSIVE ]</div>
+  <div class="keys" id="codeRow" style="margin-top:14px; pointer-events:auto; opacity:.7">your travel code · <b id="codeShow" style="letter-spacing:.2em; user-select:all; cursor:text"></b> · <u id="codeUse" style="cursor:pointer">come back with yours</u></div>
 </div>
 
 <div id="turn"><div class="ph"></div><b>TURN YOUR PHONE</b><i>icarus flies sideways</i></div>
@@ -225,6 +229,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { createAudio } from './audio.js';
+import { makeHands } from './xr.js';
 
 // ───────────────────────── utils ─────────────────────────
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1836,11 +1841,19 @@ function animateCape(dt) {
 const FIRE = { deep: col('#8f0f08'), root: col('#d4231a'), mid: col('#ff6a14'), hot: col('#ffb030'), tip: col('#fff0a0') };
 const hdr = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
 const mix3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
-const fireMat = (() => {
+// The bird's fire takes a colour: yours burns red; everyone else's burns in a colour of their own (uTintK 0 would be the
+// fire's own gold and orange). The brightest parts still go white-hot, so it reads as fire whatever the colour.
+function makeFireMat(tint, k) {
   const m = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  m.userData.tint = { value: new THREE.Color(tint) }; m.userData.tintK = { value: k };
   m.onBeforeCompile = sh => {
-    sh.uniforms.uTime = worldFx.uTime;
-    sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.a = 0.5;');
+    sh.uniforms.uTime = worldFx.uTime; sh.uniforms.uTint = m.userData.tint; sh.uniforms.uTintK = m.userData.tintK;
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uTint; uniform float uTintK;')
+      .replace('#include <dithering_fragment>', `#include <dithering_fragment>
+        { float L = dot(gl_FragColor.rgb, vec3(0.35, 0.5, 0.15));
+          vec3 t = uTint * L * 1.9 + vec3(max(L - 1.5, 0.0) * 0.45);
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, t, uTintK); }
+        gl_FragColor.a = 0.5;`);
     // uv.x runs root→tip along each feather, uv.y is the feather's own number: tips shiver and flare, each out of step with the next
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -1849,7 +1862,9 @@ const fireMat = (() => {
         vColor.rgb *= 1.0 + uv.x * (0.28 + 0.28 * sin(uTime * 9.0 + uv.y * 55.0));`);
   };
   return m;
-})();
+}
+const MY_RED = 0xff1206;
+const fireMat = makeFireMat(MY_RED, 0.96);
 const newFire = () => ({ pos: [], col: [], uv: [] });
 function fireGeo(A) {
   const g = new THREE.BufferGeometry();
@@ -2327,6 +2342,7 @@ const showScene = new THREE.Scene(); showScene.add(new THREE.Mesh(new THREE.Plan
 let heldI = 0;
 // draw a scene and put it on the screen as text
 function present(sc, cam) {
+  if (XR.on) { XR.scene = sc; return; }
   if (dbgCam.fog) { scene.fog.near = dbgCam.fog * 0.3; scene.fog.far = dbgCam.fog; }   // (tests: see further)
   renderer.setRenderTarget(rt); renderer.render(sc, cam);
   const P = postMat.uniforms;
@@ -2507,6 +2523,7 @@ function useStick() {
   try { localStorage.setItem('icarus.ctl', 'stick'); } catch {}
 }
 function ctlChoose() {
+  if (XR.supported) return;
   if (!TOUCH) return;
   let saved = null; try { saved = localStorage.getItem('icarus.ctl'); } catch {}
   if (saved === 'stick') return useStick();
@@ -2962,7 +2979,7 @@ function updateHuman(dt) {
     if (d < 1.9 && d > 0.001 && p.pos.y < b.y + 14) { p.pos.x = b.x + dx / d * 1.9; p.pos.z = b.z + dz / d * 1.9; }
   }
   // temples are solid where they should be: he walks between the columns, not through them
-  for (const T of temples) if (Math.abs(p.pos.y - T.y) < 3 && Math.abs(p.pos.x - T.x) < T.hw + 5 && Math.abs(p.pos.z - T.z) < T.hd + 5)
+  for (const T of WORLD.shrines.length ? [...temples, ...WORLD.shrines.filter(S => S.group.visible)] : temples) if (Math.abs(p.pos.y - T.y) < 3 && Math.abs(p.pos.x - T.x) < T.hw + 5 && Math.abs(p.pos.z - T.z) < T.hd + 5)
     for (const c of T.cols) {
       const dx = p.pos.x - T.x - c.x, dz = p.pos.z - T.z - c.z, d = Math.hypot(dx, dz), rr = c.r + 0.3;
       if (d < rr && d > 0.001) { p.pos.x = T.x + c.x + dx / d * rr; p.pos.z = T.z + c.z + dz / d * rr; }
@@ -3577,7 +3594,7 @@ function peerOf(id) {
   return P;
 }
 function dropPeer(id, P) {
-  if (P.av) { scene.remove(P.av.man.group, P.av.bird.group); P.av.bird.group.traverse(o => o.geometry && o.geometry.dispose()); }
+  if (P.av) { scene.remove(P.av.man.group, P.av.bird.group); P.av.bird.group.traverse(o => o.geometry && o.geometry.dispose()); P.av.fire.dispose(); P.av.cape.dispose(); }
   P.label?.remove();
   NET.peers.delete(id);
 }
@@ -3613,17 +3630,40 @@ function netSend(dt) {
 }
 // ── what other people look like: a man, or a burning bird, with their name over them
 const peerCape = new THREE.MeshLambertMaterial({ color: 0x8a2418, emissive: 0x3a0a05, side: THREE.DoubleSide });
+// Everyone else's bird burns in a colour of their own, from a set chosen to be told apart at a glance — none of them red,
+// which is yours. Picked from their name (or, nameless, from who they are this visit); if someone already in the sky has
+// that colour, the next free one.
+const PEER_COLS = [0xffc21a, 0x7dff3a, 0x16e08a, 0x19e6e6, 0x3aa8ff, 0x4f5bff, 0xa64dff, 0xff3ad8, 0xf2f6ff, 0xff8a1a];   // (in order round the wheel: neighbours look alike)
+function peerHue(P) {
+  const key = P.name && P.name !== 'SOMEONE' && P.name !== 'ICARUS' ? P.name : P.id;
+  let h = 2166136261; for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
+  const taken = new Set([...NET.peers.values()].filter(o => o !== P && o.av && o.slot != null).map(o => o.slot));
+  const N = PEER_COLS.length, near = (i, gap) => [...taken].some(j => { const d = Math.abs(i - j); return Math.min(d, N - d) <= gap; });
+  const start = (h >>> 0) % N;
+  for (const gap of [1, 0]) for (let n = 0; n < N; n++) { const i = (start + n) % N; if (!near(i, gap)) return i; }   // (a colour well apart from everyone's, if there is one)
+  return start;
+}
+function paintPeer(P) {
+  const A = P.av; if (!A) return;
+  P.painted = P.name; P.slot = peerHue(P);
+  const c = new THREE.Color(PEER_COLS[P.slot]);
+  A.fire.userData.tint.value.copy(c);
+  A.cape.color.copy(c).multiplyScalar(0.55); A.cape.emissive.copy(c).multiplyScalar(0.22);
+  if (P.label) P.label.style.color = `#${c.getHexString()}`;
+}
 function avatarOf(P) {
   if (P.av) return P.av;
   const man = makeHuman(false), bird = makePhoenix();
   bird.light.intensity = 0; bird.group.remove(bird.light);
-  bird.group.traverse(o => { if (o.isMesh && o.material === capeMat) o.material = peerCape; });
+  const fire = makeFireMat(0xffffff, 0.9), cape = peerCape.clone();
+  bird.group.traverse(o => { if (o.isMesh && o.material === capeMat) o.material = cape; else if (o.isMesh && o.material === fireMat) o.material = fire; });
   bird.group.scale.setScalar(PHX_S);
   man.group.scale.setScalar(MAN_SCALE);
   scene.add(man.group, bird.group);
   const el = document.createElement('div'); el.className = 'mk peer'; el.innerHTML = '<b>✦</b><span></span>'; $('markers').appendChild(el);
   P.label = el;
-  return P.av = { man, bird };
+  P.av = { man, bird, fire, cape }; paintPeer(P);
+  return P.av;
 }
 function updatePeers(dt) {
   if (!NET.peers.size) return;
@@ -3632,6 +3672,7 @@ function updatePeers(dt) {
     if (!P.s) continue;
     const away = me !== P.realm || now - P.s.t > 15000;
     const A = P.s.t ? avatarOf(P) : null; if (!A) continue;
+    if (P.painted !== P.name) paintPeer(P);
     if (away) { A.man.group.visible = A.bird.group.visible = false; P.label.style.display = 'none'; continue; }
     // carried on along the way they were going, and eased onto where they say they are
     const age = Math.min(1.6, (now - P.s.t) / 1000);
@@ -3920,6 +3961,7 @@ function die(how, kmh) {
   else if (how !== 'smite') witness(how === 'crash' ? `came in to land at ${kmh} km/h, hit the ground like a dropped plate, and died`
     : `fell ${drop} m to his death after ${why}`);
   state = 'dead'; death.phase = 'impact'; death.t = 0; flags.deaths++;
+  worldMark('fall', player.pos.x, player.pos.y, player.pos.z);
   for (const q of quests) if (q.kind === 'climb' && !q.done) q.v = 0;
   audio.sfx.impact(); audio.sting('death'); camShake = 1; stopVoice(); dlg.queue.length = 0; dlg.cur = null;
   for (let i = 0; i < 70; i++) emit(p.pos.x, p.pos.y + 0.3, p.pos.z, rnd(9), Math.random() * 6, rnd(9), 1.2, pick(ASH));
@@ -5931,6 +5973,7 @@ function meet(g) {
   if (g.other) { if (!story.known.has(g.id)) { story.known.add(g.id); audio.sting('godMet'); saveSoon(); } return; }
   if (story.met.has(g.id)) return;
   story.met.add(g.id); if (!g.home) { g.pinned = false; g.place = ''; }   // (Zeus does not leave his house)
+  if (!g.home) worldMark('met', g.x, Number.isFinite(g.gy) ? g.gy : groundAt(g.x, g.z), g.z, g.id);   // a shrine stays here, for everyone
   if (story.chain && story.chain.id === g.id) story.chain = null;
   sendOn(g);
   audio.sting('godMet');
@@ -6624,15 +6667,18 @@ let saveT = 20, resumed = false;
 function saveSoon() { saveT = Math.min(saveT, 1.5); }
 function saveGame() {
   if (state === 'loading' || state === 'title') return;
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 3, realm, under: UNDER, hades: hades.history.slice(-12),
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(saveData())); } catch {}
+}
+function saveData() {
+  {
+    return ({ v: 3, realm, under: UNDER, hades: hades.history.slice(-12),
       phase: story.phase === 'leap' ? 'summit' : story.phase, chain: story.chain || null, met: [...story.met], gossip: story.gossip.slice(-80), events: story.events.slice(-40),
       deaths: flags.deaths, stats: { crashes: stats.crashes, perfect: stats.perfect, toldWings: stats.toldWings, toldCrash: stats.toldCrash, dove: stats.dove },
       day: dayT, titans: story.titans === 'march' ? 'stone' : story.titans, quests, perks, known: [...story.known], intro: [...gods, hades, ...others].filter(g => g.introduced).map(g => g.id),
       order: GOD_ORDER, lit: BEACONS.filter(b => b.lit).map(b => b.id), pos: checkpoint.toArray(),
       gods: Object.fromEntries(gods.map(g => [g.id, { h: g.history.slice(-40), r: g.revealed, f: Math.max(g.formIdx, g.wantForm) }])),
-      others: Object.fromEntries(others.filter(o => o.history.length).map(o => [o.id, { h: o.history.slice(-20), r: o.revealed }])) }));
-  } catch {}
+      others: Object.fromEntries(others.filter(o => o.history.length).map(o => [o.id, { h: o.history.slice(-20), r: o.revealed }])) });
+  }
 }
 function loadGame() {
   let s;
@@ -6856,6 +6902,7 @@ function chart(dt) {
     const k = packCell(cx, cz);
     if (S.has(k)) continue;
     S.add(k); mapV.dirty = true;
+    if (!WORLD.cells[realm].has(k)) WORLD.pend[realm].set(k, [cx, cz]);
     const t = mapTiles.get(Math.floor(cx / TILE) + ',' + Math.floor(cz / TILE)); if (t) t.stale = true;
   }
   const last = C[C.length - 1];
@@ -6872,6 +6919,170 @@ function loadMap() {
     mapCells.over = new Set(m.over || []); mapCells.under = new Set(m.under || []); crumbs.over = m.co || []; crumbs.under = m.cu || []; } catch {}
 }
 addEventListener('pagehide', () => mapV.dirty && saveMap());
+
+// ───────────────────────── the shared world ─────────────────────────
+// The country comes from one seed, so it is already the same country for everyone. What is shared is what people do in it.
+// Every square anyone sees is charted for all, under the name of whoever saw it first, so the map fills in as people fly
+// further — everyone's map. Where someone meets a god a small shrine stays standing, in everybody's world; where someone
+// falls, a mark. And each traveller's journey is kept on the server under a travel code, so coming back — on this device
+// or another — picks it up where they left it, and tells them what the world did while they were gone.
+const CODE_A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const WORLD = { code: '', cells: { over: new Map(), under: new Map() }, names: [], nameIx: new Map(), marks: [], trav: [], shrines: [],
+  pend: { over: new Map(), under: new Map() }, lookT: 3, lookX: 1e9, lookZ: 1e9, looking: false, flushT: 6, syncT: 25, mapT: 0, totals: null,
+  first: 0, firstT: 0, hello: false, live: false, fails: 0, realm: 'over', emberT: 0 };
+try { WORLD.code = localStorage.getItem('icarus.code') || ''; } catch {}
+if (!/^[A-HJ-NP-Z2-9]{12}$/.test(WORLD.code)) {
+  WORLD.code = [...crypto.getRandomValues(new Uint8Array(12))].map(v => CODE_A[v & 31]).join('');
+  try { localStorage.setItem('icarus.code', WORLD.code); } catch {}
+}
+const codeShow = c => c.replace(/(.{4})(?=.)/g, '$1-');
+const agoISO = t => { const s = (Date.now() - Date.parse(t)) / 1000; return !(s >= 0) ? '' : s < 120 ? 'just now' : s < 7200 ? `${Math.round(s / 60)} min ago` : s < 172800 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} days ago`; };
+const nameId = n => { if (!WORLD.nameIx.has(n)) { WORLD.nameIx.set(n, WORLD.names.length); WORLD.names.push(n); } return WORLD.nameIx.get(n); };
+function worldPost(body, beacon) {
+  const s = JSON.stringify({ code: WORLD.code, name: heroName, realm, ...body });
+  if (beacon) { try { navigator.sendBeacon?.('/api/world', new Blob([s], { type: 'application/json' })); } catch {} return null; }
+  return fetch('/api/world', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: s }).then(r => r.ok ? r.json() : null).catch(() => null);
+}
+// the squares he has seen that the world has not heard about yet, a batch at a time
+function worldFlush(R, beacon) {
+  const P = WORLD.pend[R]; if (!P.size) return;
+  const cells = [], ks = [];
+  for (const [k, c] of P) { cells.push(c); ks.push(k); if (cells.length >= 800) break; }
+  for (const k of ks) P.delete(k);
+  const back = WORLD.backlog; WORLD.backlog = false;
+  const q = worldPost({ op: 'chart', realm: R, cells }, beacon);
+  if (!q) return;
+  q.then(j => {
+    if (!j) { for (let i = 0; i < ks.length; i++) P.set(ks[i], cells[i]); WORLD.flushT = Math.min(120, 10 * 2 ** ++WORLD.fails); return; }
+    WORLD.fails = 0;
+    const me = nameId(heroName), M = WORLD.cells[R];
+    for (const k of ks) if (!M.has(k)) M.set(k, j.first ? me : -1);
+    WORLD.first += j.first | 0;
+    // nobody had seen this before him: say so, now and then
+    if (!back && j.first >= 12 && time - WORLD.firstT > 120 && state === 'play') { WORLD.firstT = time; toast(`NO ONE HAS SEEN THIS BEFORE · CHARTED FOR EVERYONE AS ${heroName}'S`); }
+  });
+}
+function worldLook() {
+  if (WORLD.looking) return;
+  const P = player.pos, R = realm;
+  WORLD.looking = true; WORLD.lookX = P.x; WORLD.lookZ = P.z; WORLD.lookT = 75;
+  fetch(`/api/world?realm=${R}&x=${Math.round(P.x)}&z=${Math.round(P.z)}`).then(r => r.ok ? r.json() : null).then(j => {
+    WORLD.looking = false;
+    if (!j || !Array.isArray(j.cells)) { WORLD.lookT = 150; return; }
+    if (R !== realm) { WORLD.lookT = 0.5; return; }
+    WORLD.live = !!j.live; WORLD.totals = j.totals || null;
+    const M = WORLD.cells[R], names = Array.isArray(j.names) ? j.names : [];
+    for (const c of j.cells) {
+      if (!Array.isArray(c) || !Number.isInteger(c[0]) || !Number.isInteger(c[1])) continue;
+      const k = packCell(c[0], c[1]), v = nameId(String(names[c[2]] || 'SOMEONE').slice(0, 12));
+      if (M.get(k) === v) continue;
+      const fresh = !M.has(k) && !mapCells[R].has(k);
+      M.set(k, v); WORLD.pend[R].delete(k);
+      if (fresh) { const t = mapTiles.get(Math.floor(c[0] / TILE) + ',' + Math.floor(c[1] / TILE)); if (t) t.stale = true; }
+    }
+    // and anything of his own the world is missing (seen while it was not answering): offered again
+    { const cx0 = Math.round(WORLD.lookX / 200), cz0 = Math.round(WORLD.lookZ / 200), mine = mapCells[R];
+      for (let cz = cz0 - 32; cz <= cz0 + 32; cz++) for (let cx = cx0 - 32; cx <= cx0 + 32; cx++) { const k = packCell(cx, cz); if (mine.has(k) && !M.has(k)) WORLD.pend[R].set(k, [cx, cz]); } }
+    WORLD.marks = (Array.isArray(j.marks) ? j.marks : []).filter(m => m && Number.isFinite(m.x) && Number.isFinite(m.z) && Number.isFinite(m.y))
+      .map(m => ({ k: m.k === 'met' ? 'met' : 'fall', x: m.x, y: m.y, z: m.z, g: String(m.g || ''), s: m.s | 0, n: String(m.n || 'SOMEONE').slice(0, 12), mine: m.n === heroName, at: m.at }));
+    WORLD.trav = (Array.isArray(j.travellers) ? j.travellers : []).filter(t => t && Number.isFinite(t.x) && Number.isFinite(t.z)).map(t => ({ n: String(t.n || 'SOMEONE').slice(0, 12), x: t.x, z: t.z, seen: t.seen }));
+    placeShrines();
+  }).catch(() => { WORLD.looking = false; WORLD.lookT = 150; });
+}
+function mapData() {
+  const trim = (s, n) => { const a = [...s]; return a.length > n ? a.slice(a.length - n) : a; };
+  return { over: trim(mapCells.over, 6000), under: trim(mapCells.under, 2500), co: crumbs.over.slice(-300), cu: crumbs.under.slice(-300) };
+}
+// where he is and how far he has come, kept for when he comes back
+function worldSync(beacon) {
+  WORLD.syncT = 60;
+  const P = player.pos, body = { op: 'sync', x: P.x, z: P.z, phase: story.phase, save: saveData() };
+  if (beacon) { if (JSON.stringify(body.save).length > 50000) delete body.save; return worldPost(body, true); }
+  if ((WORLD.mapT -= 60) <= 0) { WORLD.mapT = 300; body.map = mapData(); }
+  if (!WORLD.hello) { WORLD.hello = true; body.hello = true; }
+  worldPost(body).then(j => { if (j && j.away) welcomeBack(j.away); });
+}
+// back after a while: what everyone else did meanwhile
+function welcomeBack(a) {
+  const bits = [];
+  if (a.people) bits.push(`${a.people} ${a.people === 1 ? 'traveller' : 'travellers'} flew`);
+  if (a.cells >= 5) bits.push(`${Math.max(1, Math.round(a.cells * MAPC * MAPC / 1e6))} km² more was charted`);
+  if (a.marks) bits.push(`${a.marks} ${a.marks === 1 ? 'mark was' : 'marks were'} left`);
+  if (bits.length) setTimeout(() => state === 'play' && titleCard('WHILE YOU WERE GONE', bits.join(' · '), 5200), 7000);
+}
+function worldMark(kind, x, y, z, god = '') {
+  const m = { k: kind, x: Math.round(x), y: Math.round(y * 10) / 10, z: Math.round(z), g: god, s: (Math.random() * 2 ** 31) | 0, n: heroName, mine: true, at: new Date().toISOString() };
+  if (kind === 'met' && WORLD.marks.some(o => o.k === 'met' && o.mine && o.g === god)) return;
+  WORLD.marks.push(m);
+  worldPost({ op: 'mark', kind, x: m.x, y: m.y, z: m.z, god, seed: m.s });
+}
+// The shrines: a little round temple, open to the sky, where someone met a god. The nearest few stand in the world.
+const shrineKey = m => `${m.g}:${m.x}:${m.z}`;
+function clearShrines() { for (const S of WORLD.shrines) { scene.remove(S.group); S.group.traverse(o => o.geometry && o.geometry.dispose()); S.el.remove(); } WORLD.shrines.length = 0; }
+function placeShrines() {
+  const P = player.pos, seen = new Set(); WORLD.shX = P.x; WORLD.shZ = P.z;
+  const want = WORLD.marks.filter(m => m.k === 'met' && Math.hypot(m.x - P.x, m.z - P.z) < 2200)
+    .sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z))
+    .filter(m => { const k = Math.round(m.x / 40) + ',' + Math.round(m.z / 40); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 4);
+  const keys = new Set(want.map(shrineKey));
+  for (const S of [...WORLD.shrines]) if (!keys.has(S.key)) { scene.remove(S.group); S.group.traverse(o => o.geometry && o.geometry.dispose()); S.el.remove(); WORLD.shrines.splice(WORLD.shrines.indexOf(S), 1); }
+  for (const m of want) {
+    if (WORLD.shrines.some(S => S.key === shrineKey(m))) continue;
+    const S = makeTemple(m.s || 1, realm === 'under', 1, { R: 5, bare: true });
+    Object.assign(S, { x: m.x, y: m.y, z: m.z, key: shrineKey(m), m });
+    S.group.position.set(m.x, m.y, m.z); scene.add(S.group);
+    const el = document.createElement('div'); el.className = 'mk'; el.innerHTML = '<b>⌂</b><span></span>'; $('markers').appendChild(el); S.el = el;
+    WORLD.shrines.push(S);
+  }
+}
+function updateWorld(dt) {
+  if (state === 'loading' || state === 'title' || state === 'prologue') return;
+  if (WORLD.realm !== realm) { WORLD.realm = realm; clearShrines(); WORLD.marks = []; WORLD.trav = []; WORLD.lookT = 0.5; }
+  if ((WORLD.flushT -= dt) <= 0) { WORLD.flushT = 8; worldFlush('over'); worldFlush('under'); }
+  const P = player.pos;
+  if ((WORLD.lookT -= dt) <= 0 || Math.hypot(P.x - WORLD.lookX, P.z - WORLD.lookZ) > 2600) worldLook();
+  if ((WORLD.syncT -= dt) <= 0) worldSync();
+  if (Math.hypot(P.x - (WORLD.shX ?? 1e9), P.z - (WORLD.shZ ?? 1e9)) > 400) placeShrines();
+  const ember = (WORLD.emberT -= dt) <= 0; if (ember) WORLD.emberT = 0.12;
+  for (const S of WORLD.shrines) {
+    // hidden while a real temple stands on the same ground (his own, still in use)
+    const busy = temples.some(T => Math.hypot(T.x - S.x, T.z - S.z) < 45);
+    S.group.visible = !busy;
+    const d = Math.hypot(S.x - P.x, S.z - P.z), m = S.m;
+    placeMarker(S.el, S.x, S.y + 9.5, S.z, !busy && d < 340 && state === 'play', '⌂', `${(godById[m.g]?.name || m.g).toUpperCase()} · MET HERE BY ${m.mine ? 'YOU' : m.n}${d > 60 ? ' · ' + fmtDist(d) : ''}`, false);
+    if (ember && !busy && d < 500) emit(S.x + rnd(1.2), S.y + 0.8, S.z + rnd(1.2), rnd(0.3), 1.2 + Math.random() * 1.5, rnd(0.3), 1.8, [1.6, 0.72, 0.28], 1.4);   // an ember that never goes out
+  }
+}
+addEventListener('pagehide', () => { if (state === 'loading' || state === 'title') return; worldFlush('over', true); worldFlush('under', true); worldSync(true); });
+// The title: his code, and coming back with one from another device
+function codeUI() {
+  $('codeShow').textContent = codeShow(WORLD.code);
+  $('codeRow').addEventListener('click', e => e.stopPropagation());
+  $('codeRow').addEventListener('keydown', e => e.stopPropagation());
+  $('codeUse').addEventListener('click', async e => {
+    e.stopPropagation();
+    const c = String(prompt('Your travel code, from the device you played on (it is on that title screen):') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!c) return;
+    if (!/^[A-HJ-NP-Z2-9]{12}$/.test(c)) return toast('THAT IS NOT A TRAVEL CODE');
+    if (c === WORLD.code) return toast('THAT IS THIS DEVICE’S OWN CODE');
+    if (resumed && !confirm('This replaces the journey saved on this device with the one on that code. Go on?')) return;
+    $('codeUse').textContent = 'looking for you…';
+    const j = await fetch('/api/world', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'resume', code: c }) }).then(r => r.ok ? r.json() : null).catch(() => null);
+    if (!j) { $('codeUse').textContent = 'come back with yours'; return toast('NO TRAVELLER BY THAT CODE'); }
+    try {
+      localStorage.setItem('icarus.code', c);
+      if (j.name) localStorage.setItem('icarus.name', String(j.name).slice(0, 12));
+      if (j.save && j.save.v === 3) localStorage.setItem(SAVE_KEY, JSON.stringify(j.save)); else localStorage.removeItem(SAVE_KEY);
+      if (j.map && Array.isArray(j.map.over)) localStorage.setItem(MAP_KEY, JSON.stringify(j.map)); else localStorage.removeItem(MAP_KEY);
+      localStorage.setItem('icarus.charted', '1');
+    } catch {}
+    toast(`WELCOME BACK, ${String(j.name || 'TRAVELLER').toUpperCase()}`);
+    setTimeout(() => location.reload(), 900);
+  });
+  // a journey from before the world was shared: offer everything he has already seen, once
+  let done = false; try { done = !!localStorage.getItem('icarus.charted'); localStorage.setItem('icarus.charted', '1'); } catch {}
+  if (!done) { WORLD.backlog = true; for (const R of ['over', 'under']) for (const k of mapCells[R]) WORLD.pend[R].set(k, [Math.floor(k / 40000) - 20000, k % 40000 - 20000]); }
+}
 // what one square of country looks like from very high up: a letter and a colour
 function cellLook(x, z) {
   const h = height(x, z);
@@ -6898,10 +7109,13 @@ function mapTile(tx, tz) {
     x.font = `bold ${TPX * 1.7}px Menlo, Consolas, monospace`; x.textAlign = 'center'; x.textBaseline = 'middle';
     for (let j = 0; j < TILE; j++) for (let i = 0; i < TILE; i++) {
       const cx = tx * TILE + i, cz = tz * TILE + j;
-      if (!S.has(packCell(cx, cz))) continue;
+      const pk = packCell(cx, cz), own = S.has(pk);
+      if (!own && !WORLD.cells[realm].has(pk)) continue;
       const [g, c] = cellLook((cx + 0.5) * MAPC, (cz + 0.5) * MAPC);
+      x.globalAlpha = own ? 1 : 0.4;
       x.fillStyle = c; x.fillText(g, (i + 0.5) * TPX * 2, (j + 0.5) * TPX * 2 + 1); t.any = true;
     }
+    x.globalAlpha = 1;
   }
   return t;
 }
@@ -6912,8 +7126,11 @@ function openMap() {
   const dpr = Math.min(devicePixelRatio, 2); mapCv.width = innerWidth * dpr; mapCv.height = innerHeight * dpr;
   // it opens out of where he is standing: close in on him, then the country spreads
   mapV.x = mapV.tx = player.pos.x; mapV.z = mapV.tz = player.pos.z; mapV.s = 0.34; mapV.ts = TOUCH ? 0.06 : 0.085;
-  $('mapTitle').textContent = `${realm === 'under' ? 'THE UNDERWORLD' : 'OLYMPUS AND THE HILLS'} · ${(mapCells[realm].size * MAPC * MAPC / 1e6).toFixed(0)} KM² SEEN`;
-  $('mapHint').textContent = !flags.morphed ? 'you have only seen the mountain' : TOUCH ? 'tap anywhere you have been and the gods will carry you there · pinch in to close' : 'click anywhere you have been and the gods will carry you there · M to close';
+  const Tt = WORLD.totals;
+  $('mapTitle').textContent = `${realm === 'under' ? 'THE UNDERWORLD' : 'OLYMPUS AND THE HILLS'} · ${(mapCells[realm].size * MAPC * MAPC / 1e6).toFixed(0)} KM² SEEN BY YOU`
+    + (Tt && Tt.cells ? ` · ${Math.round(Tt.cells * MAPC * MAPC / 1e6).toLocaleString()} KM² CHARTED BY ${Math.max(1, Tt.travellers)} ${Tt.travellers === 1 ? 'TRAVELLER' : 'TRAVELLERS'}` : '');
+  if (WORLD.lookT > 20) WORLD.lookT = 0.2;   // a fresh look at the world while the map is open
+  $('mapHint').textContent = !flags.morphed ? 'you have only seen the mountain' : TOUCH ? 'tap anywhere anyone has been and the gods will carry you there · pinch in to close' : 'click anywhere anyone has been and the gods will carry you there · M to close';
   mapEl.classList.add('open'); audio.sfx.ui();
 }
 function closeMap() {
@@ -6922,7 +7139,7 @@ function closeMap() {
   if (state === 'map') state = 'play';
 }
 const mapAt = (px, py) => [mapV.x + (px - innerWidth / 2) / mapV.s, mapV.z + (py - innerHeight / 2) / mapV.s];
-const mapKnown = (x, z) => mapCells[realm].has(packCell(Math.floor(x / MAPC), Math.floor(z / MAPC)));
+const mapKnown = (x, z) => { const k = packCell(Math.floor(x / MAPC), Math.floor(z / MAPC)); return mapCells[realm].has(k) || WORLD.cells[realm].has(k); };
 function mapZoom(f, px, py) {
   const before = mapV.ts;
   mapV.ts = clamp(mapV.ts * f, 0.022, 0.3);
@@ -6990,6 +7207,13 @@ function updateMap(dt) {
     for (const b of BEACONS) if (mapKnown(b.x, b.z)) mark(b.x, b.z, b.lit ? '◆' : '◇', '', b.lit ? '#ffc46a' : '#bfe6ff');
     for (const g of gods) if (g.active && (g.marked || story.met.has(g.id))) mark(g.x, g.z, story.met.has(g.id) ? '·' : '◇', story.met.has(g.id) || g.place === 'HERMES' ? g.name.toUpperCase() : (g.place || g.disguise).toUpperCase(), story.met.has(g.id) ? '#ffe08a' : '#ffb070');
   } else if (UNDER.hades) mark(UNDER.hades.x, UNDER.hades.z, '◇', 'H A D E S', '#7fa8ff');
+  // what other people left: the shrines where they met a god, the places they fell, and where they were last seen
+  const near = V.s > 0.06;
+  for (const m of WORLD.marks) {
+    if (m.k === 'met') mark(m.x, m.z, '⌂', near ? `${(godById[m.g]?.name || m.g).toUpperCase()} · ${m.mine ? 'YOU' : m.n}` : '', m.mine ? '#ffc46a' : '#e8c890');
+    else if (V.s > 0.1) mark(m.x, m.z, '†', '', 'rgba(255,120,90,.5)');
+  }
+  for (const t of WORLD.trav) if (t.n !== heroName) mark(t.x, t.z, '✧', near ? `${t.n} · ${agoISO(t.seen)}` : t.n, '#bfe6ff');
   // him
   const P = player.pos, px = sx(P.x), py = sy(P.z), yaw = player.form === 'human' ? human.group.rotation.y : player.yaw, pulse = 5 + (Math.sin(time * 3) * 0.5 + 0.5) * 6;
   x.strokeStyle = 'rgba(255,138,58,.7)'; x.lineWidth = 1; x.beginPath(); x.arc(px, py, pulse, 0, 6.283); x.stroke();
@@ -6999,7 +7223,13 @@ function updateMap(dt) {
   if (V.hover && flags.morphed && !TOUCH) {
     const cx = Math.floor(V.hover[0] / MAPC), cz = Math.floor(V.hover[1] / MAPC), ok = mapCells[realm].has(packCell(cx, cz));
     x.strokeStyle = ok ? 'rgba(190,255,220,.9)' : 'rgba(244,234,210,.18)'; x.strokeRect(sx(cx * MAPC), sy(cz * MAPC), MAPC * V.s, MAPC * V.s);
-    if (ok) { x.fillStyle = 'rgba(190,255,220,.9)'; x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillText(`${fmtDist(Math.hypot(V.hover[0] - P.x, V.hover[1] - P.z))}`, sx((cx + 0.5) * MAPC), sy(cz * MAPC) - 8); }
+    const theirs = !ok && WORLD.cells[realm].has(packCell(cx, cz));
+    if (theirs) { x.strokeStyle = 'rgba(190,230,255,.75)'; x.strokeRect(sx(cx * MAPC), sy(cz * MAPC), MAPC * V.s, MAPC * V.s); }
+    if (ok || theirs) {
+      const who = WORLD.names[WORLD.cells[realm].get(packCell(cx, cz))];
+      x.fillStyle = 'rgba(190,255,220,.9)'; x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillText(`${fmtDist(Math.hypot(V.hover[0] - P.x, V.hover[1] - P.z))}`, sx((cx + 0.5) * MAPC), sy(cz * MAPC) - 8);
+      if (who) { x.fillStyle = 'rgba(244,234,210,.7)'; x.fillText(who === heroName ? 'you saw it first' : `first seen by ${who}`, sx((cx + 0.5) * MAPC), sy((cz + 1) * MAPC) + 9); }
+    }
   }
 }
 
@@ -7932,8 +8162,179 @@ function adaptQuality(dt) {
 const clock = new THREE.Clock();
 const dbgCam = { on: false, p: new THREE.Vector3(), l: new THREE.Vector3(), fov: 40, fog: 0, onStrike: null };
 let time = 0, timeK = 1;   // timeK slows the whole world: a held frame in a conversation, or the still eye
+// ───────────────────────── Apple Vision Pro: flying with your body ─────────────────────────
+// In Safari on Vision Pro (or any headset with WebXR), the game can open into the room around you. You are where the
+// camera is: behind him when he flies, at his shoulder on the ground. Your head looks around; your hands fly. The moves
+// are in xr.js — wings, flap, stoop, clap, fold, spread, leap, point, offer, push, and the headset's own look-and-pinch —
+// inspired by the way the Vision Pro's sorcery stories teach spells: a shape held, or a sweep made, never a button.
+// The ASCII picture is drawn for a flat screen; in the headset the world is shown as itself, and the words that would be
+// on the screen float on a pane below your eyes.
+const XR = { on: false, sess: null, supported: false, rig: new THREE.Group(), cam: new THREE.PerspectiveCamera(70, 1, 0.1, 30000), hands: [], read: makeHands(), out: null,
+  scene: null, yaw: 0, tier: null, hud: null, hudT: 0, hudKey: '', move: '', moveT: -9, pinchT: -9, hudYaw: 0 };
+XR.rig.add(XR.cam); scene.add(XR.rig);
+const _xd = new THREE.Vector3(), _xe = new THREE.Euler(), _xp = new THREE.Vector3();
+if (navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-vr').then(ok => {
+  if (!ok) return;
+  XR.supported = true; document.documentElement.classList.add('xrdev');
+  $('xrRow').classList.remove('hidden');
+  const b = document.createElement('button'); b.id = 'xrBtn'; b.textContent = '◎ IMMERSIVE'; b.title = 'Fly with your body, in the headset';
+  b.addEventListener('click', e => { e.stopPropagation(); b.blur(); xrEnter(); }); document.body.append(b);
+}).catch(() => {});
+$('xrRow').addEventListener('click', e => { e.stopPropagation(); if (state === 'title') { nameAsked = true; begin(); } xrEnter(); });
+async function xrEnter() {
+  if (XR.on || XR.starting || !navigator.xr) return;
+  XR.starting = true;
+  try {
+    // (asked for first, while the tap still counts as the player's own)
+    const sess = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local', 'hand-tracking'] });
+    initAudio();
+    renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType('local'); renderer.xr.setFramebufferScaleFactor(0.85);
+    await renderer.xr.setSession(sess);
+    XR.sess = sess; XR.on = true; XR.tier = tierIdx; applyTier(0, false, false);
+    for (let i = 0; i < 2; i++) {
+      const h = XR.hands[i] || renderer.xr.getHand(i);
+      if (!XR.hands[i]) {
+        h.addEventListener('connected', e => { h.userData.side = e.data && e.data.handedness || ''; });
+        h.addEventListener('disconnected', () => { h.userData.side = ''; });
+        XR.rig.add(h); XR.hands[i] = h;
+      }
+    }
+    sess.addEventListener('select', () => { if (time - XR.pinchT > 0.35) { XR.pinchT = time; xrMove('pinch'); } });
+    sess.addEventListener('end', xrLeave);
+    if (!XR.hud) xrHudMake();
+    XR.hud.visible = true; XR.hudKey = '';
+    camShake = 0;
+    renderer.setAnimationLoop(xrFrame);
+    XR.move = state === 'prologue' ? 'clap or pinch to skip' : 'arms out to fly · clap for fire'; XR.moveT = time + 3;
+  } catch (e) { console.warn('xr', e); toast('IMMERSIVE MODE DID NOT OPEN'); }
+  XR.starting = false;
+}
+function xrLeave() {
+  if (!XR.on) return;
+  XR.on = false; XR.sess = null; renderer.setAnimationLoop(null); renderer.xr.enabled = false;
+  keys.TouchBoost = false; stick.x = stick.y = 0;
+  if (XR.hud) XR.hud.visible = false;
+  if (XR.tier !== null) applyTier(XR.tier, false, false);
+  dispatchEvent(new Event('resize'));
+}
+function xrFrame() {
+  const raw = Math.min(clock.getDelta(), 0.05);
+  xrInput(raw);
+  camShake = 0;   // (a shaking camera is a shaking room: not in the headset)
+  if (state === 'photo') updatePhoto(raw);
+  tick(raw * timeK);
+  xrFollow(raw);
+  const sc = XR.scene || scene;
+  XR.cam.near = Math.max(0.05, camera.near); XR.cam.far = camera.far;
+  xrHud(raw, sc);
+  XR.rig.updateMatrixWorld(true);
+  renderer.setRenderTarget(null);
+  renderer.render(sc, XR.cam);
+}
+// the room goes where the game's camera goes, turning with its heading only (never its tilt or roll: that is what makes
+// people sick), so you can look around freely and the horizon stays where your body thinks it is
+function xrFollow(dt) {
+  camera.getWorldDirection(_xd);
+  const yaw = Math.atan2(-_xd.x, -_xd.z);
+  XR.yaw += wrapAngle(yaw - XR.yaw) * damp(player.form === 'phoenix' ? 5 : 8, dt);
+  XR.rig.position.copy(camera.position);
+  XR.rig.rotation.set(0, XR.yaw, 0);
+}
+function xrJoints(side) {
+  const h = XR.hands.find(h => h && h.userData.side === side);
+  if (!h || !h.joints || !h.joints.wrist || !h.joints.wrist.visible) return null;
+  const j = {}; for (const k in h.joints) if (h.joints[k].visible) j[k] = h.joints[k].position;
+  return j;
+}
+function xrInput(dt) {
+  _xe.setFromQuaternion(XR.cam.quaternion, 'YXZ');
+  const hy = _xe.y, H = XR.cam.position, p = player;
+  const o = XR.out = XR.read.update(dt, { x: H.x, y: H.y, z: H.z, yaw: hy }, xrJoints('left'), xrJoints('right'), { form: p.form, grounded: p.grounded });
+  const fly = state === 'play' && !p.cine && (p.form === 'phoenix' || (p.wings && !p.grounded));
+  if (state === 'play' && o.pose === 'point' && p.form === 'human') {
+    // walk where the finger points: turned from the head's frame into the camera's, which is what the stick steers by
+    const a = Math.atan2(o.axes[0], o.axes[1]) - hy;
+    stick.x = Math.sin(a); stick.y = Math.cos(a);
+  } else if (fly) { stick.x = o.axes[0]; stick.y = -o.axes[1]; }   // (the game's pitch: positive climbs)
+  else { stick.x = 0; stick.y = 0; }
+  keys.TouchBoost = state === 'play' && (fly ? o.boost : o.pose === 'point' && o.run);
+  for (const ev of o.events) xrMove(ev);
+}
+// what each move does, where he is
+function xrMove(ev) {
+  XR.move = ev; XR.moveT = time + 1.2;
+  if (ev === 'flap') { audio.sfx.flap(0.9); return; }
+  if (state === 'title') return;
+  if (state === 'end') { if (['clap', 'pinch', 'push'].includes(ev) && endReady) closeEnd(); return; }
+  if (state === 'prologue') { if (ev === 'clap' || ev === 'pinch') proSkip(); return; }
+  if (state === 'talk') { if (ev === 'push') endTalk(); else if ((ev === 'clap' || ev === 'pinch') && !live()) fallbackNext(); return; }
+  if (state !== 'play') return;
+  const p = player, act = spaceAction(), kind = act && act.kind;
+  if (ev === 'clap' || ev === 'pinch') return pressSpace();
+  if (ev === 'leap') { if (p.grounded || p.climb) pressSpace(); return; }
+  if (ev === 'spread') { if (p.form === 'human' && !p.grounded && !p.wings) pressSpace(); return; }
+  if (ev === 'fold') { if (p.form === 'phoenix' && !p.cine) becomeHuman(); return; }
+  if (ev === 'offer') { if (['talk', 'kindle', 'animal'].includes(kind)) pressSpace(); else if (time - (XR.offerSaid || -99) > 20) { XR.offerSaid = time; toast('NOBODY HERE TO OFFER YOUR HAND TO'); } return; }
+  if (ev === 'push') { if (kind === 'swoop') pressSpace(); return; }
+}
+// The pane of words: whatever the flat screen would be showing — the line being spoken, the god's answer, the prologue's
+// subtitles, the hint for what a move will do here — on a sheet of glass a little below the eyes, that follows slowly.
+function xrHudMake() {
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 320;
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.3125), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, fog: false, toneMapped: false }));
+  m.renderOrder = 9999; m.frustumCulled = false;
+  XR.hud = m; XR.hudCv = cv; XR.hudX = cv.getContext('2d'); XR.hudTex = tex;
+}
+const MOVE_WORDS = { wings: 'WINGS', flap: 'WINGBEAT', stoop: 'STOOP', clap: 'FIRE', fold: 'FOLD', spread: 'CATCH FIRE', leap: 'LEAP', point: 'WALK', offer: 'OFFER', push: 'STOP', pinch: 'TAP' };
+function xrHud(dt, sc) {
+  const m = XR.hud; if (!m) return;
+  if (m.parent !== sc) sc.add(m);
+  // place it: 1.2 m out along where the head is turned, 0.42 m below the eyes, turning after the head slowly
+  _xe.setFromQuaternion(XR.cam.quaternion, 'YXZ');
+  XR.hudYaw += wrapAngle(_xe.y - XR.hudYaw) * damp(2.2, dt);
+  XR.rig.updateMatrixWorld(true);
+  _xp.set(-Math.sin(XR.hudYaw) * 1.2, -0.42, -Math.cos(XR.hudYaw) * 1.2).add(XR.cam.position);
+  m.position.copy(XR.rig.localToWorld(_xp));
+  m.rotation.set(0, XR.yaw + XR.hudYaw, 0, 'YXZ'); m.rotateX(-0.3);
+  if ((XR.hudT -= dt) > 0) return;
+  XR.hudT = 0.1;
+  const vis = id => { const el = $(id); if (!el) return ''; const cs = getComputedStyle(el); return cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.15 || el.closest('.hidden') ? '' : el.textContent.trim(); };
+  const lines = [];
+  const pro = vis('proSub'); if (pro) lines.push(['', pro]);
+  if (state === 'talk') { const t = vis('talkText'); if (t) lines.push([vis('talkName'), t]); }
+  else { const d = vis('dlgText'); if (d) lines.push([vis('dlgTitle'), d]); }
+  const card = vis('card'); if (card) lines.push(['', card]);
+  const tst = vis('toast'); if (tst) lines.push(['', tst]);
+  // what a move will do here
+  const act = state === 'play' && spaceAction();
+  const hint = state === 'talk' ? 'speak aloud · push both palms out to leave'
+    : !act ? '' : act.kind === 'talk' || act.kind === 'kindle' || act.kind === 'animal' ? `hold out a palm: ${act.label}`
+    : act.kind === 'swoop' ? 'push both palms out: land' : act.kind === 'jump' ? 'clap, or throw both hands up: jump'
+    : act.kind === 'ignite' ? 'clap, or throw both hands up: JUMP' : act.kind === 'rebirth' ? 'throw your arms out: catch fire' : `clap: ${act.label}`;
+  const mv = time < XR.moveT ? (MOVE_WORDS[XR.move] || XR.move.toUpperCase()) : (XR.out && MOVE_WORDS[XR.out.pose]) || '';
+  const key = JSON.stringify([lines, hint, mv]);
+  if (key === XR.hudKey) return;
+  XR.hudKey = key;
+  const x = XR.hudX, W = 1024, Hh = 320;
+  x.clearRect(0, 0, W, Hh);
+  if (!lines.length && !hint && !mv) { XR.hudTex.needsUpdate = true; return; }
+  x.fillStyle = 'rgba(6,7,12,.62)'; x.beginPath(); x.roundRect(8, 8, W - 16, Hh - 16, 28); x.fill();
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  const wrap = (t, max) => { const out = []; let cur = ''; for (const w of t.split(' ')) { if (x.measureText(cur + ' ' + w).width > max && cur) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; } if (cur) out.push(cur); return out; };
+  let y = 52;
+  if (mv) { x.font = 'bold 30px Menlo, monospace'; x.fillStyle = '#ffb060'; x.fillText(`✦ ${mv} ✦`, W / 2, y); y += 46; }
+  x.font = '34px Menlo, monospace';
+  for (const [who, t] of lines.slice(-2)) {
+    for (const ln of wrap((who ? who.toUpperCase() + ' — ' : '') + t, W - 90).slice(0, 3)) { if (y > Hh - 60) break; x.fillStyle = '#f4ead2'; x.fillText(ln, W / 2, y); y += 42; }
+  }
+  if (hint) { x.font = '24px Menlo, monospace'; x.fillStyle = 'rgba(190,255,220,.85)'; x.fillText(hint, W / 2, Hh - 34); }
+  XR.hudTex.needsUpdate = true;
+}
+
 function frame() {
   requestAnimationFrame(frame);
+  if (XR.on) return;   // (the headset is calling the frames)
   const raw = clock.getDelta();
   adaptQuality(raw);
   if (state === 'photo') updatePhoto(Math.min(raw, 0.05));
@@ -7973,7 +8374,7 @@ function tick(dt) {
   updateDialog(dt);
   updateTalk(dt);
   updateHUD(dt);
-  chart(dt); updateQuests(dt); updateMap(dt);
+  chart(dt); try { updateWorld(dt); } catch (e) { if (!WORLD.err) { WORLD.err = String(e); console.warn('world', e); } } updateQuests(dt); updateMap(dt);
   updateAudio(dt);
   sky.position.copy(camera.position); stars.position.copy(camera.position);
   water.position.x = camera.position.x; water.position.z = camera.position.z;
@@ -7991,7 +8392,7 @@ function tick(dt) {
 
 // build the summit and its surroundings before showing the title
 setTimeout(() => {
-  resumed = loadGame(); loadMap(); camUI();
+  resumed = loadGame(); loadMap(); camUI(); codeUI();
   $('ctl').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation(); $('ctl').classList.remove('open'); if (b.dataset.c === 'tilt') useTilt(); else useStick(); });
   $('ctlBtn').addEventListener('click', e => { e.stopPropagation(); if (tilt.on) { useStick(); toast('THE STICK · LEFT THUMB'); } else useTilt(); });
   if (realm === 'over') zeusHome();
@@ -8012,7 +8413,7 @@ setTimeout(() => {
   $('title').classList.remove('hidden');
   state = 'title';
   if (!nameAsked && !TOUCH) { nameInput.focus(); $('title').querySelector('.go').textContent = '[ type your name and press enter ]'; }
-  window.__icarus = { postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  window.__icarus = { fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);

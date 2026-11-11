@@ -463,6 +463,13 @@ export function createAudio() {
       nz(brown, { t: t + 0.02, dur: 0.45, type: 'lowpass', f0: 320, f1: 80, a: 0.03, vol: 0.75 });
       nz(pink, { t: t + 0.08, dur: 0.9, f0: 420, f1: 240, q: 0.6, a: 0.2, vol: 0.22 });
     },
+    // the title burning down to nothing: the fire going out, then the last of it crackling as it falls apart
+    flameout() {
+      if (!ctx) return; const t = T();
+      smp('flameout', 0.85, rnd(0.92, 1.0), t);
+      nz(pink, { t, dur: 1.6, f0: 2400, f1: 500, q: 0.7, a: 0.05, vol: 0.28, lp: 6000 });
+      for (let i = 0; i < 9; i++) nz(white, { t: t + 0.15 + Math.random() * 1.3, dur: 0.03 + Math.random() * 0.05, f0: 3000 + Math.random() * 3000, f1: 1500, q: 1.5, a: 0.002, vol: 0.12 + Math.random() * 0.12 });
+    },
     wingsFail() {
       if (!ctx) return; const t = T();
       smp('flameout', 0.75, 1, t);
