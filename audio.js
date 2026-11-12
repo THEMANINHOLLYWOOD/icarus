@@ -654,6 +654,24 @@ export function createAudio() {
     ui() { if (!ctx) return; tn({ t: T(), dur: 0.05, f0: 880, a: 0.003, vol: 0.05 }); },
     thud() { sfx.land(0.85); },
     // his heart, when the ground is coming up too fast: lub-dub, low, felt more than heard
+    // steam: what a cloud says when something burning goes through it
+    sizzle(k = 0.5) {
+      if (!ctx) return; const t = T();
+      nz(pink, { t, dur: rnd(0.22, 0.4), type: 'highpass', f0: rnd(3200, 4600), f1: rnd(6500, 8200), q: 0.7, a: 0.015, vol: 0.16 * k, pan: rnd(-0.5, 0.5) });
+      nz(pink, { t: t + 0.02, dur: 0.12, f0: rnd(1900, 2600), q: 2.2, a: 0.004, vol: 0.07 * k, pan: rnd(-0.6, 0.6) });
+    },
+    // a tornado, heard from where it stands: a low roar that never settles, and the higher tearing of the air round it
+    twister(k = 1) {
+      if (!ctx) return; const t = T();
+      nz(brown, { t, dur: 1.9, type: 'lowpass', f0: rnd(90, 130), f1: rnd(170, 240), f2: rnd(80, 110), tf: 0.5, a: 0.5, vol: 0.9 * k });
+      nz(pink, { t: t + rnd(0, 0.3), dur: 1.4, f0: rnd(420, 620), f1: rnd(900, 1300), q: 1.4, a: 0.4, vol: 0.2 * k });
+    },
+    // a great wave: the sea drawing back, and then all of it arriving
+    wave(k = 1) {
+      if (!ctx) return; const t = T();
+      nz(brown, { t, dur: 3.4, type: 'lowpass', f0: 120, f1: 900, f2: 180, tf: 0.55, a: 1.1, vol: 0.85 * k });
+      nz(pink, { t: t + 1.5, dur: 2.2, type: 'highpass', f0: 1800, f1: 5200, q: 0.6, a: 0.5, vol: 0.2 * k });
+    },
     heart(k = 1) {
       if (!ctx) return; const t = T(), v = 0.35 + 0.4 * clamp(k);
       tn({ t, dur: 0.17, type: 'sine', f0: 64, f1: 38, a: 0.006, vol: v });
@@ -928,6 +946,23 @@ export function createAudio() {
       const real = sfxBus; sfxBus = g;
       try { fn(); } finally { sfxBus = real; }
       setTimeout(() => { try { g.disconnect(); pn && pn.disconnect(); } catch {} }, 6000);
+    },
+    // The ears. Where the listener is and which way they face (the lens): anything played with at3 is then heard from
+    // where it is in the world — behind, above, coming up on the left — and fades with distance.
+    listen(px, py, pz, fx, fy, fz) {
+      if (!ctx) return; const L = ctx.listener, t = ctx.currentTime;
+      if (L.positionX) { L.positionX.setTargetAtTime(px, t, 0.04); L.positionY.setTargetAtTime(py, t, 0.04); L.positionZ.setTargetAtTime(pz, t, 0.04);
+        L.forwardX.setTargetAtTime(fx, t, 0.04); L.forwardY.setTargetAtTime(fy, t, 0.04); L.forwardZ.setTargetAtTime(fz, t, 0.04); L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }
+      else { try { L.setPosition(px, py, pz); L.setOrientation(fx, fy, fz, 0, 1, 0); } catch {} }
+    },
+    at3(x, y, z, fn, o = {}) {
+      if (!ctx || live > cap()) return;
+      const g = gain(Math.min(1.5, o.vol ?? 1)), pn = ctx.createPanner();
+      pn.panningModel = quality === 'low' ? 'equalpower' : 'HRTF'; pn.distanceModel = 'inverse'; pn.refDistance = o.ref ?? 12; pn.maxDistance = o.max ?? 600; pn.rolloffFactor = o.roll ?? 1.1;
+      if (pn.positionX) { pn.positionX.value = x; pn.positionY.value = y; pn.positionZ.value = z; } else pn.setPosition(x, y, z);
+      chain(g, pn, sfxBus); const real = sfxBus; sfxBus = g;
+      try { fn(); } finally { sfxBus = real; }
+      setTimeout(() => { try { g.disconnect(); pn.disconnect(); } catch {} }, o.life ?? 6000);
     },
     update, sfx, sting, song: songStart, songPrep, songStop, omen: omenStart, omenStop, get songOn() { return !!(song && song.on); },
     get songTime() { return song && song.on && !song.el.paused && song.el.readyState >= 2 ? song.el.currentTime : -1; },   // (where the song really is, for whatever has to land on a word) get reverbIn() { return revIn; },

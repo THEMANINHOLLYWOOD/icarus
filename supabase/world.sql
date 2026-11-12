@@ -89,3 +89,6 @@ create index if not exists god_notes_who on public.god_notes (by_hash, at desc);
 alter table public.god_notes enable row level security;
 revoke all on public.god_notes from anon, authenticated;
 grant select, insert, delete on public.god_notes to service_role;
+
+-- A course of rings goes on past its first length for whoever keeps flying it: how far it has been opened (it only grows).
+alter table public.world_rings add column if not exists len integer not null default 0 check (len between 0 and 400);

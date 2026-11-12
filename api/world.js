@@ -67,7 +67,7 @@ async function look(realm, cx, cz, hash) {
       rest('world_cells?select=cx&limit=1', { prefer: 'count=estimated' }),
       rest('travellers?select=hash&limit=1', { prefer: 'count=exact' }),
       rest(`world_winds?select=id,pts,patron,by_name,by_hash,at&realm=eq.${realm}&cx=gte.${mx0}&cx=lte.${mx1}&cz=gte.${mz0}&cz=lte.${mz1}&order=at.desc&limit=40`),
-      rest(`world_rings?select=id,patrons,names,at&realm=eq.${realm}&cx=gte.${mx0}&cx=lte.${mx1}&cz=gte.${mz0}&cz=lte.${mz1}&order=at.desc&limit=300`),
+      rest(`world_rings?select=id,patrons,names,at,len&realm=eq.${realm}&cx=gte.${mx0}&cx=lte.${mx1}&cz=gte.${mz0}&cz=lte.${mz1}&order=at.desc&limit=300`),
     ]);
     arenas = a.ok && Array.isArray(a.data) ? a.data : [];   // (no table yet: nobody holds anything that lasts)
     winds = Array.isArray(w.data) ? w.data : [];
@@ -84,7 +84,7 @@ async function look(realm, cx, cz, hash) {
     marks: marks.map(m => ({ k: m.kind, x: Math.round(m.x), y: Math.round(m.y * 10) / 10, z: Math.round(m.z), g: m.god, s: m.seed, n: m.by_name, mine: !!hash && m.by_hash === hash, at: m.at })),
     travellers: trav.map(t => ({ n: t.name, x: Math.round(t.x), z: Math.round(t.z), ph: t.phase, seen: t.seen })),
     winds: winds.map(w => ({ id: w.id, p: w.pts, c: w.patron, n: w.by_name, mine: !!hash && w.by_hash === hash, at: w.at })),
-    arenas: arenas.map(a => ({ id: a.id, c: a.patrons, n: a.names, at: a.at })),
+    arenas: arenas.map(a => ({ id: a.id, c: a.patrons, n: a.names, at: a.at, l: a.len | 0 })),
   };
 }
 
@@ -148,11 +148,21 @@ export async function POST(req) {
       const pats = [...new Set((Array.isArray(b.pats) ? b.pats : []).filter(p => PATRON_IDS.has(p)))].slice(0, 4);
       const names = [...new Set([name, ...(Array.isArray(b.names) ? b.names : []).map(name12)])].slice(0, 4);
       if (!id || !pats.length) return json({ error: 'bad claim' }, 400);
-      const row = { id, realm, cx: fin(b.cx, 4e6), cz: fin(b.cz, 4e6), patrons: pats, names, by_hash: hash, at: new Date().toISOString() };
+      const row = { id, realm, cx: fin(b.cx, 4e6), cz: fin(b.cz, 4e6), patrons: pats, names, by_hash: hash, at: new Date().toISOString(), len: int(b.len, 0, 400) ?? 0 };
       await rememberDeed('arena', { name, hash, god: pats[0] }).catch(() => {});   // (the gods hear whose colour it burns in now)
-      if (!LIVE) { MEM.rings.set(id, row); return json({ ok: true }); }
+      if (!LIVE) { row.len = Math.max(row.len, MEM.rings.get(id)?.len || 0); MEM.rings.set(id, row); return json({ ok: true }); }
+      { const o = await rest(`world_rings?select=len&id=eq.${id}`); row.len = Math.max(row.len, Array.isArray(o.data) && o.data[0] ? o.data[0].len | 0 : 0); }   // (a course never gets shorter, whoever takes it)
       const r = await rest('world_rings?on_conflict=id', { method: 'POST', body: row, prefer: 'resolution=merge-duplicates,return=minimal' });
       return r.ok ? json({ ok: true }) : json({ ok: false, kept: false });   // (no table yet: the claim is only live)
+    }
+    // a course flown further than it went: it is that long now, for everyone (it only ever grows, and only once someone holds it)
+    if (b.op === 'arena_len') {
+      if (limited(req, 'world-arena-len', 30)) return json({ error: 'slow down' }, 429);
+      const id = String(b.id || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24), len = int(b.len, 1, 400);
+      if (!id || len === null) return json({ error: 'bad length' }, 400);
+      if (!LIVE) { const r = MEM.rings.get(id); if (r && len > (r.len || 0)) r.len = len; return json({ ok: !!r }); }
+      const r = await rest(`world_rings?id=eq.${id}&len=lt.${len}`, { method: 'PATCH', body: { len }, prefer: 'return=minimal' });
+      return json({ ok: r.ok });
     }
     if (b.op === 'deed') {   // something the gods will talk about: the page names it, the words are the server's
       if (!isDeed(b.k) || b.k === 'met' || b.k === 'arena' || limited(req, 'deed', 12)) return json({ ok: false });
