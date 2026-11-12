@@ -24,14 +24,18 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dz = (v, d, r) => (Math.abs(v) < d ? 0 : clamp((v - Math.sign(v) * d) / r, -1, 1));
+const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
+const frame = (h, yaw) => ({ ...h, yaw, rx: Math.cos(yaw), rz: -Math.sin(yaw), fx: -Math.sin(yaw), fz: -Math.cos(yaw) });
 
 export function makeHands() {
   const H = {
     L: { prev: null, v: [0, 0, 0], hist: [], hold: {} }, R: { prev: null, v: [0, 0, 0], hist: [], hold: {} },
-    cool: {}, sepPrev: null, sepV: 0, boostT: 0, foldHeld: 0, folded: false, spreadHeld: 0, spreadFired: false, offerHeld: 0, t: 0,
+    cool: {}, sepPrev: null, sepV: 0, boostT: 0, foldHeld: 0, folded: false, spreadHeld: 0, spreadFired: false, offerHeld: 0, t: 0, bodyYaw: null,
   };
-  // one hand, in the head's frame: x to the right, y up, z straight ahead (metres, from between the eyes)
-  function readHand(side, joints, head, dt) {
+  // one hand, in the BODY's frame: x to the right, y up, z straight ahead (metres, from between the eyes). The body, not
+  // the head: you look at your own wing without the wing turning into a hand held out in front of you. (Where a finger
+  // points is read in the head's frame, because walking goes where you look.)
+  function readHand(side, joints, head, dt, look = head) {
     const S = H[side];
     const need = ['wrist', 'middle-finger-phalanx-proximal', 'index-finger-phalanx-proximal', 'pinky-finger-phalanx-proximal'];
     if (!joints || need.some(n => !joints[n])) { S.prev = null; S.hist.length = 0; return null; }
@@ -54,7 +58,7 @@ export function makeHands() {
     const open = FINGERS.every(ext), fist = FINGERS.every(curled);
     const point = ext('index') && curled('middle') && curled('ring') && curled('pinky');
     let aim = null;
-    if (point && joints['index-finger-tip']) { const v = sub(joints['index-finger-tip'], joints['index-finger-phalanx-proximal']), l = len(v) || 1; aim = dirLocal([v[0] / l, v[1] / l, v[2] / l]); }
+    if (point && joints['index-finger-tip']) { const v = sub(joints['index-finger-tip'], joints['index-finger-phalanx-proximal']), l = len(v) || 1; aim = { x: v[0] / l * look.rx + v[2] / l * look.rz, y: v[1] / l, z: v[0] / l * look.fx + v[2] / l * look.fz }; }
     const pinch = joints['thumb-tip'] && joints['index-finger-tip'] ? dist(joints['thumb-tip'], joints['index-finger-tip']) < 0.02 : false;
     // how fast the palm is moving (smoothed), and where it was over the last third of a second
     if (S.prev && dt > 0) {
@@ -72,8 +76,21 @@ export function makeHands() {
   // ctx: { form: 'phoenix' | 'human', grounded, falling }
   function update(dt, head, L, R, ctx = {}) {
     H.t += dt;
-    const hd = { ...head, rx: Math.cos(head.yaw), rz: -Math.sin(head.yaw), fx: -Math.sin(head.yaw), fz: -Math.cos(head.yaw) };
-    const l = readHand('L', L, hd, dt), r = readHand('R', R, hd, dt);
+    // which way the body faces: along the line between the hands when they are out to the sides; otherwise it follows the
+    // head, slowly. (The line can't tell facing from facing away: it is taken the way nearest where the body was a moment
+    // ago, or, when it has not been seen for a while, nearest where the head is looking.)
+    if (H.bodyYaw === null) H.bodyYaw = head.yaw;
+    let tgt = head.yaw, k = 1.2;
+    if (L?.wrist && R?.wrist) {
+      const ddx = R.wrist.x - L.wrist.x, ddz = R.wrist.z - L.wrist.z;
+      if (Math.hypot(ddx, ddz) > 0.55) {
+        const y = Math.atan2(-ddz, ddx), ref = H.t - (H.bodyT ?? -9) < 0.6 ? H.bodyYaw : head.yaw;
+        tgt = Math.abs(wrapA(y - ref)) <= Math.PI / 2 ? y : wrapA(y + Math.PI); k = 8; H.bodyT = H.t;
+      }
+    }
+    H.bodyYaw = wrapA(H.bodyYaw + wrapA(tgt - H.bodyYaw) * Math.min(1, dt * k));
+    const hd = frame(head, head.yaw), bd = frame(head, H.bodyYaw);
+    const l = readHand('L', L, bd, dt, hd), r = readHand('R', R, bd, dt, hd);
     const out = { axes: [0, 0], boost: false, run: false, pose: '', events: [], hands: { l, r } };
     const both = l && r;
     const air = ctx.form === 'phoenix';

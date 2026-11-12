@@ -358,7 +358,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { createAudio } from './audio.js';
-import { makeHands } from './xr.js';
+import { makeHands, fakeHand } from './xr.js';
 
 // ───────────────────────── utils ─────────────────────────
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -2194,7 +2194,7 @@ function animateCape(dt) {
     const u = (st + 1) / steps;
     for (let c = 0; c < W * 3; c++) { px[c] = x[c]; x[c] = C.pin0[c] + (C.pin1[c] - C.pin0[c]) * u; }
     // the threads
-    for (let it = 0, its = TOUCH ? 5 : 8; it < its; it++) {
+    for (let it = 0, its = TOUCH || XR.on ? 5 : 8; it < its; it++) {
       for (let q = 0; q < nc; q += 4) {
         const i = cons[q], j = cons[q + 1], L = cons[q + 2] * sc, k = cons[q + 3], a3 = i * 3, b3 = j * 3;
         const dx = x[b3] - x[a3], dy = x[b3 + 1] - x[a3 + 1], dz = x[b3 + 2] - x[a3 + 2], d = Math.hypot(dx, dy, dz);
@@ -3410,7 +3410,7 @@ function updateHuman(dt) {
   if (p.climb) return updateClimb(dt);
   if (p.trip) return updateTrip(dt);
   const gliding = p.wings && !p.grounded;
-  const locked = state !== 'play' || p.tumble;
+  const locked = state !== 'play' || p.tumble && p.grounded;
   const [ix, iz] = locked ? [0, 0] : axes();
   const gHere = groundAt(p.pos.x, p.pos.z, p.pos.y + 0.5);
   const swimming = gHere < WATER - 1.1;
@@ -3434,6 +3434,22 @@ function updateHuman(dt) {
     p.flame -= dt / 100 / (1 + 0.4 * perks.ember);
     if (p.flame <= 0) { p.flame = 0; loseWings(); }
     if (!dragging) camYaw += wrapAngle(yaw - camYaw) * damp(2.5, dt);
+  } else if (p.tumble && !p.grounded) {
+    // Freefall, the way a skydiver flies it. Belly to the earth, arms and legs out, the air holds him to a fall of about
+    // 50 m/s and a slow slide forward. Spread right out (W) and it slows to 30 and he glides further; tuck in and point
+    // his head at the ground (S, faster still with SHIFT) and he drops at nearly 80 and shoots forward. A or D drops a
+    // shoulder and he turns. Control comes back as the tumble settles into the arch.
+    const k = smoothstep(0.25, 0.7, p.skyK || 0), wantPull = locked ? 0 : clamp(iz - (boosting() ? 0.6 : 0), -1, 1) * k;
+    p.ffTurn = lerp(p.ffTurn || 0, locked ? 0 : ix * k, damp(4, dt));
+    p.ffPull = lerp(p.ffPull || 0, wantPull, damp(2.5, dt));
+    human.group.rotation.y -= p.ffTurn * 1.7 * dt;
+    const yaw = human.group.rotation.y, spread = Math.max(0, p.ffPull), dive = Math.max(0, -p.ffPull);
+    const vT = -(50 - spread * 20 + dive * 28), hT = 7 + spread * 9 + dive * 17;
+    p.vel.y = p.vel.y > vT ? Math.max(vT, p.vel.y - 30 * dt) : lerp(p.vel.y, vT, damp(1.3, dt));
+    const kh = damp(0.15 + 0.85 * k, dt);
+    p.vel.x = lerp(p.vel.x, -Math.sin(yaw) * hT, kh); p.vel.z = lerp(p.vel.z, -Math.cos(yaw) * hT, kh);
+    if (!dragging) camYaw += wrapAngle(yaw - camYaw) * damp(2.2, dt);
+    if (!flags.ffTold && k > 0.9 && state === 'play' && !XR.on) { flags.ffTold = true; toast(TOUCH ? 'DRAG TO STEER · UP SLOWS · DOWN DIVES' : 'A / D TURN · W SPREADS OUT · S DIVES'); }
   } else {
     const fwdX = -Math.sin(camYaw), fwdZ = -Math.cos(camYaw), rX = Math.cos(camYaw), rZ = -Math.sin(camYaw);
     mx = fwdX * iz + rX * ix; mz = fwdZ * iz + rZ * ix;
@@ -3501,8 +3517,8 @@ function updateHuman(dt) {
     else p.pos.y = floor2;
   }
   if (!p.grounded) {
-    if (!p.wings) p.vel.y = Math.max(p.vel.y - 30 * dt, -60);
-    if (!p.wings && !p.tumble && p.vel.y < -22 && state === 'play') { p.tumble = true; p.spin.set(1.4, 0, rnd(0.5)); }   // a long drop: he stops stepping and starts falling
+    if (!p.wings && !p.tumble) p.vel.y = Math.max(p.vel.y - 30 * dt, -60);   // (in freefall the air sets the speed: above)
+    if (!p.wings && !p.tumble && p.vel.y < -22 && state === 'play') { p.tumble = true; p.spin.set(1.4, 0, rnd(0.5)); p.ffPull = p.ffTurn = 0; }   // a long drop: he stops stepping and starts falling
     p.pos.y += p.vel.y * dt;
     if (p.pos.y <= floor2) {
       p.pos.y = floor2; p.grounded = true;
@@ -3575,8 +3591,8 @@ function updateHuman(dt) {
     }
     return;
   }
-  if (human.wings.visible) stowWings(dt);
-  if (p.tumble) { skydive(dt); return; }
+  if (human.wings.visible && !(XR.on && XR.manOpen > 0.05)) stowWings(dt);   // (in the headset, arms held out keep them open)
+  if (p.tumble) { skydive(dt, p.ffPull || 0, p.ffTurn || 0); return; }
   p.skyK = 0;
   bodyLanguage(dt, hs, swimming);
   const foot = Math.floor(p.walkPhase / Math.PI);
@@ -3586,11 +3602,13 @@ function updateHuman(dt) {
 
 // A real fall. For a second he flails; then the body finds the air the way a skydiver's does — belly to the earth, back arched,
 // arms out and bent at the elbow, knees bent and feet up — and everything loose on him shakes in the wind.
-function skydive(dt) {
+// pull: + spread out flat to slow the fall, − tucked and head-down to dive; turn: + to his right
+function skydive(dt, pull = 0, turn = 0) {
   const p = player, H = human, R = H.rig;
   const k = p.skyK = Math.min(1, (p.skyK || 0) + dt / 1.2), e = k * k * (3 - 2 * k), w = 1 - e;
-  const b1 = Math.sin(time * 13.1) * 0.05, b2 = Math.cos(time * 11.3) * 0.05, fl = Math.sin(time * 12), fl2 = Math.sin(time * 14.3);
-  const tx = -1.42 + Math.sin(time * 1.7) * 0.07, tz = Math.sin(time * 1.1) * 0.1;
+  const sp = Math.max(0, pull) * e, dv = Math.max(0, -pull) * e, tn = clamp(turn, -1, 1) * e;
+  const b1 = Math.sin(time * 13.1) * 0.05 * (1 + dv), b2 = Math.cos(time * 11.3) * 0.05 * (1 + dv), fl = Math.sin(time * 12), fl2 = Math.sin(time * 14.3);
+  const tx = -1.42 + Math.sin(time * 1.7) * 0.07 * (1 - dv) - dv * 0.95 + sp * 0.22, tz = Math.sin(time * 1.1) * 0.1 * (1 - Math.abs(tn)) - tn * 0.5;
   R.position.y = 1.0;
   // whatever spin he had bleeds off into the arch
   R.rotation.x = tx + wrapAngle(R.rotation.x + p.spin.x * w * dt - tx); R.rotation.x = lerp(R.rotation.x, tx, damp(5, dt) * e);
@@ -3606,6 +3624,34 @@ function skydive(dt) {
   H.shinL.rotation.x = -0.9 * e - (0.6 + Math.cos(time * 12) * 0.5) * w + b1; H.shinR.rotation.x = -0.9 * e - (0.6 - Math.cos(time * 12) * 0.5) * w + b2;
   H.footL.rotation.x = H.footR.rotation.x = 0.55 * e;
   H.scarf.rotation.x = 2.6 + Math.sin(time * 20) * 0.3;
+  // diving: an arrow — arms swept back along his sides, legs straight and together, toes pointed, head down to the ground
+  if (dv > 0.01) {
+    H.armL.rotation.z = lerp(H.armL.rotation.z, -0.3, dv); H.armR.rotation.z = lerp(H.armR.rotation.z, 0.3, dv);
+    H.armL.rotation.x = lerp(H.armL.rotation.x, 0.3, dv); H.armR.rotation.x = lerp(H.armR.rotation.x, 0.3, dv);
+    H.foreL.rotation.z = lerp(H.foreL.rotation.z, -0.12, dv); H.foreR.rotation.z = lerp(H.foreR.rotation.z, 0.12, dv);
+    H.legL.rotation.z = lerp(H.legL.rotation.z, -0.04, dv); H.legR.rotation.z = lerp(H.legR.rotation.z, 0.04, dv);
+    H.legL.rotation.x = lerp(H.legL.rotation.x, 0, dv); H.legR.rotation.x = lerp(H.legR.rotation.x, 0, dv);
+    H.shinL.rotation.x = lerp(H.shinL.rotation.x, -0.1, dv); H.shinR.rotation.x = lerp(H.shinR.rotation.x, -0.1, dv);
+    H.footL.rotation.x = H.footR.rotation.x = lerp(0.55, 0.9, dv);
+    H.head.rotation.x = lerp(H.head.rotation.x, -0.05, dv); H.chest.rotation.x = lerp(H.chest.rotation.x, 0, dv);
+    setCurl(H.handL, RELAX, 0.3); setCurl(H.handR, RELAX, 0.3);
+  }
+  // spread out: arms wide and reaching forward, hands flat, legs wide and bent, back arched hard — a brake made of a body
+  if (sp > 0.01) {
+    H.armL.rotation.z = lerp(H.armL.rotation.z, -1.62, sp); H.armR.rotation.z = lerp(H.armR.rotation.z, 1.62, sp);
+    H.armL.rotation.x = lerp(H.armL.rotation.x, -0.6, sp); H.armR.rotation.x = lerp(H.armR.rotation.x, -0.6, sp);
+    H.foreL.rotation.z = lerp(H.foreL.rotation.z, -0.55, sp); H.foreR.rotation.z = lerp(H.foreR.rotation.z, 0.55, sp);
+    H.legL.rotation.z = lerp(H.legL.rotation.z, -0.55, sp); H.legR.rotation.z = lerp(H.legR.rotation.z, 0.55, sp);
+    H.shinL.rotation.x = lerp(H.shinL.rotation.x, -1.25, sp); H.shinR.rotation.x = lerp(H.shinR.rotation.x, -1.25, sp);
+    H.chest.rotation.x = lerp(H.chest.rotation.x, -0.5, sp); H.head.rotation.x = lerp(H.head.rotation.x, -0.75, sp);
+  }
+  // turning: the inside shoulder drops and that arm comes in, the outside arm reaches out, he looks into the turn
+  if (Math.abs(tn) > 0.01) {
+    const a = Math.abs(tn);
+    if (tn > 0) { H.armR.rotation.z = lerp(H.armR.rotation.z, 0.55, a); H.armL.rotation.z = lerp(H.armL.rotation.z, -1.7, a * 0.7); }
+    else { H.armL.rotation.z = lerp(H.armL.rotation.z, -0.55, a); H.armR.rotation.z = lerp(H.armR.rotation.z, 1.7, a * 0.7); }
+    H.head.rotation.y = -tn * 0.45; H.chest.rotation.y = -tn * 0.2;
+  } else H.head.rotation.y = H.chest.rotation.y = 0;
   // the ground coming: arms thrown forward over the head, knees up — the body knows, even if it is too late
   const alt = p.pos.y - groundAt(p.pos.x, p.pos.z, p.pos.y), br = smoothstep(Math.max(10, -p.vel.y * 0.55), 3, alt);
   if (br > 0.01) {
@@ -4555,6 +4601,11 @@ function closeChat() {
 function sendChat(raw) {
   const text = String(raw || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
   if (!text) return;
+  if (text[0] === '/') {   // a command, not a message: /become a whale, /be an owl, /wolf
+    const w = text.slice(1).toLowerCase().replace(/^(become|be|turn into|shape|shift|transform into)\s+/, '').replace(/^(a|an|the)\s+/, '').trim();
+    if (w) { chatLine('', `→ ${w.toUpperCase()}`, 'sys'); shapeshift(w); }
+    return;
+  }
   const t = performance.now(); if (t - CHAT.last < 700) { chatLine('', 'SLOW DOWN A LITTLE', 'sys'); return; } CHAT.last = t;
   chatLine(heroName, text, 'me');
   if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'chat', payload: { i: NET.id, n: heroName, t: text } });
@@ -4705,12 +4756,12 @@ function updatePhoenix(dt) {
   const dive = smoothstep(-0.2, -0.8, p.pitch);
   flyWings(dt, { boost, dive, climb: clamp(pin, 0, 1) });
 
-  const n = boost || dive > 0.5 ? 4 : 2;
+  const n = SH.def ? 0 : boost || dive > 0.5 ? 4 : 2;
   for (let i = 0; i < n; i++) {
     _v.set(rnd(1.5), rnd(0.5), 3 + Math.random() * 4).applyEuler(phoenix.group.rotation).add(p.pos);
     emit(_v.x, _v.y, _v.z, rnd(4) + dir3.x * p.speed * 0.6, rnd(3) + dir3.y * p.speed * 0.6, rnd(4) + dir3.z * p.speed * 0.6, 0.35 + Math.random() * 0.35, pick(EMBER));
   }
-  if (Math.random() < 0.6) {
+  if (!SH.def && Math.random() < 0.6) {
     const side = Math.random() < 0.5 ? -1 : 1;
     phoenix.wings[side < 0 ? 0 : 1].tip.getWorldPosition(_v);
     emit(_v.x, _v.y, _v.z, rnd(1), rnd(1), rnd(1), 0.6, EMBER[0]);
@@ -4742,6 +4793,7 @@ function die(how, kmh) {
   else if (how !== 'smite') witness(how === 'crash' ? `came in to land at ${kmh} km/h, hit the ground like a dropped plate, and died`
     : `fell ${drop} m to his death after ${why}`);
   state = 'dead'; death.phase = 'impact'; death.t = 0; flags.deaths++; death.lava = how === 'lava' ? p.pos.y : null;
+  if (SH.def) endShift();
   worldMark('fall', player.pos.x, player.pos.y, player.pos.z);
   for (const q of quests) if (q.kind === 'climb' && !q.done) q.v = 0;
   audio.sfx.impact(); audio.sting('death'); camShake = 1; stopVoice(); dlg.queue.length = 0; dlg.cur = null; netFx('impact');
@@ -6881,14 +6933,14 @@ function updateFire(dt) {
   // the bird sets fire to what he flies through
   if ((BLAZE.scanT -= dt) < 0) {
     BLAZE.scanT = 0.1;
-    if (realm === 'over' && state === 'play' && p.form === 'phoenix' && !p.sub && !p.cine)
+    if (realm === 'over' && state === 'play' && p.form === 'phoenix' && !p.sub && !p.cine && !SH.def)
       treesNear(p.pos.x, p.pos.z, 30, (g, ck, i, t) => {
         if ((t.x - p.pos.x) ** 2 + (t.z - p.pos.z) ** 2 < (t.rad + 3) ** 2 && p.pos.y > t.y0 - 2 && p.pos.y < t.top + 5) ignite(ck, i, true);
       });
   }
   if (!BLAZE.list.length) { BLAZE.light.intensity = 0; return; }
   const c = camera.position, wet = realm === 'over' ? WX.rain : 0;
-  let near = null, nd = 1e9, budget = TOUCH ? 30 : 70; BLAZE.burning = 0;
+  let near = null, nd = 1e9, budget = TOUCH || XR.on ? 30 : 70; BLAZE.burning = 0;
   for (let n = BLAZE.list.length - 1; n >= 0; n--) {
     const f = BLAZE.list[n];
     f.t += dt;
@@ -7103,18 +7155,285 @@ function updateGrass(dt) {
     for (const k of G.tiles.keys()) if (!want.has(k)) { G.tiles.delete(k); G.dirty = true; }
     G.queue.sort((a, b) => a[2] - b[2]);
   }
-  for (let b = TOUCH ? 2 : 4; b > 0 && G.queue.length; b--) {   // a few tiles a frame, nearest first
+  for (let b = TOUCH || XR.on ? 2 : 4; b > 0 && G.queue.length; b--) {   // a few tiles a frame, nearest first
     const [tx, tz] = G.queue.shift(), t = grassTile(tx, tz);
     if (t) { G.tiles.set(tx + ',' + tz, t); G.dirty = true; } else { G.key = ''; break; }   // (not ready: ask again next frame)
   }
   if (G.dirty) {
     G.dirty = false; let n = 0; const MA = m.instanceMatrix.array, CA = m.instanceColor.array;
-    for (const t of G.tiles.values()) { if (n >= G.max) break; const k = Math.min(t.n, G.max - n); if (!k) continue; MA.set(t.M.subarray(0, k * 16), n * 16); CA.set(t.C.subarray(0, k * 3), n * 3); n += k; }
+    for (const t of G.tiles.values()) { const cap = XR.on ? 9000 : G.max; if (n >= cap) break; const k = Math.min(t.n, cap - n); if (!k) continue; MA.set(t.M.subarray(0, k * 16), n * 16); CA.set(t.C.subarray(0, k * 3), n * 3); n += k; }
     m.count = n; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true;
   }
   G.push.value.set(p.pos.x, p.pos.y, p.pos.z, p.form === 'human' && state !== 'dead' ? 1.15 : 0);
   G.cen.value.set(c.x, G.R, c.z);
 }
+
+// ───────────────────────── the shapes he can take ─────────────────────────
+// Say it and he becomes it — "become a whale", "turn into a wolf", "be an eagle" — or type /become anything in the chat, or
+// press B. His body comes apart into blocks of lit text, a few hundred little cubes each with a character on it, that pour
+// into the new shape and hold it, and move like it: wings beat, legs walk, tails swing, a whale's whole body rolls. Things
+// that fly or swim fly the way the bird does (and can dive into the sea); things that walk walk the way he does. A shape the
+// game doesn't know is asked for (the shape server roughs out any creature in a couple of dozen rounded pieces), and kept.
+// "Become yourself" pours him back into his own body; "become the phoenix" into the bird.
+const SH_MAX = 900, SH_ROLES = ['body', 'head', 'neck', 'wingL', 'wingR', 'legFL', 'legFR', 'legBL', 'legBR', 'tail', 'fin', 'other'];
+const SH = { def: null, N: 0, t: 1, ph: 0, walk: 0, scale: 1, size: 0.1, eye: [1, 0], busy: false, coolT: 0, hide: { value: new THREE.Vector4() },
+  tgt: new Float32Array(SH_MAX * 3), from: new Float32Array(SH_MAX * 3), piv: new Float32Array(SH_MAX * 3), role: new Uint8Array(SH_MAX), seed: new Float32Array(SH_MAX) };
+const E5 = (role, c, s, pitch = 0) => ({ role, c, s, pitch });
+const SHAPES = {
+  whale: { kind: 'swim', length: 15, color: '#9cc6ff', parts: [E5('body', [0, 0, 0], [1.9, 1.7, 5.2]), E5('head', [0, 0.15, -4.6], [1.75, 1.55, 2.5]), E5('other', [0, -0.75, -4.2], [1.55, 0.55, 2.7]),
+    E5('tail', [0, 0.25, 4.6], [1.0, 0.85, 2.9]), E5('tail', [-1.7, 0.35, 7.1], [1.7, 0.16, 0.75]), E5('tail', [1.7, 0.35, 7.1], [1.7, 0.16, 0.75]), E5('fin', [-2.3, -0.8, -1.6], [1.7, 0.18, 0.6]), E5('fin', [2.3, -0.8, -1.6], [1.7, 0.18, 0.6]), E5('fin', [0, 1.65, 2.4], [0.14, 0.5, 0.75])] },
+  dolphin: { kind: 'swim', length: 2.5, color: '#a6b8cc', parts: [E5('body', [0, 0, 0], [0.3, 0.32, 0.95]), E5('head', [0, 0.05, -0.95], [0.25, 0.24, 0.35]), E5('head', [0, -0.02, -1.3], [0.07, 0.06, 0.2]), E5('tail', [0, 0.03, 0.95], [0.16, 0.15, 0.45]),
+    E5('tail', [-0.28, 0.05, 1.38], [0.3, 0.03, 0.12]), E5('tail', [0.28, 0.05, 1.38], [0.3, 0.03, 0.12]), E5('fin', [0, 0.42, 0.1], [0.03, 0.2, 0.2], -0.5), E5('fin', [-0.35, -0.18, -0.4], [0.22, 0.03, 0.08]), E5('fin', [0.35, -0.18, -0.4], [0.22, 0.03, 0.08])] },
+  fish: { kind: 'swim', length: 1.2, color: '#8fd6dc', parts: [E5('body', [0, 0, 0], [0.12, 0.24, 0.42]), E5('head', [0, 0, -0.4], [0.1, 0.18, 0.14]), E5('tail', [0, 0, 0.5], [0.03, 0.08, 0.1]), E5('tail', [0, 0.12, 0.62], [0.02, 0.14, 0.07], -0.6),
+    E5('tail', [0, -0.12, 0.62], [0.02, 0.14, 0.07], 0.6), E5('fin', [0, 0.26, 0.05], [0.02, 0.1, 0.15]), E5('fin', [-0.13, -0.08, -0.15], [0.08, 0.02, 0.05]), E5('fin', [0.13, -0.08, -0.15], [0.08, 0.02, 0.05])] },
+  eagle: { kind: 'fly', length: 2.2, color: '#dcb274', parts: [E5('body', [0, 0, 0], [0.16, 0.16, 0.42]), E5('head', [0, 0.12, -0.44], [0.1, 0.1, 0.12]), E5('head', [0, 0.08, -0.57], [0.03, 0.04, 0.07], 0.4), E5('wingL', [-0.32, 0.04, -0.02], [0.3, 0.03, 0.2]), E5('wingL', [-0.82, 0.06, 0.04], [0.32, 0.025, 0.16]),
+    E5('wingR', [0.32, 0.04, -0.02], [0.3, 0.03, 0.2]), E5('wingR', [0.82, 0.06, 0.04], [0.32, 0.025, 0.16]), E5('tail', [0, 0, 0.55], [0.16, 0.02, 0.2]), E5('legBL', [-0.06, -0.15, 0.15], [0.03, 0.08, 0.03]), E5('legBR', [0.06, -0.15, 0.15], [0.03, 0.08, 0.03])] },
+  dragon: { kind: 'fly', length: 12, color: '#d0503c', parts: [E5('body', [0, 0, 0], [0.9, 0.85, 2.2]), E5('neck', [0, 0.7, -2.6], [0.45, 0.45, 1.3], -0.5), E5('head', [0, 1.4, -3.8], [0.5, 0.45, 0.85]), E5('head', [-0.25, 1.9, -3.5], [0.08, 0.35, 0.08], 0.6), E5('head', [0.25, 1.9, -3.5], [0.08, 0.35, 0.08], 0.6),
+    E5('tail', [0, 0, 3.0], [0.5, 0.45, 1.5]), E5('tail', [0, -0.1, 5.0], [0.3, 0.28, 1.4]), E5('tail', [0, -0.15, 6.7], [0.14, 0.13, 1.0]), E5('wingL', [-2.4, 0.5, -0.3], [2.4, 0.08, 1.4]), E5('wingL', [-5.6, 0.7, 0.2], [1.6, 0.06, 1.1]), E5('wingR', [2.4, 0.5, -0.3], [2.4, 0.08, 1.4]),
+    E5('wingR', [5.6, 0.7, 0.2], [1.6, 0.06, 1.1]), E5('legFL', [-0.6, -0.9, -0.8], [0.22, 0.5, 0.25]), E5('legFR', [0.6, -0.9, -0.8], [0.22, 0.5, 0.25]), E5('legBL', [-0.6, -0.9, 1.0], [0.26, 0.55, 0.3]), E5('legBR', [0.6, -0.9, 1.0], [0.26, 0.55, 0.3])] },
+  wolf: { kind: 'walk', length: 1.6, color: '#cfc8bc', parts: [E5('body', [0, 0.62, 0.05], [0.22, 0.24, 0.52]), E5('body', [0, 0.66, -0.35], [0.24, 0.28, 0.3]), E5('neck', [0, 0.8, -0.58], [0.13, 0.18, 0.15], -0.6), E5('head', [0, 0.9, -0.76], [0.13, 0.13, 0.16]), E5('head', [0, 0.86, -0.96], [0.06, 0.06, 0.12]),
+    E5('head', [-0.07, 1.04, -0.73], [0.03, 0.07, 0.03]), E5('head', [0.07, 1.04, -0.73], [0.03, 0.07, 0.03]), E5('legFL', [-0.12, 0.3, -0.38], [0.05, 0.3, 0.06]), E5('legFR', [0.12, 0.3, -0.38], [0.05, 0.3, 0.06]), E5('legBL', [-0.12, 0.3, 0.42], [0.055, 0.3, 0.065]), E5('legBR', [0.12, 0.3, 0.42], [0.055, 0.3, 0.065]), E5('tail', [0, 0.6, 0.75], [0.07, 0.07, 0.28], 0.5)] },
+  horse: { kind: 'walk', length: 2.4, color: '#a8784c', parts: [E5('body', [0, 1.25, 0], [0.34, 0.38, 0.8]), E5('neck', [0, 1.65, -0.78], [0.16, 0.42, 0.2], -0.55), E5('head', [0, 1.98, -1.05], [0.13, 0.16, 0.32], 0.5), E5('head', [-0.07, 2.15, -0.95], [0.03, 0.08, 0.03]), E5('head', [0.07, 2.15, -0.95], [0.03, 0.08, 0.03]),
+    E5('legFL', [-0.18, 0.55, -0.6], [0.07, 0.55, 0.08]), E5('legFR', [0.18, 0.55, -0.6], [0.07, 0.55, 0.08]), E5('legBL', [-0.18, 0.55, 0.62], [0.08, 0.55, 0.09]), E5('legBR', [0.18, 0.55, 0.62], [0.08, 0.55, 0.09]), E5('tail', [0, 1.15, 0.95], [0.08, 0.4, 0.1], 0.35), E5('other', [0, 1.85, -0.6], [0.05, 0.35, 0.22], -0.55)] },
+  deer: { kind: 'walk', length: 1.8, color: '#bf8f5c', parts: [E5('body', [0, 1.0, 0], [0.24, 0.28, 0.6]), E5('neck', [0, 1.35, -0.55], [0.1, 0.32, 0.12], -0.35), E5('head', [0, 1.65, -0.7], [0.09, 0.1, 0.2], 0.4), E5('legFL', [-0.13, 0.45, -0.45], [0.04, 0.45, 0.05]), E5('legFR', [0.13, 0.45, -0.45], [0.04, 0.45, 0.05]),
+    E5('legBL', [-0.13, 0.45, 0.48], [0.045, 0.45, 0.055]), E5('legBR', [0.13, 0.45, 0.48], [0.045, 0.45, 0.055]), E5('tail', [0, 1.08, 0.62], [0.05, 0.07, 0.06]), E5('other', [-0.14, 1.95, -0.62], [0.03, 0.25, 0.03], 0.3), E5('other', [0.14, 1.95, -0.62], [0.03, 0.25, 0.03], 0.3),
+    E5('other', [-0.24, 2.1, -0.55], [0.12, 0.025, 0.025]), E5('other', [0.24, 2.1, -0.55], [0.12, 0.025, 0.025]), E5('head', [-0.08, 1.78, -0.62], [0.03, 0.07, 0.02]), E5('head', [0.08, 1.78, -0.62], [0.03, 0.07, 0.02])] },
+  bear: { kind: 'walk', length: 2.0, color: '#6a4c36', parts: [E5('body', [0, 0.85, 0.1], [0.45, 0.45, 0.75]), E5('body', [0, 1.0, -0.4], [0.42, 0.48, 0.45]), E5('head', [0, 1.05, -0.95], [0.24, 0.24, 0.26]), E5('head', [0, 0.98, -1.18], [0.11, 0.1, 0.13]), E5('head', [-0.15, 1.27, -0.9], [0.06, 0.06, 0.04]),
+    E5('head', [0.15, 1.27, -0.9], [0.06, 0.06, 0.04]), E5('legFL', [-0.25, 0.38, -0.5], [0.12, 0.38, 0.13]), E5('legFR', [0.25, 0.38, -0.5], [0.12, 0.38, 0.13]), E5('legBL', [-0.25, 0.38, 0.55], [0.13, 0.38, 0.14]), E5('legBR', [0.25, 0.38, 0.55], [0.13, 0.38, 0.14]), E5('tail', [0, 0.95, 0.85], [0.07, 0.07, 0.06])] },
+  snake: { kind: 'walk', length: 3, color: '#78a64c', slither: true, parts: Array.from({ length: 12 }, (_, i) => E5(i === 0 ? 'head' : 'body', [0, 0.09, -1.4 + i * 0.26], [0.09 - i * 0.004, 0.08 - i * 0.003, 0.17])) },
+};
+// [shape, size, colour]
+const SH_ALIAS = { dog: ['wolf', 1, '#a8865e'], fox: ['wolf', 0.7, '#e0782e'], cat: ['wolf', 0.5, '#c9a46e'], lion: ['wolf', 1.6, '#cfa456'], tiger: ['wolf', 1.7, '#e6902e'], panther: ['wolf', 1.5, '#26262c'],
+  owl: ['eagle', 0.6, '#a88c6c'], hawk: ['eagle', 0.8], falcon: ['eagle', 0.7, '#9c8a76'], bird: ['eagle', 0.5, '#c8c0b0'], crow: ['eagle', 0.5, '#32323a'], raven: ['eagle', 0.6, '#2a2a33'], dove: ['eagle', 0.4, '#efefef'], swan: ['eagle', 0.9, '#f4f4f4'],
+  shark: ['fish', 4, '#8c98a6'], orca: ['dolphin', 3, '#2c2e36'], pony: ['horse', 0.7], unicorn: ['horse', 1, '#f2eefc'], stag: ['deer', 1.1], elk: ['deer', 1.3, '#9a7048'], moose: ['deer', 1.5, '#5c4634'], serpent: ['snake', 3, '#3c7a56'], cobra: ['snake', 0.8, '#b08a3c'] };
+const SH_SELF = new Set(['human', 'man', 'myself', 'me', 'icarus', 'boy', 'yourself', 'normal', 'person']);
+const SH_FIRE = new Set(['phoenix', 'firebird', 'fire bird', 'bird of fire', 'the phoenix', 'fire']);
+function builtinShape(w) {
+  if (SHAPES[w]) return { ...SHAPES[w], name: w };
+  const a = SH_ALIAS[w]; if (!a) return null;
+  const b = SHAPES[a[0]], k = a[1];
+  return { ...b, name: w, color: a[2] || b.color, length: b.length * k, parts: b.parts.map(p => ({ ...p, c: p.c.map(v => v * k), s: p.s.map(v => v * k) })) };
+}
+// the blocks: one cube, drawn N times, each face a character cut from a sheet of them
+SH.mesh = (() => {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 512;
+  const x = cv.getContext('2d'), CH = '#@%&$*+=?!/\\|<>{}[]()^~01AEFHIKLMNRSTVWXYZ:;ox§¶∆Ω≈'.slice(0, 64).padEnd(64, '#');
+  x.fillStyle = '#9aa0ab'; x.fillRect(0, 0, 512, 512);   // (a face takes the creature's colour, dimmed; its character shines)
+  x.font = 'bold 46px Menlo, Consolas, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.strokeStyle = 'rgba(255,255,255,0.16)'; x.lineWidth = 3;
+  for (let i = 0; i < 64; i++) { const cx = (i % 8) * 64, cy = Math.floor(i / 8) * 64; x.strokeRect(cx + 2, cy + 2, 60, 60); x.fillStyle = '#ffffff'; x.fillText(CH[i], cx + 32, cy + 35); }
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  geo.setAttribute('aGlyph', new THREE.InstancedBufferAttribute(new Float32Array(SH_MAX), 1).setUsage(THREE.DynamicDrawUsage));
+  const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uHide = SH.hide;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aGlyph; uniform vec4 uHide;')
+      .replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef USE_MAP\nvMapUv = (uv + vec2(mod(aGlyph, 8.0), 7.0 - floor(aGlyph / 8.0))) / 8.0;\n#endif')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n{ vec3 ic = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz; if (uHide.w > 0.0 && distance(ic, uHide.xyz) < uHide.w) transformed *= 0.0; }');
+  };
+  const m = new THREE.InstancedMesh(geo, mat, SH_MAX);
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; m.count = 0; m.visible = false;
+  for (let i = 0; i < SH_MAX; i++) m.setColorAt(i, new THREE.Color(1, 1, 1));
+  scene.add(m); return m;
+})();
+// a cloud of points over a shape made of ellipsoids, each knowing what part it is on and where that part hinges
+function shapeCloud(def, N) {
+  const parts = def.parts, area = parts.map(p => p.s[0] * p.s[1] + p.s[1] * p.s[2] + p.s[0] * p.s[2]), tot = area.reduce((a, b) => a + b, 0) || 1;
+  const r = mulberry32([...def.name || 'x'].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619), 2166136261));
+  let k = 0;
+  for (let pi = 0; pi < parts.length; pi++) {
+    const p = parts[pi], n = pi === parts.length - 1 ? N - k : Math.round(N * area[pi] / tot), ro = Math.max(0, SH_ROLES.indexOf(p.role)), cp = Math.cos(p.pitch || 0), sp = Math.sin(p.pitch || 0);
+    const side = p.c[0] < 0 ? -1 : 1, hy = p.c[1] + p.s[1] * cp, hz = p.c[2] - p.s[1] * sp;   // (a leg hinges at its top; a wing at its inner edge; a tail where it meets the body)
+    for (let j = 0; j < n && k < N; j++, k++) {
+      let dx, dy, dz, l; do { dx = r() * 2 - 1; dy = r() * 2 - 1; dz = r() * 2 - 1; l = dx * dx + dy * dy + dz * dz; } while (l > 1 || l < 0.01);
+      l = Math.sqrt(l); dx = dx / l * p.s[0]; dy = dy / l * p.s[1]; dz = dz / l * p.s[2];
+      SH.tgt[k * 3] = p.c[0] + dx; SH.tgt[k * 3 + 1] = p.c[1] + dy * cp - dz * sp; SH.tgt[k * 3 + 2] = p.c[2] + dy * sp + dz * cp;
+      SH.role[k] = ro;
+      if (ro === 3 || ro === 4) SH.piv.set([p.c[0] - side * p.s[0], p.c[1], p.c[2]], k * 3);
+      else if (ro >= 5 && ro <= 8) SH.piv.set([p.c[0], hy, hz], k * 3);
+      else if (ro === 9) SH.piv.set([p.c[0], p.c[1], p.c[2] - Math.abs(p.s[2])], k * 3);
+      else SH.piv.set([0, 0, 0], k * 3);
+      SH.seed[k] = r();
+    }
+  }
+  const head = parts.find(p => p.role === 'head') || parts[0];
+  SH.eye = [head.c[1] + head.s[1] * 0.35, -head.c[2] + head.s[2] * 0.6];
+}
+// the same, over the surface of one of his own bodies as it stands right now (so the blocks peel off it exactly)
+const _sm = new THREE.Matrix4(), _sa = new THREE.Vector3(), _sb = new THREE.Vector3(), _sc = new THREE.Vector3();
+function modelCloud(obj, N, out, world) {
+  obj.updateMatrixWorld(true);
+  const inv = world ? null : obj.matrixWorld.clone().invert(), tri = [], acc = [];
+  let tot = 0;
+  obj.traverse(o => {
+    if (!o.isMesh || o.userData.ink || o.isInstancedMesh) return;
+    for (let q = o; q && q !== obj; q = q.parent) if (!q.visible) return;
+    const g = o.geometry, P = g.attributes.position, I = g.index, n = I ? I.count : P.count;
+    if (world) _sm.copy(o.matrixWorld); else _sm.multiplyMatrices(inv, o.matrixWorld);
+    for (let t = 0; t + 2 < n; t += 3) {
+      const a = I ? I.getX(t) : t, b = I ? I.getX(t + 1) : t + 1, c = I ? I.getX(t + 2) : t + 2;
+      _sa.fromBufferAttribute(P, a).applyMatrix4(_sm); _sb.fromBufferAttribute(P, b).applyMatrix4(_sm); _sc.fromBufferAttribute(P, c).applyMatrix4(_sm);
+      const ar = _sb.clone().sub(_sa).cross(_sc.clone().sub(_sa)).length() / 2; if (!(ar > 1e-7)) continue;
+      tri.push(_sa.x, _sa.y, _sa.z, _sb.x, _sb.y, _sb.z, _sc.x, _sc.y, _sc.z); tot += ar; acc.push(tot);
+    }
+  });
+  if (!acc.length) { out.fill(0, 0, N * 3); return; }
+  for (let i = 0; i < N; i++) {
+    const u = Math.random() * tot; let lo = 0, hi = acc.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (acc[m] < u) lo = m + 1; else hi = m; }
+    let a = Math.random(), b = Math.random(); if (a + b > 1) { a = 1 - a; b = 1 - b; }
+    const o = lo * 9;
+    for (let d = 0; d < 3; d++) out[i * 3 + d] = tri[o + d] + (tri[o + 3 + d] - tri[o + d]) * a + (tri[o + 6 + d] - tri[o + d]) * b;
+  }
+}
+// the frame the blocks are held in: the bird's (with its pitch and bank) for things that fly, his own heading for things that walk
+const _sq = new THREE.Quaternion(), _se = new THREE.Euler(), _so = new THREE.Vector3();
+function shiftFrame() {
+  const p = player;
+  if (p.form === 'phoenix') _sq.setFromEuler(_se.set(-p.pitch * 0.8, p.yaw, p.bank, 'YXZ')); else _sq.setFromAxisAngle(UP, human.group.rotation.y);
+  _so.copy(p.form === 'phoenix' ? p.pos : human.group.position);
+  return _sq;
+}
+function toBird() {
+  const p = player;
+  if (p.form === 'phoenix') return;
+  p.form = 'phoenix'; p.cine = null; p.grounded = false; p.scale = 1; p.morphT = 0; p.ghost = null; p.burnout = false; p.skyT = 0; p.armed = false; p.wings = false; p.tumble = false; p.climb = null;
+  resetPose(); setBurn(0);
+  p.yaw = human.group.rotation.y; p.pitch = 0.35; p.bank = 0; p.turn = 0; p.speed = Math.max(p.speed || 0, 45); p.vy = 10; p.flame = Math.max(p.flame, 0.6);
+  p.pos.y = Math.max(p.pos.y, groundAt(p.pos.x, p.pos.z, p.pos.y) + 3);
+}
+function startShift(def) {
+  const p = player;
+  if (state !== 'play' || p.cine || p.sub || p.gone) return false;
+  const N = TOUCH || XR.on ? 520 : SH_MAX, was = SH.def, m = SH.mesh;
+  // where the blocks start from: where they are now, or the surface of the body he is wearing (in the world)
+  const W = new Float32Array(N * 3);
+  if (was && m.visible) { const A = m.instanceMatrix.array; for (let i = 0; i < N; i++) { const j = (i % SH.N) * 16; W[i * 3] = A[j + 12]; W[i * 3 + 1] = A[j + 13]; W[i * 3 + 2] = A[j + 14]; } }
+  else modelCloud(p.form === 'phoenix' ? phoenix.group : human.group, N, W, true);
+  // the body that moves him: things that fly or swim go as the bird; things that walk, as he does
+  if (def.kind === 'walk' && p.form === 'phoenix') becomeHuman();
+  else if (def.kind !== 'walk' && p.form !== 'phoenix') toBird();
+  SH.def = def; SH.N = N; SH.t = 0; SH.coolT = 1.2;
+  if (def.model) { const G = def.model === 'phoenix' ? phoenix.group : human.group; SH.scale = G.scale.x || 1; human.group.visible = def.model === 'human'; phoenix.group.visible = def.model === 'phoenix'; modelCloud(G, N, SH.tgt, false); SH.role.fill(0); SH.eye = [1.6, 0]; }
+  else { SH.scale = def.kind === 'walk' ? 1 : Math.max(1, 22 / def.length); shapeCloud(def, N); }
+  SH.size = clamp(def.length * SH.scale * 0.04 * Math.sqrt(SH_MAX / N), 0.05, 1.7);
+  // the starting points, taken into the new body's own frame
+  const q = shiftFrame().clone().invert();
+  for (let i = 0; i < N; i++) { _sa.set(W[i * 3], W[i * 3 + 1], W[i * 3 + 2]).sub(_so).applyQuaternion(q).divideScalar(SH.scale); SH.from[i * 3] = _sa.x; SH.from[i * 3 + 1] = _sa.y; SH.from[i * 3 + 2] = _sa.z; }
+  // the colour of the new thing, block by block a little lighter or darker, and a character on each
+  const c = new THREE.Color(def.color || '#ffd0a0'), G = m.geometry.attributes.aGlyph;
+  for (let i = 0; i < N; i++) { const k = 0.65 + Math.random() * 0.75; m.setColorAt(i, _cc.copy(c).multiplyScalar(k * 2.1)); G.array[i] = Math.floor(Math.random() * 64); }
+  m.instanceColor.needsUpdate = true; G.needsUpdate = true;
+  flash = Math.max(flash, 0.2); audio.sfx.whoosh?.(true); netFx('rebirth');
+  for (let i = 0; i < 60; i++) emit(p.pos.x + rnd(2), p.pos.y + Math.random() * 2, p.pos.z + rnd(2), rnd(6), Math.random() * 6, rnd(6), 0.6 + Math.random() * 0.5, pick(EMBER), 2, 1.2);
+  if (!def.model) { toast(def.name.toUpperCase()); witness(`turned himself into ${/^[aeiou]/.test(def.name) ? 'an' : 'a'} ${def.name}`); }
+  return true;
+}
+function endShift() { SH.def = null; SH.mesh.visible = false; SH.mesh.count = 0; SH.hide.value.w = 0; }
+// a shape from the server, stood on its feet (or, for a flier or a swimmer, centred on its body)
+function settleShape(def) {
+  const ps = def.parts;
+  let dy = 0, dz = 0;
+  if (def.kind === 'walk') dy = -Math.min(...ps.map(p => p.c[1] - p.s[1]));
+  else { const b = ps.find(p => p.role === 'body') || ps[0]; dy = -b.c[1]; dz = -b.c[2]; }
+  return { ...def, parts: ps.map(p => ({ ...p, c: [p.c[0], p.c[1] + dy, p.c[2] + dz] })) };
+}
+// say a thing, and he becomes it
+async function shapeshift(word) {
+  word = String(word || '').toLowerCase().replace(/[^a-z \-']/g, '').replace(/\s+/g, ' ').trim();
+  if (!word || SH.busy || SH.coolT > 0 || state !== 'play') return;
+  if (SH_SELF.has(word)) return SH.def && startShift({ model: 'human', kind: 'walk', length: 1.9, color: '#ffc890', name: 'himself' });
+  if (SH_FIRE.has(word)) { if (!SH.def && player.form === 'phoenix') return; startShift({ model: 'phoenix', kind: 'fly', length: 26, color: '#ff8a3a', name: 'phoenix' }); return; }
+  let def = builtinShape(word);
+  if (!def) {
+    try { const c = JSON.parse(localStorage.getItem('icarus.shape:' + word) || 'null'); if (c?.parts?.length) def = settleShape(c); } catch {}
+  }
+  if (!def) {
+    SH.busy = true; toast(`BECOMING ${word.toUpperCase()}…`);
+    try {
+      const r = await fetch('/api/shape', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: word }) });
+      const j = r.ok ? await r.json() : null;
+      if (j?.parts?.length) { def = { ...j, name: word }; try { localStorage.setItem('icarus.shape:' + word, JSON.stringify(def)); } catch {} }
+    } catch {}
+    SH.busy = false;
+    if (!def) { toast('THE FIRE CANNOT FIND THAT SHAPE'); return; }
+    def = settleShape(def);
+  }
+  startShift(def);
+}
+// "become a whale", "turn into an owl", "be a wolf", or just "dragon"
+const SH_STRONG = /\b(?:become|turn (?:me |myself )?into|transform (?:me |myself )?into|change (?:me |myself )?into|shift into|morph into|shapeshift into)\s+(?:a |an |the |my )?([a-z][a-z' \-]{1,40})/;
+const SH_WEAK = /\b(?:be|i am|i'm) (?:a|an) ([a-z][a-z' \-]{1,40})/;
+const SH_FILL = new Set(['please', 'now', 'again', 'then', 'thanks', 'big', 'huge', 'giant', 'great', 'little', 'small', 'the', 'a', 'an']);
+function shiftWord(low, words) {
+  const m = words <= 8 ? low.match(SH_STRONG) || low.match(SH_WEAK) : null;
+  let w = m ? m[1] : (words <= 2 ? low.replace(/[^a-z \-]/g, '').trim() : '');
+  if (!w) return null;
+  const ws = w.split(/\s+/).filter(x => x && !SH_FILL.has(x)).slice(0, 3);
+  const known = ws.find(x => SHAPES[x] || SH_ALIAS[x] || SH_SELF.has(x) || SH_FIRE.has(x));
+  if (known) return known;
+  return m ? ws.join(' ') : null;   // (a bare word is only taken when it is a shape the game already knows)
+}
+// every frame: hold the shape, move it like the creature it is, and pour it from the last one
+function updateShift(dt) {
+  SH.coolT -= dt;
+  const D = SH.def, m = SH.mesh;
+  if (!D) return;
+  const p = player, N = SH.N, A = m.instanceMatrix.array, S = SH.scale;
+  if (state !== 'play' && state !== 'talk' && state !== 'photo') { endShift(); return; }
+  SH.t = Math.min(1, SH.t + dt / 1.1);
+  if (D.model && SH.t >= 1) { endShift(); return; }   // poured back into one of his own bodies: that body takes over
+  human.group.visible = false; phoenix.group.visible = false;
+  m.visible = true; m.count = N;
+  const q = shiftFrame(), e = q, L = D.length, fly = p.form === 'phoenix';
+  const hs = fly ? p.speed : Math.hypot(p.vel.x, p.vel.z), moving = clamp(hs / 2.5, 0, 1);
+  SH.ph += dt * (fly ? 1.4 + (boosting() ? 1.1 : 0) : 0) * Math.PI * 2;
+  SH.walk += dt * hs / Math.max(0.25, L * 0.42) * Math.PI;
+  // your arms are the wings in the headset, here too
+  const arms = fly && XR.on ? xrArms() : null;
+  _m4.makeRotationFromQuaternion(e); const R = _m4.elements, s = SH.size, k = SH.t, ease = k * k * (3 - 2 * k), swirl = Math.sin(k * Math.PI);
+  for (let i = 0; i < N; i++) {
+    const o = i * 3, ro = SH.role[i];
+    let x = SH.tgt[o], y = SH.tgt[o + 1], z = SH.tgt[o + 2];
+    if (!D.model) {
+      const px = SH.piv[o], py = SH.piv[o + 1], pz = SH.piv[o + 2];
+      if (ro === 3 || ro === 4) {   // a wing beats from its root, and its tip lags
+        const d = Math.abs(x - px), a = arms ? (ro === 3 ? arms.L.e : arms.R.e) : Math.sin(SH.ph - d * 0.35 / Math.max(0.3, L * 0.1)) * 0.55;
+        y += Math.sin(a) * d; x -= Math.sign(x - px) * d * (1 - Math.cos(a)) * 0.6;
+      } else if (ro >= 5 && ro <= 8 && !fly) {   // legs swing from the hip, the diagonals together
+        const a = Math.sin(SH.walk + (ro === 5 || ro === 8 ? 0 : Math.PI)) * 0.5 * moving, c = Math.cos(a), sn = Math.sin(a), yy = y - py, zz = z - pz;
+        y = py + yy * c - zz * sn; z = pz + yy * sn + zz * c;
+      } else if (ro === 9) {   // a tail swings (walking) or beats up and down (swimming, flying)
+        const d = Math.abs(z - pz);
+        if (fly) y += Math.sin(SH.ph * 0.5 - z * 0.7 / Math.max(0.2, L * 0.1)) * d * 0.25; else x += Math.sin(time * 3.2 + z * 2) * d * 0.25 * (0.4 + moving);
+      } else if (ro === 0 || ro === 2) {
+        if (D.kind === 'swim') y += Math.sin(SH.ph * 0.5 - z * 5 / L) * L * 0.025 * smoothstep(-0.3 * L, 0.5 * L, z);
+        else if (!fly) y += Math.sin(SH.walk * 2) * L * 0.006 * moving;
+      }
+      if (D.slither) x += Math.sin(time * 4.5 - z * 7 / L) * L * 0.05 * (0.5 + moving);
+      if (fly && D.kind !== 'swim' && ro === 1) y += Math.sin(SH.ph) * L * 0.01;
+    }
+    // pouring in from where the blocks were, curling round on the way
+    if (k < 1) {
+      const sd = SH.seed[i] * 6.283, fx = SH.from[o], fy = SH.from[o + 1], fz = SH.from[o + 2];
+      x = fx + (x - fx) * ease + Math.cos(sd + k * 7) * swirl * L * 0.12; y = fy + (y - fy) * ease + Math.sin(sd * 1.7 + k * 5) * swirl * L * 0.1; z = fz + (z - fz) * ease + Math.sin(sd + k * 6) * swirl * L * 0.12;
+    }
+    x *= S; y *= S; z *= S;
+    const j = i * 16, sz = s * (k < 1 ? 0.7 + 0.6 * swirl * SH.seed[i] : 1);
+    A[j] = R[0] * sz; A[j + 1] = R[1] * sz; A[j + 2] = R[2] * sz; A[j + 3] = 0;
+    A[j + 4] = R[4] * sz; A[j + 5] = R[5] * sz; A[j + 6] = R[6] * sz; A[j + 7] = 0;
+    A[j + 8] = R[8] * sz; A[j + 9] = R[9] * sz; A[j + 10] = R[10] * sz; A[j + 11] = 0;
+    A[j + 12] = _so.x + R[0] * x + R[4] * y + R[8] * z; A[j + 13] = _so.y + R[1] * x + R[5] * y + R[9] * z; A[j + 14] = _so.z + R[2] * x + R[6] * y + R[10] * z; A[j + 15] = 1;
+  }
+  m.instanceMatrix.needsUpdate = true;
+  // the characters never quite settle: a few change every frame, a great many while it is pouring
+  const G = m.geometry.attributes.aGlyph, flick = k < 1 ? 0.1 : 0.006;
+  for (let i = 0, n = Math.ceil(N * flick); i < n; i++) G.array[Math.floor(Math.random() * N)] = Math.floor(Math.random() * 64);
+  G.needsUpdate = true;
+  // in the headset you are inside it: the blocks right round your eyes are left out
+  if (xrFP() && XR.eye) SH.hide.value.set(XR.eye.x, XR.eye.y, XR.eye.z, Math.max(0.45, L * S * 0.16)); else SH.hide.value.w = 0;
+}
+const _m4 = new THREE.Matrix4();
 
 // ───────────────────────── the still eye ─────────────────────────
 // A gift, when someone gives it: time all but stops and he can walk the camera anywhere, pick a lens, and keep the picture.
@@ -7779,6 +8098,7 @@ function heard(text) {
     netSay(text, null);
     return;
   }
+  if (state === 'play' && !player.cine) { const sw = shiftWord(low, words); if (sw) return shapeshift(sw); }   // "become a whale"
   if (state === 'play' && words <= 3 && /\b(camera|photo|picture)\b/.test(low)) return openPhoto();
   if (state === 'photo') { if (/\b(back|camera|done)\b/.test(low)) closePhoto(); else if (/\b(take|keep|save|shoot)\b/.test(low)) snapPhoto(); return; }
   if (state === 'play' && cmd && words <= 3 && !player.cine) return voiceCommand(cmd);
@@ -9080,6 +9400,7 @@ const camTarget = new THREE.Vector3(), camWant = new THREE.Vector3(), lookAt = n
 function updateCamera(dt) {
   const p = player;
   if (state === 'photo') { camera.position.copy(photo.pos); camera.rotation.set(photo.pitch, photo.yaw, photo.roll, 'YXZ'); camera.fov = photo.fov; camera.updateProjectionMatrix(); return; }
+  if (xrFP()) { camera.position.copy(XR.eye || xrEye(_v)); camera.quaternion.copy(XR.rig.quaternion).multiply(XR.cam.quaternion); camera.fov = 70; camera.updateProjectionMatrix(); return; }   // (in the headset the game's camera is his eyes)
   if (state === 'title' && titleFly.on) return;   // (the title flies its own lens: updateTitle)
   if (state === 'title' || state === 'loading') {
     const a = time * 0.035;
@@ -9977,6 +10298,7 @@ addEventListener('keydown', e => {
   }
   if (state === 'play' && !e.repeat && !e.metaKey && !e.ctrlKey) {
     if (e.code === 'KeyT' || e.code === 'Slash') { e.preventDefault(); return openChat(e.code === 'Slash' ? '/' : ''); }
+    if (e.code === 'KeyB') { e.preventDefault(); return openChat('/become '); }   // become anything
     if (isPlus(e)) { e.preventDefault(); return openPhoto(true); }
   }
   keys[e.code] = true;
@@ -10109,14 +10431,16 @@ const clock = new THREE.Clock();
 const dbgCam = { on: false, p: new THREE.Vector3(), l: new THREE.Vector3(), fov: 40, fog: 0, onStrike: null };
 let time = 0, timeK = 1;   // timeK slows the whole world: a held frame in a conversation, or the still eye
 // ───────────────────────── Apple Vision Pro: flying with your body ─────────────────────────
-// In Safari on Vision Pro (or any headset with WebXR), the game can open into the room around you. You are where the
-// camera is: behind him when he flies, at his shoulder on the ground. Your head looks around; your hands fly. The moves
+// In Safari on Vision Pro (or any headset with WebXR), the game opens around you, and you are him: you look out of his
+// eyes, as the boy and as the bird. Your head looks around freely; the world turns with him when he turns in the air,
+// never tilts or rolls (that is what makes people sick). Your arms are his wings: lift them and they are there, tip them
+// to bank, raise or lower them to climb or dive, and sweep them down to beat — the bird beats when you do. The moves
 // are in xr.js — wings, flap, stoop, clap, fold, spread, leap, point, offer, push, and the headset's own look-and-pinch —
 // inspired by the way the Vision Pro's sorcery stories teach spells: a shape held, or a sweep made, never a button.
 // The ASCII picture is drawn for a flat screen; in the headset the world is shown as itself, and the words that would be
 // on the screen float on a pane below your eyes.
 const XR = { on: false, sess: null, supported: false, rig: new THREE.Group(), cam: new THREE.PerspectiveCamera(70, 1, 0.1, 30000), hands: [], read: makeHands(), out: null,
-  scene: null, yaw: 0, tier: null, hud: null, hudT: 0, hudKey: '', move: '', moveT: -9, pinchT: -9, hudYaw: 0 };
+  scene: null, yaw: 0, tier: null, hud: null, hudT: 0, hudKey: '', move: '', moveT: -9, pinchT: -9, hudYaw: 0, h0: null, frames: 0, armK: 0, manOpen: 0, fake: null };
 XR.rig.add(XR.cam); scene.add(XR.rig);
 const _xd = new THREE.Vector3(), _xe = new THREE.Euler(), _xp = new THREE.Vector3();
 if (navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-vr').then(ok => {
@@ -10136,7 +10460,8 @@ async function xrEnter() {
     initAudio();
     renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType('local'); renderer.xr.setFramebufferScaleFactor(0.85);
     await renderer.xr.setSession(sess);
-    XR.sess = sess; XR.on = true; XR.tier = tierIdx; applyTier(0, false, false);
+    try { renderer.xr.setFoveation(1); } catch {}
+    XR.sess = sess; XR.on = true; XR.tier = tierIdx; applyTier(0, false, false); xrStart();
     for (let i = 0; i < 2; i++) {
       const h = XR.hands[i] || renderer.xr.getHand(i);
       if (!XR.hands[i]) {
@@ -10151,7 +10476,7 @@ async function xrEnter() {
     XR.hud.visible = true; XR.hudKey = '';
     camShake = 0;
     renderer.setAnimationLoop(xrFrame);
-    XR.move = state === 'prologue' ? 'clap or pinch to skip' : 'arms out to fly · clap for fire'; XR.moveT = time + 3;
+    XR.move = state === 'prologue' ? 'clap or pinch to skip' : 'lift your arms · flap to fly'; XR.moveT = time + 4;
   } catch (e) { console.warn('xr', e); toast('IMMERSIVE MODE DID NOT OPEN'); }
   XR.starting = false;
 }
@@ -10161,17 +10486,48 @@ function xrLeave() {
   keys.TouchBoost = false; stick.x = stick.y = 0;
   if (XR.hud) XR.hud.visible = false;
   if (XR.tier !== null) applyTier(XR.tier, false, false);
+  human.head.visible = human.cape.visible = true; for (const o of [XR.phxCape, XR.phxBody]) if (o) o.visible = true; xrCull(true); XR.h0 = null; GRASS.R = TOUCH ? 44 : 72; GRASS.key = '';
   dispatchEvent(new Event('resize'));
+}
+// a headset draws every frame twice, 90 times a second: the trees and houses of far-off country are left out (the ground
+// they stand on, coloured by them, is still there under the fog)
+function xrCull(off) {
+  const c = camera.position, R2 = 1400 * 1400;
+  for (const [k, g] of chunks) {
+    const d = g.userData.deco; if (!d) continue;
+    if (off) { d.visible = true; continue; }
+    const i = k.indexOf(','), cx = (+k.slice(0, i) + 0.5) * CHUNK, cz = (+k.slice(i + 1) + 0.5) * CHUNK;
+    d.visible = (cx - c.x) ** 2 + (cz - c.z) ** 2 < R2;
+  }
+}
+// (also how the tests open it without a headset: XR.on, then xrFrame by hand, with XR.fake hands)
+function xrStart() { GRASS.R = 38; GRASS.key = ''; XR.h0 = null; XR.frames = 0; XR.armK = 0; XR.manOpen = 0; XR.yaw = player.form === 'phoenix' ? player.yaw : human.group.rotation.y; }
+// first person while he is playing or talking; the death, the warp, the ending and the title keep their own camera
+const xrFP = () => XR.on && (state === 'play' || state === 'talk') && !player.gone;
+// where his eyes are: in the boy's head, or just above and ahead of the bird's
+function xrEye(out) {
+  const p = player;
+  if (SH.def && !SH.def.model) { const y = p.form === 'phoenix' ? p.yaw : human.group.rotation.y, S = SH.scale; return out.set(p.pos.x - Math.sin(y) * SH.eye[1] * S, p.pos.y + SH.eye[0] * S, p.pos.z - Math.cos(y) * SH.eye[1] * S); }
+  if (p.form === 'human' && human.group.visible && !p.cine) { human.group.updateMatrixWorld(true); return human.head.localToWorld(out.set(0, 0.12, -0.12)); }
+  if (p.form === 'human') return out.set(p.pos.x, p.pos.y + 1.55, p.pos.z);
+  const k = phoenix.group.scale.x || PHX_S;
+  return out.set(p.pos.x - Math.sin(p.yaw) * 0.9 * k, p.pos.y + 1.0 * k, p.pos.z - Math.cos(p.yaw) * 0.9 * k);
 }
 function xrFrame() {
   const raw = Math.min(clock.getDelta(), 0.05);
+  XR.frames++;
+  // where the headset put your head at the start is "his eyes"; leaning away from it moves you from there
+  if (!XR.h0 && XR.frames > 4) XR.h0 = XR.cam.position.clone();
+  if (XR.frames % 30 === 1) xrHandDots();
+  if (XR.frames % 15 === 2) xrCull();
   xrInput(raw);
   camShake = 0;   // (a shaking camera is a shaking room: not in the headset)
   if (state === 'photo') updatePhoto(raw);
   tick(raw * timeK);
   xrFollow(raw);
+  xrBody(raw);
   const sc = XR.scene || scene;
-  XR.cam.near = Math.max(0.05, camera.near); XR.cam.far = camera.far;
+  XR.cam.near = xrFP() ? 0.06 : Math.max(0.05, camera.near); XR.cam.far = camera.far;
   xrHud(raw, sc);
   XR.rig.updateMatrixWorld(true);
   renderer.setRenderTarget(null);
@@ -10180,13 +10536,63 @@ function xrFrame() {
 // the room goes where the game's camera goes, turning with its heading only (never its tilt or roll: that is what makes
 // people sick), so you can look around freely and the horizon stays where your body thinks it is
 function xrFollow(dt) {
-  camera.getWorldDirection(_xd);
-  const yaw = Math.atan2(-_xd.x, -_xd.z);
-  XR.yaw += wrapAngle(yaw - XR.yaw) * damp(player.form === 'phoenix' ? 5 : 8, dt);
-  XR.rig.position.copy(camera.position);
+  const p = player;
+  if (xrFP()) {
+    // in the air the world turns as he turns; on his feet it stays put and you turn your own head
+    const air = p.form === 'phoenix' || (p.wings && !p.grounded);
+    if (air) XR.yaw += wrapAngle(p.yaw - XR.yaw) * damp(4, dt);
+    xrEye(_xp); _xd.subVectors(_xp, p.pos);
+    if (!XR.eyeOff || XR.eyeOff.distanceTo(_xd) > 4) XR.eyeOff = (XR.eyeOff || new THREE.Vector3()).copy(_xd); else XR.eyeOff.lerp(_xd, damp(10, dt));
+    XR.eye = (XR.eye || new THREE.Vector3()).copy(p.pos).add(XR.eyeOff);
+    _xp.copy(XR.eye);
+    if (XR.h0) _xp.sub(_xd.copy(XR.h0).applyAxisAngle(UP, XR.yaw));
+    XR.rig.position.copy(_xp);
+    if (!air && p.form === 'human' && !p.climb) { _xe.setFromQuaternion(XR.cam.quaternion, 'YXZ'); camYaw = XR.yaw + _xe.y; }   // walking: forward is wherever you look
+  } else {
+    camera.getWorldDirection(_xd);
+    const yaw = Math.atan2(-_xd.x, -_xd.z);
+    XR.yaw += wrapAngle(yaw - XR.yaw) * damp(p.form === 'phoenix' ? 5 : 8, dt);
+    XR.rig.position.copy(camera.position);
+  }
   XR.rig.rotation.set(0, XR.yaw, 0);
 }
+// your arms, read as wings: how high each is (from the shoulder, which is about a hand below the eyes) and how far out
+function xrArms() {
+  const o = XR.out, l = o?.hands?.l, r = o?.hands?.r;
+  if (!l || !r) return null;
+  const arm = h => { const ax = Math.abs(h.palm.x); return { e: clamp(Math.atan2(h.palm.y + 0.25, Math.max(0.08, ax - 0.1)), -1.3, 1.3), s: clamp((ax - 0.15) / 0.45, 0, 1) }; };
+  return { L: arm(l), R: arm(r) };
+}
+// the body you are in: no head in front of your eyes; and the wings go where your arms go
+function xrBody(dt) {
+  const p = player, fp = xrFP();
+  human.head.visible = human.cape.visible = !(fp && p.form === 'human');   // (no head in front of your eyes, no cape collar across them)
+  XR.phxCape ??= phoenix.group.children.find(o => o.material === capeMat) || null;
+  XR.phxBody ??= phoenix.group.children.filter(o => o.isMesh).sort((a, b) => b.geometry.attributes.position.count - a.geometry.attributes.position.count)[0] || null;
+  for (const o of [XR.phxCape, XR.phxBody]) if (o) o.visible = !(fp && p.form === 'phoenix');   // (as the bird you are its eyes: its own body and the cape off its neck would fill them — what you see of yourself are the wings, and the tail behind)
+  const A = fp && state === 'play' ? xrArms() : null;
+  XR.armK = clamp(XR.armK + (A ? dt * 4 : -dt * 3), 0, 1);
+  if (!A || XR.armK <= 0) { XR.manOpen = Math.max(0, XR.manOpen - dt * 3); return; }
+  if (p.form === 'phoenix' && !p.cine) {
+    for (let i = 0; i < 2; i++) {
+      const a = i === 0 ? A.L : A.R, J = WR.j[i], k = XR.armK * damp(18, dt);   // (wing 0 is his left)
+      const want = [0.24 + a.e * 0.85, lerp(0.8, -0.3, a.s), lerp(0.8, -0.3, a.s) * 0.6, 0.06 + (1 - a.s) * 0.55, 1.12];
+      for (let n = 0; n < 5; n++) J[n] = lerp(J[n], want[n], k);
+      setWingSide(i, J[0], J[1], J[2], J[3], J[4]);
+    }
+  } else if (p.form === 'human' && !p.cine && !p.climb) {
+    // on his feet, lift your arms out and the wings unfold from his back; gliding, they are yours to work
+    const gliding = p.wings && !p.grounded;
+    XR.manOpen = lerp(XR.manOpen, gliding || (A.L.s > 0.55 && A.R.s > 0.55) ? 1 : 0, damp(5, dt));
+    if (XR.manOpen > 0.02) setManWingsLR(0.17 + A.L.e * 0.9, 0.17 + A.R.e * 0.9, lerp(0.9, 0.05, A.L.s), lerp(0.9, 0.05, A.R.s), 0, 0, gliding ? Math.max(p.wingOpen, XR.manOpen) : XR.manOpen, 0);
+  }
+}
+const DOT_GEO = new THREE.IcosahedronGeometry(0.0065, 0), DOT_MAT = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.05, 0.35), fog: false, toneMapped: false });
+function xrHandDots() {
+  for (const h of XR.hands) if (h?.joints) for (const n in h.joints) { const j = h.joints[n]; if (!j.userData.dot) { const m = new THREE.Mesh(DOT_GEO, DOT_MAT); if (n.endsWith('tip')) m.scale.setScalar(1.4); j.add(m); j.userData.dot = m; } }
+}
 function xrJoints(side) {
+  if (XR.fake) return XR.fake[side] || null;   // (tests: made-up hands)
   const h = XR.hands.find(h => h && h.userData.side === side);
   if (!h || !h.joints || !h.joints.wrist || !h.joints.wrist.visible) return null;
   const j = {}; for (const k in h.joints) if (h.joints[k].visible) j[k] = h.joints[k].position;
@@ -10197,11 +10603,17 @@ function xrInput(dt) {
   const hy = _xe.y, H = XR.cam.position, p = player;
   const o = XR.out = XR.read.update(dt, { x: H.x, y: H.y, z: H.z, yaw: hy }, xrJoints('left'), xrJoints('right'), { form: p.form, grounded: p.grounded });
   const fly = state === 'play' && !p.cine && (p.form === 'phoenix' || (p.wings && !p.grounded));
+  const fall = state === 'play' && !p.cine && p.form === 'human' && p.tumble && !p.grounded;
   if (state === 'play' && o.pose === 'point' && p.form === 'human') {
-    // walk where the finger points: turned from the head's frame into the camera's, which is what the stick steers by
-    const a = Math.atan2(o.axes[0], o.axes[1]) - hy;
+    // walk where the finger points: in first person the stick's "forward" is where you look, so the finger is the stick;
+    // otherwise it is turned from the head's frame into the follow camera's
+    const a = Math.atan2(o.axes[0], o.axes[1]) - (xrFP() ? 0 : hy);
     stick.x = Math.sin(a); stick.y = Math.cos(a);
   } else if (fly) { stick.x = o.axes[0]; stick.y = -o.axes[1]; }   // (the game's pitch: positive climbs)
+  else if (fall && o.hands.l && o.hands.r) {
+    if (o.pose === 'wings') { stick.x = o.axes[0]; stick.y = clamp(0.55 - o.axes[1] * 0.45, 0, 1); }   // spread out: slower, and the higher the arms the slower
+    else { stick.x = 0; stick.y = -1; }   // arms in: an arrow, head-down
+  }
   else { stick.x = 0; stick.y = 0; }
   keys.TouchBoost = state === 'play' && (fly ? o.boost : o.pose === 'point' && o.run);
   for (const ev of o.events) xrMove(ev);
@@ -10209,7 +10621,17 @@ function xrInput(dt) {
 // what each move does, where he is
 function xrMove(ev) {
   XR.move = ev; XR.moveT = time + 1.2;
-  if (ev === 'flap') { audio.sfx.flap(0.9); return; }
+  if (ev === 'flap') {
+    audio.sfx.flap(0.9);
+    const p = player;
+    if (state === 'play' && !p.cine && !p.sub) {
+      if (p.form === 'phoenix') {   // a wingbeat: speed, and lift that lasts a moment
+        WR.beat = 1; p.speed = Math.min(p.speed + 16, 175); p.vy = Math.min(p.vy + 9, 15); netFx('beat');
+      } else if (p.grounded || p.climb) { const k = spaceAction()?.kind; if (k === 'jump' || k === 'ignite' || k === 'jumpoff') pressSpace(); }   // beat your wings on the ground and up he goes
+      else if (spaceAction()?.kind === 'rebirth') pressSpace();   // in the air, falling or gliding: catch fire and fly
+    }
+    return;
+  }
   if (state === 'title') return;
   if (state === 'end') { if (['clap', 'pinch', 'push'].includes(ev) && endReady) closeEnd(); return; }
   if (state === 'prologue') { if (ev === 'push') proSkip(); else if (['clap', 'pinch', 'flap', 'leap'].includes(ev)) { proPress(true); setTimeout(() => proPress(false), 200); } return; }
@@ -10218,7 +10640,7 @@ function xrMove(ev) {
   const p = player, act = spaceAction(), kind = act && act.kind;
   if (ev === 'clap' || ev === 'pinch') return pressSpace();
   if (ev === 'leap') { if (p.grounded || p.climb) pressSpace(); return; }
-  if (ev === 'spread') { if (p.form === 'human' && !p.grounded && !p.wings) pressSpace(); return; }
+  if (ev === 'spread') { if (p.form === 'human' && !p.grounded && !p.wings && !p.tumble) pressSpace(); return; }   // (just off the ground: catch fire. In a long fall, spreading out is how he slows down; a flap is how he burns)
   if (ev === 'fold') { if (p.form === 'phoenix' && !p.cine) becomeHuman(); return; }
   if (ev === 'offer') { if (['talk', 'kindle', 'animal'].includes(kind)) pressSpace(); else if (time - (XR.offerSaid || -99) > 20) { XR.offerSaid = time; toast('NOBODY HERE TO OFFER YOUR HAND TO'); } return; }
   if (ev === 'push') { if (kind === 'swoop') pressSpace(); return; }
@@ -10231,6 +10653,17 @@ function xrHudMake() {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.3125), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, fog: false, toneMapped: false }));
   m.renderOrder = 9999; m.frustumCulled = false;
   XR.hud = m; XR.hudCv = cv; XR.hudX = cv.getContext('2d'); XR.hudTex = tex;
+}
+function xrHint(act) {
+  const p = player, k = act?.kind;
+  if (p.cine) return '';
+  if (p.form === 'phoenix') return k === 'swoop' ? 'push both palms out: land · two fists: fall' : 'tip your arms: turn · raise or lower them · flap: climb · two fists: fall';
+  if (p.wings && !p.grounded) return 'tip your arms: turn · raise them: slow · flap: burn';
+  if (p.tumble && !p.grounded) return k === 'rebirth' ? 'arms out: slow · arms in: dive · flap: catch fire' : 'arms out: slow · arms in: dive';
+  if (!p.grounded) return k === 'rebirth' ? 'flap: catch fire' : '';
+  if (k === 'talk' || k === 'kindle' || k === 'animal') return `hold out a palm: ${act.label}`;
+  if (k === 'ignite') return 'flap your arms: JUMP';
+  return 'point: walk · flap your arms: jump';
 }
 const MOVE_WORDS = { wings: 'WINGS', flap: 'WINGBEAT', stoop: 'STOOP', clap: 'FIRE', fold: 'FOLD', spread: 'CATCH FIRE', leap: 'LEAP', point: 'WALK', offer: 'OFFER', push: 'STOP', pinch: 'TAP' };
 function xrHud(dt, sc) {
@@ -10254,7 +10687,8 @@ function xrHud(dt, sc) {
   const tst = vis('toast'); if (tst) lines.push(['', tst]);
   // what a move will do here
   const act = state === 'play' && spaceAction();
-  const hint = state === 'prologue' ? (pro.act ? pro.act.replace(/SPACE|TAP/, 'CLAP').replace('HOLD  —', 'FLAP  —').replace('HOLD CLAP', 'FLAP') : 'push both palms out to skip')
+  const fpHint = xrFP() && state === 'play' ? xrHint(act) : null;
+  const hint = fpHint !== null ? fpHint : state === 'prologue' ? (pro.act ? pro.act.replace(/SPACE|TAP/, 'CLAP').replace('HOLD  —', 'FLAP  —').replace('HOLD CLAP', 'FLAP') : 'push both palms out to skip')
     : state === 'talk' ? 'speak aloud · push both palms out to leave'
     : !act ? '' : act.kind === 'talk' || act.kind === 'kindle' || act.kind === 'animal' ? `hold out a palm: ${act.label}`
     : act.kind === 'swoop' ? 'push both palms out: land' : act.kind === 'jump' ? 'clap, or throw both hands up: jump'
@@ -10303,8 +10737,9 @@ function tick(dt) {
   updateGodDirector(dt);
   updateCinemaState(dt);
   if (state === 'title') updateTitle(dt);
-  streamChunks(Math.floor(player.pos.x / CHUNK), Math.floor(player.pos.z / CHUNK), BUILD_BUDGET);
+  streamChunks(Math.floor(player.pos.x / CHUNK), Math.floor(player.pos.z / CHUNK), XR.on ? 1 : BUILD_BUDGET);
   updateModels(dt);
+  updateShift(dt);
   applyMirror(dt);
   updateNet(dt);
   updateCamera(dt);
@@ -10373,7 +10808,7 @@ setTimeout(() => {
   $('title').classList.remove('hidden');
   state = 'title';
   titleStart();
-  window.__icarus = { BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  window.__icarus = { SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);

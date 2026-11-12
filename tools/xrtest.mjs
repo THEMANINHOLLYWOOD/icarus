@@ -56,6 +56,12 @@ check('palm down is not an offer', !r.ev.includes('offer'));
 // push
 r = run(t => { const z = -0.15 - Math.min(1, t / 0.25) * 0.35; return { L: fakeHand('L', at(-0.18, -0.15, z), { facing: 'ahead', toward: [0, 1, 0] }), R: fakeHand('R', at(0.18, -0.15, z), { facing: 'ahead', toward: [0, 1, 0] }) }; }, 0.5, { form: 'human', grounded: true });
 check('push (palms shoved forward)', r.ev.filter(e => e === 'push').length === 1, r.ev.join(','));
+// looking at your own wing: the head turned 70° to the left, the arms still straight out to the sides
+{ const H = makeHands(); const turned = { ...head, yaw: 1.2 }; let last; for (let i = 0; i < 45; i++) { const { L, R } = wings(); last = H.update(1 / 90, turned, L, R, { form: 'phoenix' }); }
+  check('wings while looking at the left wing', last.pose === 'wings' && Math.abs(last.axes[0]) < 0.1, `${last.pose} ${JSON.stringify(last.axes)}`); }
+// arms out the whole time while the head swings round to 100°: the body stays where it was
+{ const H = makeHands(); let last; for (let i = 0; i < 180; i++) { const yaw = Math.min(1.75, i / 60); const { L, R } = wings(); last = H.update(1 / 90, { ...head, yaw }, L, R, { form: 'phoenix' }); }
+  check('wings while the head turns 100° away', last.pose === 'wings' && Math.abs(last.axes[0]) < 0.1, `${last.pose} body ${H.state.bodyYaw.toFixed(2)}`); }
 // point
 r = run(() => ({ L: null, R: fakeHand('R', at(0.2, -0.3, -0.35), { shape: 'point', toward: [0.7071, 0, -0.7071] }) }), 0.3, { form: 'human', grounded: true });
 check('point ahead-right walks ahead-right', r.last.pose === 'point' && r.last.axes[0] > 0.6 && r.last.axes[1] > 0.6 && !r.last.run, JSON.stringify(r.last.axes));
