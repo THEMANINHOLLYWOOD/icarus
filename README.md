@@ -32,7 +32,7 @@ The database schema is in `supabase/world.sql`.
 
 Space to jump and to beat your wings, hold to climb · WASD / mouse to steer ·
 C cinematic camera · + photo camera (copies and downloads) · T chat · M map ·
-Tab who's playing · Y plain picture (no letters) · B (or say "become a whale")
+Tab who's playing · B (or say "become a whale")
 to take any shape · R (or blow into the mic, or say "blow") to leave a river of wind anyone can ride ·
 Delete to respawn on Olympus. In the Underworld, Space burns back the dead. Almost everything can also be said out loud.
 On phones: touch and tilt, two fingers to blow wind. Vision Pro: hand gestures and voice.

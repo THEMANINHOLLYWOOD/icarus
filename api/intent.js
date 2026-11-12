@@ -3,7 +3,7 @@
 import { json, clip, limited, refuse } from './_lib.js';
 
 const ACTIONS = ['fly', 'land', 'glide', 'bird', 'human', 'jump', 'dive', 'climb', 'faster', 'slower', 'left', 'right', 'around', 'walk', 'run', 'stop',
-  'go_there', 'map', 'photo', 'snap', 'close', 'cinematic', 'normalcam', 'players', 'chat', 'letters_on', 'letters_off', 'mute', 'unmute', 'help',
+  'go_there', 'map', 'photo', 'snap', 'close', 'cinematic', 'normalcam', 'players', 'chat', 'mute', 'unmute', 'help',
   'objective', 'home', 'temple', 'nova', 'blow'];
 
 const SYSTEM = `You turn what a player says to their character in a flying game into actions. The player is Icarus: a man who can walk, jump, fall and glide on wax wings, and who turns into a phoenix to fly. They may also be shapeshifted into an animal.
@@ -11,7 +11,7 @@ Actions you may use, in the order they should happen:
 fly (take off / keep flying), land (come down where he is), glide (open wings and glide), bird (become the phoenix), human (become a man again / fold wings),
 jump, dive, climb, faster, slower, left, right, around (turn around), walk, run, stop (stop whatever he is doing),
 go_there (go to the place the player is looking at or pointing at), map, photo (photo camera), snap (take the picture), close (close whatever is open),
-cinematic (cinematic camera), normalcam (normal camera), players (show who else is playing), chat, letters_on, letters_off (the text-art look on or off),
+cinematic (cinematic camera), normalcam (normal camera), players (show who else is playing), chat,
 mute, unmute, help (list what can be said), objective (what to do next in the story), home (go back to Olympus), temple (go to the next god's temple),
 nova (a burst of fire all round him that burns back the dead attacking him in the Underworld),
 blow (the bird breathes out a gust: a burst of speed, and a river of wind along his path that anyone can ride).

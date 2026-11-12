@@ -122,7 +122,7 @@ export const GODS = {
     asks: 'journeys; where he thinks he is going; how he would know he had arrived; why nobody up here is ever hungry.',
     feuds: `Apollo (playfully), Prometheus (he carried Zeus's threats to the rock), everyone a little.`,
     secret: 'It is his job to lead this boy down. Zeus told him to leave it. He keeps almost doing it anyway.',
-    wants: 'Him to find the way down on his own, so Hermes does not have to take him.',
+    wants: 'Him to find the way down on his own, so Hermes does not have to take him. And first, to see him fly: his rings hang round his island in the air — fly every one, in order, and they burn in your god’s colour for all to see. Only then does he send the boy on.',
     delivery: 'quick, bright, conspiratorial, always half joking; slows right down for the one thing he means.',
     smites: false },
   dionysus: { name: 'Dionysus', kind: 'god', side: 'for', disguise: 'a dark bull with vines wound round its horns', voice: 'CwhRBWXzGAHq8TQ4Fs17',

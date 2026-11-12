@@ -53,3 +53,19 @@ create index if not exists world_winds_at on public.world_winds (at desc);
 alter table public.world_winds enable row level security;
 revoke all on public.world_winds from anon, authenticated;
 grant select, insert, update, delete on public.world_winds to service_role;
+
+-- Ring arenas (api/world.js): whoever last flew a course of rings from the first to the last holds it, and its rings burn
+-- in their gods' colours (several, if they flew it together) until a flier of another god takes it.
+create table if not exists public.world_rings (
+  id text primary key check (id ~ '^[a-z0-9_-]{1,24}$'),
+  realm text not null check (realm in ('over','under')),
+  cx real not null, cz real not null,                      -- its first ring, to find the ones near someone
+  patrons jsonb not null check (jsonb_typeof(patrons) = 'array' and jsonb_array_length(patrons) between 1 and 4),
+  names jsonb not null default '[]'::jsonb check (jsonb_typeof(names) = 'array'),
+  by_hash text not null default '',
+  at timestamptz not null default now()
+);
+create index if not exists world_rings_place on public.world_rings (realm, cx, cz);
+alter table public.world_rings enable row level security;
+revoke all on public.world_rings from anon, authenticated;
+grant select, insert, update, delete on public.world_rings to service_role;

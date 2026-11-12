@@ -37,17 +37,19 @@ async function rest(path, { method = 'GET', body, prefer, range } = {}) {
 // ───────── the same, in memory, for the dev server
 const MEM = globalThis.__icarusWorld ||= { cells: new Map(), marks: [], trav: new Map(), winds: [], id: 1 };
 MEM.winds ||= [];
+MEM.rings ||= new Map();
 const PATRON_IDS = new Set(['zeus', 'hera', 'poseidon', 'demeter', 'athena', 'apollo', 'artemis', 'ares', 'aphrodite', 'hephaestus', 'hermes', 'dionysus']);
 const memKey = (r, x, z) => `${r}:${x}:${z}`;
 
 async function look(realm, cx, cz, hash) {
   const x0 = cx - SPAN, x1 = cx + SPAN, z0 = cz - SPAN, z1 = cz + SPAN;
-  let cells = [], marks = [], trav = [], winds = [], totals = { cells: 0, travellers: 0 };
+  let cells = [], marks = [], trav = [], winds = [], arenas = [], totals = { cells: 0, travellers: 0 };
   if (!LIVE) {
     for (const [k, c] of MEM.cells) { const [r, x, z] = k.split(':'); if (r === realm && +x >= x0 && +x <= x1 && +z >= z0 && +z <= z1) cells.push({ cx: +x, cz: +z, by_name: c.by }); }
     marks = MEM.marks.filter(m => m.realm === realm && Math.abs(m.x / 200 - cx) <= SPAN * 2 && Math.abs(m.z / 200 - cz) <= SPAN * 2).slice(-300);
     trav = [...MEM.trav.entries()].filter(([h, t]) => h !== hash && t.realm === realm && Date.now() - Date.parse(t.seen) < 14 * 864e5).map(([, t]) => t);
     winds = MEM.winds.filter(w => w.realm === realm && Math.abs(w.cx / 200 - cx) <= SPAN * 2 && Math.abs(w.cz / 200 - cz) <= SPAN * 2).slice(-40).reverse();
+    arenas = [...MEM.rings.values()].filter(a => a.realm === realm && Math.abs(a.cx / 200 - cx) <= SPAN * 2 && Math.abs(a.cz / 200 - cz) <= SPAN * 2);
     totals = { cells: MEM.cells.size, travellers: MEM.trav.size };
   } else {
     const box = `realm=eq.${realm}&cx=gte.${x0}&cx=lte.${x1}&cz=gte.${z0}&cz=lte.${z1}`;
@@ -58,13 +60,15 @@ async function look(realm, cx, cz, hash) {
       if (r.data.length < 1000) break;
     }
     const mx0 = (cx - SPAN * 2) * 200, mx1 = (cx + SPAN * 2) * 200, mz0 = (cz - SPAN * 2) * 200, mz1 = (cz + SPAN * 2) * 200;
-    const [m, t, c, n, w] = await Promise.all([
+    const [m, t, c, n, w, a] = await Promise.all([
       rest(`world_marks?select=kind,x,y,z,god,seed,by_name,by_hash,at&realm=eq.${realm}&x=gte.${mx0}&x=lte.${mx1}&z=gte.${mz0}&z=lte.${mz1}&order=at.desc&limit=300`),
       rest(`travellers?select=hash,name,x,z,phase,seen&realm=eq.${realm}&seen=gte.${new Date(Date.now() - 14 * 864e5).toISOString()}&order=seen.desc&limit=60`),
       rest('world_cells?select=cx&limit=1', { prefer: 'count=estimated' }),
       rest('travellers?select=hash&limit=1', { prefer: 'count=exact' }),
       rest(`world_winds?select=id,pts,patron,by_name,by_hash,at&realm=eq.${realm}&cx=gte.${mx0}&cx=lte.${mx1}&cz=gte.${mz0}&cz=lte.${mz1}&order=at.desc&limit=40`),
+      rest(`world_rings?select=id,patrons,names,at&realm=eq.${realm}&cx=gte.${mx0}&cx=lte.${mx1}&cz=gte.${mz0}&cz=lte.${mz1}&order=at.desc&limit=300`),
     ]);
+    arenas = a.ok && Array.isArray(a.data) ? a.data : [];   // (no table yet: nobody holds anything that lasts)
     winds = Array.isArray(w.data) ? w.data : [];
     marks = Array.isArray(m.data) ? m.data : [];
     trav = Array.isArray(t.data) ? t.data.filter(x => x.hash !== hash) : [];
@@ -79,6 +83,7 @@ async function look(realm, cx, cz, hash) {
     marks: marks.map(m => ({ k: m.kind, x: Math.round(m.x), y: Math.round(m.y * 10) / 10, z: Math.round(m.z), g: m.god, s: m.seed, n: m.by_name, mine: !!hash && m.by_hash === hash, at: m.at })),
     travellers: trav.map(t => ({ n: t.name, x: Math.round(t.x), z: Math.round(t.z), ph: t.phase, seen: t.seen })),
     winds: winds.map(w => ({ id: w.id, p: w.pts, c: w.patron, n: w.by_name, mine: !!hash && w.by_hash === hash, at: w.at })),
+    arenas: arenas.map(a => ({ id: a.id, c: a.patrons, n: a.names, at: a.at })),
   };
 }
 
@@ -133,6 +138,19 @@ export async function POST(req) {
       const r = await rest('world_winds', { method: 'POST', body: row, prefer: 'return=minimal' });
       if (r.status === 409) return json({ ok: true, again: true });
       return r.ok ? json({ ok: true }) : json({ error: 'not kept' }, 502);
+    }
+    // a course of rings flown from first to last: it is theirs (one god or several, if they flew it together) until someone
+    // of another god flies it
+    if (b.op === 'arena') {
+      if (limited(req, 'world-arena', 10)) return json({ error: 'slow down' }, 429);
+      const id = String(b.id || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24);
+      const pats = [...new Set((Array.isArray(b.pats) ? b.pats : []).filter(p => PATRON_IDS.has(p)))].slice(0, 4);
+      const names = [...new Set([name, ...(Array.isArray(b.names) ? b.names : []).map(name12)])].slice(0, 4);
+      if (!id || !pats.length) return json({ error: 'bad claim' }, 400);
+      const row = { id, realm, cx: fin(b.cx, 4e6), cz: fin(b.cz, 4e6), patrons: pats, names, by_hash: hash, at: new Date().toISOString() };
+      if (!LIVE) { MEM.rings.set(id, row); return json({ ok: true }); }
+      const r = await rest('world_rings?on_conflict=id', { method: 'POST', body: row, prefer: 'resolution=merge-duplicates,return=minimal' });
+      return r.ok ? json({ ok: true }) : json({ ok: false, kept: false });   // (no table yet: the claim is only live)
     }
     // something that stays: a shrine where he met a god (once per god), or the place he fell
     if (b.op === 'mark') {

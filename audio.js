@@ -653,6 +653,12 @@ export function createAudio() {
     },
     ui() { if (!ctx) return; tn({ t: T(), dur: 0.05, f0: 880, a: 0.003, vol: 0.05 }); },
     thud() { sfx.land(0.85); },
+    // his heart, when the ground is coming up too fast: lub-dub, low, felt more than heard
+    heart(k = 1) {
+      if (!ctx) return; const t = T(), v = 0.35 + 0.4 * clamp(k);
+      tn({ t, dur: 0.17, type: 'sine', f0: 64, f1: 38, a: 0.006, vol: v });
+      tn({ t: t + 0.23, dur: 0.14, type: 'sine', f0: 58, f1: 36, a: 0.006, vol: v * 0.72 });
+    },
     jump() { if (!ctx) return; if (!smp('jump', 0.55, rnd(0.95, 1.08), T())) sfx.step(); },
     grab(tree) { if (!ctx) return; smp('grab', tree ? 0.22 : 0.3, tree ? rnd(0.8, 0.9) : rnd(0.93, 1.07), T(), null, rnd(-0.3, 0.3)); },   // (no good bark takes came back: a rock grip, lower and softer, stands in)
     flyby(pan = 0) { if (!ctx) return; smp('whoosh', 0.9, rnd(0.9, 1.1), T(), null, pan); },
