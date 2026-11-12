@@ -113,6 +113,7 @@ ${Object.entries(KINDS).map(([k, v]) => `   ${k}: ${v}`).join('\n')}
 - "gift": simply give him something (rare: when he has moved you).
 - "leave": walk away. Do it when you are bored, insulted, done, or he keeps saying nothing.
 - "scare": do something frightening as you speak — the light goes out of the world for a moment, or the sky cracks open beside him, or you are suddenly very close. At most once in a conversation, on a line that is a threat or a truth he does not want. When he insults you, defies you or dares you to act, that is the moment: do it, do not set him a chore.
+- "weather": change the sky over him, with "sky" one of storm, rain, dark, mist, clear, waves. Use it when the moment calls for it and it is yours to do: Zeus brings storms and can clear them; Poseidon raises the sea (waves) and the rain; Apollo and Helios clear the sky; anyone may darken it in anger or clear it in kindness. Say it aloud in your own words as you do it.
 - "smite": strike him dead where he stands. ${god.smites ? 'You are capable of it. Only for real insolence or a threat; say why in a few words first.' : 'It is not in you; never use it.'} (He wakes on the summit; everyone hears about it.)
 Gifts: ${Object.entries(GIFTS).map(([k, v]) => `${k} = ${v}`).join('; ')}.
 He already has: ${perks.length ? perks.join(', ') : 'nothing'}.
@@ -138,7 +139,7 @@ ${seen.length ? seen.join('\n') : '- nothing worth mentioning yet'}`,
     hades ? RULES.replace(/- Never say that he is dead[^\n]*\n/, '- You alone may tell him the truth, and only when your instructions above say so.\n') : RULES,
     acts,
     `Two tics to avoid: never hand his own words back to him with a question mark on them ("Not afraid?", "Nobody?"), and never start by counting his deaths.`,
-    `FORMAT: answer with one JSON object and nothing else: {"say": "<only the words you speak aloud, with at most two [stage cues] in square brackets; never a description of a sound, a gesture or anything you do>", "act": "none" | "quest" | "gift" | "scare" | "leave" | "smite", "kind": "<quest kind, only with quest>", "n": <number, only with quest>, "reward": "<gift id, only with quest>", "gift": "<gift id, only with gift>"}`,
+    `FORMAT: answer with one JSON object and nothing else: {"say": "<only the words you speak aloud, with at most two [stage cues] in square brackets; never a description of a sound, a gesture or anything you do>", "act": "none" | "quest" | "gift" | "scare" | "leave" | "smite" | "weather", "sky": "<storm|rain|dark|mist|clear|waves, only with weather>", "kind": "<quest kind, only with quest>", "n": <number, only with quest>, "reward": "<gift id, only with quest>", "gift": "<gift id, only with gift>"}`,
   ].filter(Boolean).join('\n\n');
 
   const messages = [{ role: 'system', content: system }, ...history];
@@ -171,6 +172,7 @@ ${seen.length ? seen.join('\n') : '- nothing worth mentioning yet'}`,
     if (out.act === 'quest' && has(KINDS, out.kind) && has(GIFTS, out.reward) && SPOKEN[out.kind].test(text)) Object.assign(res, { act: 'quest', kind: out.kind, n: Math.max(1, Math.min(1500, Math.round(+out.n || 1))), reward: out.reward });
     else if (out.act === 'gift' && has(GIFTS, out.gift)) Object.assign(res, { act: 'gift', gift: out.gift });
     else if (out.act === 'leave') res.act = 'leave';
+    else if (out.act === 'weather' && ['storm', 'rain', 'dark', 'mist', 'clear', 'waves'].includes(out.sky)) Object.assign(res, { act: 'weather', sky: out.sky });
     else if (out.act === 'scare') res.act = 'scare';
     else if (out.act === 'smite' && god.smites) res.act = 'smite';
     // the model is shy of its own teeth: a threat out of their mouth, or open defiance out of his, lands with the world reacting

@@ -521,6 +521,39 @@ for (const s of SITES) {
   else s.reach2 = s.rad * s.rad;
 }
 
+// The blue fire. Three old volcanoes, flat-topped and sheer-sided, each holding a lake of lava that burns blue (sulphur,
+// as it does at Ijen) and spills through notches in the rim and over the cliffs in falls, into pools at their feet.
+// Black rock all round them, yellow crust at the lake's edge, nothing growing. Touch it and he is gone.
+const VCLIFF = 70;
+const VOLCANOES = [
+  { x: -1750, z: 850, H: 150, Rt: 150, Rl: 92, falls: [0.6, 2.4, 4.3] },
+  { x: 2550, z: 250, H: 175, Rt: 165, Rl: 100, falls: [1.3, 3.5, 5.4] },
+  { x: -2450, z: -2250, H: 135, Rt: 135, Rl: 80, falls: [2.0, 4.7] },
+];
+for (const v of VOLCANOES) {
+  v.R0 = v.Rt + VCLIFF + 130; v.reach2 = v.R0 * v.R0;
+  let hi = baseHeight(v.x, v.z); for (let a = 0; a < 6.28; a += 0.52) hi = Math.max(hi, baseHeight(v.x + Math.cos(a) * (v.Rt + VCLIFF), v.z + Math.sin(a) * (v.Rt + VCLIFF)));
+  v.top = Math.max(hi, WATER + 20) + v.H; v.lava = v.top - 8;
+  v.fl = v.falls.map(a => ({ a, ca: Math.cos(a), sa: Math.sin(a) }));
+  v.pools = [];
+}
+function volcanoH(v, x, z, h) {
+  const dx = x - v.x, dz = z - v.z, d = Math.sqrt(dx * dx + dz * dz), dd = d + noise2(x / 70 + v.x * 0.01, z / 70) * 9;   // (the cliff edge is not a perfect circle)
+  let y = lerp(h, v.top - v.H * 0.78, smoothstep(v.R0, v.Rt + VCLIFF, dd));   // the skirt of old flows, rising to the cliff foot
+  y = lerp(y, v.top + noise2(x / 25, z / 25) * 1.5, smoothstep(v.Rt + VCLIFF, v.Rt, dd));   // the cliff, and the flat top
+  y = lerp(y, v.lava - 10, smoothstep(v.Rl + 18, v.Rl - 4, d));   // the crater
+  for (const f of v.fl) {   // the notches the lava runs out through, and the pools it falls into
+    const along = dx * f.ca + dz * f.sa, lat = Math.abs(-dx * f.sa + dz * f.ca);
+    if (along > v.Rl - 10 && along < v.Rt + 14 && lat < 18) y = Math.min(y, lerp(y, v.lava - 4, smoothstep(18, 9, lat)));
+    if (f.pool) { const pd = Math.hypot(x - f.pool.x, z - f.pool.z); if (pd < 26) y = Math.min(y, lerp(y, f.pool.y - 3, smoothstep(26, 13, pd))); }
+  }
+  return y;
+}
+for (const v of VOLCANOES) for (const f of v.fl) {   // each pool sits at the foot of its fall, a little out from the cliff
+  const r = v.Rt + VCLIFF + 22, x = v.x + f.ca * r, z = v.z + f.sa * r;
+  f.pool = { x, z, y: volcanoH(v, x, z, baseHeight(x, z)) - 1.2 };
+}
+const volcanoNear = (x, z, r = 0) => VOLCANOES.some(v => (x - v.x) ** 2 + (z - v.z) ** 2 < (v.R0 + r * 0.5) ** 2);
 function mountainAt(x, z) {
   const dx = x - MOUNT.x, dz = z - MOUNT.z, d = Math.sqrt(dx * dx + dz * dz);
   if (d > MOUNT.R) return 0;
@@ -564,6 +597,7 @@ function overHeight(x, z) {
       h = lerp(h, WATER + 5, smoothstep(60, 26, d));
     }
   }
+  for (const v of VOLCANOES) { const dx = x - v.x, dz = z - v.z; if (dx * dx + dz * dz < v.reach2) h = volcanoH(v, x, z, h); }
   return h;
 }
 
@@ -635,6 +669,7 @@ const COL = {
   trunk: col('#5a3e2b'), pine: col('#2c5a26'), pine2: col('#24502a'), round: col('#4f8f2e'),
   autumn: [col('#e0862a'), col('#e9b52e'), col('#c9462a'), col('#f0a03a')],
   stone: col('#8d877c'), sheep: col('#f4f1ea'), sheepHead: col('#2d2a28'),
+  basalt: col('#25262d'), ash: col('#4a4950'), sulphur: col('#d9c447'),
 };
 
 const UCOL = { ash: col('#4c5270'), ashLight: col('#737b9c'), obsidian: col('#20233a'), asphodel: col('#d2daf6'), vein: [0.35, 0.9, 3.2], shore: col('#1c2a58'),
@@ -661,6 +696,12 @@ function terrainColor(x, z, h, ny, out, o) {
   mix(COL.rock, Math.max(smoothstep(0.86, 0.68, ny), smoothstep(380, 540, h)));
   mix(COL.snow, smoothstep(600, 720, h) * smoothstep(0.55, 0.8, ny));
   mix(COL.sand, smoothstep(WATER + 5, WATER + 1, h));
+  for (const v of VOLCANOES) {   // black rock and grey ash on the volcanoes, yellow sulphur crusting the lake's rim
+    const d = Math.hypot(x - v.x, z - v.z); if (d > v.R0) continue;
+    const n = noise2(x / 23, z / 23);
+    mix(n > 0.2 ? COL.ash : COL.basalt, smoothstep(v.R0, v.Rt + VCLIFF + 30, d) * 0.92);
+    mix(COL.sulphur, smoothstep(v.Rl + 34, v.Rl + 10, d) * smoothstep(v.Rl - 2, v.Rl + 8, d) * smoothstep(-0.3, 0.35, n) * 0.85);
+  }
   out[o] = r; out[o + 1] = g; out[o + 2] = b;
 }
 
@@ -761,13 +802,33 @@ function growTree(acc, x, y, z, r, s, kind) {
   growTree0(acc, x, y, z, r, s, kind);
   rec.v1 = acc.n; rec.s1 = SOLIDS ? SOLIDS.length : 0; TREES.push(rec);
 }
+// each standing tree, as fire needs it: its vertices, its solids, and how big it is
+function treeIndex(list) {
+  const P = fastBuf.P, out = [];
+  for (const t of list || []) {
+    if (t.gone || t.v1 - t.v0 < 6) continue;
+    let y0 = 1e9, top = -1e9, rad = 0;
+    for (let v = t.v0; v < t.v1; v++) { const y = P[v * 3 + 1]; if (y < y0) y0 = y; if (y > top) top = y; const d = (P[v * 3] - t.x) ** 2 + (P[v * 3 + 2] - t.z) ** 2; if (d > rad) rad = d; }
+    out.push({ x: t.x, z: t.z, v0: t.v0, v1: t.v1, s0: t.s0, s1: t.s1, y0, top, rad: Math.sqrt(rad) });
+  }
+  return out;
+}
 function clearTrees() {
   if (!TREES || !CLEAR?.length) return;
   const P = fastBuf.P;
   for (const t of TREES) {
     if (!CLEAR.some(c => (t.x - c.x) ** 2 + (t.z - c.z) ** 2 < c.r * c.r)) continue;
+    t.gone = true;
     for (let v = t.v0 + 1; v < t.v1; v++) { P[v * 3] = P[t.v0 * 3]; P[v * 3 + 1] = P[t.v0 * 3 + 1]; P[v * 3 + 2] = P[t.v0 * 3 + 2]; }   // (folded to a point: nothing drawn)
     for (let k = t.s0; k < t.s1; k++) if (SOLIDS[k]) SOLIDS[k].y1 = -1e9;
+  }
+}
+// a broad crown is not one lump: a few smaller clumps stand out from it, so the wind has edges to work on
+function leafClumps(acc, cx, cy, cz, R, pal, n) {
+  const lr = mulberry32(((cx * 13.7) | 0) * 2654435761 ^ ((cz * 7.3) | 0) * 40503);
+  for (let i = 0; i < n; i++) {
+    const a = lr() * 6.28, e = lr() * 1.1 - 0.25, q = R * (0.22 + lr() * 0.14), k = R * 0.92;
+    part(acc, G.oct, cx + Math.cos(a) * Math.cos(e) * k, cy + Math.sin(e) * k * 0.75, cz + Math.sin(a) * Math.cos(e) * k, q, q * 0.8, q, jitter(pal[Math.floor(lr() * pal.length)], lr), lr() * 6);
   }
 }
 function growTree0(acc, x, y, z, r, s, kind) {
@@ -804,6 +865,7 @@ function growTree0(acc, x, y, z, r, s, kind) {
     part(acc, G.bole, x, y - 0.3, z, 0.24 * s, H * 0.85, 0.24 * s, WOOD.barkPale, ry);
     SWAY = [y, 0.036];
     for (let i = 0; i < 3; i++) part(acc, G.oct, x + jr(0.5) * s, y + H * (0.52 + i * 0.2), z + jr(0.5) * s, R * (1 - i * 0.2), R * 1.25 * (1 - i * 0.12), R * (1 - i * 0.2), J(WOOD.birch), r() * 6);
+    if (!TOUCH) leafClumps(acc, x, y + H * 0.7, z, R * 1.1, WOOD.birch, 3);
     SWAY = null;
     solid(x, z, R, y + H * 0.42, y + H * 1.05, 'a birch', true, 0.28 * s, y);
   } else if (kind === 'giant') {
@@ -821,6 +883,7 @@ function growTree0(acc, x, y, z, r, s, kind) {
     part(acc, G.bole, x, y - 0.3, z, r0, H * 0.6, r0, WOOD.bark, ry);
     SWAY = [y, 0.019];
     part(acc, G.ico0, x, y + H * 0.74, z, R, R * 0.8, R, J(pal), ry);
+    leafClumps(acc, x, y + H * 0.74, z, R, pal, TOUCH ? 2 : 4);
     for (let i = 0, n = 2 + Math.floor(r() * 2); i < n; i++) { const a = r() * 6.28, q = R * (0.5 + r() * 0.28); part(acc, i ? G.oct : G.ico0, x + Math.cos(a) * R * 0.72, y + H * (0.58 + r() * 0.3), z + Math.sin(a) * R * 0.72, q, q * 0.85, q, J(pal), r() * 6); }
     SWAY = null;
     solid(x, z, R * 1.15, y + H * 0.42, y + H * 0.74 + R * 0.8, 'a tree', true, r0, y);
@@ -899,7 +962,7 @@ const _snag = (acc, x, y, z, r, s) => {
 };
 
 // Leaves coming down through the wood, wherever he is in it: each one flutters, drifts on the wind, and gets out of the way of the bird.
-const LEAVES = TOUCH ? 140 : 300, leafPos = new Float32Array(LEAVES * 3).fill(-99999), leafCol = new Float32Array(LEAVES * 3);
+const LEAVES = TOUCH ? 200 : 520, leafPos = new Float32Array(LEAVES * 3).fill(-99999), leafCol = new Float32Array(LEAVES * 3);
 const leaves = Array.from({ length: LEAVES }, () => ({ on: false, vx: 0, vy: 0, vz: 0, ph: Math.random() * 6.28, g: 0 }));
 const leafPts = (() => {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(leafPos, 3)); g.setAttribute('color', new THREE.BufferAttribute(leafCol, 3));
@@ -910,7 +973,7 @@ function updateLeaves(dt) {
   const c = camera.position, p = player, on = realm === 'over' && state !== 'prologue', bird = p.form === 'phoenix' ? clamp(p.speed / 90, 0.4, 2.5) : 0;
   leafPts.visible = on;
   if (!on) return;
-  for (let k = 0; k < 5; k++) {   // a few new ones a frame, where there are trees to drop them
+  for (let k = 0; k < 8; k++) {   // a few new ones a frame, where there are trees to drop them
     const i = leafN++ % LEAVES, L = leaves[i];
     if (L.on) continue;
     const x = c.x + rnd(75), z = c.z + rnd(75), f = forestAt(x, z);
@@ -939,7 +1002,7 @@ function updateLeaves(dt) {
   worldFx.uGale.value = storm;
 }
 
-const nearSite = (x, z, r) => BEACONS.some(b => (x - b.x) ** 2 + (z - b.z) ** 2 < r * r);
+const nearSite = (x, z, r) => BEACONS.some(b => (x - b.x) ** 2 + (z - b.z) ** 2 < r * r) || volcanoNear(x, z, r);   // (nothing grows or is built on the volcanoes)
 
 // one wind for everything that drifts: clouds, their shadows, snow, the ribbons of air
 const WIND = new THREE.Vector3(0.93, 0, 0.37);
@@ -948,7 +1011,7 @@ const worldFx = { uTime: { value: 0 }, uShade: { value: 1 }, uUnder: { value: 0 
 function patchWorld(mat, shore, sways) {
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, worldFx);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWp;' + (sways ? '\nattribute float sway; uniform vec4 uBird; uniform float uGale, uTime;' : ''))
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWp;' + (sways ? '\nattribute float sway; uniform vec4 uBird; uniform float uGale, uTime; varying float vLeaf;' : ''))
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWp = (modelMatrix * vec4(position, 1.0)).xyz;' + (sways ? `
         if (sway > 0.0) {
           // the wind goes through the wood in slow waves, and every tree answers a little differently
@@ -959,13 +1022,19 @@ function patchWorld(mat, shore, sways) {
           vec3 tb = vWp - uBird.xyz; float bk = uBird.w * smoothstep(70.0, 10.0, length(tb));
           push += normalize(tb.xz + 0.001) * bk * (2.4 + sin(uTime * 23.0 + ph * 9.0) * 1.0);
           transformed.xz += push * sway; transformed.y -= length(push) * sway * 0.2; vWp.xz += push * sway;
-        }` : ''));
+          // and every leaf shivers on its own, faster and smaller than the bough: the crown seethes instead of nodding
+          float lf = clamp(sway * 5.0, 0.0, 1.0);
+          vec3 shiver = vec3(sin(uTime * 3.7 + vWp.y * 1.9 + vWp.x * 0.83), sin(uTime * 4.9 + vWp.z * 1.4 + vWp.x * 0.6) * 0.55, cos(uTime * 4.3 + vWp.z * 1.7 + vWp.y * 1.1));
+          transformed += shiver * lf * 0.17 * (0.55 + 0.45 * gust + uGale * 1.3);
+          vLeaf = lf;
+        } else vLeaf = 0.0;` : ''));
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vWp; uniform float uTime, uShade, uUnder, uWater;
+      varying vec3 vWp; uniform float uTime, uShade, uUnder, uWater;${sways ? ' varying float vLeaf;' : ''}
       float wHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float wNoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(wHash(i), wHash(i + vec2(1.0, 0.0)), f.x), mix(wHash(i + vec2(0.0, 1.0)), wHash(i + vec2(1.0, 1.0)), f.x), f.y); }`)
       .replace('#include <tonemapping_fragment>', `{
+        ${sways ? `gl_FragColor.rgb *= 1.0 + vLeaf * (0.09 * sin(uTime * 5.3 + vWp.x * 2.7 + vWp.z * 2.1) + 0.05 * sin(uTime * 8.1 - vWp.y * 3.3));   // sun flickering through the leaves` : ''}
         vec2 q = vWp.xz * 0.0011 - vec2(${WIND.x.toFixed(2)}, ${WIND.z.toFixed(2)}) * uTime * 0.0125;
         float c = wNoise(q) * 0.6 + wNoise(q * 2.3 + 7.0) * 0.4;
         float under = smoothstep(430.0, 300.0, vWp.y) * uShade;
@@ -1050,8 +1119,9 @@ function buildChunk(cx, cz) {
   }
   growForest(acc, x0, z0, mulberry32((cx * 83492791) ^ (cz * 49979687) ^ 0x2545f491));
   buildFeatures(cx, cz, rng, acc, group);
-  if (acc.n) { const m = new THREE.Mesh(accToGeo(acc), decoMat); m.castShadow = m.receiveShadow = true; group.add(m); }
-  clearTrees(); group.userData.solids = solids; SOLIDS = null; group.userData.rooms = rooms; ROOMS = null; TREES = CLEAR = null;
+  clearTrees();
+  if (acc.n) { const m = new THREE.Mesh(accToGeo(acc), decoMat); m.castShadow = m.receiveShadow = true; group.add(m); group.userData.deco = m; }
+  group.userData.trees = treeIndex(TREES); group.userData.clear = CLEAR.slice(); group.userData.solids = solids; SOLIDS = null; group.userData.rooms = rooms; ROOMS = null; TREES = CLEAR = null;
   scene.add(group);
   return group;
 }
@@ -1577,6 +1647,10 @@ function updateClouds(dt) {
   _cc.copy(pal.hor).lerp(WHITE_C, under ? 0.05 : 0.45);
   scene.fog.color.lerp(_cc, cloudIn * 0.8);
   scene.fog.near = lerp(260, 40, cloudIn); scene.fog.far = lerp(fogFar, 720, cloudIn);
+  if (!under && WX.fog > 0.01) {   // rain and mist close the world in, and grey it
+    scene.fog.near = lerp(scene.fog.near, 30, WX.fog * 0.8); scene.fog.far = lerp(scene.fog.far, Math.min(scene.fog.far, 560), WX.fog * 0.85);
+    _cc.setRGB(0.52, 0.55, 0.6).multiplyScalar(pal.hemiI / 1.45); scene.fog.color.lerp(_cc, WX.fog * 0.55);
+  }
   skyMat.uniforms.mist.value = cloudIn * 0.5; skyMat.uniforms.mistCol.value.copy(_cc);
   if (flying && cloudIn > 0.12 && !under) for (let i = 0; i < 3; i++) {   // and it streams off his wings
     const w = phoenix.wings[i & 1].tip.getWorldPosition(_v);
@@ -1609,9 +1683,9 @@ function updatePalette(dt) {
   skyMat.uniforms.zen.value.copy(pal.zen); skyMat.uniforms.hor.value.copy(pal.hor);
   skyMat.uniforms.sunCol.value.copy(pal.sun); skyMat.uniforms.sunDir.value.copy(sunDir);
   scene.fog.color.copy(pal.fog);
-  sun.color.copy(pal.sun); sun.intensity = pal.sunI;
+  sun.color.copy(pal.sun); sun.intensity = pal.sunI * (realm === 'over' ? WX.light : 1);
   sun.target.position.copy(player.pos); sun.position.copy(player.pos).addScaledVector(sunDir, 1000);
-  hemi.color.copy(pal.hemiS).lerp(BOLT_C, Math.min(1, skyFlash)); hemi.groundColor.copy(pal.hemiG).lerp(BOLT_C, Math.min(1, skyFlash) * 0.6); hemi.intensity = pal.hemiI + skyFlash * 2.4;   // lightning lights the country, not just the screen
+  hemi.color.copy(pal.hemiS).lerp(BOLT_C, Math.min(1, skyFlash)); hemi.groundColor.copy(pal.hemiG).lerp(BOLT_C, Math.min(1, skyFlash) * 0.6); hemi.intensity = pal.hemiI * (realm === 'over' ? lerp(1, WX.light, 0.6) : 1) + skyFlash * 2.4;   // lightning lights the country, not just the screen
   skyFlash = Math.max(0, skyFlash - 0.11 - skyFlash * 0.12) * (Math.random() < 0.85 ? 1 : 0.4);
   cloudMat.emissive.copy(pal.cloud).multiplyScalar(0.7); seaMat.emissive.copy(pal.cloud).multiplyScalar(0.32);
   const wu = waterMat.uniforms;
@@ -4040,7 +4114,7 @@ function netJoin() {
     const st = ch.presenceState(), here = new Set();
     const quiet = performance.now() - CHAT.joinedAt < 4000;
     for (const id in st) { if (id === NET.id) continue; here.add(id); const m = st[id][0] || {}; const P = peerOf(id); P.name = cleanName(m.n);
-      if (!P.seen) { P.seen = true; if (!quiet) chatLine('', `${P.name} IS FLYING`, 'sys'); } }
+      if (!P.seen) { P.seen = true; if (!quiet) { chatLine('', `${P.name} IS FLYING`, 'sys'); joinStorm(); } } }
     for (const [id, P] of NET.peers) if (!here.has(id)) dropPeer(id, P);
   });
   ch.on('broadcast', { event: 's' }, ({ payload: m }) => gotState(m));
@@ -4050,6 +4124,7 @@ function netJoin() {
   ch.on('broadcast', { event: 'rtc' }, ({ payload: m }) => gotRtc(m));
   ch.on('broadcast', { event: 'fx' }, ({ payload: m }) => gotFx(m));
   ch.on('broadcast', { event: 'chat' }, ({ payload: m }) => gotChat(m));
+  ch.on('broadcast', { event: 'burn' }, ({ payload: m }) => gotBurn(m));
   ch.subscribe((status, err) => {
     NET.log.push([Math.round(performance.now() / 100) / 10, status, err ? String(err.message || err).slice(0, 120) : '']); if (NET.log.length > 20) NET.log.shift();
     if (ch !== NET.ch) return;
@@ -4663,13 +4738,14 @@ function die(how, kmh) {
   const why = { sun: 'flying too close to the sun and burning his own wings off', ember: 'letting his fire run out in mid-air',
     skid: 'crash-landing and skidding off an edge', collide: 'flying into another flier in mid-air' }[p.fallCause] || 'stepping off into thin air';
   if (how === 'hit') witness(`flew into ${p.hitWhat} at ${kmh} km/h and went out like a match`);
+  else if (how === 'lava') witness('touched the blue fire of the volcano and burned to nothing in a breath');
   else if (how !== 'smite') witness(how === 'crash' ? `came in to land at ${kmh} km/h, hit the ground like a dropped plate, and died`
     : `fell ${drop} m to his death after ${why}`);
-  state = 'dead'; death.phase = 'impact'; death.t = 0; flags.deaths++;
+  state = 'dead'; death.phase = 'impact'; death.t = 0; flags.deaths++; death.lava = how === 'lava' ? p.pos.y : null;
   worldMark('fall', player.pos.x, player.pos.y, player.pos.z);
   for (const q of quests) if (q.kind === 'climb' && !q.done) q.v = 0;
   audio.sfx.impact(); audio.sting('death'); camShake = 1; stopVoice(); dlg.queue.length = 0; dlg.cur = null; netFx('impact');
-  for (let i = 0; i < 70; i++) emit(p.pos.x, p.pos.y + 0.3, p.pos.z, rnd(9), Math.random() * 6, rnd(9), 1.2, pick(ASH));
+  if (death.lava === null) for (let i = 0; i < 70; i++) emit(p.pos.x, p.pos.y + 0.3, p.pos.z, rnd(9), Math.random() * 6, rnd(9), 1.2, pick(ASH));
   // how he hit: how hard, which way he was going, and whether he comes down on his face or his back
   { const v = p.form === 'phoenix' ? _v.copy(dir3).multiplyScalar(p.speed) : _v.copy(p.vel);
     const hs = Math.hypot(v.x, v.z), sp = Math.min(1, Math.hypot(v.x, v.y, v.z) / 60);
@@ -4705,7 +4781,11 @@ function updateDeath(dt) {
   const p = player, f = $('fade');
   death.t += dt;
   if (death.phase === 'impact') {
-    if (death.t < 1.0) {
+    if (death.lava !== null) {   // in the blue fire: he goes black and sinks, burning, and is gone
+      impactPose(Math.min(death.t, 0.3)); setBurn(1, Math.random() * 1.5);
+      p.pos.y = death.lava - smoothstep(0, 1.5, death.t) * 1.9;
+      if (Math.random() < 0.8) emit(p.pos.x + rnd(0.9), death.lava + 0.2, p.pos.z + rnd(0.9), rnd(1.5), 3 + Math.random() * 6, rnd(1.5), 0.6 + Math.random() * 0.6, pick(BLUEFIRE), 5, 1.2);
+    } else if (death.t < 1.0) {
       impactPose(death.t);
       // the slide: carried on along the ground the way he was going, ploughing up dirt or snow
       const I = death.imp, k = I ? Math.exp(-4.5 * death.t) : 0;
@@ -4722,7 +4802,7 @@ function updateDeath(dt) {
       // back to the top: high above the summit, already falling (below the water there is no mountain: he drops in where he first came through)
       if (realm === 'under') { const [x, z] = dryNear(UNDER.arrive.x, UNDER.arrive.z); wake.set(x, terrainAt(x, z), z); } else wake.copy(START);
       p.pos.set(wake.x, wake.y + (realm === 'under' ? 150 : 230), wake.z); p.vel.set(0, -12, 0);
-      p.form = 'human'; p.cine = null; p.flame = 1; p.burnout = false; p.sliding = false; p.gone = false;
+      p.form = 'human'; p.cine = null; p.flame = 1; p.burnout = false; p.sliding = false; p.gone = false; death.lava = null;
       resetPose(); setBurn(0); human.group.rotation.y = Math.PI * 0.15; p.spin.set(1.2, 0, 0.4); p.skyK = 0.45;
       camera.position.set(wake.x + 4.5, wake.y + 1.2, wake.z - 8);
       death.phase = 'drop'; death.t = 0; f.style.opacity = 0;
@@ -6399,6 +6479,7 @@ const boltRib = makeRibbons(2, 14);
 let boltT = 0, strikeT = 2, homeBoltT = 0;
 function strike(x, y, z, big = 0.6) {
   dbgCam.onStrike?.(x, y, z, big);   // (tests: a recorder wants to know)
+  if (realm === 'over' && Math.random() < 0.45) igniteNear(x, z, 25, false);   // and where it comes down in a wood, the wood catches
   const top = y + 600 + Math.random() * 350, ox = rnd(140), oz = rnd(140);
   boltRib.clear(0);
   for (let i = 13; i >= 0; i--) { const t = i / 13, w = Math.sin(Math.PI * t) * 30; boltRib.lead(0, x + ox * (1 - t) + rnd(w), lerp(top, y, t), z + oz * (1 - t) + rnd(w), 0); }
@@ -6429,7 +6510,7 @@ function cloudStorm(dt, k) {
 }
 function updateRain(dt) {
   const c = camera.position, inCloud = realm === 'over' ? smoothstep(170, 40, Math.abs(c.y - CLOUD_SEA)) : 0;
-  const want = state === 'title' || state === 'loading' ? 0 : Math.max(realm === 'over' && storm > 0.3 && c.y > CLOUD_SEA - 150 ? storm : 0, inCloud * 0.9);
+  const want = state === 'title' || state === 'loading' ? 0 : Math.max(realm === 'over' && storm > 0.3 && c.y > CLOUD_SEA - 150 ? storm : 0, inCloud * 0.9, realm === 'over' ? WX.rain : 0);
   cloudStorm(dt, inCloud);
   rainAmt = lerp(rainAmt, want, damp(want > rainAmt ? 1.2 : 0.7, dt));
   rainMesh.visible = rainAmt > 0.02;
@@ -6469,14 +6550,15 @@ function updateStorm(dt) {
   // the first night is a storm on the mountain; below the clouds it is only the flicker of it, and the Titans walking
   // (the storm is Zeus's, and it stays on his mountain: under the clouds the night is over and the sky is clean)
   const first = story.phase === 'summit' || story.phase === 'leap', above = p.pos.y > CLOUD_SEA - 150;
-  const want = realm === 'over' && above && !titleFly.on && (first || story.titans === 'march') ? 1 : 0;
+  const tale = realm === 'over' && above && !titleFly.on && (first || story.titans === 'march') ? 1 : 0, want = Math.max(tale, realm === 'over' && !titleFly.on ? WX.storm : 0);
   storm = lerp(storm, want, damp(want < storm ? 0.6 : 0.25, dt));
   // the first time he comes down out of it, the dark goes with the storm: the sun comes up while he watches
   if (flags.firstNight && !flags.dawn && realm === 'over' && p.form === 'phoenix' && !p.cine && p.pos.y < CLOUD_SEA - 60) flags.dawn = 1;
   if (flags.dawn === 1) { dayT = (dayT + dt / DAY_LEN * 42) % 1; if (dayT > 0.27 && dayT < 0.6) flags.dawn = 2; }
   updateRain(dt);
-  if (storm > 0.15 && (strikeT -= dt * (0.5 + storm)) <= 0 && state !== 'title' && state !== 'loading') {
-    strikeT = storm > 0.8 ? 0.5 + Math.random() * 1.8 : 1.6 + Math.random() * 4.5;
+  const bolts = tale ? storm : WX.thunder;   // (only a thunderstorm throws lightning; rain is just rain)
+  if (bolts > 0.3 && (strikeT -= dt * (0.5 + bolts)) <= 0 && state !== 'title' && state !== 'loading') {
+    strikeT = bolts > 0.8 ? 0.5 + Math.random() * 1.8 : 1.6 + Math.random() * 4.5;
     const a = Math.random() * 6.28, d = 120 + Math.random() * 900, x = p.pos.x + Math.cos(a) * d, z = p.pos.z + Math.sin(a) * d;
     strike(x, Math.max(terrainAt(x, z), WATER), z, 0.4 + Math.random() * 0.4);
   }
@@ -6603,6 +6685,435 @@ function updateOthers(dt) {
     if (!o.greeted && !o.fixed && d < 5.5 && state === 'play' && p.form === 'human' && p.grounded && !p.cine && !p.stumbleT && !p.rollT && Math.abs(P.y - o.gy) < 6) { o.greeted = true; startTalk(o); }
     if (!o.fixed && !o.pinned && d > 2800) { o.active = false; o.group.visible = false; if (o.place === 'TEMPLE') o.place = ''; }
   }
+}
+
+// ───────────────────────── the blue fire ─────────────────────────
+// Lava drawn the way it looks: a dark crust drifting on the lake with blue-white fire showing through the cracks, and in
+// the falls a fast streaked flow, brightest in the middle where it runs thickest. Brighter than white, so it glows in the
+// letters, through the fog and at night. One blue light goes with whichever volcano he is nearest.
+function lavaMat(flow) {
+  const m = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uTime = worldFx.uTime;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vLu; varying vec3 vLw;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLu = uv; vLw = (modelMatrix * vec4(position, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      varying vec2 vLu; varying vec3 vLw; uniform float uTime;
+      float lH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float lN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(lH(i), lH(i + vec2(1.0, 0.0)), f.x), mix(lH(i + vec2(0.0, 1.0)), lH(i + vec2(1.0, 1.0)), f.x), f.y); }
+      float lF(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * lN(p); p = p * 2.07 + 13.1; a *= 0.5; } return s; }`)
+      .replace('vec4 diffuseColor = vec4( diffuse, opacity );', `
+      float heat;
+      ${flow ? `
+      vec2 q = vec2(vLu.x * 2.4, vLu.y * 0.085 - uTime * 0.95);
+      float n = lF(q + vec2(0.0, lF(q * 0.7 + 3.0) * 1.4));
+      float mid = 1.0 - abs(vLu.x - 0.5) * 2.0;
+      heat = smoothstep(0.3, 0.8, n) * 0.75 + mid * 0.45 - (1.0 - smoothstep(0.0, 0.2, mid)) * 0.3;` : `
+      vec2 q = vLw.xz * 0.045 + vec2(uTime * 0.012, uTime * 0.008);
+      float n = lF(q + lF(q * 1.7 + uTime * 0.03) * 0.8);
+      float cells = abs(lN(vLw.xz * 0.11 + vec2(uTime * 0.02, -uTime * 0.013)) - 0.5) * 2.0;
+      heat = smoothstep(0.42, 0.78, n) * 0.55 + smoothstep(0.14, 0.0, cells) * 0.95;`}
+      heat *= 0.85 + 0.15 * sin(uTime * 2.1 + vLw.x * 0.05 + vLw.z * 0.04);
+      vec3 crust = vec3(0.012, 0.022, 0.08), hot = vec3(0.08, 0.42, 2.3), white = vec3(0.95, 1.7, 2.7);
+      vec4 diffuseColor = vec4(mix(mix(crust, hot, smoothstep(0.08, 0.7, heat)), white, smoothstep(0.78, 1.15, heat)), 1.0);`);
+  };
+  return m;
+}
+const LAVA_LAKE = lavaMat(false), LAVA_FLOW = lavaMat(true);
+const lavaLight = new THREE.PointLight(0x3d8dff, 0, 560, 0); scene.add(lavaLight);
+const BLUEFIRE = [[0.25, 0.6, 2.2], [0.5, 0.9, 2.4], [0.9, 1.4, 2.6], [0.15, 0.35, 1.8]];
+// a strip of flowing lava along a path, `side` across it; widths along the way
+function lavaRibbon(pts, side, wid, mat) {
+  const n = pts.length, pos = new Float32Array(n * 6), uv = new Float32Array(n * 4), idx = [];
+  let len = 0;
+  for (let i = 0; i < n; i++) {
+    const [x, y, z] = pts[i], w = wid[i] / 2;
+    if (i) len += Math.hypot(x - pts[i - 1][0], y - pts[i - 1][1], z - pts[i - 1][2]);
+    pos.set([x - side[0] * w, y, z - side[1] * w, x + side[0] * w, y, z + side[1] * w], i * 6);
+    uv.set([0, len, 1, len], i * 4);
+    if (i) { const a = (i - 1) * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(idx);
+  const m = new THREE.Mesh(g, mat); m.frustumCulled = false; return m;
+}
+function buildVolcano(v) {
+  const g = v.group = new THREE.Group();
+  const lake = new THREE.Mesh(new THREE.CircleGeometry(v.Rl + 14, 80).rotateX(-Math.PI / 2), LAVA_LAKE); lake.position.set(v.x, v.lava, v.z); g.add(lake);
+  v.sheets = [];
+  for (const f of v.fl) {
+    const side = [-f.sa, f.ca], pts = [], wid = [];
+    // along the notch from the lake to the lip, level with the lake
+    for (let r = v.Rl - 4; r < v.Rt + 2; r += 5) { pts.push([v.x + f.ca * r, v.lava + 0.05, v.z + f.sa * r]); wid.push(24); }
+    // off the lip with the speed it had, curving down; where it meets the cliff it slides the rest of the way
+    let r = v.Rt + 2, y = v.lava, vy = 0, landed = false;
+    for (let k = 0; k < 220; k++) {
+      r += 8.5 * 0.05; vy -= 9.8 * 0.05; y += vy * 0.05;
+      const x = v.x + f.ca * r, z = v.z + f.sa * r, gy = terrainAt(x, z) + 0.9;
+      if (y <= gy) { y = gy; landed = true; }
+      pts.push([x, y, z]); wid.push(24 + Math.min(8, (v.lava - y) * 0.05));
+      if (landed) break;
+    }
+    const rp = Math.hypot(f.pool.x - v.x, f.pool.z - v.z);
+    for (r += 2.5; r < rp; r += 2.5) { const x = v.x + f.ca * r, z = v.z + f.sa * r; pts.push([x, Math.max(terrainAt(x, z) + 0.9, f.pool.y + 0.05), z]); wid.push(30); }
+    g.add(lavaRibbon(pts, side, wid, LAVA_FLOW));
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(21, 40).rotateX(-Math.PI / 2), LAVA_LAKE); pool.position.set(f.pool.x, f.pool.y, f.pool.z); g.add(pool);
+    v.sheets.push({ pts, wid, side, f });
+    f.foot = pts[pts.length - 1];
+  }
+  scene.add(g);
+}
+// what burns: the lake, the notches, the falls (a sheet: across it, its width; through it, a pace and a half), the pools
+function inLava(v, x, y, z) {
+  const dx = x - v.x, dz = z - v.z, d = Math.hypot(dx, dz);
+  if (d < v.Rl + 7 && y < v.lava + 0.7 && y > v.lava - 40) return v.lava;
+  for (const S of v.sheets || []) {
+    const f = S.f, pd = Math.hypot(x - f.pool.x, z - f.pool.z);
+    if (pd < 20 && y < f.pool.y + 0.7 && y > f.pool.y - 30) return f.pool.y;
+    for (let i = 0; i < S.pts.length; i++) {
+      const p = S.pts[i], ex = x - p[0], ey = y - p[1], ez = z - p[2];
+      if (ex * ex + ey * ey + ez * ez > (S.wid[i] / 2 + 3) ** 2) continue;
+      const across = ex * S.side[0] + ez * S.side[1];
+      const tx = ex - S.side[0] * across, tz = ez - S.side[1] * across;
+      if (Math.abs(across) < S.wid[i] / 2 && Math.hypot(tx, ey, tz) < 1.7) return p[1];
+    }
+  }
+  return null;
+}
+const lavaS = { seen: false, sparkT: 0 };
+function updateLava(dt) {
+  const p = player, on = realm === 'over';
+  let near = null, nd = 1e9;
+  for (const v of VOLCANOES) {
+    const d = Math.hypot(p.pos.x - v.x, p.pos.z - v.z);
+    if (d < nd) { nd = d; near = v; }
+    if (!v.group && on && d < 4500) buildVolcano(v);
+    if (v.group) v.group.visible = on;
+  }
+  lavaLight.intensity = on && near ? 3.2 * smoothstep(near.R0 + 900, near.R0, nd) : 0;
+  if (near && lavaLight.intensity > 0) lavaLight.position.set(near.x, near.lava + 40, near.z);
+  if (!on || !near?.group || nd > near.R0 + 700) return;
+  if (!lavaS.seen && nd < near.R0 && state === 'play') { lavaS.seen = true; toast('THE BLUE FIRE · DO NOT TOUCH IT'); witness('found a mountain with a lake of blue fire in its top, pouring over its cliffs'); }
+  // spray where the falls land, sparks spat off the lake, and the heat-haze of fumes going up off it
+  if ((lavaS.sparkT -= dt) < 0) {
+    lavaS.sparkT = 0.05;
+    for (const S of near.sheets) { const q = S.f.foot; if (q) emit(q[0] + rnd(8), q[1] + 0.5, q[2] + rnd(8), rnd(5), 4 + Math.random() * 9, rnd(5), 0.6 + Math.random() * 0.6, pick(BLUEFIRE), -4); }
+    const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * near.Rl;
+    emit(near.x + Math.cos(a) * r, near.lava + 0.3, near.z + Math.sin(a) * r, rnd(2), 2 + Math.random() * 6, rnd(2), 0.7 + Math.random() * 0.5, pick(BLUEFIRE), -2);
+    if (Math.random() < 0.5) emit(near.x + rnd(near.Rl * 0.8), near.lava + 2, near.z + rnd(near.Rl * 0.8), rnd(1), 3 + Math.random() * 2, rnd(1), 4, [0.55, 0.6, 0.7], 3, 2.2);   // fumes
+  }
+  if (state === 'play' && !p.gone && nd < near.R0) {
+    const y = inLava(near, p.pos.x, p.pos.y, p.pos.z);
+    if (y !== null) burnInLava(y);
+  }
+}
+// into the blue fire: no fall, no crash. Gone in a breath, whatever shape he was in.
+function burnInLava(y) {
+  const p = player;
+  if (state !== 'play') return;
+  p.form = 'human'; p.sub = null; p.cine = null; p.wings = false; p.tumble = false; p.scale = 1;
+  p.pos.y = y; p.vel.set(0, 0, 0);
+  for (let i = 0; i < 110; i++) emit(p.pos.x + rnd(1.2), y + Math.random() * 1.8, p.pos.z + rnd(1.2), rnd(5), 3 + Math.random() * 10, rnd(5), 0.7 + Math.random() * 0.9, pick(BLUEFIRE), 6, 1.4);
+  flash = 0.3;
+  die('lava');
+}
+
+// ───────────────────────── forest fire ─────────────────────────
+// The bird is fire. Fly him through the trees, or low over them, and they catch: the leaves go orange, the flames stand
+// up out of the crown and the smoke goes up a long way; the wind carries it on to the next tree and the next. A tree
+// burns for twenty seconds, its leaves shrivel to nothing and it stands black. Rain puts it out. Lightning starts it
+// too. A few minutes later the green comes back, from the branches out. Everyone near sees it: where a fire starts is
+// sent to the other fliers.
+const BLAZE = { list: [], key: new Set(), scanT: 0, seen: false, light: new THREE.PointLight(0xff7a2a, 0, 220, 0), burning: 0 };
+scene.add(BLAZE.light);
+const F_CATCH = 3, F_SHRIVEL = [9, 21], F_BLACK = 21, F_REGROW = 170, F_GREEN = 196;
+const F_CHAR = [0.07, 0.055, 0.05], F_FLAME = [2.6, 0.95, 0.22];
+function treeGrid(g) {   // trees by 20 m squares, so a fire can find its neighbours
+  if (g.userData.tgrid) return g.userData.tgrid;
+  const m = new Map();
+  g.userData.trees.forEach((t, i) => { const k = Math.floor(t.x / 20) + ',' + Math.floor(t.z / 20); (m.get(k) || m.set(k, []).get(k)).push(i); });
+  return g.userData.tgrid = m;
+}
+function treesNear(x, z, r, fn) {
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+    const ck = (Math.floor(x / CHUNK) + dx) + ',' + (Math.floor(z / CHUNK) + dz), g = chunks.get(ck);
+    if (!g?.userData.trees) continue;
+    const G = treeGrid(g), c0 = Math.floor((x - r) / 20), c1 = Math.floor((x + r) / 20), e0 = Math.floor((z - r) / 20), e1 = Math.floor((z + r) / 20);
+    for (let cz = e0; cz <= e1; cz++) for (let cx = c0; cx <= c1; cx++) for (const i of G.get(cx + ',' + cz) || []) fn(g, ck, i, g.userData.trees[i]);
+  }
+}
+function ignite(ck, i, net) {
+  const k = ck + ':' + i; if (BLAZE.key.has(k) || BLAZE.burning > 90 || BLAZE.list.length > 260) return false;
+  const g = chunks.get(ck), t = g?.userData.trees?.[i]; if (!t) return false;
+  BLAZE.key.add(k); BLAZE.list.push({ ck, i, k, x: t.x, z: t.z, t: 0, g: null, nextSpread: 1 + Math.random(), upd: 0 });
+  if (net) netBurn(t.x, t.z);
+  if (!BLAZE.seen && state === 'play') { BLAZE.seen = true; toast('THE FOREST IS BURNING'); witness('set the forest on fire with his own wings'); }
+  return true;
+}
+function igniteNear(x, z, r, net) { let best = null, bd = 1e9; treesNear(x, z, r, (g, ck, i, t) => { const d = (t.x - x) ** 2 + (t.z - z) ** 2; if (d < bd && d < (r + t.rad) ** 2) { bd = d; best = [ck, i]; } }); return best ? ignite(best[0], best[1], net) : false; }
+// what a fire t seconds old does to its tree: the leaves catch, flare, shrivel to black knots; the wood goes black; later it all comes back
+function paintFire(f) {
+  const g = chunks.get(f.ck); if (!g?.userData.deco) return;
+  const t = g.userData.trees[f.i], geo = g.userData.deco.geometry, Pa = geo.attributes.position, Ca = geo.attributes.color, Sa = geo.attributes.sway;
+  if (f.g !== g) { f.g = g; f.P = Pa.array.slice(t.v0 * 3, t.v1 * 3); f.C = Ca.array.slice(t.v0 * 3, t.v1 * 3); }   // (a fresh chunk: remember the tree as it was)
+  const P = Pa.array, C = Ca.array, S = Sa.array, T = f.t, cy = lerp(t.y0, t.top, 0.62);
+  const back = smoothstep(F_REGROW, F_GREEN, T), shrivel = smoothstep(F_SHRIVEL[0], F_SHRIVEL[1], T) * 0.9 * (1 - back);
+  const hot = smoothstep(0, F_CATCH, T) * (1 - smoothstep(F_SHRIVEL[1] - 3, F_BLACK + 2, T)), black = smoothstep(F_CATCH, F_BLACK, T) * (1 - back);
+  const fl = 0.75 + 0.25 * Math.sin(time * 17 + f.i);
+  for (let v = t.v0, j = 0; v < t.v1; v++, j += 3) {
+    const o = v * 3, leaf = S[v] > 0;
+    for (let a = 0; a < 3; a++) {
+      const c0 = f.C[j + a], ch = F_CHAR[a] * (leaf ? 0.8 : 1);
+      let c = lerp(c0, ch, black); if (leaf) c = lerp(c, F_FLAME[a] * fl, hot * 0.85);
+      C[o + a] = c;
+      P[o + a] = leaf ? lerp(f.P[j + a], a === 1 ? cy : a === 0 ? t.x : t.z, shrivel) : f.P[j + a];
+    }
+  }
+  Pa.addUpdateRange(t.v0 * 3, (t.v1 - t.v0) * 3); Ca.addUpdateRange(t.v0 * 3, (t.v1 - t.v0) * 3);
+  Pa.needsUpdate = true; Ca.needsUpdate = true;
+  // the canopy no longer stops a bird once it has burned away, and does again when it has grown back
+  const sol = g.userData.solids;
+  for (let k = t.s0; k < t.s1; k++) { const q = sol[k]; if (!q?.soft) continue; if (q.y1o === undefined) q.y1o = q.y1; q.y1 = shrivel > 0.6 ? -1e9 : q.y1o; }
+}
+function updateFire(dt) {
+  const p = player;
+  // the bird sets fire to what he flies through
+  if ((BLAZE.scanT -= dt) < 0) {
+    BLAZE.scanT = 0.1;
+    if (realm === 'over' && state === 'play' && p.form === 'phoenix' && !p.sub && !p.cine)
+      treesNear(p.pos.x, p.pos.z, 30, (g, ck, i, t) => {
+        if ((t.x - p.pos.x) ** 2 + (t.z - p.pos.z) ** 2 < (t.rad + 3) ** 2 && p.pos.y > t.y0 - 2 && p.pos.y < t.top + 5) ignite(ck, i, true);
+      });
+  }
+  if (!BLAZE.list.length) { BLAZE.light.intensity = 0; return; }
+  const c = camera.position, wet = realm === 'over' ? WX.rain : 0;
+  let near = null, nd = 1e9, budget = TOUCH ? 30 : 70; BLAZE.burning = 0;
+  for (let n = BLAZE.list.length - 1; n >= 0; n--) {
+    const f = BLAZE.list[n];
+    f.t += dt;
+    if (wet > 0.45 && f.t > F_CATCH && f.t < F_BLACK) f.t = Math.min(F_BLACK, f.t + dt * 6 * wet);   // rain beats it down
+    const burning = f.t < F_BLACK;
+    if (burning) BLAZE.burning++;
+    const g = chunks.get(f.ck);
+    if (g && ((f.upd -= dt) < 0 || f.g !== g)) { f.upd = burning || f.t > F_REGROW ? 0.12 : 2; paintFire(f); }
+    if (f.t > F_GREEN) { if (g) { f.t = F_GREEN + 1; paintFire(f); } BLAZE.key.delete(f.k); BLAZE.list.splice(n, 1); continue; }
+    if (!burning || !g) continue;
+    const t = g.userData.trees[f.i];
+    // it spreads: on the wind more than against it, not at all in rain
+    if (f.t > F_CATCH && (f.nextSpread -= dt) < 0) {
+      f.nextSpread = 1.1 + Math.random() * 0.8;
+      treesNear(t.x, t.z, t.rad + 18, (g2, ck2, i2, t2) => {
+        const dx = t2.x - t.x, dz = t2.z - t.z, d = Math.hypot(dx, dz) || 1;
+        if (d > t.rad + t2.rad + 7) return;
+        const down = (dx * WIND.x + dz * WIND.z) / d;
+        if (Math.random() < 0.3 * (1 + 0.9 * down) * (1 - wet)) ignite(ck2, i2, false);
+      });
+    }
+    // flames out of the crown, sparks, and smoke going up a long way
+    const d = Math.hypot(t.x - c.x, t.z - c.z);
+    if (d < nd) { nd = d; near = t; }
+    if (d < 900 && budget > 0) {
+      const k = f.t < F_CATCH ? f.t / F_CATCH : 1 - smoothstep(F_BLACK - 5, F_BLACK, f.t), geo = g.userData.deco.geometry, Pa = geo.attributes.position.array, S = geo.attributes.sway.array;
+      for (let e = 0; e < 3 * k && budget > 0; e++) {
+        const v = t.v0 + Math.floor(Math.random() * (t.v1 - t.v0)); if (!(S[v] > 0) && Math.random() < 0.7) continue;
+        budget--; emit(Pa[v * 3] + rnd(0.8), Pa[v * 3 + 1], Pa[v * 3 + 2] + rnd(0.8), rnd(1.5) + WIND.x * 2, 3 + Math.random() * 6, rnd(1.5) + WIND.z * 2, 0.5 + Math.random() * 0.8, pick(EMBER), 5, 1.4 + Math.random() * 1.5);
+      }
+      if (Math.random() < 0.35 * k) { budget--; emit(t.x + rnd(t.rad * 0.5), t.top + 1, t.z + rnd(t.rad * 0.5), WIND.x * 3 + rnd(1), 4 + Math.random() * 3, WIND.z * 3 + rnd(1), 5 + Math.random() * 3, [0.2, 0.19, 0.19], 4, 3 + Math.random() * 3); }
+    }
+  }
+  BLAZE.light.intensity = near && nd < 400 ? (2.2 + Math.sin(time * 13) * 0.4 + Math.sin(time * 31) * 0.3) * smoothstep(400, 120, nd) : 0;
+  if (near) BLAZE.light.position.set(near.x, near.top + 4, near.z);
+}
+function netBurn(x, z) { if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'burn', payload: { i: NET.id, x: Math.round(x), z: Math.round(z) } }); }
+function gotBurn(m) {
+  if (!m || !ok(m.i) || realm !== 'over') return;
+  const P = peerOf(m.i); if (flood(P)) return;
+  igniteNear(num(m.x, -1e6, 1e6), num(m.z, -1e6, 1e6), 6, false);
+}
+
+// ───────────────────────── weather that goes somewhere ─────────────────────────
+// The sky is not one sky. Thunderstorms, rain, grey country, bright country and mist, each a few kilometres across,
+// drift over the world on the wind, swell and die away and come again; fly a few minutes in any direction and you come
+// out of one into another. They are worked out from the clock, so everyone flying sees the same weather in the same
+// place. Olympus keeps a sky of its own that turns from clear to cloud to storm; when someone new arrives in the world
+// Zeus breaks a storm over it; and a god can change it while you stand there — Zeus the storm, Poseidon the sea, Apollo the sun.
+const WX = { storm: 0, rain: 0, thunder: 0, light: 1, fog: 0, kind: '', shown: '', sampleT: 0, god: [], olyT: 0, waveT: 0, want: null };
+const WX_KINDS = ['thunder', 'rain', 'rain', 'grey', 'grey', 'bright', 'mist'];
+const WX_NAMES = { thunder: 'A THUNDERSTORM', rain: 'RAIN', grey: 'GREY SKIES', bright: 'CLEAR SKY', mist: 'MIST', waves: 'THE SEA RISES' };
+function wxHash(a, b, c) { let h = Math.imul(a, 374761393) + Math.imul(b, 668265263) + Math.imul(c, 1442695041) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+function wxAt(x, z) {
+  const t = Date.now() / 1000, T = 7000, X = x - WIND.x * 7 * t, Z = z - WIND.z * 7 * t;   // (the whole pattern drifts downwind at 7 m/s)
+  const tx = Math.floor(X / T), tz = Math.floor(Z / T), w = { thunder: 0, rain: 0, grey: 0, bright: 0, mist: 0, waves: 0 };
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) for (let k = 0; k < 6; k++) {
+    const a = tx + dx, b = tz + dz, h1 = wxHash(a, b, k), h2 = wxHash(a, b, k + 50), h3 = wxHash(a, b, k + 100), h4 = wxHash(a, b, k + 150);
+    const life = Math.sin(t / (420 + h4 * 600) + h1 * 40); if (life <= 0) continue;   // each one grows, holds, dies away, and comes again
+    const r = 900 + h3 * 1500, d = Math.hypot(X - (a + h1) * T, Z - (b + h2) * T); if (d > r) continue;
+    const kind = WX_KINDS[Math.floor(h4 * 997) % WX_KINDS.length];
+    w[kind] = Math.max(w[kind], smoothstep(r, r * 0.4, d) * smoothstep(0, 0.35, life));
+  }
+  // the summit's own sky, round and round every few minutes; and Zeus's storm when someone arrives
+  const md = Math.hypot(x - MOUNT.x, z - MOUNT.z);
+  if (md < 1800) {
+    const k = smoothstep(1800, 700, md), s = 0.5 + 0.5 * Math.sin(t / 75);
+    w.thunder = Math.max(w.thunder, k * smoothstep(0.62, 0.92, s), k * smoothstep(0, 6, WX.olyT));
+    w.mist = Math.max(w.mist, k * smoothstep(0.3, 0.6, s) * (1 - smoothstep(0.62, 0.92, s)));
+    w.bright = Math.max(w.bright, k * smoothstep(0.3, 0.05, s));
+  }
+  // what the gods are doing to the sky: what one has called down, and what they carry with them
+  for (const q of WX.god) {
+    const k = smoothstep(q.r, q.r * 0.35, Math.hypot(x - q.x, z - q.z)) * smoothstep(0, 4, time - q.t0) * smoothstep(q.until, q.until - 8, time);
+    if (k <= 0) continue;
+    if (q.kind === 'calm') { for (const n of ['thunder', 'rain', 'grey', 'mist', 'waves']) w[n] *= 1 - k; w.bright = Math.max(w.bright, k); }
+    else w[q.kind] = Math.max(w[q.kind], k);
+    if (q.kind === 'waves') w.rain = Math.max(w.rain, k * 0.7);
+  }
+  for (const g of gods) {
+    if (!g.active || realm !== 'over') continue;
+    const dom = g.id === 'poseidon' ? 'waves' : g.id === 'apollo' ? 'bright' : g.id === 'zeus' && !g.home ? 'thunder' : '';
+    if (dom) w[dom] = Math.max(w[dom], smoothstep(500, 120, Math.hypot(x - g.x, z - g.z)) * (dom === 'thunder' ? 0.7 : 0.8));
+  }
+  return w;
+}
+function updateWeather(dt) {
+  if ((WX.olyT -= dt) < 0) WX.olyT = 0;
+  WX.god = WX.god.filter(q => time < q.until);
+  if ((WX.sampleT -= dt) < 0 || !WX.want) { WX.sampleT = 0.25; WX.want = realm === 'over' ? wxAt(player.pos.x, player.pos.z) : { thunder: 0, rain: 0, grey: 0, bright: 0, mist: 0, waves: 0 }; }
+  const w = WX.want, k = damp(0.35, dt);
+  WX.thunder = lerp(WX.thunder, w.thunder, k);
+  WX.rain = lerp(WX.rain, Math.max(w.thunder, w.rain * 0.85, w.waves * 0.6), k);
+  WX.storm = lerp(WX.storm, Math.max(w.thunder * 0.95, w.rain * 0.55, w.grey * 0.32, w.waves * 0.5), k);
+  WX.light = lerp(WX.light, clamp(1 - w.grey * 0.42 - w.thunder * 0.4 - w.rain * 0.22 - w.mist * 0.12 + w.bright * 0.3, 0.45, 1.3), k);
+  WX.fog = lerp(WX.fog, Math.max(w.mist * 0.9, w.rain * 0.35, w.thunder * 0.4), k);
+  // say what he has flown into, once, when it is properly here
+  let top = '', tv = 0.55; for (const n in w) if (w[n] > tv) { tv = w[n]; top = n; }
+  if (top && top !== WX.shown && state === 'play') { WX.shown = top; toast(WX_NAMES[top]); }
+  if (!top && WX.shown && Math.max(...Object.values(w)) < 0.2) WX.shown = '';
+  // Poseidon's weather: the sea heaves in long rolling waves near him
+  if (w.waves > 0.3 && (WX.waveT -= dt) < 0) {
+    WX.waveT = 4 + Math.random() * 4;
+    for (let a = 0; a < 8; a++) { const r = 120 + Math.random() * 300, b = Math.random() * 6.28, x = player.pos.x + Math.cos(b) * r, z = player.pos.z + Math.sin(b) * r; if (height(x, z) < WATER - 6) { tsunami(x, z, 0.5 + w.waves * 0.5); break; } }
+  }
+}
+// a god's hand on the sky (from a conversation): it follows from where he stands, and lasts a few minutes
+function godWeather(g, sky) {
+  const kind = { storm: 'thunder', thunder: 'thunder', rain: 'rain', dark: 'grey', grey: 'grey', mist: 'mist', fog: 'mist', clear: 'calm', calm: 'calm', sun: 'calm', waves: 'waves', sea: 'waves' }[sky];
+  if (!kind) return;
+  WX.god.push({ x: player.pos.x, z: player.pos.z, r: 1500, kind, t0: time, until: time + 240 });
+  if (kind === 'thunder') { const a = Math.random() * 6.28; strike(player.pos.x + Math.cos(a) * 30, player.pos.y, player.pos.z + Math.sin(a) * 30, 1); }
+  witness(`watched ${g.name} ${kind === 'calm' ? 'clear the sky with a word' : kind === 'waves' ? 'raise the sea' : `bring ${WX_NAMES[kind].toLowerCase()} down over him`}`);
+}
+// someone new in the world: Zeus greets them the only way he knows
+function joinStorm() { WX.olyT = 50; WX.sampleT = 0; }
+
+// ───────────────────────── grass ─────────────────────────
+// A field of it round him, a few tufts to the square metre, each tuft three blades. The wind goes through it in waves
+// you can watch cross a meadow; every blade flutters on top of that; he parts it where he walks and the bird flattens it
+// going over low. It thins out under the trees and stops at sand, rock, snow, floors and the volcanoes, and the far edge
+// of the patch sinks into the ground so it never pops.
+const GRASS = { T: 12, R: TOUCH ? 44 : 72, max: TOUCH ? 7500 : 26000, tiles: new Map(), queue: [], dirty: false, key: '', push: { value: new THREE.Vector4() }, cen: { value: new THREE.Vector3() } };
+GRASS.mesh = (() => {
+  const P = [], C = [], N = [];
+  for (let b = 0; b < 3; b++) {
+    const a = b * 2.094 + 0.3, ca = Math.cos(a), sa = Math.sin(a), ox = Math.cos(a + 1.57) * 0.05, oz = Math.sin(a + 1.57) * 0.05, lean = 0.13 + b * 0.04;
+    const V = (u, h) => [ox + ca * u + Math.cos(a + 1.57) * lean * h * h, h, oz + sa * u + Math.sin(a + 1.57) * lean * h * h];
+    const v = [V(-0.045, 0), V(0.045, 0), V(-0.03, 0.5), V(0.03, 0.5), V(0, 1)];
+    for (const [i, j, k] of [[0, 1, 2], [1, 3, 2], [2, 3, 4]]) for (const q of [i, j, k]) { P.push(...v[q]); const t = v[q][1]; C.push(0.5 + 0.6 * t, 0.55 + 0.6 * t, 0.5 + 0.45 * t); N.push(0, 1, 0); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, worldFx); sh.uniforms.uPush = GRASS.push; sh.uniforms.uCen = GRASS.cen;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime, uGale; uniform vec4 uBird, uPush; uniform vec3 uCen;')
+      .replace('#include <project_vertex>', `
+      vec4 mvPosition = instanceMatrix * vec4(transformed, 1.0);
+      {
+        vec3 root = instanceMatrix[3].xyz; float hk = position.y, tall = length(instanceMatrix[1].xyz);
+        vec2 W = vec2(${WIND.x.toFixed(2)}, ${WIND.z.toFixed(2)});
+        float wave = sin(dot(root.xz, W) * 0.085 - uTime * 2.1) * 0.5 + 0.5;   // gusts rolling across the field
+        wave = wave * wave;
+        float n = sin(uTime * 1.3 + root.x * 0.21 + root.z * 0.17) * 0.5 + sin(uTime * 2.9 + root.x * 0.63 - root.z * 0.47) * 0.25;
+        vec2 off = W * (0.18 + wave * 0.75 + n * 0.22) * (1.0 + uGale * 2.2);
+        off += vec2(sin(uTime * 5.3 + root.z * 3.1 + root.x), cos(uTime * 4.7 + root.x * 2.9 - root.z)) * 0.07;   // each blade flutters
+        vec2 dp = root.xz - uPush.xz; float pk = smoothstep(uPush.w, 0.0, length(dp)) * step(abs(root.y - uPush.y), 1.6);
+        off += normalize(dp + 0.0001) * pk * 1.5;   // he parts it
+        vec3 tb = root - uBird.xyz; float bk = uBird.w * smoothstep(45.0, 6.0, length(tb));
+        off += normalize(tb.xz + 0.001) * bk * (1.6 + sin(uTime * 21.0 + root.x * 3.0) * 0.6);   // the bird flattens it
+        float bend = hk * hk;
+        mvPosition.xz += off * bend * tall;
+        mvPosition.y -= min(dot(off, off), 1.6) * bend * tall * 0.3;
+        float fade = smoothstep(uCen.y, uCen.y * 0.72, length(root.xz - uCen.xz));
+        mvPosition.y = root.y + (mvPosition.y - root.y) * fade;
+      }
+      mvPosition = modelViewMatrix * mvPosition;
+      gl_Position = projectionMatrix * mvPosition;`);
+  };
+  const m = new THREE.InstancedMesh(g, mat, GRASS.max);
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(GRASS.max * 3), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage);
+  m.count = 0; m.frustumCulled = false; m.receiveShadow = true; scene.add(m);
+  return m;
+})();
+const _gc = new Float32Array(3), _gm = new THREE.Matrix4(), _gq = new THREE.Quaternion(), _gp = new THREE.Vector3(), _gs = new THREE.Vector3();
+function grassTile(tx, tz) {
+  const T = GRASS.T, x0 = tx * T, z0 = tz * T, ck = Math.floor((x0 + T / 2) / CHUNK) + ',' + Math.floor((z0 + T / 2) / CHUNK);
+  if (!chunks.get(ck)) return null;   // (wait for the ground, and for what was built on it)
+  const clear = [];
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const c = chunks.get((Math.floor((x0 + T / 2) / CHUNK) + dx) + ',' + (Math.floor((z0 + T / 2) / CHUNK) + dz)); if (c?.userData.clear) for (const q of c.userData.clear) if (Math.abs(q.x - x0 - T / 2) < q.r + T && Math.abs(q.z - z0 - T / 2) < q.r + T) clear.push(q); }
+  const hc = new Map(), H = (i, j) => { const k = i * 100003 + j; let h = hc.get(k); if (h === undefined) { h = height(i * STEP, j * STEP); hc.set(k, h); } return h; };
+  const r = mulberry32((tx * 92837111) ^ (tz * 689287499) ^ 0x3c6ef372), dens = (TOUCH ? 1.0 : 1.35) * clamp(tier.deco / 104, 0.55, 1);
+  const n = Math.round(T * T * dens), M = new Float32Array(n * 16), Cc = new Float32Array(n * 3);
+  let k = 0;
+  if (nearSite(x0 + T / 2, z0 + T / 2, 30)) return { M, C: Cc, n: 0 };
+  for (let q = 0; q < n; q++) {
+    const x = x0 + r() * T, z = z0 + r() * T, rot = r() * 6.28, sw = 0.75 + r() * 0.55, ht = r(), lit = r();
+    const gx = x / STEP, gz = z / STEP, ix = Math.floor(gx), iz = Math.floor(gz), fx = gx - ix, fz = gz - iz;
+    const h00 = H(ix, iz), h10 = H(ix + 1, iz), h01 = H(ix, iz + 1), h11 = H(ix + 1, iz + 1);
+    let h, sx, sz;
+    if (fx + fz <= 1) { h = h00 + (h10 - h00) * fx + (h01 - h00) * fz; sx = h10 - h00; sz = h01 - h00; }
+    else { h = h11 + (h01 - h11) * (1 - fx) + (h10 - h11) * (1 - fz); sx = h11 - h01; sz = h11 - h10; }
+    const ny = 1 / Math.sqrt(1 + (sx * sx + sz * sz) / (STEP * STEP));
+    if (h < WATER + 2.4 || h > 420 || ny < 0.83) continue;
+    const wood = forestAt(x, z); if (r() < wood * 0.55) continue;
+    if (clear.some(c => (x - c.x) ** 2 + (z - c.z) ** 2 < (c.r * 0.8) ** 2)) continue;
+    if (temples.some(t => Math.abs(x - t.x) < t.hw + 3 && Math.abs(z - t.z) < t.hd + 3)) continue;
+    terrainColor(x, z, h, ny, _gc, 0);
+    const b = 0.82 + lit * 0.36, tall = (0.32 + ht * ht * 0.62) * (1 - wood * 0.35) * smoothstep(WATER + 2.4, WATER + 6, h);
+    _gm.compose(_gp.set(x, h - 0.03, z), _gq.setFromAxisAngle(UP, rot), _gs.set(sw, tall, sw));
+    _gm.toArray(M, k * 16);
+    Cc[k * 3] = _gc[0] * b * 1.05; Cc[k * 3 + 1] = _gc[1] * b * 1.08; Cc[k * 3 + 2] = _gc[2] * b * 0.9;
+    k++;
+  }
+  return { M, C: Cc, n: k };
+}
+function updateGrass(dt) {
+  const G = GRASS, m = G.mesh, c = state === 'photo' ? camera.position : player.pos, p = player;
+  const g = terrainAt(c.x, c.z), alt = camera.position.y - g;
+  const on = realm === 'over' && state !== 'title' && state !== 'prologue' && state !== 'loading' && alt < 90;
+  m.visible = on;
+  if (!on) return;
+  const T = G.T, tcx = Math.floor(c.x / T), tcz = Math.floor(c.z / T), key = tcx + ',' + tcz, rt = Math.ceil(G.R / T);
+  if (key !== G.key) {   // he has moved into another tile: which tiles should be here now?
+    G.key = key; const want = new Set(); G.queue = [];
+    for (let dz = -rt; dz <= rt; dz++) for (let dx = -rt; dx <= rt; dx++) {
+      if ((dx * T) ** 2 + (dz * T) ** 2 > (G.R + T) ** 2) continue;
+      const k = (tcx + dx) + ',' + (tcz + dz); want.add(k);
+      if (!G.tiles.has(k)) G.queue.push([tcx + dx, tcz + dz, dx * dx + dz * dz]);
+    }
+    for (const k of G.tiles.keys()) if (!want.has(k)) { G.tiles.delete(k); G.dirty = true; }
+    G.queue.sort((a, b) => a[2] - b[2]);
+  }
+  for (let b = TOUCH ? 2 : 4; b > 0 && G.queue.length; b--) {   // a few tiles a frame, nearest first
+    const [tx, tz] = G.queue.shift(), t = grassTile(tx, tz);
+    if (t) { G.tiles.set(tx + ',' + tz, t); G.dirty = true; } else { G.key = ''; break; }   // (not ready: ask again next frame)
+  }
+  if (G.dirty) {
+    G.dirty = false; let n = 0; const MA = m.instanceMatrix.array, CA = m.instanceColor.array;
+    for (const t of G.tiles.values()) { if (n >= G.max) break; const k = Math.min(t.n, G.max - n); if (!k) continue; MA.set(t.M.subarray(0, k * 16), n * 16); CA.set(t.C.subarray(0, k * 3), n * 3); n += k; }
+    m.count = n; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true;
+  }
+  G.push.value.set(p.pos.x, p.pos.y, p.pos.z, p.form === 'human' && state !== 'dead' ? 1.15 : 0);
+  G.cen.value.set(c.x, G.R, c.z);
 }
 
 // ───────────────────────── the still eye ─────────────────────────
@@ -7120,6 +7631,7 @@ function applyAct(g, j) {
   else if (j.act === 'gift') { talk.gift = [j.gift, g.name]; talk.after = giveGift; }
   else if (j.act === 'leave') talk.after = () => { endTalk(); depart(g); };
   else if (j.act === 'smite') talk.after = () => { endTalk(); smite(g); };
+  else if (j.act === 'weather') godWeather(g, j.sky);
 }
 // They are not safe to talk to. A line can come with the sky splitting open beside him, or with the light going out of
 // the world while the camera is suddenly under their chin.
@@ -9801,7 +10313,7 @@ function tick(dt) {
   updateClouds(dt);
   updateSea(dt); updateSkim(dt); updateShore();
   updateRings(dt);
-  updateWorldLife(dt); updateLeaves(dt);
+  updateWorldLife(dt); updateLeaves(dt); updateLava(dt); updateGrass(dt); updateWeather(dt); updateFire(dt);
   updateTemple(); updateCurrents(dt); updateDay(dt); updateStorm(dt); updateOthers(dt);
   if (realm === 'over') { updateBeacons(dt); updateAnimals(dt); updateBirds(dt); updateGods(dt); }
   else updateUnder(dt);
@@ -9861,7 +10373,7 @@ setTimeout(() => {
   $('title').classList.remove('hidden');
   state = 'title';
   titleStart();
-  window.__icarus = { CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  window.__icarus = { BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);
