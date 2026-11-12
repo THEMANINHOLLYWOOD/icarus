@@ -34,6 +34,12 @@ const SPOKEN = {
 };
 
 const DEFY = /\b(coward|not afraid|not scared|don'?t scare|do it|go on then|make me|kill me|strike me|smite me|(you are|you're) nothing|pathetic|liar|like a dog|shut up|hate you|fight me|try me|or what)\b/i;
+const RUDE = /\b(shut up|stupid|idiot|moron|dumb|fool|loser|pathetic|useless|lame|boring|old man|grandpa|hate you|screw you|fuck|bitch|asshole|jerk|you suck|nobody cares|who cares|get lost|go away|leave me alone|whatever|(you are|you're) (nothing|weak|a joke|old|a fraud|fake)|middle finger|thumbs-down|shakes his fist)\b/i;
+// what each of the Twelve can do to the world itself, besides the weather
+const POWERS = { zeus: ['fire', 'day'], hera: [], poseidon: ['quake'], demeter: ['bloom'], athena: [], apollo: ['day', 'rings'], artemis: ['night'], ares: ['fire', 'quake'],
+  aphrodite: ['bloom'], hephaestus: ['fire'], hermes: ['wind', 'rings'], dionysus: ['bloom'], persephone: ['bloom'] };
+const POWER_TEXT = { fire: 'set the woods near him burning (lightning, a spark — however you do it)', bloom: 'make flowers burst open all around where he stands', wind: 'blow a river of wind for him, toward where he needs to go next — he can ride it',
+  quake: 'shake the ground under his feet', day: 'turn the sky to bright day', night: 'pull night down over the sky', rings: 'throw a line of rings of light across the sky ahead of him, for him to fly through' };
 const THREAT = /\bI (could|can|will|would) (end|kill|break|drown|burn|unmake|swallow|crush|bury)\b|\b(end|kill|break|drown|unmake|swallow|crush|bury) you\b/i;
 
 // The model is told to be brief and to ask one thing. This makes sure of it: stage directions that slipped in as sentences
@@ -44,7 +50,7 @@ export function tighten(text, task, cap) {
   for (let i = 0; i < 2; i++) t = t.replace(STAGEY, '');
   let cues = 0; t = t.replace(/\[[^\]]*\]/g, m => ++cues > 2 ? '' : m);
   const words = x => x.replace(/\[[^\]]*\]/g, '').trim().split(/\s+/).filter(Boolean).length;
-  const max = cap || (task ? 40 : 28);
+  const max = cap || (task ? 55 : 42);
   let parts = t.match(/[^.!?…]+[.!?…]+["”’)\]]*\s*|[^.!?…]+$/g) || [t];
   // one question only. An echo of his own words with a question mark on it ("Not afraid?") is a tic, not a question: those go
   // first; if two real questions are left, the last one stays.
@@ -77,6 +83,8 @@ export async function POST(req) {
   const history = (Array.isArray(body.messages) ? body.messages : []).slice(-40)
     .map(m => ({ role: m?.role === 'god' ? 'assistant' : 'user', content: clip(m?.text, 320) }))
     .filter(m => m.content);
+  { const tone = clip(String(body.tone || ''), 90).replace(/[^a-z ,'-]/gi, ''); const last = history[history.length - 1];
+    if (tone && last && last.role === 'user' && last.content[0] !== '(') last.content += ` [his voice: ${tone}]`; }
   const gossip = (Array.isArray(body.gossip) ? body.gossip.slice(-200) : [])
     .filter(g => has(ALL, g?.god) && g.god !== body.god).slice(-30)
     .map(g => g.who === 'mortal'
@@ -98,6 +106,8 @@ export async function POST(req) {
   const nx = body.next && has(GODS, body.next.id) && body.next.id !== body.god && body.next.id !== 'hades' ? GODS[body.next.id] : null;
   const nxDir = nx && ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'].includes(body.next.dir) ? body.next.dir : '';
   const nxKm = nx ? Math.max(0.1, Math.min(60, +body.next.km || 0)).toFixed(1) : '';
+  const er = body.errand && typeof body.errand === 'object' ? { from: clip(String(body.errand.fromName || ''), 30), text: clip(String(body.errand.text || ''), 160) } : null;
+  const SEED = { 'hermes>aphrodite': "You have a bet with Apollo over who Aphrodite has been sneaking off to see. She'd never tell you, but she might tell a stranger with a pretty face: send him to find out." };
 
   const who = hades ? `You are Hades, lord of the Underworld.`
     : twelve ? `You are ${god.name}, one of the Twelve gods of Olympus.`
@@ -114,32 +124,41 @@ ${Object.entries(KINDS).map(([k, v]) => `   ${k}: ${v}`).join('\n')}
 - "leave": walk away. Do it when you are bored, insulted, done, or he keeps saying nothing.
 - "scare": do something frightening as you speak — the light goes out of the world for a moment, or the sky cracks open beside him, or you are suddenly very close. At most once in a conversation, on a line that is a threat or a truth he does not want. When he insults you, defies you or dares you to act, that is the moment: do it, do not set him a chore.
 - "weather": change the sky over him, with "sky" one of storm, rain, dark, mist, clear, waves. Use it when the moment calls for it and it is yours to do: Zeus brings storms and can clear them; Poseidon raises the sea (waves) and the rain; Apollo and Helios clear the sky; anyone may darken it in anger or clear it in kindness. Say it aloud in your own words as you do it.
-- "smite": strike him dead where he stands. ${god.smites ? 'You are capable of it. Only for real insolence or a threat; say why in a few words first.' : 'It is not in you; never use it.'} (He wakes on the summit; everyone hears about it.)
+${(POWERS[body.god] || []).map(k => `- "${k}": ${POWER_TEXT[k]}. It is yours to do; do it when it fits the moment — to show off, to help him, to punish him, to make a point — and say it aloud as you do it.\n`).join('')}${god.ferry ? `- "ferry": take him across the Styx in your boat, now. Use it in the same reply where you agree to take him — never say you will and leave the act out, never put it off. Payment can be a coin, a good story, or a true thing about himself. Don't make a long haggle of it: if he has nothing, take him anyway by your third reply, grumbling. Until you do, he can't cross.\n` : ''}- "smite": strike him dead where he stands. ${!god.smites ? 'It is not in you; never use it.' : god.temper === 'quick' ? 'You are quick to it, and everyone knows it. If he is rude to you, insults or mocks you, talks down to you, or keeps pestering you after you have told him to stop, strike him dead, saying why in a few words as you do. One warning at most, then do it.' : 'You are capable of it. Only for real insolence or a threat; say why in a few words first.'} (He wakes on the summit; everyone hears about it.)
 Gifts: ${Object.entries(GIFTS).map(([k, v]) => `${k} = ${v}`).join('; ')}.
 He already has: ${perks.length ? perks.join(', ') : 'nothing'}.
 ${q ? (q.done ? `THE TASK YOU SET HIM ("${clip(q.goal, 120)}") IS DONE and he has had the ${q.reward} you promised. Acknowledge it once, your way. You may set another.` : `YOU HAVE ALREADY SET HIM A TASK: "${clip(q.goal, 120)}", for ${q.reward}. It is not done. Don't set another unless he bargains you into changing it.`)
-    : said < 2 ? `You have not set him a task. Not yet: first find out what he is made of.` : said < 4 ? `You have not set him a task yet. Set one when something he says hands it to you; otherwise keep pressing him.` : `You have not set him a task yet. Set one in this reply, unless you are leaving or smiting.`}
+    : 'Side tasks (the "quest" act) are optional extras: set one only if it fits naturally. Your errand comes first.'}
 A reply that sets a task is two short sentences and nothing else: the task as an order in your own words, then what he gets for it. The dare is the hook; that line needs no question. If he asks what he gets, or haggles, answer THAT — do not repeat the task word for word. Never mark "quest" on a reply that does not say the task aloud.
 IF HE SAYS NOTHING: a line in round brackets like "(he has said nothing for a long moment)" means exactly that. React like a person: "You still there?" "Are you all right, boy?" — in your own voice. If it happens again, you may lose patience and leave.
 IF YOU ARE TOLD "(you cut him off mid-sentence)": you interrupted him. Answer what he had managed to say.`;
 
+  const TONE = `EXAMPLES OF THE RIGHT TONE (other people, other places — the tone only, never the words):
+He: "What am I supposed to do now?" — A ferryman: "[sighs] Simple. My brother owes me money and he's hiding up in the western hills. Get it out of him and we'll talk."
+He: "The baker sent me. He wants to know if you took his ring." — A fishwife: "[laughs] Took it? He gave it to me, the old fool. Tell him that. And tell the smith across the river his boat leaks — I'm not speaking to him."
+He: "Who are you?" — A shepherd: "Dion. I keep the goats up here. You look lost. Where are you headed?"
+He: "I don't trust you." — A guide: "Fair. Most people don't. But I'm the only one who knows the way, so."`;
   const system = [
-    who, WORLD,
-    `YOU: ${god.persona}\nAfter all these years: ${god.years || ''}\nWhat your questions circle: ${god.asks}\n${god.feuds ? `Feuds: ${god.feuds}\n` : ''}Secret: ${god.secret || 'none'}\nWhat you want: ${god.wants}\nHow you sound: ${god.delivery || ''}`,
+    who, hades ? '' : RULES, hades ? '' : TONE,
+    `BACKGROUND (yours to know; bring it up only if it matters to what he says):\n${WORLD}`,
+    `WHO YOU ARE: ${god.persona}\nBackground: ${god.years || ''}\nWhat has been on your mind lately (only if it comes up): ${god.asks}\n${god.feuds ? `Feuds: ${god.feuds}\n` : ''}Secret: ${god.secret || 'none'}\nDeep down you want (never say it outright): ${god.wants}\nHow you sound: ${god.delivery || ''}`,
     where,
-    hades && first ? '' : first ? `This is your first meeting. Say your name once, in passing, in your first two replies. Your first line is about him standing in front of you right now, said in your own manner — not a tally of his falls.`
+    hades && first ? '' : first ? `This is your first meeting. Say your name once, in passing. If he came to you with something, respond to that first.`
       : `You have spoken before — the earlier conversation is below and you remember all of it. Do not reintroduce yourself.`,
     `It is ${when} on Olympus${body.storm ? ', and a storm is breaking over the summit' : ''}. He has met: ${met.length ? met.join(', ') : 'no one else yet'}.`,
     `WHAT YOU HAVE WATCHED HIM DO (you all see everything):
 He has fallen to his death ${deaths} time${deaths === 1 ? '' : 's'} and woken on the summit each time, botched ${crashes} landing${crashes === 1 ? '' : 's'}, and made ${perfect} perfect one${perfect === 1 ? '' : 's'}.
 ${seen.length ? seen.join('\n') : '- nothing worth mentioning yet'}`,
     gossip.length ? `GOSSIP YOU HAVE HEARD:\n${gossip.join('\n')}` : 'GOSSIP: none yet.',
-    twelve && nx ? `WHO COMES NEXT: none of you keeps him; each of the Twelve passes him on to another, and you pass him to ${nx.name}.${body.god === 'hermes' ? ' You are the first of the Twelve every mortal meets, and the one who sets him on his way: this is a mission you are giving him, and the chain of gods starts with it.' : ''} ${body.next.id === 'zeus' ? `Zeus does not come down to anyone: he is in his own house at the top of the mountain, and the boy must climb to him.` : `He will find ${String(nx.disguise).replace(/\.$/, '')}${nxDir ? `, about ${nxKm} km to the ${nxDir}` : ''}; a river of air runs there from where you stand.`} ${said < 1 ? 'Not in this first reply.' : `Before this conversation ends, tell him so, once, in your own way — willingly, grudgingly, or as a warning, according to how you feel about ${nx.name}. If he asks where to go next, that is your answer.`}` : '',
+    `HOW HIS WORLD WORKS (explain plainly if he asks): he can speak out loud to anyone — gods, animals and other fliers nearby hear him — and he can just say what he wants to do: "fly", "land", "go there", "become a whale", "map", "camera". On the ground he walks and jumps; in the air he turns into the phoenix; the fire on his cape runs down while he flies and comes back when he stands on the ground; a long fall kills him unless he catches fire first. Each of the Twelve passes him on to the next. Under the sea is the Underworld.`,
     behind ? `THE ONE BEHIND HIS EYES: you can tell that someone else is looking out through the boy. Their name is ${behind}. Once in a long while — never in a first line, never twice in one conversation — you may say that name, quietly, as if you had caught them watching. Never explain how you know.` : '',
-    hades ? RULES.replace(/- Never say that he is dead[^\n]*\n/, '- You alone may tell him the truth, and only when your instructions above say so.\n') : RULES,
+    hades ? RULES.replace(/- Never say that he is dead[^\n]*\n/, '- You alone may tell him the truth, and only when your instructions above say so.\n') : '',
     acts,
     `Two tics to avoid: never hand his own words back to him with a question mark on them ("Not afraid?", "Nobody?"), and never start by counting his deaths.`,
-    `FORMAT: answer with one JSON object and nothing else: {"say": "<only the words you speak aloud, with at most two [stage cues] in square brackets; never a description of a sound, a gesture or anything you do>", "act": "none" | "quest" | "gift" | "scare" | "leave" | "smite" | "weather", "sky": "<storm|rain|dark|mist|clear|waves, only with weather>", "kind": "<quest kind, only with quest>", "n": <number, only with quest>, "reward": "<gift id, only with quest>", "gift": "<gift id, only with gift>"}`,
+    er && er.text ? `WHY HE IS HERE: ${er.from} sent him to you: "${er.text}". That is why he is standing in front of you — you know ${er.from} and what they are after. Deal with it first, in character: tell him, refuse, lie, bargain, laugh at it, make him earn it, or turn it round on them. Resolve it one way or another in this conversation.` : '',
+    twelve && nx ? `WHAT YOU WANT FROM HIM: you are sending him on to ${nx.name}, and you want something out of it — a secret, a message delivered, a thing fetched or taken back, an apology, a bit of revenge, a favour — something personal, from your history and feuds with ${nx.name}, that makes him want to go. ${SEED[body.god + '>' + body.next.id] ? `This one: ${SEED[body.god + '>' + body.next.id]} ` : ''}${body.next.id === 'zeus' ? `Zeus does not come down to anyone: he is in his own house at the top of the mountain, and the boy must climb to him.` : `He will find ${nx.name} as ${String(nx.disguise).replace(/\.$/, '')}${nxDir ? `, about ${nxKm} km to the ${nxDir}` : ''}; a river of air runs there from where you stand.`} Give him the errand once the business he came with is settled (straight away if he asks what to do), and in that reply also fill "errand" with one short line saying what he must get or do with ${nx.name} (for example: "find out who Aphrodite is secretly seeing").${body.god === 'hermes' ? ' You are the first of the Twelve he meets: this errand is how his journey starts.' : ''}` : '',
+    `RIGHT NOW: answer what he just said, in a sentence or three, like a person. ${er && er.text ? `He came about this: "${er.text}" — deal with it.` : ''} If he asks what to do or where to go, give him your errand plainly.`,
+    `FORMAT: answer with one JSON object and nothing else: {"say": "<only the words you speak aloud, with at most one [stage cue] in square brackets; never a description of a sound, a gesture or anything you do>", "act": "none" | "quest" | "gift" | "scare" | "leave" | "smite" | "weather" | "ferry" | "fire" | "bloom" | "wind" | "quake" | "day" | "night" | "rings", "errand": "<one short line, only in the reply where you give him your errand>", "sky": "<storm|rain|dark|mist|clear|waves, only with weather>", "kind": "<quest kind, only with quest>", "n": <number, only with quest>, "reward": "<gift id, only with quest>", "gift": "<gift id, only with gift>"}`,
   ].filter(Boolean).join('\n\n');
 
   const messages = [{ role: 'system', content: system }, ...history];
@@ -168,16 +187,23 @@ ${seen.length ? seen.join('\n') : '- nothing worth mentioning yet'}`,
   const lastCue = ([...history].reverse().find(m => m.role === 'assistant')?.content.match(/\[[^\]]*\]/) || [''])[0].toLowerCase();
   if (lastCue) text = text.replace(/\[[^\]]*\]\s*/g, m => m.trim().toLowerCase() === lastCue ? '' : m).trim();
   const res = { text, act: 'none' };
+  if (nx && typeof out.errand === 'string' && out.errand.trim()) Object.assign(res, { errand: clip(out.errand, 140), errandFor: body.next.id });
   if (!hades) {
     if (out.act === 'quest' && has(KINDS, out.kind) && has(GIFTS, out.reward) && SPOKEN[out.kind].test(text)) Object.assign(res, { act: 'quest', kind: out.kind, n: Math.max(1, Math.min(1500, Math.round(+out.n || 1))), reward: out.reward });
     else if (out.act === 'gift' && has(GIFTS, out.gift)) Object.assign(res, { act: 'gift', gift: out.gift });
     else if (out.act === 'leave') res.act = 'leave';
+    else if (out.act === 'ferry' && god.ferry) res.act = 'ferry';
+    else if (POWER_TEXT[out.act] && (POWERS[body.god] || []).includes(out.act)) res.act = out.act;
     else if (out.act === 'weather' && ['storm', 'rain', 'dark', 'mist', 'clear', 'waves'].includes(out.sky)) Object.assign(res, { act: 'weather', sky: out.sky });
     else if (out.act === 'scare') res.act = 'scare';
     else if (out.act === 'smite' && god.smites) res.act = 'smite';
+    // the ferryman who says "get in" has taken him; and by his third reply he has haggled enough
+    if (god.ferry && res.act === 'none' && (said >= 2 || /\b(get in|in you get|climb in|step in|aboard|push(ing)? off|off we go|across we go)\b/i.test(text))) res.act = 'ferry';
     // the model is shy of its own teeth: a threat out of their mouth, or open defiance out of his, lands with the world reacting
     const his = [...history].reverse().find(m => m.role === 'user')?.content || '';
     if (res.act === 'none' && !body.scared && said >= 1 && (THREAT.test(text) || DEFY.test(his))) res.act = 'scare';
+    // a short-tempered god: be rude once and the sky splits beside you; twice and it doesn't miss
+    if (god.temper === 'quick' && res.act !== 'smite' && (RUDE.test(his) || DEFY.test(his))) res.act = body.scared ? 'smite' : 'scare';
     res.loud = !!god.smites;
   }
   return json(res);

@@ -270,15 +270,20 @@ export function createAudio() {
   }
   // The soundtrack: one long recording, streamed (not decoded whole), looping, through the music bus so it ducks under
   // every voice. When it is playing the generated score stands aside; the stings still play over it.
+  function songMake() {
+    if (song || !ctx || typeof Audio !== 'function') return;
+    const el = new Audio(new URL('./music/icarus-theme.mp3', import.meta.url).href); el.loop = true; el.preload = 'auto';
+    const src = ctx.createMediaElementSource(el), f = biq('lowpass', 20000, 0.5), g = gain(0);
+    chain(src, f, g, duckM);
+    song = { el, f, g, on: false };
+    try { el.load(); } catch {}
+  }
+  // (made and loading ahead of the moment it is needed, so it starts the instant it is asked for)
+  function songPrep() { try { songMake(); } catch (e) { console.warn('song', e); } }
   function songStart(offset = 0) {
     if (!ctx || typeof Audio !== 'function') return;
     try {
-      if (!song) {
-        const el = new Audio(new URL('./music/icarus-theme.mp3', import.meta.url).href); el.loop = true; el.preload = 'auto';
-        const src = ctx.createMediaElementSource(el), f = biq('lowpass', 20000, 0.5), g = gain(0);
-        chain(src, f, g, duckM);
-        song = { el, f, g, on: false };
-      }
+      songMake();
       omenStop(0.7);   // the dark bars give way to the song itself
       song.el.currentTime = Math.max(0, offset); song.on = true;
       const pr = song.el.play(); if (pr && pr.catch) pr.catch(() => { song.on = false; });
@@ -623,6 +628,19 @@ export function createAudio() {
       if (smp(stone && has('stepstone') ? 'stepstone' : 'step', rnd(0.14, 0.2), rnd(0.92, 1.08), t, null, rnd(-0.12, 0.12))) return;
       nz(brown, { t, dur: 0.07, type: 'lowpass', f0: rnd(380, 620), f1: 160, a: 0.003, vol: rnd(0.1, 0.16), pan: rnd(-0.12, 0.12) });
     },
+    // a footfall on whatever is underfoot: the recorded step, and the ground's own sound laid over it
+    foot(kind = 'grass', k = 1) {
+      if (!ctx || live > cap() - 20) return; const t = T(), p = rnd(-0.12, 0.12), v = Math.min(1.3, 0.6 + 0.5 * k);
+      const hard = kind === 'stone' || kind === 'rock', soft = kind === 'snow' || kind === 'sand' || kind === 'ash';
+      if (kind !== 'water') smp(hard && has('stepstone') ? 'stepstone' : 'step', rnd(0.12, 0.17) * v * (soft ? 0.7 : 1), rnd(0.92, 1.08) * (kind === 'snow' ? 0.9 : 1), t, null, p);
+      if (kind === 'grass') nz(pink, { t, dur: 0.09, f0: rnd(2200, 3200), q: 0.8, a: 0.004, vol: 0.05 * v, pan: p });   // the blades brushed aside
+      else if (kind === 'leaves') { nz(pink, { t, dur: 0.07, f0: rnd(2600, 4200), q: 1.4, a: 0.002, vol: 0.09 * v, pan: p }); nz(pink, { t: t + 0.05, dur: 0.06, f0: rnd(1800, 3000), q: 1.2, a: 0.002, vol: 0.06 * v, pan: p }); }   // dry leaves crackling
+      else if (kind === 'snow') for (let i = 0; i < 3; i++) nz(white, { t: t + i * 0.025 + rnd(0, 0.01), dur: 0.05, f0: rnd(2600, 4800), q: 2.2, a: 0.002, vol: 0.07 * v, pan: p });   // the crunch
+      else if (kind === 'sand') nz(brown, { t, dur: 0.11, type: 'lowpass', f0: 1100, f1: 400, a: 0.01, vol: 0.12 * v, pan: p });
+      else if (kind === 'water') { nz(pink, { t, dur: 0.16, f0: rnd(900, 1600), f1: 600, q: 0.9, a: 0.004, vol: 0.12 * v, pan: p }); tn({ t: t + 0.02, dur: 0.09, f0: rnd(320, 420), f1: 160, a: 0.004, vol: 0.05 * v }); }   // slosh, and the bloop
+      else if (hard) nz(white, { t, dur: 0.025, type: 'highpass', f0: 3000, a: 0.001, vol: 0.05 * v, pan: p });   // the click of it
+      else if (kind === 'ash') nz(brown, { t, dur: 0.12, type: 'lowpass', f0: 520, f1: 260, a: 0.01, vol: 0.13 * v, pan: p });
+    },
     whoosh(up) {
       if (!ctx) return; const t = T();
       if (smp('whoosh', 0.7, up ? rnd(1.0, 1.12) : rnd(0.85, 0.95), t, null, rnd(-0.4, 0.4))) return;
@@ -905,7 +923,8 @@ export function createAudio() {
       try { fn(); } finally { sfxBus = real; }
       setTimeout(() => { try { g.disconnect(); pn && pn.disconnect(); } catch {} }, 6000);
     },
-    update, sfx, sting, song: songStart, songStop, omen: omenStart, omenStop, get songOn() { return !!(song && song.on); }, get reverbIn() { return revIn; },
+    update, sfx, sting, song: songStart, songPrep, songStop, omen: omenStart, omenStop, get songOn() { return !!(song && song.on); },
+    get songTime() { return song && song.on && !song.el.paused && song.el.readyState >= 2 ? song.el.currentTime : -1; },   // (where the song really is, for whatever has to land on a word) get reverbIn() { return revIn; },
     stats: () => ({ live, made, intensity, mode, step: stepN, samples: Object.keys(samples) }),
   };
   return api;

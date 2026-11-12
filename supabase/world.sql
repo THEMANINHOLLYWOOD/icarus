@@ -37,3 +37,19 @@ alter table public.world_marks enable row level security;
 alter table public.travellers  enable row level security;
 revoke all on public.world_cells, public.world_marks, public.travellers from anon, authenticated;
 grant select, insert, update, delete on public.world_cells, public.world_marks, public.travellers to service_role;
+
+-- Rivers of wind players blow across the sky (api/world.js). Anyone who flies into one is carried down it; they stay.
+create table if not exists public.world_winds (
+  id text primary key check (id ~ '^[a-z0-9]{4,12}$'),
+  realm text not null check (realm in ('over','under')),
+  cx real not null, cz real not null,                      -- its middle, to find the ones near someone
+  pts jsonb not null check (jsonb_typeof(pts) = 'array' and jsonb_array_length(pts) between 15 and 180),   -- x, y, z, x, y, z, ...
+  patron text not null default '',                         -- whose colour it flies in
+  by_name text not null default '', by_hash text not null default '',
+  at timestamptz not null default now()
+);
+create index if not exists world_winds_place on public.world_winds (realm, cx, cz);
+create index if not exists world_winds_at on public.world_winds (at desc);
+alter table public.world_winds enable row level security;
+revoke all on public.world_winds from anon, authenticated;
+grant select, insert, update, delete on public.world_winds to service_role;

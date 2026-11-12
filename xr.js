@@ -68,7 +68,10 @@ export function makeHands() {
     S.prev = palm;
     S.hist.push([H.t, palm.y, palm.z]); while (S.hist.length && H.t - S.hist[0][0] > 0.33) S.hist.shift();
     const dy = S.hist.length ? palm.y - Math.min(...S.hist.map(h => h[1])) : 0, dropY = S.hist.length ? Math.max(...S.hist.map(h => h[1])) - palm.y : 0;
-    return { palm, palmW, n, straight, open, fist, point, aim, pinch, v: S.v, rise: dy, drop: dropY };
+    // the thumb, for a thumbs-up or a thumbs-down: out from the fist and pointing up or down
+    const tt = joints['thumb-tip'], tpx = joints['thumb-phalanx-proximal'];
+    const thumb = tt && tpx ? { up: tt.y - w.y > 0.05 && tt.y - tpx.y > 0.02, down: w.y - tt.y > 0.05 && tpx.y - tt.y > 0.02 } : null;
+    return { palm, palmW, n, straight, open, fist, point, aim, pinch, thumb, v: S.v, rise: dy, drop: dropY };
   }
   const ready = (name, t) => (H.cool[name] || 0) <= H.t ? ((H.cool[name] = H.t + t), true) : false;
 
