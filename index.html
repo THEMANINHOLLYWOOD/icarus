@@ -338,6 +338,23 @@
   #menuBtn.open i:nth-child(2) { opacity:0; transform:scaleX(.2); }
   #menuBtn.open i:nth-child(3) { transform:translateY(-5.5px) rotate(-45deg); }
   #menuBtn.talk { box-shadow:0 0 0 2px rgba(255,140,60,.6); }
+  /* the keeper's readout (only for whoever flies as ANDRES): a dot and a number in the corner; a tap opens the rest */
+  #health { display:none; position:fixed; right:calc(var(--sr) + 12px); top:calc(var(--st) + 10px); z-index:21; font-size:10px; letter-spacing:.12em; color:var(--dim); text-align:right; pointer-events:none; }
+  #health.on { display:block; }
+  .photo #health, .pro #health, body:has(#menu.open) #health { display:none; }
+  #healthPill { pointer-events:auto; cursor:pointer; display:inline-flex; align-items:center; gap:7px; min-height:26px; padding:4px 8px; border:0; border-radius:13px; background:none; color:inherit; font:inherit; letter-spacing:inherit; text-shadow:0 0 6px #000; -webkit-tap-highlight-color:transparent; }
+  #healthPill:focus-visible { outline:1px solid var(--ember); }
+  #healthPill i { width:6px; height:6px; border-radius:50%; background:#7fd6a0; box-shadow:0 0 7px rgba(127,214,160,.8); flex:none; }
+  #health.warn #healthPill i { background:#ffc46a; box-shadow:0 0 7px rgba(255,196,106,.8); } #health.warn #healthPill span { color:#ffc46a; }
+  #health.bad #healthPill i { background:#ff5a4a; box-shadow:0 0 8px rgba(255,90,74,.9); animation:healthBeat 1.1s ease-in-out infinite; } #health.bad #healthPill span { color:#ff8a7a; }
+  @keyframes healthBeat { 50% { opacity:.35; } }
+  #healthBox { display:none; margin-top:2px; padding:9px 12px 10px; box-sizing:border-box; width:max-content; max-width:min(460px, calc(100vw - var(--sl) - var(--sr) - 24px)); margin-left:auto; background:rgba(5,7,13,.88); border:1px solid rgba(244,234,210,.14); border-radius:6px;
+    text-align:left; line-height:1.7; letter-spacing:.06em; pointer-events:auto; backdrop-filter:blur(3px); }
+  #health.open #healthBox { display:grid; grid-template-columns:auto minmax(0, 1fr); column-gap:14px; }
+  #healthBox b { font-weight:400; color:var(--dim); opacity:.7; } #healthBox span { color:var(--ink); overflow-wrap:anywhere; } #healthBox span.w { color:#ffc46a; } #healthBox span.x { color:#ff8a7a; }
+  .touch #health { right:auto; left:50%; transform:translateX(-50%); top:calc(var(--st) + 2px); text-align:center; }
+  .touch #healthPill { min-height:40px; padding:8px 16px; } .touch #healthBox { margin:0 auto; max-height:calc(100vh - var(--st) - var(--sb) - 56px); overflow-y:auto; }
+  @media (prefers-reduced-motion: reduce) { #health.bad #healthPill i { animation:none; } }
   .photo #menuBtn, .pro #menuBtn, body:has(#title:not(.hidden)) #menuBtn { opacity:0; pointer-events:none; }
   #menu { position:fixed; left:0; right:0; top:0; z-index:23; box-sizing:border-box; padding:calc(var(--st) + 8px) calc(var(--sr) + 10px) 8px calc(var(--sl) + 10px);
     display:grid; grid-template-columns:repeat(auto-fit, minmax(64px, 1fr)); gap:2px; background:rgba(6,7,12,.93);
@@ -429,6 +446,7 @@
 <div id="photoHint">WASD MOVE · DRAG TO LOOK · Q / E DOWN / UP · Z / X TILT · WHEEL LENS · 1–6 VIEWS · SPACE TAKES IT · + GOES BACK</div>
 <div id="patron" class="hidden"><b>CHOOSE YOUR PATRON</b><i>one of the Twelve will stand for you — and your fire will burn in their colour</i><div id="patronGrid"></div><u id="patronAny">let the gods decide</u></div>
 <button id="menuBtn" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu"><i></i><i></i><i></i><small id="menuCount"></small></button><div id="menu" role="menu" aria-label="Menu"></div>
+<div id="health"><button id="healthPill" type="button" aria-label="Site health" aria-expanded="false" aria-controls="healthBox"><i></i><span></span></button><div id="healthBox"></div></div>
 <div id="who"></div><button id="micBtn" type="button" aria-label="Microphone"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15"/><path class="x" d="M2 2l12 12" style="display:none"/></svg></button><button id="whoBtn" type="button"></button>
 <div id="map"><canvas id="mapC"></canvas><div id="mapTitle"></div><div id="mapHint"></div></div>
 
@@ -4778,6 +4796,7 @@ function netJoin() {
   if (NET.ch) { try { NET.sb.removeChannel(NET.ch); } catch {} NET.ch = null; }
   CHAT.joinedAt = performance.now();
   const ch = NET.ch = NET.sb.channel('world', { config: { broadcast: { self: false, ack: false }, presence: { key: NET.id } } });
+  healthCount(ch);
   ch.on('presence', { event: 'sync' }, () => {
     const st = ch.presenceState(), here = new Set();
     const quiet = performance.now() - CHAT.joinedAt < 4000;
@@ -5282,6 +5301,100 @@ function menuShow(on) {
   else m.classList.remove('open');
 }
 $('menuBtn').addEventListener('click', e => { e.stopPropagation(); menuShow(!MENU.open); $('menuBtn').blur(); });
+// ── the keeper's readout. Whoever flies under the name ANDRES sees how the site itself is doing: a dot and the frame
+//    rate in the corner (green, amber, red, with the reason beside it when something is wrong), and a tap, or saying
+//    "health", opens the rest: frames, the shared world's messages against its allowance, every call to the server and
+//    which failed, what has been downloaded, what the services behind it answer, and the last thing that went wrong.
+//    Everything is counted for everyone (it costs nothing), so what went wrong before the name was typed is there too.
+const HEALTH = { me: false, open: false, t: performance.now(), frames: 0, worst: 0, fps: 60, slow: 0, lowN: 0, out: 0, in: 0, outR: 0, inR: 0, ws: 0, api: new Map(), calls: 0, fails: 0, lastFail: null,
+  errs: 0, lastErr: null, bytes: 0, srv: null, srvT: -1e9, srvBad: 0, ctxLost: false, offT: 0, el: null };
+{ const f0 = window.fetch.bind(window);
+  window.fetch = async (u, o) => {   // (every call the page makes to its own server: how many, how long, and what came back)
+    const m = (typeof u === 'string' ? u : u?.url || '').match(/^\/api\/([a-z]+)/);
+    if (!m || m[1] === 'health') return f0(u, o);
+    const k = m[1], t0 = performance.now(), e = HEALTH.api.get(k) || { n: 0, bad: 0, ms: 0, last: 0 }; HEALTH.api.set(k, e); e.n++; HEALTH.calls++;
+    const bad = st => { e.bad++; HEALTH.fails++; HEALTH.lastFail = { k, s: st, t: performance.now() }; };
+    try { const r = await f0(u, o); e.ms = performance.now() - t0; e.last = r.status; if (!r.ok && r.status !== 501) bad(r.status); return r; }   // (501: that service isn't set up here, which is not a failure)
+    catch (err) { e.ms = performance.now() - t0; e.last = 0; bad(err?.name === 'TimeoutError' || err?.name === 'AbortError' ? 'timeout' : 'offline'); throw err; }
+  }; }
+addEventListener('error', e => { HEALTH.errs++; HEALTH.lastErr = { m: String(e.message || 'error').slice(0, 90), at: e.lineno || 0, t: performance.now() }; });
+addEventListener('unhandledrejection', e => { HEALTH.errs++; HEALTH.lastErr = { m: String(e.reason?.message || e.reason || 'a promise failed').slice(0, 90), at: 0, t: performance.now() }; });
+canvas.addEventListener('webglcontextlost', () => { HEALTH.ctxLost = true; }); canvas.addEventListener('webglcontextrestored', () => { HEALTH.ctxLost = false; });
+try { new PerformanceObserver(l => { for (const e of l.getEntries()) HEALTH.bytes += e.transferSize || 0; }).observe({ type: 'resource', buffered: true }); } catch {}
+function healthCount(ch) {   // the shared channel: what goes out and what comes in
+  const s0 = ch.send.bind(ch), on0 = ch.on.bind(ch);
+  ch.send = (m, o) => { HEALTH.out++; if (HEALTH.me) try { HEALTH.ws += JSON.stringify(m.payload || '').length + 60; } catch {} return s0(m, o); };
+  ch.on = (type, f, cb) => on0(type, f, type === 'broadcast' ? x => { HEALTH.in++; if (HEALTH.me) try { HEALTH.ws += JSON.stringify(x.payload || '').length + 60; } catch {} return cb(x); } : cb);
+}
+const hAgo = t => { const sec = Math.max(0, Math.round((performance.now() - t) / 1000)); return sec < 90 ? `${sec}s ago` : `${Math.round(sec / 60)}m ago`; };
+const hSize = b => b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`;
+function healthShow(on) {
+  HEALTH.open = on; $('health').classList.toggle('open', on); $('healthPill').setAttribute('aria-expanded', on ? 'true' : 'false');
+  if (on) { if (performance.now() - HEALTH.srvT > 15000) healthAsk(); healthDraw(); }
+}
+async function healthAsk() {   // what the services behind the site answer (the server remembers it for a minute, so asking is cheap)
+  HEALTH.srvT = performance.now();
+  try { const r = await fetch('/api/health'); if (!r.ok) throw 0; HEALTH.srv = await r.json(); HEALTH.srvBad = 0; } catch { HEALTH.srvBad++; }
+  if (HEALTH.open) healthDraw();
+}
+// how it is doing, in one word and a colour: 0 fine, 1 worth a look, 2 broken
+function healthLevel() {
+  const now = performance.now(), S = HEALTH.srv, f = HEALTH.lastFail, e = HEALTH.lastErr, recent = t => now - t < 60000;
+  if (HEALTH.ctxLost) return [2, 'GRAPHICS LOST'];
+  if (navigator.onLine === false) return [2, 'OFFLINE'];
+  if (e && recent(e.t)) return [2, 'ERROR'];
+  if (f && recent(f.t) && f.s !== 429) return [2, `${f.k.toUpperCase()} ${String(f.s).toUpperCase()}`];
+  if (HEALTH.srvBad >= 2) return [2, 'SERVER SILENT'];
+  if (S) for (const [k, n] of [['ai', 'AI'], ['voice', 'VOICE'], ['db', 'SAVES']]) if (S[k] && !S[k].ok) return [2, `${n} DOWN`];
+  if (f && recent(f.t)) return [1, `${f.k.toUpperCase()} LIMIT`];
+  if (S?.voice?.used >= 90) return [1, `VOICE ${S.voice.used}% USED`];
+  if (API.mp && !NET.on && HEALTH.offT > 15) return [1, 'WORLD OFFLINE'];
+  if (healthShare() > 80) return [1, 'WORLD BUSY'];
+  if (HEALTH.lowN >= 5) return [1, 'SLOW'];
+  return [0, ''];
+}
+// the shared world's allowance: every copy delivered to anyone counts, so with everyone sending alike it is what comes in here, times everyone
+const healthShare = () => Math.round(HEALTH.inR * ([...NET.peers.values()].filter(P => P.seen).length + 1));
+function healthDraw() {
+  const [lv, why] = healthLevel(), h = $('health');
+  h.classList.toggle('warn', lv === 1); h.classList.toggle('bad', lv === 2);
+  $('healthPill').lastChild.textContent = `${Math.round(HEALTH.fps)} FPS${why ? ' · ' + why : ''}`;
+  if (!HEALTH.open) return;
+  if (!HEALTH.el) { HEALTH.el = {}; for (const k of ['frames', 'world', 'voice', 'server', 'calls', 'services', 'loaded', 'errors']) { const b = document.createElement('b'), sp = document.createElement('span'); b.textContent = k; HEALTH.el[k] = sp; $('healthBox').append(b, sp); } }
+  const set = (k, text, lvl = 0) => { const el = HEALTH.el[k]; if (el.textContent !== text) el.textContent = text; el.className = lvl === 2 ? 'x' : lvl === 1 ? 'w' : ''; };
+  const now = performance.now(), flying = [...NET.peers.values()].filter(P => P.seen).length + 1, S = HEALTH.srv, f = HEALTH.lastFail, e = HEALTH.lastErr, mem = performance.memory?.usedJSHeapSize;
+  set('frames', `${Math.round(HEALTH.fps)} fps · worst ${Math.round(HEALTH.slow)} ms · ${tier.name.toLowerCase()} ${canvas.width}×${canvas.height}`, HEALTH.ctxLost ? 2 : HEALTH.lowN >= 5 ? 1 : 0);
+  const share = healthShare();
+  set('world', !API.mp ? 'not set up here' : NET.on ? `on · ${flying} flying · ${HEALTH.outR.toFixed(0)}↑ ${HEALTH.inR.toFixed(0)}↓ a second · ${share}% of its limit` : 'offline', API.mp && !NET.on && HEALTH.offT > 15 ? 1 : share > 80 ? 1 : 0);
+  set('voice', `mic ${mic.denied ? 'blocked' : !mic.stream ? 'not asked' : VC.muted ? 'off' : 'on'}${mic.mode ? ` (${mic.mode === 'sr' ? 'browser' : 'server'} hearing)` : ''} · ${VC.pcs.size} call${VC.pcs.size === 1 ? '' : 's'}${cam.on ? ' · hands on' : ''}`);
+  const worst = [...HEALTH.api.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 5).map(([k, v]) => `${k} ${v.n}${v.bad ? `(${v.bad}✕)` : ''}`).join(' · ');
+  set('server', HEALTH.calls ? `${HEALTH.calls} call${HEALTH.calls === 1 ? '' : 's'} · ${HEALTH.fails} failed${f ? ` · last ${f.k} ${f.s} ${hAgo(f.t)}` : ''}` : 'no calls yet', f && now - f.t < 60000 ? (f.s === 429 ? 1 : 2) : 0);
+  set('calls', worst || '—');
+  const svc = (k, n) => !S?.[k] ? `${n} off` : S[k].ok ? `${n} ${S[k].ms} ms` : `${n} DOWN`;
+  set('services', !S ? (HEALTH.srvBad ? 'no answer' : 'asking…') : `${svc('ai', 'ai')} · ${svc('voice', 'voice')}${S.voice?.used != null ? ` (${S.voice.used}% of the month used)` : ''} · ${svc('db', 'saves')}`,
+    !S ? (HEALTH.srvBad >= 2 ? 2 : 0) : ['ai', 'voice', 'db'].some(k => S[k] && !S[k].ok) ? 2 : S.voice?.used >= 90 ? 1 : 0);
+  set('loaded', `${hSize(HEALTH.bytes)} page · ${hSize(HEALTH.ws)} live${mem ? ` · ${Math.round(mem / 1048576)} MB mem` : ''} · ${renderer.info.memory.geometries} geo`);
+  set('errors', e ? `${HEALTH.errs} · ${e.m}${e.at ? ` (line ${e.at})` : ''} · ${hAgo(e.t)}` : 'none', e ? (now - e.t < 60000 ? 2 : 1) : 0);
+}
+// once a second: the counts turned into rates, and the readout redrawn for whoever it is for
+function updateHealth() {
+  const now = performance.now(), span = (now - HEALTH.t) / 1000;
+  if (span < 1) return;
+  HEALTH.t = now;
+  if (span < 2.5 && !document.hidden) {   // (a tab that was away has no frame rate worth reporting)
+    HEALTH.fps = HEALTH.frames / span; HEALTH.slow = HEALTH.worst * 1000; HEALTH.outR = HEALTH.out / span; HEALTH.inR = HEALTH.in / span;
+    HEALTH.lowN = state === 'play' && HEALTH.fps < 24 ? HEALTH.lowN + 1 : 0;
+    HEALTH.offT = API.mp && !NET.on && state === 'play' ? HEALTH.offT + span : 0;
+  }
+  HEALTH.frames = 0; HEALTH.worst = 0; HEALTH.out = HEALTH.in = 0;
+  const me = heroName === 'ANDRES' && state !== 'title' && state !== 'loading' && state !== 'prologue' && state !== 'end' && !XR.on;
+  if (me !== HEALTH.me) { HEALTH.me = me; $('health').classList.toggle('on', me); if (!me && HEALTH.open) healthShow(false); }
+  if (!me) return;
+  if (now - HEALTH.srvT > (HEALTH.open ? 60000 : 180000)) healthAsk();
+  healthDraw();
+}
+$('healthPill').addEventListener('click', e => { e.stopPropagation(); healthShow(!HEALTH.open); $('healthPill').blur(); audio.sfx.ui?.(); });
+for (const ev of ['pointerdown', 'touchstart']) $('health').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 for (const ev of ['pointerdown', 'touchstart']) $('menuBtn').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 $('menu').addEventListener('pointerdown', e => { e.stopPropagation(); MENU.y0 = e.clientY; });
 $('menu').addEventListener('pointerup', e => { if (MENU.y0 - e.clientY > 26) menuShow(false); });   // (pushed back up: it goes)
@@ -9411,7 +9524,7 @@ function updateFlies(dt) {
 const AP = { q: [], kind: '', t0: 0, until: 0, tx: 0, ty: 0, tb: false, run: false, ax: 0, ay: 0, boost: false, nextT: 0, wp: null, flyT: -9, askT: -9 };
 AP.el = (() => { const el = document.createElement('div'); el.className = 'mk'; el.innerHTML = '<b>✦</b><span></span>'; el.style.display = 'none'; $('markers').appendChild(el); return el; })();
 AP.beam = (() => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 700, 8, 1, true).translate(0, 350, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.15, 0.5), transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); m.visible = false; m.frustumCulled = false; scene.add(m); return m; })();
-const V_SAY = 'SAY: FLY · LAND · GLIDE · BIRD · DIVE · CLIMB · FASTER · BLOW · LEFT · WALK · STOP · GO THERE · MAP · CAMERA · CINEMATIC · PLAYERS · BECOME A WHALE';
+const V_SAY = 'SAY: FLY · LAND · GLIDE · BIRD · DIVE · CLIMB · FASTER · BLOW · LEFT · WALK · STOP · GO THERE · MAP · CAMERA · CINEMATIC · PLAYERS · MENU · HANDS ON · BECOME A WHALE';
 function apClear() { AP.kind = ''; AP.until = 0; AP.tx = AP.ty = 0; AP.tb = false; }
 function apTimed(x, y, secs, boost = false) { AP.kind = 'timed'; AP.tx = x; AP.ty = y; AP.tb = boost; AP.until = time + secs; }
 function apMark(w) {
@@ -9446,7 +9559,7 @@ function voiceFly() {
   if (p.form === 'phoenix') { apTimed(0, 0.75, 2.2); return; }
   const k = spaceAction()?.kind;
   if (p.grounded || p.climb) {
-    if (k === 'ignite' || k === 'jumpoff' || story.phase === 'summit') { pressSpace(); return; }
+    if (k === 'ignite' || k === 'jumpoff' || k === 'breach' || story.phase === 'summit') { pressSpace(); return; }
     if (p.grounded && !p.sliding) { jump(); AP.kind = 'catch'; AP.t0 = time; AP.flyT = time; }
     return;
   }
@@ -9469,6 +9582,7 @@ function voiceRun(a) {
   (TUT.voiced ||= {})[a.startsWith('goto:') ? 'goto' : a.startsWith('become:') ? 'become' : a] = time;
   const p = player, k = spaceAction()?.kind;
   if (a.startsWith('become:')) return shapeshift(a.slice(7));
+  if (a.startsWith('view:')) { if (state === 'play') openPhoto(true); if (state === 'photo') photoPreset(+a.slice(5) || 1); return; }
   if (a.startsWith('goto:')) { const w = placeNamed(a.slice(5)); if (!w) { toast("I DON'T KNOW WHERE THAT IS"); return; } if (state === 'map') closeMap(); apMark(w); AP.kind = 'go'; AP.t0 = time; toast(`TO ${w.label.toUpperCase()}`); return; }
   switch (a) {
     case 'fly': voiceFly(); toast('FLY'); break;
@@ -9495,7 +9609,17 @@ function voiceRun(a) {
     case 'map': if (state === 'map') closeMap(); else if (state === 'play') openMap(); break;
     case 'photo': if (state === 'play') openPhoto(true); break;
     case 'snap': if (state === 'photo') snapPhoto(); else if (state === 'play') { openPhoto(true); setTimeout(() => snapPhoto(), 250); } break;
-    case 'close': if (state === 'photo') closePhoto(); else if (state === 'map') closeMap(); else if (CHAT.open) closeChat(); else if (who.pinned) who.pinned = false; break;
+    case 'menu': menuShow(!MENU.open); break;
+    case 'hands_on': if (!cam.on && !cam.loading) startCam(); else toast('HANDS ARE ON'); break;
+    case 'hands_off': if (cam.on || cam.loading) stopCam(); break;
+    case 'mic_off': setMicMuted(true); break;   // (and on again from the menu, or V: it can't hear "mic on")
+    case 'tilt': if (TOUCH) useTilt(); else toast('TILT IS FOR PHONES'); break;
+    case 'thumb': if (TOUCH) { useStick(); toast('STEER WITH YOUR LEFT THUMB'); } break;
+    case 'quality_up': if (tierIdx < TIERS.length - 1) applyTier(tierIdx + 1, true); else toast('ALREADY THE BEST IT GETS'); break;
+    case 'quality_down': if (tierIdx > 0) applyTier(tierIdx - 1, true); else toast('ALREADY AS LIGHT AS IT GETS'); break;
+    case 'letters_up': cellIdx = Math.min(CELLS.length - 1, cellIdx + 1); resize(); toast('BIGGER LETTERS'); break;
+    case 'letters_down': cellIdx = Math.max(0, cellIdx - 1); resize(); toast('SMALLER LETTERS'); break;
+    case 'close': if (MENU.open) menuShow(false); else if (state === 'photo') closePhoto(); else if (state === 'map') closeMap(); else if (CHAT.open) closeChat(); else if (EXPLAIN.i >= 0) { EXPLAIN.i = 1e9; explainPanel(); } else if (who.pinned) who.pinned = false; else if (HEALTH.open) healthShow(false); break;
     case 'cinematic': TUT.cineOpen = true; cinema.manual = true; toast('CINEMATIC CAMERA'); break;
     case 'normalcam': cinema.manual = false; toast('FOLLOW CAMERA'); break;
     case 'players': who.pinned = !who.pinned; who.t = 0; toast(who.pinned ? 'WHO IS FLYING' : 'LIST CLOSED'); break;
@@ -9532,6 +9656,16 @@ const V_RULES = [
   [/\b(center|centre|on me|where am i on the map|find me)\b/, 'mapme'],
   [/\b(go |look |move |pan )?north\b/, 'north'], [/\b(go |look |move |pan )?south\b/, 'south'],
   [/\b(go |look |move |pan )?east\b/, 'east'], [/\b(go |look |move |pan )?west\b/, 'west'],
+  // the menu and its switches, by name
+  [/\b(hands? (tracking |control |steering )?off|stop (tracking|watching|using) (my )?hands?|no (more )?hands)\b/, 'hands_off'],
+  [/\b(hands? (tracking |control |steering )?on|use (my )?hands?|track (my )?hands?|hand (tracking|control|steering)|watch my hands?|(fly|steer) with (my )?hands?)\b/, 'hands_on'],
+  [/\b(mic(rophone)? off|mute (me|my ?self|my (mic|microphone|voice))|stop listening|don'?t listen|turn (the |my )?mic(rophone)? off)\b/, 'mic_off'],
+  [/\b(tilt (steering|control|mode|to steer)|steer (with|by) (tilt|tilting|the phone)|use (the )?tilt)\b/, 'tilt'],
+  [/\b(thumb (steering|control|stick|mode)|(use|steer with) (the |my )?(stick|joystick|thumb)|joystick)\b/, 'thumb'],
+  [/\b((open|show|close|hide) (the )?(menu|settings|options)|menu|settings|options)\b/, 'menu'],
+  [/\b((better|higher|more|best|sharper|nicer) (graphics|quality|detail)|(graphics|quality|detail) (up|higher))\b/, 'quality_up'],
+  [/\b((lower|less|worse|faster) (graphics|quality|detail)|(graphics|quality|detail) (down|lower)|make it (smoother|run faster|faster to run)|it'?s (lagging|laggy|choppy|stuttering))\b/, 'quality_down'],
+  [/\b(bigger|larger) (letters|text|characters)\b/, 'letters_up'], [/\b(smaller|finer|tinier) (letters|text|characters)\b/, 'letters_down'],
   [/\b(what can i (say|do)|what do i say|commands|voice commands|help me|help)\b/, 'help'],
   [/\b(what (do|should|must) i (have to )?do|where (do|should|must) i go|what now|what next|what'?s next|my (mission|quest|task)|where to)\b/, 'objective'],
   [/\b(go|fly|head|take (me|us)|let'?s go|move|walk|run|get)\b.*\b(there|that way|over there|that place|to it|this way)\b/, 'go_there'],
@@ -9575,6 +9709,8 @@ function voiceParse(low) {
     cl = cl.trim(); if (!cl) continue;
     const gm = cl.match(/\b(?:go|take (?:me|us)|fly|head|bring (?:me|us)|let'?s go|lead me|walk|run)\s+(?:back\s+)?(?:to|towards|over to|up to)\s+(?:the\s+)?([a-z][a-z' ]{1,30})/);
     if (gm && !/^(there|that|it|here)\b/.test(gm[1])) { acts.push('goto:' + gm[1].trim()); continue; }
+    const vm = cl.match(/\b(?:view|angle|shot|preset|picture) (?:number )?(one|two|three|four|five|six|[1-6])\b/);   // the photo camera's six set views
+    if (vm) { acts.push('view:' + (({ one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 })[vm[1]] || vm[1])); continue; }
     const sw = shiftWord(cl, cl.split(/\s+/).length);
     if (sw && !SH_FIRE.has(sw) && !SH_SELF.has(sw)) { acts.push('become:' + sw); continue; }
     const clean = cl.replace(V_NOT, m => m.includes('right here') || m.includes('right there') ? 'here' : ' ');
@@ -9585,8 +9721,12 @@ function voiceParse(low) {
 }
 const V_CUE = /^(let'?s|lets|can (we|you)|could (we|you)|would you|please|go|take me|take us|i want to|i wanna|we should|time to|how about|make|show|open|close|turn|get|put|bring|head|start)\b/;
 // what he said: if it was an order, it's done (and not said aloud to the world)
-function voiceDo(low, words) {
+function voiceDo(low, words, said) {
   if (state !== 'play' && state !== 'photo' && state !== 'map') return false;
+  if (HEALTH.me && words <= 4 && /\b(health|stats|statistics|diagnostics|site status)\b/.test(low)) { healthShow(!HEALTH.open); return true; }   // (the keeper's readout)
+  // a message for everyone, said instead of typed: "tell everyone I'm at the volcano", "chat hello"
+  const cm = low.match(/^(?:(?:send|write|type|post) (?:a |the )?(?:chat |text )?(?:message|chat)(?: to (?:everyone|everybody|the others))?(?: saying| that says)?|(?:chat|message)(?: (?:everyone|everybody|the others))?|(?:tell|say to|ask) (?:everyone|everybody|them all|the others|the world|the chat))[\s,:]+(.{2,200})$/);
+  if (cm && state === 'play') { sendChat(said && said.length === low.length ? said.slice(-cm[1].length) : cm[1]); return true; }
   const acts = voiceParse(low);
   if (acts.length) { AP.q.push(...acts); apPump(); return true; }
   if (words <= 14 && V_CUE.test(low) && time - AP.askT > 2.5) { AP.askT = time; voiceAsk(low); return true; }
@@ -9602,10 +9742,12 @@ async function voiceAsk(text) {
   } catch { spoke(text); }
 }
 // every frame: the next order in line, and whatever he is in the middle of being told to do
-const V_SCREEN = new Set(['map', 'photo', 'snap', 'close', 'cinematic', 'normalcam', 'players', 'chat', 'explain', 'mute', 'unmute', 'help', 'objective', 'closer', 'further', 'face', 'wide', 'mapme']);
+const V_SCREEN = new Set(['map', 'photo', 'snap', 'close', 'cinematic', 'normalcam', 'players', 'chat', 'explain', 'mute', 'unmute', 'help', 'objective', 'closer', 'further', 'face', 'wide', 'mapme',
+  'menu', 'hands_on', 'hands_off', 'mic_off', 'tilt', 'thumb', 'quality_up', 'quality_down', 'letters_up', 'letters_down']);
 function apPump() {
   while (AP.q.length && (state === 'play' || state === 'photo' || state === 'map')) {
-    const a = AP.q[0], screen = V_SCREEN.has(a) || state === 'map' && (/^(north|south|east|west|go_there)$/.test(a) || a.startsWith('goto:'));
+    if (AP.q.includes('stop')) { const rest = AP.q.slice(AP.q.lastIndexOf('stop') + 1); voiceRun('stop'); AP.nextT = 0; AP.q.push(...rest); continue; }   // ("stop" never waits its turn: whatever he was doing or was about to do, he doesn't)
+    const a = AP.q[0], screen = V_SCREEN.has(a) || a.startsWith('view:') || state === 'map' && (/^(north|south|east|west|go_there)$/.test(a) || a.startsWith('goto:'));
     if (!screen && (state !== 'play' || player.cine || time < AP.nextT || !(!AP.kind || AP.kind === 'timed' || AP.kind === 'walk' || AP.kind === 'spread'))) break;
     AP.q.shift(); if (!screen) AP.nextT = time + 0.7; voiceRun(a);
   }
@@ -10441,15 +10583,19 @@ function heard(text) {
   $('micText').textContent = text.length > 60 ? text.slice(0, 60) + '…' : text; mic.shownT = 2.5;
   ear.wordsAt = performance.now();
   const low = text.toLowerCase(), words = low.split(/\s+/).length;
+  if (state === 'prologue') { if (words <= 4 && /\b(skip|move on|get on with it)\b/.test(low)) { if (!(time - pro.skipT < 3)) pro.skipT = time; proSkip(); } return; }   // (said once: it is not a slip of the thumb)
+  if (state === 'end') { if (words <= 4 && /\b(continue|close|keep (going|flying))\b/.test(low)) closeEnd(); return; }
+  if (PATRON.picking && !PATRON.id && /\b(any( of them| one)?|anyone|surprise me|you (choose|decide|pick)|(let )?the gods (can )?decide|whoever|i don'?t (mind|care))\b/.test(low)) { choosePatron(pick(Object.keys(PATRONS))); return; }
   if (words <= 3 && /\bmap\b/.test(low)) { if (state === 'play') openMap(); else if (state === 'map') closeMap(); return; }
   const cmd = /\btemples?\b/.test(low) ? 'temple' : /\bground\b/.test(low) ? 'ground' : null;
   if (state === 'talk') {
     if (cmd && words <= 3) { endTalk(); voiceCommand(cmd); }
     else if (words <= 3 && /\b(goodbye|bye|leave me|i'm leaving|im leaving)\b/.test(low)) endTalk();
+    else if (!live()) { if (words <= 4 && /\b(next|continue|go on|and then|yes|okay|ok|i see|tell me more)\b/.test(low)) fallbackNext(); }   // (a god reading his lines: "go on" turns the page)
     else if (live() && !talk.busy && !talk.intro && performance.now() > talk.cutUntil - 4000) godSay(text.slice(0, 300));
     return;
   }
-  if (voiceDo(low, words)) return;   // an order: something to do, somewhere to go, something to show
+  if (voiceDo(low, words, text)) return;   // an order: something to do, somewhere to go, something to show
   if (state === 'play' && !player.cine) { const sw = shiftWord(low, words); if (sw) return shapeshift(sw); }   // "become a whale"
   if (state === 'play' && words <= 3 && /\b(camera|photo|picture)\b/.test(low)) return openPhoto();
   if (state === 'photo') { if (/\b(back|camera|done)\b/.test(low)) closePhoto(); else if (/\b(take|keep|save|shoot)\b/.test(low)) snapPhoto(); return; }
@@ -13551,6 +13697,7 @@ function frame() {
   requestAnimationFrame(frame);
   if (XR.on) return;   // (the headset is calling the frames)
   const raw = clock.getDelta();
+  HEALTH.frames++; if (raw > HEALTH.worst) HEALTH.worst = raw;
   adaptQuality(raw);
   if (state === 'photo') updatePhoto(Math.min(raw, 0.05));
   tick(Math.min(raw, 0.05) * timeK);
@@ -13599,7 +13746,7 @@ function tick(dt) {
   updateParticles(dt);
   updateDialog(dt);
   updateTalk(dt);
-  updateHUD(dt); updateWho(dt); updateLessons(dt); updateExplainer(dt); updatePrayPrompt(dt); updateTitleSync(); updateGodWorld(dt);
+  updateHUD(dt); updateHealth(); updateWho(dt); updateLessons(dt); updateExplainer(dt); updatePrayPrompt(dt); updateTitleSync(); updateGodWorld(dt);
   chart(dt); try { updateWorld(dt); } catch (e) { if (!WORLD.err) { WORLD.err = String(e); console.warn('world', e); } } updateQuests(dt); updateMap(dt);
   updateAudio(dt);
   sky.position.copy(camera.position); stars.position.copy(camera.position);
@@ -13653,7 +13800,7 @@ setTimeout(() => {
   $('title').classList.remove('hidden');
   state = 'title';
   titleStart();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);

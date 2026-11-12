@@ -4,7 +4,8 @@ import { json, clip, limited, refuse } from './_lib.js';
 
 const ACTIONS = ['fly', 'land', 'glide', 'bird', 'human', 'jump', 'dive', 'climb', 'faster', 'slower', 'left', 'right', 'around', 'walk', 'run', 'stop',
   'go_there', 'map', 'photo', 'snap', 'close', 'cinematic', 'normalcam', 'players', 'chat', 'mute', 'unmute', 'help',
-  'objective', 'home', 'temple', 'nova', 'blow'];
+  'objective', 'home', 'temple', 'nova', 'blow', 'perch', 'explain', 'closer', 'further', 'face', 'wide',
+  'menu', 'hands_on', 'hands_off', 'mic_off', 'tilt', 'thumb', 'quality_up', 'quality_down', 'letters_up', 'letters_down'];
 
 const SYSTEM = `You turn what a player says to their character in a flying game into actions. The player is Icarus: a man who can walk, jump, fall and glide on wax wings, and who turns into a phoenix to fly. They may also be shapeshifted into an animal.
 Actions you may use, in the order they should happen:
@@ -14,7 +15,10 @@ go_there (go to the place the player is looking at or pointing at), map, photo (
 cinematic (cinematic camera), normalcam (normal camera), players (show who else is playing), chat,
 mute, unmute, help (list what can be said), objective (what to do next in the story), home (go back to Olympus), temple (go to the next god's temple),
 nova (a burst of fire all round him that burns back the dead attacking him in the Underworld),
-blow (the bird breathes out a gust: a burst of speed, and a river of wind along his path that anyone can ride).
+blow (the bird breathes out a gust: a burst of speed, and a river of wind along his path that anyone can ride),
+perch (land and stay a bird), explain (how to play), closer / further (move the camera in or out), face (a close-up of him), wide (a wide shot),
+menu (open or close the menu), hands_on / hands_off (steer with hands seen by the camera, or stop), mic_off (stop listening), tilt / thumb (how a phone steers),
+quality_up / quality_down (sharper graphics, or smoother), letters_up / letters_down (bigger or smaller letters in the picture).
 To change shape, use "become:<animal>" (e.g. "become:whale").
 If what they said is not an instruction to the character or the game (it's chatter, or said to someone else), return no actions.
 Answer with one JSON object only: {"actions": ["..."]}`;
