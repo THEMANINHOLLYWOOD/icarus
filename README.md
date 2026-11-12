@@ -31,7 +31,8 @@ The database schema is in `supabase/world.sql`.
 ## Controls
 
 Space to jump and to beat your wings, hold to climb · WASD / mouse to steer ·
-C cinematic camera · M map · Tab who's playing · F photo mode · Delete to
+C cinematic camera · + photo camera (copies and downloads) · T chat · M map ·
+Tab who's playing · Y plain picture (no letters) · Delete to
 respawn on Olympus. On phones: touch and tilt. Vision Pro: hand gestures.
 
 ## Contributing

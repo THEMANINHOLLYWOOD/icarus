@@ -207,6 +207,27 @@
     text-align:center; text-transform:uppercase; width:min(320px, 72vw); padding:4px 0 6px; outline:none; -webkit-user-select:text; user-select:text; caret-color:var(--ember); }
   #nameInput:focus { border-bottom-color:var(--ember); }
   .photo #hud > *, .photo #bars { opacity:0 !important; }
+  /* the photo camera: one faint line of keys at the foot of the frame (never in the picture: it is not on the canvas) */
+  #photoHint { position:fixed; left:50%; bottom:calc(var(--sb) + 12px); transform:translateX(-50%); z-index:6; pointer-events:none; width:min(860px, calc(100vw - 120px)); text-align:center; line-height:1.7;
+    font-size:9px; letter-spacing:.22em; color:var(--dim); text-shadow:0 0 6px #000, 0 0 2px #000; opacity:0; transition:opacity .4s; }
+  .photo #photoHint { opacity:.75; }
+  .touch #photoHint, .touch #chat:not(.open) #chatRow { display:none; }
+  .photo #micBtn, .photo #whoBtn, .photo #chat:not(.open) { opacity:0 !important; pointer-events:none; }
+  /* chat: a few lines low on the left, each on its own faint band, gone after a while; T opens it */
+  #chat { position:fixed; left:calc(var(--sl, 0px) + 14px); bottom:calc(var(--sb, 0px) + 100px); z-index:8; width:min(440px, calc(100vw - 28px)); pointer-events:none;
+    font-size:12px; line-height:1.35; letter-spacing:.03em; text-shadow:0 0 4px #000, 0 0 1px #000; }
+  #chatLog { display:flex; flex-direction:column; align-items:flex-start; gap:1px; max-height:calc(10 * 1.35em + 30px); overflow:hidden; }
+  #chatLog .cl { background:rgba(0,0,0,.34); padding:2px 7px; max-width:100%; box-sizing:border-box; overflow-wrap:anywhere; animation:clFade 11s forwards; }
+  #chatLog .cl b { font-weight:400; color:var(--ember); letter-spacing:.12em; margin-right:6px; }
+  #chatLog .cl.me b { color:#ffd9a8; }
+  #chatLog .cl.sys { color:#e9d27a; letter-spacing:.14em; font-size:10.5px; }
+  @keyframes clFade { 0%, 88% { opacity:1; } 100% { opacity:0; } }
+  #chat.open #chatLog { overflow-y:auto; pointer-events:auto; max-height:min(46vh, calc(18 * 1.35em)); scrollbar-width:none; }
+  #chat.open #chatLog .cl { animation:none; opacity:1; }
+  #chatRow { display:none; margin-top:4px; background:rgba(0,0,0,.5); padding:3px 7px; }
+  #chat.open #chatRow { display:flex; pointer-events:auto; }
+  #chatRow span { color:var(--dim); margin-right:6px; }
+  #chatInput { flex:1; background:none; border:none; outline:none; color:var(--ink); font:inherit; letter-spacing:inherit; padding:0; caret-color:var(--ember); -webkit-user-select:text; user-select:text; }
   #quest { margin-top:5px; letter-spacing:.1em; color:#ffd9a8; opacity:.85; max-width:min(520px, 78vw); line-height:1.5; }
   #quest:empty { display:none; }
   /* the map: everything he has flown over, drawn in the same letters as the world. It opens out of where he is. */
@@ -295,6 +316,8 @@
 <div id="proSub"><b></b><span></span></div><div id="proSkip"></div><div id="proAct"></div>
 <div id="fsHint"><b>↑</b><span>SWIPE UP · FULL SCREEN</span><i>for no browser at all: Share → Add to Home Screen</i><u id="fsKeep">keep the bar</u></div>
 <div id="primer"><b>YOU WILL SPEAK FOR HIM</b><span>his father, the gods and the world hear your voice — allow the microphone<br>(no microphone? you can tap instead)</span></div><div id="tut"><kbd></kbd><span></span></div>
+<div id="chat" class="hidden"><div id="chatLog"></div><div id="chatRow"><span>›</span><input id="chatInput" maxlength="200" autocomplete="off" spellcheck="false" enterkeyhint="send" placeholder="say something to everyone"></div></div>
+<div id="photoHint">WASD MOVE · DRAG TO LOOK · Q / E DOWN / UP · Z / X TILT · WHEEL LENS · 1–6 VIEWS · SPACE TAKES IT · + GOES BACK</div>
 <div id="who"></div><button id="micBtn" type="button" aria-label="Microphone"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15"/><path class="x" d="M2 2l12 12" style="display:none"/></svg></button><button id="whoBtn" type="button"></button>
 <div id="map"><canvas id="mapC"></canvas><div id="mapTitle"></div><div id="mapHint"></div></div>
 
@@ -1942,15 +1965,19 @@ function makeHuman(mask = true) {
 
   // the cloak, pinned at one shoulder, its hem torn; and the tail of the red sash at his hip
   // (the cloak is long now, shoulder to ankle and flaring toward the hem, because it is also how he reads his fire)
-  const capeLen = 1.5, capeGeo = new THREE.PlaneGeometry(0.6, capeLen, 6, 16).translate(0, -capeLen / 2, 0);
-  { const p = capeGeo.attributes.position, r = mulberry32(3); const hem = Array.from({ length: 7 }, () => r() * 0.1);
+  // (fine enough to fold: the hero's is simulated as cloth, see animateCape; the other fliers' hang still, so theirs is coarse)
+  const CW = mask ? 11 : 7, CH = mask ? 26 : 17;
+  const capeLen = 1.5, capeGeo = new THREE.PlaneGeometry(0.6, capeLen, CW - 1, CH - 1).translate(0, -capeLen / 2, 0);
+  { const p = capeGeo.attributes.position, r = mulberry32(3); const hem = Array.from({ length: CW }, () => r() * 0.1);
     for (let i = 0; i < p.count; i++) {
-      const t = -p.getY(i) / capeLen;
-      if (t > 0.995) p.setY(i, p.getY(i) + hem[Math.round((p.getX(i) / 0.6 + 0.5) * 6)]);
+      const t = -p.getY(i) / capeLen, c = i % CW, u = c / (CW - 1) * 2 - 1;
+      if (t > 0.995) p.setY(i, p.getY(i) + hem[c]);
       p.setX(i, p.getX(i) * (1 + 0.5 * t));
-    } }
+      p.setZ(i, -0.12 * u * u * (1 - smoothstep(0, 0.22, t)));   // the collar wraps forward over his shoulders
+    }
+    capeGeo.computeVertexNormals(); }
   const cMat = mask ? capeMat : peerCape;
-  const cape = M(capeGeo, cMat, 0, 0.53, 0.15, chest);
+  const cape = M(capeGeo, cMat, 0, 0.53, 0.15, chest); cape.frustumCulled = false;
   { const collar = M(new THREE.TorusGeometry(0.1, 0.034, 6, 16), cMat, 0, 0.555, 0.012, chest); collar.rotation.x = Math.PI / 2; collar.scale.y = 0.9; }
   M(sph(0.035, 8, 6), bronze, -0.17, 0.5, -0.1, chest);
   const sashHold = new THREE.Group(); sashHold.position.set(-0.16, 0.14, 0.05); sashHold.rotation.y = Math.PI; rig.add(sashHold);
@@ -1958,7 +1985,7 @@ function makeHuman(mask = true) {
   rig.traverse(o => { if (o.isMesh) o.castShadow = true; });
   const mats = [skin, cloth, clothIn, leather, hair, bronze, wax, cMat, sashMat];
   inkOutline(rig);
-  return { group: g, rig, chest, head, mouth, lids, legL, legR, shinL, shinR, footL, footR, armL, armR, foreL, foreR, handL, handR, scarf, cape, capeLen, capeBase: Float32Array.from(capeGeo.attributes.position.array),
+  return { group: g, rig, chest, head, mouth, lids, legL, legR, shinL, shinR, footL, footR, armL, armR, foreL, foreR, handL, handR, scarf, cape, capeLen, capeW: CW, capeBase: Float32Array.from(capeGeo.attributes.position.array),
     mats, base: mats.map(m => m.color.clone()), baseE: mats.map(m => m.emissive.clone()) };
 }
 // The hands. A curl is five numbers, thumb to little finger: 0 straight, 1 a fist. The joints ease toward them.
@@ -1980,15 +2007,161 @@ function setBurn(k, flicker = 0) {
     m.emissive.copy(BURN).multiplyScalar(k * (1.1 + flicker)).add(human.baseE[i]);
   });
 }
+// The cloak is cloth. A grid of points out in the world, each carried on by what it was doing a moment ago (Verlet), held
+// to its neighbours by threads that resist stretching hard, shearing less and folding hardly at all, so it creases and
+// billows instead of bending like card. The collar is sewn to his shoulders. Gravity hangs it; the wind, and the air he
+// runs or falls through, push on every small face of it by how squarely that face meets the air (so it fills like a sail
+// side-on and slices edge-on); and it can't go through him: his back, his hips and skirt, his legs and his head push it
+// out of the way, and the ground stops the hem. Small fixed steps, then it is drawn where it hangs.
+const CLOTH = { aero: 1, body: true, ok: false, lastT: -1, anchor: new THREE.Vector3(), inv: new THREE.Matrix4(), cols: null };
+function clothInit() {
+  const C = CLOTH, b = human.capeBase, n = b.length / 3, W = human.capeW, H = n / W, cons = [];
+  const L = (i, j, k) => cons.push(i, j, Math.hypot(b[i * 3] - b[j * 3], b[i * 3 + 1] - b[j * 3 + 1], b[i * 3 + 2] - b[j * 3 + 2]), k);
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    const i = r * W + c;
+    if (c + 1 < W) L(i, i + 1, 1);
+    if (r + 1 < H) L(i, i + W, 1);
+    if (c + 1 < W && r + 1 < H) { L(i, i + W + 1, 0.5); L(i + 1, i + W, 0.5); }
+    if (c + 2 < W) L(i, i + 2, 0.12);
+    if (r + 2 < H) L(i, i + 2 * W, 0.12);
+  }
+  C.cons = Float32Array.from(cons); C.n = n; C.W = W; C.H = H;
+  C.x = new Float32Array(n * 3); C.px = new Float32Array(n * 3); C.a = new Float32Array(n * 3);
+  C.pin0 = new Float32Array(W * 3); C.pin1 = new Float32Array(W * 3);
+  C.idx = human.cape.geometry.index.array; C.deg = new Float32Array(n);
+  for (let t = 0; t < C.idx.length; t++) C.deg[C.idx[t]]++;
+  // what it can't pass through: tapered capsules along each bone, in that bone's own space (y0 r0 → y1 r1, z squashed by zk)
+  C.cols = [
+    [human.chest, -0.06, 0.175, 0.47, 0.205, 0.74], [human.head, 0.02, 0.15, 0.16, 0.15, 1],
+    [human.rig, 0.16, 0.2, -0.4, 0.33, 0.86],
+    [human.legL, 0, 0.1, -0.44, 0.07, 1], [human.legR, 0, 0.1, -0.44, 0.07, 1],
+    [human.shinL, 0, 0.075, -0.42, 0.05, 1], [human.shinR, 0, 0.075, -0.42, 0.05, 1],
+    [human.armL, 0, 0.065, -0.3, 0.055, 1], [human.armR, 0, 0.065, -0.3, 0.055, 1],
+  ].map(([bone, y0, r0, y1, r1, zk]) => ({ bone, y0, r0, y1, r1, zk, inv: new THREE.Matrix4() }));
+}
+function clothReset() {
+  const C = CLOTH, b = human.capeBase, e = human.cape.matrixWorld.elements;
+  for (let i = 0; i < C.n * 3; i += 3) {
+    const x = b[i], y = b[i + 1], z = b[i + 2];
+    C.x[i] = C.px[i] = e[0] * x + e[4] * y + e[8] * z + e[12];
+    C.x[i + 1] = C.px[i + 1] = e[1] * x + e[5] * y + e[9] * z + e[13];
+    C.x[i + 2] = C.px[i + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
+  }
+  C.pin1.set(C.x.subarray(0, C.W * 3));
+}
+const _cw = new THREE.Vector3();
 function animateCape(dt) {
-  const p = player, a = human.cape.geometry.attributes.position.array, b = human.capeBase;
-  const v = Math.min(1, Math.hypot(p.vel.x, p.vel.z) / 14 + (p.grounded ? 0 : 0.6) + (p.tumble ? 0.6 : 0) + (windLead ? 0.22 + gust * 0.3 : 0.05));   // the wind has hold of it even when he stands still
-  for (let i = 0; i < a.length; i += 3) {
-    const t = Math.max(0, -b[i + 1] / human.capeLen);   // 0 at the shoulders, 1 at the hem
-    const wave = Math.sin(time * (5 + v * 8) - t * 4 + b[i] * 3) * (0.04 + v * 0.1) * t;
-    a[i + 2] = b[i + 2] + Math.pow(t, 1.4) * (0.14 + v * 1.05) + wave;
-    a[i + 1] = b[i + 1] + Math.pow(t, 2) * v * 0.7;
-    a[i] = b[i] + wave * 0.3;
+  const C = CLOTH, p = player;
+  if (!C.cols) clothInit();
+  human.group.updateMatrixWorld(true);
+  const e = human.cape.matrixWorld.elements, sc = Math.hypot(e[0], e[1], e[2]), b = human.capeBase, W = C.W, n = C.n, x = C.x, px = C.px, A = C.a;
+  // the collar, where it is now (pin0 is where it was at the last step)
+  for (let c = 0; c < W; c++) { const i = c * 3, X = b[i], Y = b[i + 1], Z = b[i + 2];
+    C.pin1[i] = e[0] * X + e[4] * Y + e[8] * Z + e[12]; C.pin1[i + 1] = e[1] * X + e[5] * Y + e[9] * Z + e[13]; C.pin1[i + 2] = e[2] * X + e[6] * Y + e[10] * Z + e[14]; }
+  _cw.set(C.pin1[0], C.pin1[1], C.pin1[2]);
+  let bx = 0, by = 0, bz = 0;
+  if (!C.ok || time - C.lastT > 0.4 || _cw.distanceTo(C.anchor) > 6 || !(x[n * 3 - 2] === x[n * 3 - 2])) { clothReset(); C.ok = true; C.acc = 0; C.pin0.set(C.pin1); }   // first time, a jump, a long absence, or a NaN
+  else if (dt > 0) {
+    // Going fast (a dive, a long fall), the threads can't pull the cloth along quickly enough: carry it with him, and let
+    // the air he is rushing through, not the lag, be what streams it out behind.
+    const dx = _cw.x - C.anchor.x, dy = _cw.y - C.anchor.y, dz = _cw.z - C.anchor.z, kb = smoothstep(8, 26, Math.hypot(dx, dy, dz) / dt);
+    if (kb > 0) {
+      for (let i = W * 3; i < n * 3; i += 3) { x[i] += dx * kb; x[i + 1] += dy * kb; x[i + 2] += dz * kb; px[i] += dx * kb; px[i + 1] += dy * kb; px[i + 2] += dz * kb; }
+      for (let i = 0; i < W * 3; i += 3) { C.pin0[i] += dx * kb; C.pin0[i + 1] += dy * kb; C.pin0[i + 2] += dz * kb; }
+      bx = dx * kb / dt; by = dy * kb / dt; bz = dz * kb / dt;
+    }
+  }
+  C.anchor.copy(_cw); C.lastT = time;
+  // fixed steps of 1/150 s however the frames come (a changing step makes Verlet cloth explode); none at all when time stops
+  C.acc = Math.min((C.acc || 0) + Math.max(0, dt), 6 / 150);
+  const steps = Math.floor(C.acc * 150 + 1e-6); C.acc -= steps / 150;
+  if (!steps) return clothDraw();
+  for (const k of C.cols) {   // each bone's space, and a ball round the whole capsule so most points can skip it cheaply
+    k.inv.copy(k.bone.matrixWorld).invert(); const m = k.bone.matrixWorld.elements, ym = (k.y0 + k.y1) / 2;
+    k.cx = m[4] * ym + m[12]; k.cy = m[5] * ym + m[13]; k.cz = m[6] * ym + m[14];
+    k.cr2 = ((Math.abs(k.y1 - k.y0) / 2 + Math.max(k.r0, k.r1) + 0.03) * sc * 1.1) ** 2;
+  }
+  // the air: the wind where he is, a gust that comes and goes, eddies that wander over the cloth
+  const wk = (realm === 'under' ? 0.4 : 0.7 + gust * 2.1) + (windLead ? 1.6 : 0);
+  const wx = _wd.x * wk, wy = _wd.y * wk, wz = _wd.z * wk;
+  const floor = groundAt(p.pos.x, p.pos.z, p.pos.y + 1) + 0.02, swim = !!p.swim;
+  const h = 1 / 150, h2 = h * h, idx = C.idx, cons = C.cons, nc = cons.length;
+  for (let st = 0; st < steps; st++) {
+    A.fill(0);
+    // aerodynamics, a face at a time: force ∝ |v|·(v·n)·area along the face's normal (ρ·Cd/2 over the cloth's weight per m²)
+    for (let t = 0; t < idx.length; t += 3) {
+      const ia = idx[t] * 3, ib = idx[t + 1] * 3, ic = idx[t + 2] * 3;
+      const ux = x[ib] - x[ia], uy = x[ib + 1] - x[ia + 1], uz = x[ib + 2] - x[ia + 2], vx = x[ic] - x[ia], vy = x[ic + 1] - x[ia + 1], vz = x[ic + 2] - x[ia + 2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const nl = Math.hypot(nx, ny, nz); if (nl < 1e-9) continue;
+      nx /= nl; ny /= nl; nz /= nl;
+      const cx = (x[ia] + x[ib] + x[ic]) / 3, cz = (x[ia + 2] + x[ib + 2] + x[ic + 2]) / 3;
+      const ed = Math.sin(time * 2.3 + cx * 1.9 + cz * 0.7) * 0.9 + Math.sin(time * 5.1 - cz * 2.6) * 0.45;   // eddies
+      const rx = wx * (1 + ed * 0.35) + ed * 0.5 - ((x[ia] - px[ia]) + (x[ib] - px[ib]) + (x[ic] - px[ic])) / (3 * h) - bx;
+      const ry = wy + ed * 0.35 - ((x[ia + 1] - px[ia + 1]) + (x[ib + 1] - px[ib + 1]) + (x[ic + 1] - px[ic + 1])) / (3 * h) - by;
+      const rz = wz * (1 + ed * 0.35) - ((x[ia + 2] - px[ia + 2]) + (x[ib + 2] - px[ib + 2]) + (x[ic + 2] - px[ic + 2])) / (3 * h) - bz;
+      const sp = Math.hypot(rx, ry, rz), dn = rx * nx + ry * ny + rz * nz;
+      // fast air makes cloth flutter: ripples that run from the collar to the hem, bigger toward the free end
+      const q = (t / 6) | 0, row = (q / (W - 1)) | 0, fl = Math.sin(time * (6 + sp * 0.45) - row * 0.8 + (q % (W - 1)) * 0.45) * row / C.H;
+      let f = 0.55 * C.aero * sp * (dn + fl * Math.min(sp, 30) * 0.09); f = clamp(f, -220, 220);
+      // and a little skin friction along the face, so the air drags it as well as pushing it
+      const fr = 0.12 * C.aero, fx = nx * f + rx * fr, fy = ny * f + ry * fr, fz = nz * f + rz * fr;
+      A[ia] += fx; A[ia + 1] += fy; A[ia + 2] += fz; A[ib] += fx; A[ib + 1] += fy; A[ib + 2] += fz; A[ic] += fx; A[ic + 1] += fy; A[ic + 2] += fz;
+    }
+    // move
+    for (let i = W; i < n; i++) {
+      const j = i * 3, k = 1 / Math.max(1, C.deg[i]);
+      for (let a = 0; a < 3; a++) {
+        const cur = x[j + a], vel = (cur - px[j + a]) * 0.994;
+        px[j + a] = cur; x[j + a] = cur + vel + (A[j + a] * k + (a === 1 ? -9.8 : 0)) * h2;
+      }
+      if (swim && x[j + 1] < WATER) { x[j + 1] += (WATER - x[j + 1]) * 0.08; px[j + 1] = lerp(px[j + 1], x[j + 1], 0.3); }   // it floats out on the water
+    }
+    // the collar follows his shoulders through the frame
+    const u = (st + 1) / steps;
+    for (let c = 0; c < W * 3; c++) { px[c] = x[c]; x[c] = C.pin0[c] + (C.pin1[c] - C.pin0[c]) * u; }
+    // the threads
+    for (let it = 0, its = TOUCH ? 5 : 8; it < its; it++) {
+      for (let q = 0; q < nc; q += 4) {
+        const i = cons[q], j = cons[q + 1], L = cons[q + 2] * sc, k = cons[q + 3], a3 = i * 3, b3 = j * 3;
+        const dx = x[b3] - x[a3], dy = x[b3 + 1] - x[a3 + 1], dz = x[b3 + 2] - x[a3 + 2], d = Math.hypot(dx, dy, dz);
+        if (d < 1e-9) continue;
+        const wi = i < W ? 0 : 1, wj = j < W ? 0 : 1, ws = wi + wj; if (!ws) continue;
+        const g = (d - L) / d * k / ws;
+        x[a3] += dx * g * wi; x[a3 + 1] += dy * g * wi; x[a3 + 2] += dz * g * wi;
+        x[b3] -= dx * g * wj; x[b3 + 1] -= dy * g * wj; x[b3 + 2] -= dz * g * wj;
+      }
+    }
+    // cloth barely stretches: one pass down from the collar holds each point within a tenth of its length of the one above
+    for (let i = W; i < n; i++) {
+      const j = i * 3, k = (i - W) * 3, L = Math.hypot(b[j] - b[k], b[j + 1] - b[k + 1], b[j + 2] - b[k + 2]) * sc * 1.1;
+      const dx = x[j] - x[k], dy = x[j + 1] - x[k + 1], dz = x[j + 2] - x[k + 2], d = Math.hypot(dx, dy, dz);
+      if (d > L) { const g = L / d; x[j] = x[k] + dx * g; x[j + 1] = x[k + 1] + dy * g; x[j + 2] = x[k + 2] + dz * g; }
+    }
+    // his body, and the ground
+    for (let i = W; i < n; i++) {
+      const j = i * 3;
+      if (C.body) for (const K of C.cols) {
+        const X = x[j], Y = x[j + 1], Z = x[j + 2];
+        if ((X - K.cx) ** 2 + (Y - K.cy) ** 2 + (Z - K.cz) ** 2 > K.cr2) continue;
+        const m = K.inv.elements;
+        const lx = m[0] * X + m[4] * Y + m[8] * Z + m[12], ly = m[1] * X + m[5] * Y + m[9] * Z + m[13], lz = (m[2] * X + m[6] * Y + m[10] * Z + m[14]) / K.zk;
+        const t = clamp((ly - K.y0) / (K.y1 - K.y0), 0, 1), cy = K.y0 + (K.y1 - K.y0) * t, r = K.r0 + (K.r1 - K.r0) * t + 0.012;
+        const ox = lx, oy = ly - cy, oz = lz, dl = ox * ox + oy * oy + oz * oz;
+        if (dl >= r * r || dl < 1e-12) continue;
+        const kk = r / Math.sqrt(dl), nx = ox * kk, ny = cy + oy * kk, nz = oz * kk * K.zk, M2 = K.bone.matrixWorld.elements;
+        x[j] = M2[0] * nx + M2[4] * ny + M2[8] * nz + M2[12]; x[j + 1] = M2[1] * nx + M2[5] * ny + M2[9] * nz + M2[13]; x[j + 2] = M2[2] * nx + M2[6] * ny + M2[10] * nz + M2[14];
+      }
+      if (x[j + 1] < floor) { x[j + 1] = floor; px[j] = lerp(px[j], x[j], 0.5); px[j + 2] = lerp(px[j + 2], x[j + 2], 0.5); }   // (and the ground holds it: friction)
+    }
+  }
+  C.pin0.set(C.pin1);
+  clothDraw();
+}
+function clothDraw() {
+  const C = CLOTH, a = human.cape.geometry.attributes.position.array, inv = C.inv.copy(human.cape.matrixWorld).invert().elements, x = C.x;
+  for (let i = 0; i < C.n * 3; i += 3) {
+    const X = x[i], Y = x[i + 1], Z = x[i + 2];
+    a[i] = inv[0] * X + inv[4] * Y + inv[8] * Z + inv[12]; a[i + 1] = inv[1] * X + inv[5] * Y + inv[9] * Z + inv[13]; a[i + 2] = inv[2] * X + inv[6] * Y + inv[10] * Z + inv[14];
   }
   human.cape.geometry.attributes.position.needsUpdate = true;
   human.cape.geometry.computeVertexNormals();
@@ -3861,10 +4034,13 @@ async function netStart() {
 NET.log = []; NET.tries = 0;
 function netJoin() {
   if (NET.ch) { try { NET.sb.removeChannel(NET.ch); } catch {} NET.ch = null; }
+  CHAT.joinedAt = performance.now();
   const ch = NET.ch = NET.sb.channel('world', { config: { broadcast: { self: false, ack: false }, presence: { key: NET.id } } });
   ch.on('presence', { event: 'sync' }, () => {
     const st = ch.presenceState(), here = new Set();
-    for (const id in st) { if (id === NET.id) continue; here.add(id); const m = st[id][0] || {}; const P = peerOf(id); P.name = cleanName(m.n); }
+    const quiet = performance.now() - CHAT.joinedAt < 4000;
+    for (const id in st) { if (id === NET.id) continue; here.add(id); const m = st[id][0] || {}; const P = peerOf(id); P.name = cleanName(m.n);
+      if (!P.seen) { P.seen = true; if (!quiet) chatLine('', `${P.name} IS FLYING`, 'sys'); } }
     for (const [id, P] of NET.peers) if (!here.has(id)) dropPeer(id, P);
   });
   ch.on('broadcast', { event: 's' }, ({ payload: m }) => gotState(m));
@@ -3873,6 +4049,7 @@ function netJoin() {
   ch.on('broadcast', { event: 'ev' }, ({ payload: m }) => gotEvent(m));
   ch.on('broadcast', { event: 'rtc' }, ({ payload: m }) => gotRtc(m));
   ch.on('broadcast', { event: 'fx' }, ({ payload: m }) => gotFx(m));
+  ch.on('broadcast', { event: 'chat' }, ({ payload: m }) => gotChat(m));
   ch.subscribe((status, err) => {
     NET.log.push([Math.round(performance.now() / 100) / 10, status, err ? String(err.message || err).slice(0, 120) : '']); if (NET.log.length > 20) NET.log.shift();
     if (ch !== NET.ch) return;
@@ -3890,6 +4067,7 @@ function peerOf(id) {
   return P;
 }
 function dropPeer(id, P) {
+  if (P.seen && performance.now() - CHAT.joinedAt > 4000) chatLine('', `${P.name} LANDED · GONE`, 'sys');
   if (P.av) { scene.remove(P.av.man.group, P.av.bird.group); P.av.bird.group.traverse(o => o.geometry && o.geometry.dispose()); P.av.fire.dispose(); P.av.cape.dispose(); }
   P.label?.remove();
   NET.peers.delete(id);
@@ -4278,7 +4456,51 @@ function gotEvent(m) {
   story.events.push({ t: Date.now(), text: `— elsewhere, another flier called ${cleanName(m.n)} ${m.t.replace(/[<>]/g, '').slice(0, 160)}`, other: true });
   if (story.events.length > 40) story.events.shift();
 }
+// ── chat (T): low on the left, everyone flying sees it wherever they are, and it hangs over the speaker's head nearby
+const CHAT = { open: false, last: 0, joinedAt: 0, alone: false };
+function chatLine(name, text, kind) {
+  const box = $('chatLog'), el = document.createElement('div');
+  el.className = 'cl' + (kind ? ' ' + kind : '');
+  if (name) { const b = document.createElement('b'); b.textContent = name; el.append(b); }
+  el.append(document.createTextNode(text));
+  box.append(el); while (box.children.length > 80) box.firstChild.remove();
+  box.scrollTop = box.scrollHeight;
+}
+function openChat(pre = '') {
+  if (CHAT.open) return;
+  CHAT.open = true; for (const k in keys) keys[k] = false;
+  const c = $('chat'), i = $('chatInput'); c.classList.remove('hidden'); c.classList.add('open');
+  i.value = pre; i.focus({ preventScroll: true }); $('chatLog').scrollTop = 1e6;
+}
+function closeChat() {
+  if (!CHAT.open) return;
+  CHAT.open = false; $('chat').classList.remove('open'); $('chatInput').blur();
+  for (const k in keys) keys[k] = false;
+}
+function sendChat(raw) {
+  const text = String(raw || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  if (!text) return;
+  const t = performance.now(); if (t - CHAT.last < 700) { chatLine('', 'SLOW DOWN A LITTLE', 'sys'); return; } CHAT.last = t;
+  chatLine(heroName, text, 'me');
+  if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'chat', payload: { i: NET.id, n: heroName, t: text } });
+  else if (!CHAT.alone) { CHAT.alone = true; chatLine('', 'NO ONE ELSE IS FLYING RIGHT NOW', 'sys'); }
+}
+function gotChat(m) {
+  if (!m || !ok(m.i) || typeof m.t !== 'string') return;
+  const P = peerOf(m.i); if (flood(P)) return;
+  const text = m.t.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200); if (!text) return;
+  if (m.n) P.name = cleanName(m.n);
+  P.said = text.slice(0, 160); P.saidT = performance.now();
+  chatLine(P.name, text); audio.sfx.ui?.();
+}
+$('chatInput').addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.code === 'Enter') { e.preventDefault(); sendChat(e.target.value); e.target.value = ''; closeChat(); }
+  else if (e.code === 'Escape') { e.preventDefault(); closeChat(); }
+});
+$('chatInput').addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== $('chatInput')) closeChat(); }, 0));
 function updateNet(dt) {
+  $('chat').classList.toggle('hidden', state === 'title' || state === 'loading' || state === 'prologue' || state === 'end' || state === 'map');
   if (!NET.sb && API.mp && state !== 'title' && state !== 'loading' && state !== 'prologue') netStart();
   if (NET.on && NET.ch && NET.ch.state === 'closed') { NET.on = false; if (!NET.retry) NET.retry = setTimeout(() => { NET.retry = 0; netJoin(); }, 1500); }
   netSend(dt); updatePeers(dt); netCollide(); vcUpdate(dt);
@@ -6386,13 +6608,25 @@ function updateOthers(dt) {
 // ───────────────────────── the still eye ─────────────────────────
 // A gift, when someone gives it: time all but stops and he can walk the camera anywhere, pick a lens, and keep the picture.
 const photo = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, roll: 0, fov: 50, snap: false, back: 'play' };
-function openPhoto() {
+function openPhoto(free) {
   if (state !== 'play') return;
-  if (!perks.lens) { toast('THE STILL EYE IS A GIFT · SOMEONE HAS TO GIVE IT'); return; }
+  if (!free && !perks.lens) { toast('THE STILL EYE IS A GIFT · SOMEONE HAS TO GIVE IT'); return; }
   state = 'photo'; timeK = 0.02; for (const k in keys) keys[k] = false;
   photo.pos.copy(camera.position); _e.setFromQuaternion(camera.quaternion, 'YXZ'); photo.yaw = _e.y; photo.pitch = _e.x; photo.roll = 0; photo.fov = camera.fov;
   document.body.classList.add('photo'); document.body.classList.remove('cinema');
-  toast(TOUCH ? 'DRAG TO MOVE AND LOOK · PINCH FOR THE LENS · TAP TO KEEP IT · TAP THE CORNER TO GO BACK' : 'WASD · MOUSE · Q/E · WHEEL FOR THE LENS · 1–6 VIEWS · ENTER KEEPS IT · F GOES BACK');
+  toast(TOUCH ? 'DRAG TO MOVE AND LOOK · PINCH FOR THE LENS · TAP TO KEEP IT · TAP THE CORNER TO GO BACK' : 'PHOTO CAMERA');
+}
+// Take the picture. The clipboard has to be asked inside the key press itself (Safari insists), so it is handed a promise
+// that the next drawn frame fills.
+function snapPhoto() {
+  if (state !== 'photo' || photo.snap) return;
+  photo.snap = true; photo.clip = 0;
+  photo.blob = new Promise(r => photo.blobR = r);
+  try {
+    if (navigator.clipboard?.write && window.ClipboardItem)
+      navigator.clipboard.write([new ClipboardItem({ 'image/png': photo.blob.then(b => b || Promise.reject(new Error('no picture'))) })])
+        .then(() => { photo.clip = 1; toast('SAVED · COPIED TO THE CLIPBOARD'); }, () => { photo.clip = -1; });
+  } catch { photo.clip = -1; }
 }
 function closePhoto() { if (state !== 'photo') return; state = 'play'; timeK = 1; document.body.classList.remove('photo'); for (const k in keys) keys[k] = false; }
 // six ready-made framings of wherever he is
@@ -6443,28 +6677,34 @@ function springTo(cur, vel, target, smooth, dt) {
   cur.copy(target).add(_n.add(_s).multiplyScalar(e));
 }
 const rr = ([a, b]) => a + Math.random() * (b - a);
+// which way he is facing, flying or walking, and how big the shots are around him
+const cineHead = () => player.form === 'human' ? human.group.rotation.y : player.yaw;
+const cineDir = out => player.form === 'human' ? out.set(-Math.sin(human.group.rotation.y), 0, -Math.cos(human.group.rotation.y)) : out.copy(dir3);
+const _cd = new THREE.Vector3();
 function newShot() {
-  const p = player, fast = p.speed > 150;
+  const p = player, foot = p.form === 'human', sc = cinema.sc = foot ? 0.085 : 1, fast = !foot && p.speed > 150;
   const pool = Object.keys(SHOTS).filter(k => k !== cinema.last && !(fast && (k === 'orbit' || k === 'lead')));
   let roll = Math.random() * pool.reduce((s, k) => s + SHOTS[k].w + (fast && (k === 'low' || k === 'top' || k === 'flyby') ? 2 : 0), 0), type = pool[0];
   for (const k of pool) { roll -= SHOTS[k].w + (fast && (k === 'low' || k === 'top' || k === 'flyby') ? 2 : 0); if (roll <= 0) { type = k; break; } }
   if (!cinema.last && cinema.autoT > 0) type = 'profile';   // the very first thing he sees of himself: the wide side-on
   cinema.last = type;
   const S = SHOTS[type], side = Math.random() < 0.5 ? -1 : 1;
-  const shot = cinema.shot = { type, S, side, t: 0, dur: rr(S.dur) * (fast ? 0.7 : 1), dist: rr(S.dist), up: rnd(1), drift: rnd(1), ang: Math.random() * 6.28 };
+  const shot = cinema.shot = { type, S, side, t: 0, dur: rr(S.dur) * (fast ? 0.7 : 1), dist: rr(S.dist) * sc, up: rnd(1), drift: rnd(1), ang: Math.random() * 6.28 };
+  const hd = cineHead();
   if (type === 'flyby') {
-    shot.anchor = new THREE.Vector3().copy(p.pos).addScaledVector(dir3, p.speed * shot.dur * 0.42)
-      .add(_v.set(Math.cos(p.yaw) * 26 * side, 4 + Math.random() * 10, -Math.sin(p.yaw) * 26 * side));
-    shot.anchor.y = Math.max(shot.anchor.y, groundAt(shot.anchor.x, shot.anchor.z) + 5, WATER + 3);
+    const spd = foot ? Math.max(1.5, Math.hypot(p.vel.x, p.vel.z)) : p.speed;
+    shot.anchor = new THREE.Vector3().copy(p.pos).addScaledVector(cineDir(_cd), spd * shot.dur * 0.42)
+      .add(_v.set(Math.cos(hd) * 26 * sc * side, (4 + Math.random() * 10) * sc, -Math.sin(hd) * 26 * sc * side));
+    shot.anchor.y = Math.max(shot.anchor.y, groundAt(shot.anchor.x, shot.anchor.z, shot.anchor.y + 3) + (foot ? 1.2 : 5), WATER + 3 * sc);
   }
-  cinema.head = p.yaw; cinema.blocked = 0;
+  cinema.head = hd; cinema.blocked = 0;
   shotPos(shot, cinema.pos); cinema.posV.set(0, 0, 0);
-  cinema.aim.copy(p.pos); cinema.aimV.set(0, 0, 0);
+  cinema.aim.copy(p.pos); if (foot) cinema.aim.y += 1.1; cinema.aimV.set(0, 0, 0);
   camera.position.copy(cinema.pos);   // a hard cut
   camera.fov = S.fov[0] * (camera.aspect < 1 ? 1.35 : 1);
 }
 function shotPos(sh, out) {
-  const p = player, h = cinema.head, fx = -Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h), d = sh.dist, s = sh.side;
+  const p = player, h = cinema.head, fx = -Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h), d = sh.dist, s = sh.side, k = cinema.sc || 1;
   const u = sh.t / sh.dur;
   switch (sh.type) {
     case 'flyby': return out.copy(sh.anchor);
@@ -6472,12 +6712,12 @@ function shotPos(sh, out) {
       const along = (0.5 - u) * d * 0.5 * sh.drift;
       out.set(p.pos.x + rx * d * s + fx * along, p.pos.y + sh.up * d * 0.12, p.pos.z + rz * d * s + fz * along); break; }
     case 'orbit': { const a = sh.ang + sh.t * 0.24 * s; out.set(p.pos.x + Math.cos(a) * d, p.pos.y + d * 0.2, p.pos.z + Math.sin(a) * d); break; }
-    case 'low': out.set(p.pos.x - fx * d + rx * 7 * s, p.pos.y - 5, p.pos.z - fz * d + rz * 7 * s); break;
+    case 'low': out.set(p.pos.x - fx * d + rx * 7 * k * s, p.pos.y - 5 * k, p.pos.z - fz * d + rz * 7 * k * s); break;
     case 'crane': out.set(p.pos.x - fx * d * 0.7 + rx * d * 0.45 * s, p.pos.y + d * (0.35 + u * 0.5), p.pos.z - fz * d * 0.7 + rz * d * 0.45 * s); break;
-    case 'lead': { const k = d * (1 - u * 0.75); out.set(p.pos.x + fx * k + rx * 10 * s, p.pos.y + 3 + sh.up * 6, p.pos.z + fz * k + rz * 10 * s); break; }
-    case 'top': out.set(p.pos.x - fx * 6, p.pos.y + d, p.pos.z - fz * 6); break;
+    case 'lead': { const a = d * (1 - u * 0.75); out.set(p.pos.x + fx * a + rx * 10 * k * s, p.pos.y + (3 + sh.up * 6) * k, p.pos.z + fz * a + rz * 10 * k * s); break; }
+    case 'top': out.set(p.pos.x - fx * 6 * k, p.pos.y + d, p.pos.z - fz * 6 * k); break;
   }
-  out.y = Math.max(out.y, groundAt(out.x, out.z) + 4, WATER + 3);
+  out.y = Math.max(out.y, k < 1 ? groundAt(out.x, out.z, out.y + 3) + 0.9 : groundAt(out.x, out.z) + 4, WATER + 3 * k);
   return out;
 }
 function sightBlocked() {
@@ -6490,14 +6730,18 @@ function sightBlocked() {
 }
 function updateCinemaState(dt) {
   const p = player, flying = p.form === 'phoenix' && state === 'play' && !p.cine;
+  // on foot it is only ever asked for (C), and never indoors, where the walls would be in the way
+  const foot = p.form === 'human' && state === 'play' && !p.cine && !p.gone && cinema.manual && !roomAt(p.pos.x, p.pos.y, p.pos.z);
   const [ax, ay] = axes();
   const steering = Math.abs(ax) + Math.abs(ay) > 0.1;
   cinema.idle = flying && !steering ? cinema.idle + dt : 0;
   if (flying && cinema.autoT > 0) cinema.autoT -= dt;
   const alt = p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER);
   const want = flying && (cinema.manual || cinema.autoT > 0 || cinema.idle > 6 && TUT.cineOpen) && !(alt < ROLL_ALT * 1.5 && !cinema.manual && cinema.autoT <= 0);
-  if (want && !cinema.on) { cinema.on = true; cinema.last = ''; newShot(); }
-  if (!want && cinema.on) cinema.on = false;
+  const on = want || foot;
+  if (on && cinema.on && (cinema.sc < 1) !== (p.form === 'human')) newShot();   // (he changed shape: the shots change size)
+  if (on && !cinema.on) { cinema.on = true; cinema.last = ''; newShot(); }
+  if (!on && cinema.on) cinema.on = false;
   document.body.classList.toggle('cinema', cinema.on || state === 'talk' || state === 'end');
 }
 function updateCinemaCam(dt) {
@@ -6505,18 +6749,18 @@ function updateCinemaCam(dt) {
   sh.t += dt;
   cinema.blocked = sightBlocked() ? cinema.blocked + dt : 0;
   if (sh.t > sh.dur || cinema.blocked > 0.5) { newShot(); return; }
-  cinema.head += wrapAngle(p.yaw - cinema.head) * damp(0.5, dt);
+  cinema.head += wrapAngle(cineHead() - cinema.head) * damp(0.5, dt);
   springTo(cinema.pos, cinema.posV, shotPos(sh, _v), sh.S.smooth, dt);
   camera.position.copy(cinema.pos);
   // aim a little ahead of him so he flies into open frame, with a breath of handheld drift
   const dist = camera.position.distanceTo(p.pos), lead = sh.type === 'flyby' || sh.type === 'top' ? 0 : Math.min(18, dist * 0.09);
-  _p.copy(p.pos).addScaledVector(dir3, lead);
+  _p.copy(p.pos).addScaledVector(cineDir(_cd), lead * (cinema.sc || 1)); if (p.form === 'human') _p.y += 1.1;
   _p.x += Math.sin(time * 0.7) * dist * 0.004; _p.y += Math.sin(time * 0.9 + 1.3) * dist * 0.003;
   springTo(cinema.aim, cinema.aimV, _p, sh.type === 'flyby' ? 0.18 : 0.3, dt);
   if (sh.type === 'top') camera.up.set(-Math.sin(cinema.head), 0, -Math.cos(cinema.head));
   camera.lookAt(cinema.aim);
   camera.up.set(0, 1, 0);
-  if (sh.type === 'low' || sh.type === 'tight') camera.rotateZ(-p.bank * 0.25);   // lean with him
+  if ((sh.type === 'low' || sh.type === 'tight') && p.form === 'phoenix') camera.rotateZ(-p.bank * 0.25);   // lean with him
   const u = sh.t / sh.dur, k = u * u * (3 - 2 * u);
   camera.fov = lerp(sh.S.fov[0], sh.S.fov[1], k) * (camera.aspect < 1 ? 1.35 : 1);
   camera.updateProjectionMatrix();
@@ -7024,7 +7268,7 @@ function heard(text) {
     return;
   }
   if (state === 'play' && words <= 3 && /\b(camera|photo|picture)\b/.test(low)) return openPhoto();
-  if (state === 'photo') { if (/\b(back|camera|done)\b/.test(low)) closePhoto(); else if (/\b(take|keep|save|shoot)\b/.test(low)) photo.snap = true; return; }
+  if (state === 'photo') { if (/\b(back|camera|done)\b/.test(low)) closePhoto(); else if (/\b(take|keep|save|shoot)\b/.test(low)) snapPhoto(); return; }
   if (state === 'play' && cmd && words <= 3 && !player.cine) return voiceCommand(cmd);
   if (state === 'play') spoke(text);   // anything else he says, he has said out loud, and whoever is near has heard it
 }
@@ -8479,7 +8723,7 @@ function pointerEnd(e) {
   // a quick touch that went nowhere is the button
   if (tp && !tp.moved && e.type === 'pointerup' && performance.now() - tp.t < 320) {
     if (state === 'play') pressSpace();
-    else if (state === 'photo') { if (e.clientX > innerWidth - 70 && e.clientY < 70) closePhoto(); else photo.snap = true; }
+    else if (state === 'photo') { if (e.clientX > innerWidth - 70 && e.clientY < 70) closePhoto(); else snapPhoto(); }
   }
 }
 canvas.addEventListener('pointerup', pointerEnd);
@@ -9190,6 +9434,7 @@ function firstNight(seen) {
 $('title').addEventListener('pointerdown', e => { if (e.target.closest('#nameRow, .foot')) return; e.preventDefault(); titlePress(true); });
 for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) $('title').addEventListener(ev, () => titlePress(false));
 $('goBtn').addEventListener('click', e => { e.stopPropagation(); nameAsked = true; begin(); });
+const isPlus = e => e.key === '+' || e.key === '=' || e.code === 'NumpadAdd';
 addEventListener('keydown', e => {
   if (e.target instanceof HTMLInputElement) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
@@ -9211,21 +9456,26 @@ addEventListener('keydown', e => {
   }
   if (state === 'map') { if (e.code === 'KeyM' || e.code === 'Escape') closeMap(); return; }
   if (state === 'photo') {
+    if (e.code === 'KeyT' && !e.repeat) { e.preventDefault(); return openChat(); }
     keys[e.code] = true;
-    if (e.code === 'KeyF' || e.code === 'Escape') closePhoto();
-    else if (e.code === 'Enter' || e.code === 'Space') photo.snap = true;
+    if (e.code === 'KeyF' || e.code === 'Escape' || isPlus(e)) closePhoto();
+    else if (e.code === 'Enter' || e.code === 'Space') snapPhoto();
     else if (/^Digit[1-6]$/.test(e.code)) photoPreset(+e.code[5]);
     return;
+  }
+  if (state === 'play' && !e.repeat && !e.metaKey && !e.ctrlKey) {
+    if (e.code === 'KeyT' || e.code === 'Slash') { e.preventDefault(); return openChat(e.code === 'Slash' ? '/' : ''); }
+    if (isPlus(e)) { e.preventDefault(); return openPhoto(true); }
   }
   keys[e.code] = true;
   if (e.repeat) return;
   switch (e.code) {
     case 'Space': pressSpace(); break;
     case 'KeyH': if (cam.on || cam.loading) stopCam(); else startCam(); break;
-    case 'KeyC': if (!TUT.cineOpen) break; cinema.manual = !cinema.manual; toast(cinema.manual ? 'CINEMATIC CAMERA' : 'FOLLOW CAMERA'); break;
+    case 'KeyC': TUT.cineOpen = true; cinema.manual = !cinema.manual; toast(cinema.manual ? 'CINEMATIC CAMERA' : 'FOLLOW CAMERA'); break;
     case 'Enter': dlgAdvance(); break;
     case 'KeyG': applyTier((tierIdx + 2) % 3, true); break;
-    case 'KeyT': asciiOn = !asciiOn; resize(); break;
+    case 'KeyY': asciiOn = !asciiOn; resize(); break;   // (T is chat)
     case 'Delete': case 'Backspace': if (!e.repeat) respawnTop(); break;
     case 'KeyV': if (!e.repeat && mic.stream) setMicMuted(!VC.muted); break;   // (the Mac's "delete" key is Backspace)
     case 'BracketLeft': cellIdx = Math.max(0, cellIdx - 1); resize(); break;
@@ -9581,8 +9831,13 @@ function tick(dt) {
   present(scene, camera);
   if (photo.snap) {   // the picture is taken straight off the frame that was just drawn
     photo.snap = false;
-    canvas.toBlob(b => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `icarus-${heroName.toLowerCase().replace(/ /g, '-')}-${Date.now() % 100000}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); });
-    flash = 0.5; audio.sfx.ui(); toast('SAVED');
+    const done = photo.blobR; photo.blobR = null;
+    canvas.toBlob(b => {
+      done?.(b); if (!b) return;
+      const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `icarus-${heroName.toLowerCase().replace(/ /g, '-')}-${Date.now() % 100000}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      if (photo.clip !== 1) toast('SAVED');
+    });
+    flash = 0.5; audio.sfx.ui();
   }
 }
 
@@ -9606,7 +9861,7 @@ setTimeout(() => {
   $('title').classList.remove('hidden');
   state = 'title';
   titleStart();
-  window.__icarus = { quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  window.__icarus = { CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);
