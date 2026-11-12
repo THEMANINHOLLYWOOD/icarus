@@ -4,7 +4,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-const out = path.join(path.dirname(fileURLToPath(import.meta.url)), 'cap');
+const out = process.env.CAP_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), 'cap');
 fs.mkdirSync(out, { recursive: true });
 http.createServer(async (req, res) => {
   // (any of this machine's own dev servers may send frames)
