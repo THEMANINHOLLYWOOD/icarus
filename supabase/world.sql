@@ -69,3 +69,23 @@ create index if not exists world_rings_place on public.world_rings (realm, cx, c
 alter table public.world_rings enable row level security;
 revoke all on public.world_rings from anon, authenticated;
 grant select, insert, update, delete on public.world_rings to service_role;
+
+-- What the gods share (api/_pantheon.js): each god is one mind speaking with many mortals at once, and they talk among
+-- themselves. A row is one thing worth telling: a god's own short note after a conversation (kind 'talk'), or a deed
+-- the game saw (kind 'deed': found a god, finished a task, chose a patron, went under the sea). Notes are written by
+-- the god, cleaned on the server, and forgotten after a month.
+create table if not exists public.god_notes (
+  id bigint generated always as identity primary key,
+  god text not null default '' check (god ~ '^[a-z]{0,16}$'),   -- who tells it ('' when it was simply seen)
+  kind text not null check (kind in ('talk','deed')),
+  name text not null check (char_length(name) <= 12),
+  by_hash text not null,                                     -- whose it is about (the hash of their travel code)
+  note text not null check (char_length(note) between 1 and 200),
+  at timestamptz not null default now()
+);
+create index if not exists god_notes_at on public.god_notes (at desc);
+create index if not exists god_notes_god on public.god_notes (god, at desc);
+create index if not exists god_notes_who on public.god_notes (by_hash, at desc);
+alter table public.god_notes enable row level security;
+revoke all on public.god_notes from anon, authenticated;
+grant select, insert, delete on public.god_notes to service_role;

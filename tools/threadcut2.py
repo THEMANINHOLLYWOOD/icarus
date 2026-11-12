@@ -44,7 +44,7 @@ def main(name):
     # depth: the top of the frame falls out of focus, as through a long lens
     band = int(H * C.get('blur_top', 0.38)); r_top = C.get('blur_r', 7.0)
     ramp = np.clip((band - np.arange(band)) / band, 0, 1) ** 1.25
-    blur_mask = Image.fromarray(np.repeat((ramp * 255)[:, None], W, 1).astype(np.uint8))
+    blur_mask = Image.fromarray(np.repeat((ramp * 255)[:, None], W, 1).astype(np.uint8)) if band > 0 else None
     def depth(im):
         if band <= 0: return im
         top = im.crop((0, 0, W, band)); im.paste(Image.composite(top.filter(ImageFilter.GaussianBlur(r_top)), top, blur_mask), (0, 0)); return im
@@ -123,6 +123,22 @@ def main(name):
             cr = (rng.random(Ls) < 0.0016) * rng.standard_normal(Ls) * 2.2; cr = cr - lowpass(cr, 900)
             env = np.minimum(1, np.minimum(u / 0.25, (1 - u) / 0.3)).clip(0)
             sig = (br * 0.9 + hiss + cr * 0.5) * env; st = np.stack([sig, np.roll(sig, 240)], 1)
+        elif kind == 'shutter':   # a camera's shutter: two dry clicks and the little slap of the mirror
+            db, = rest; Ls = int(0.22 * SR); tt = np.arange(Ls) / SR; sig = np.zeros(Ls)
+            for t_c, amp, dec in [(0.0, 1.0, 260), (0.055, 0.8, 200), (0.085, 0.45, 90)]:
+                j = int(t_c * SR); m = Ls - j; nz = rng.standard_normal(m); nz = nz - lowpass(nz, 1400)
+                sig[j:] += nz * np.exp(-np.arange(m) / SR * dec) * amp + np.sin(2 * np.pi * 190 * np.arange(m) / SR) * np.exp(-np.arange(m) / SR * 70) * amp * 0.5
+            st = np.stack([sig, sig], 1) * 0.5
+        elif kind == 'stop':   # time stopping: everything winds down, a tone and its air falling away
+            db, = rest; Ls = int(1.1 * SR); u = np.arange(Ls) / Ls
+            f = 520 * 2 ** (-u * 3.6); ph = 2 * np.pi * np.cumsum(f) / SR
+            nz = lowpass(rng.standard_normal(Ls), 4000 * (1 - u) ** 2 + 120)
+            sig = (0.5 * np.sin(ph) + 0.25 * np.sin(2.01 * ph) + nz * 0.8) * (1 - u) ** 1.2 * np.minimum(1, u / 0.02); st = np.stack([sig, sig], 1)
+        elif kind == 'go':   # and starting again: the same, wound up
+            db, = rest; Ls = int(0.8 * SR); u = np.arange(Ls) / Ls
+            f = 60 * 2 ** (u * 3.4); ph = 2 * np.pi * np.cumsum(f) / SR
+            nz = lowpass(rng.standard_normal(Ls), 4000 * u ** 2 + 120)
+            sig = (0.5 * np.sin(ph) + 0.25 * np.sin(2.01 * ph) + nz * 0.8) * u ** 1.5; st = np.stack([sig, sig], 1)
         else: continue
         st = st * (10 ** (db / 20)); e = min(n, i0 + len(st)); fx[i0:e] += st[:e - i0]
     if C.get('strikes'):   # thunder where the game's lightning struck: near ones crack, far ones roll in late
@@ -161,6 +177,9 @@ def main(name):
                 u = (t - t0) / (t1 - t0); u = u * u * (3 - 2 * u); z = z0 + (z1 - z0) * u
                 w2, h2 = W / z, H / z; x0, y0 = (W - w2) / 2, (H - h2) * 0.42
                 im = im.resize((W, H), Image.BICUBIC, box=(x0, y0, x0 + w2, y0 + h2)); break
+        for tf in C.get('flashes', []):   # a shutter: the frame blinks white and comes back
+            if 0 <= t - tf < 0.3: im = Image.blend(im, Image.new('RGB', im.size, (255, 255, 255)), max(0.0, 0.85 * (1 - (t - tf) / 0.3) ** 2))
+            elif -0.05 <= t - tf < 0: im = Image.blend(im, Image.new('RGB', im.size, (0, 0, 0)), 0.75)
         return depth(im)
     def caption(im, t):
         live = [(t0, e, text, who) for t0, e, text, who in vo_env if text and t0 - 0.15 <= t <= t0 + max(1.6, len(e) / FPS) + 0.5]

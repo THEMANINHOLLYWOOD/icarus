@@ -131,10 +131,23 @@ function direct(t) {
     P.set(p.pos.x + bz * lerp(45, 58, k) - bx * 6, p.pos.y + 5, p.pos.z - bx * lerp(45, 58, k) - bz * 6);
     Lk.set(p.pos.x + bx * 8, p.pos.y + 0.5, p.pos.z + bz * 8); D.fov = 40; D.fog = 7000;
   }
+  if (FOVK !== 1) D.fov = Math.min(105, 2 * Math.atan(Math.tan(D.fov * Math.PI / 360) * FOVK) * 180 / Math.PI);   // (a tall frame: open the lens so the sides are not lost)
   D.p.copy(P); D.l.copy(Lk);
 }
 // the big glyphs, held (the game resets them whenever it resizes)
-const DIVE_AT = +(Q.get('dive') || 4.5), TITLE_AFTER = +(Q.get('titleafter') || 3);
+const DIVE_AT = +(Q.get('dive') || 4.5), TITLE_AFTER = +(Q.get('titleafter') || 3), FOVK = +(Q.get('fovk') || 1), ROWS = +(Q.get('rows') || 1);
+// a tall frame's title: the name in rows (ICA / RUS), each stretched to fill its band, for the same fire
+function stackedTitle() {
+  const W = Math.min(2048, Math.round(innerWidth * Math.min(devicePixelRatio, 2))), H = Math.round(W * innerHeight / innerWidth), c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, W, H);
+  x.font = '900 200px Impact, "Haettenschweiler", "Arial Narrow Bold", "Arial Black", sans-serif'; x.textBaseline = 'alphabetic';
+  const per = Math.ceil(6 / ROWS), gap = H * 0.022, bh = (H * 0.94 - gap * (ROWS - 1)) / ROWS;
+  for (let r = 0; r < ROWS; r++) {
+    const word = 'ICARUS'.slice(r * per, r * per + per), m = x.measureText(word), w = m.width, asc = m.actualBoundingBoxAscent || 150, h = asc + (m.actualBoundingBoxDescent || 0);
+    x.setTransform(W * 0.97 / w, 0, 0, bh / h, W * 0.015, H * 0.03 + r * (bh + gap) + asc * bh / h); x.fillStyle = '#fff'; x.fillText(word, 0, 0);
+  }
+  const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; return t;
+}
 const CELL = (Q.get('cell') || '9x14').split('x').map(Number);
 function cellHold() {
   const U = I.postMat.uniforms, dpr = I.renderer.getPixelRatio();
@@ -147,7 +160,7 @@ function cellHold() {
 let titleF = -1;
 function titleHold() {
   const U = I.postMat.uniforms;
-  if (titleF < 0 && U.tTitle.value && tPhx >= 0 && R.frame / FPS >= tPhx + TITLE_AFTER) { titleF = R.frame; R.log.push(['title', R.frame / FPS]); }
+  if (titleF < 0 && U.tTitle.value && tPhx >= 0 && R.frame / FPS >= tPhx + TITLE_AFTER) { titleF = R.frame; R.log.push(['title', R.frame / FPS]); if (ROWS > 1) { U.tTitle.value.dispose?.(); U.tTitle.value = stackedTitle(); } }
   if (titleF < 0) { U.uTitleT.value = -1; return; }   // (the name waits until the bird has flown a while)
   { const u = (R.frame - titleF) / FPS; U.uTitleT.value = u < 5.6 ? u : -1; if (u >= 5.6 && U.tTitle.value) { U.tTitle.value.dispose?.(); U.tTitle.value = null; } }
 }

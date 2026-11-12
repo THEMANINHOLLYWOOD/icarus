@@ -1,0 +1,11 @@
+<!doctype html>
+<!-- A recorder's way in: loads the game exactly as it is, but catches the frame loop the game hands to requestAnimationFrame
+     (window.__loop) instead of letting the browser run it, so tools/cinereel.js can drive that loop itself, one frame at a time
+     on its own clock. That is the only way to film anything that slows the game's time (the photo camera). Local only; not deployed.
+     Open http://localhost:8125/tools/loopwrap.html?mute=1 -->
+<meta charset="utf-8">
+<script>
+window.__loop = null;
+window.requestAnimationFrame = cb => { if (cb && cb.name === 'frame') window.__loop = cb; return 0; };
+fetch('/').then(r => r.text()).then(h => { document.open(); document.write(h.replace('<head>', '<head><base href="/">')); document.close(); });
+</script>

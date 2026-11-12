@@ -1,4 +1,4 @@
-# Icarus — The Last Ember
+# Icarus
 
 Icarus fell. He woke on Olympus. A story game in endless ASCII country: fly as the
 phoenix, walk as the man, meet the gods (who are not always what they seem), and

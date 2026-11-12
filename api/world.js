@@ -7,6 +7,7 @@
 // nothing). Locally, with no key, it keeps everything in memory, so two tabs on the dev server still share a world.
 import { json, refuse, limited, clip } from './_lib.js';
 import { createHash } from 'node:crypto';
+import { rememberDeed, isDeed } from './_pantheon.js';
 
 const URL_ = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -148,9 +149,14 @@ export async function POST(req) {
       const names = [...new Set([name, ...(Array.isArray(b.names) ? b.names : []).map(name12)])].slice(0, 4);
       if (!id || !pats.length) return json({ error: 'bad claim' }, 400);
       const row = { id, realm, cx: fin(b.cx, 4e6), cz: fin(b.cz, 4e6), patrons: pats, names, by_hash: hash, at: new Date().toISOString() };
+      await rememberDeed('arena', { name, hash, god: pats[0] }).catch(() => {});   // (the gods hear whose colour it burns in now)
       if (!LIVE) { MEM.rings.set(id, row); return json({ ok: true }); }
       const r = await rest('world_rings?on_conflict=id', { method: 'POST', body: row, prefer: 'resolution=merge-duplicates,return=minimal' });
       return r.ok ? json({ ok: true }) : json({ ok: false, kept: false });   // (no table yet: the claim is only live)
+    }
+    if (b.op === 'deed') {   // something the gods will talk about: the page names it, the words are the server's
+      if (!isDeed(b.k) || b.k === 'met' || b.k === 'arena' || limited(req, 'deed', 12)) return json({ ok: false });
+      return json({ ok: await rememberDeed(b.k, { name, hash, god: String(b.god || '') }) });
     }
     // something that stays: a shrine where he met a god (once per god), or the place he fell
     if (b.op === 'mark') {
@@ -163,10 +169,12 @@ export async function POST(req) {
       if (!LIVE) {
         if (kind === 'met' && MEM.marks.some(m => m.kind === 'met' && m.by_hash === hash && m.god === row.god)) return json({ ok: true, again: true });
         MEM.marks.push({ ...row, id: MEM.id++, at: new Date().toISOString() }); if (MEM.marks.length > 5000) MEM.marks.shift();
+        if (kind === 'met') await rememberDeed('met', { name, hash, god: row.god }).catch(() => {});
         return json({ ok: true });
       }
       const r = await rest('world_marks', { method: 'POST', body: row, prefer: 'return=minimal' });
       if (r.status === 409) return json({ ok: true, again: true });   // (he met this god before: the first shrine stands)
+      if (r.ok && kind === 'met') await rememberDeed('met', { name, hash, god: row.god }).catch(() => {});
       return r.ok ? json({ ok: true }) : json({ error: 'not marked' }, 502);
     }
     // where he is and how far his story has gone, kept for when he comes back; says what changed while he was away
