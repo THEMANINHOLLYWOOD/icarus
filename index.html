@@ -758,6 +758,21 @@ function underHeight(x, z) {
   return h;
 }
 function height(x, z) { return realm === 'under' ? underHeight(x, z) : overHeight(x, z); }
+// The ground is not fixed. Where burning rock comes down (or a bird comes in far too fast) it leaves a crater: a bowl
+// with a raised lip, scorched black, nothing growing in it, and the country is cut again to show it. And out past the
+// mountain there are lands the sea has taken: everything low is under water there, the hills left standing as islands.
+// Crete is a real place: far out to the south-east of the mountain, in a sea of its own (whatever country the dice put
+// there is under water). The island, the Labyrinth and the tower stand in it for anyone to fly to, and it is where
+// everyone begins.
+const CRETE = { x: MOUNT.x + 11500, z: MOUNT.z + 11000, group: null, R: 0 };   // (sixteen kilometres out: the whole island is seven across, and its sea has to clear the mountain's country)
+const CRATERS = [];
+function craterAt(x, z) {
+  let dh = 0;
+  for (const c of CRATERS) { const dx = x - c.x, dz = z - c.z, r2 = (dx * dx + dz * dz) / (c.R * c.R); if (r2 > 2.2) continue;
+    const r = Math.sqrt(r2); dh += r < 1 ? -c.d * (1 - r2) * (1 - r2) : 0; dh += c.d * 0.24 * Math.exp(-(((r - 1.05) / 0.17) ** 2)); }
+  return dh;
+}
+const floodAt = (x, z) => smoothstep(0.34, 0.48, noise2(x / 3100 + 71.3, z / 3100 - 19.7));
 function overHeight(x, z) {
   let h = baseHeight(x, z);
   const mdx = x - MOUNT.x, mdz = z - MOUNT.z, md2 = mdx * mdx + mdz * mdz;
@@ -789,6 +804,9 @@ function overHeight(x, z) {
       h = Math.min(h, y);
     }
   }
+  { const cdx = x - CRETE.x, cdz = z - CRETE.z, cd2 = cdx * cdx + cdz * cdz; if (cd2 < 8000 * 8000) h = lerp(Math.min(h, WATER - 18), h, smoothstep(7100, 8000, Math.sqrt(cd2))); }   // the sea round Crete
+  if (md2 > 4500 * 4500 && h > WATER - 1 && h < 170) { const f = floodAt(x, z); if (f > 0) h = lerp(h, WATER - 2.5 - (170 - h) * 0.02, f * smoothstep(170, 70, h)); }   // the drowned lands
+  if (CRATERS.length) h += craterAt(x, z);
   return h;
 }
 
@@ -968,6 +986,7 @@ function terrainColor(x, z, h, ny, out, o) {
   if (wood > 0) mix(noise2(x / 900 - 12.1, z / 900 + 44.4) > 0.12 ? WOOD.litter : WOOD.floor, wood * 0.5);
   if (h < 330) { const w = biomeW(x, z); if (w[0] > 0) mix(BIO.moss, w[0] * 0.5); if (w[1] > 0) mix(BIO.dusk, w[1] * 0.62); if (w[2] > 0) mix(BIO.petal, w[2] * (0.22 + 0.3 * n1)); }
   mix(COL.rock, Math.max(smoothstep(0.86, 0.68, ny), smoothstep(380, 540, h)));
+  for (const c of CRATERS) { const d = Math.hypot(x - c.x, z - c.z); if (d < c.R * 1.8) mix(noise2(x / 3, z / 3) > 0 ? COL.basalt : COL.ash, smoothstep(c.R * 1.8, c.R * 0.7, d) * 0.9); }   // (scorched)
   mix(COL.snow, smoothstep(600, 720, h) * smoothstep(0.55, 0.8, ny));
   mix(COL.sand, smoothstep(WATER + 5, WATER + 1, h));
   for (const v of VOLCANOES) {   // black rock and grey ash on the volcanoes, yellow sulphur crusting the lake's rim
@@ -1315,6 +1334,8 @@ function growForest(acc, x0, z0, r) {
     if (h < WATER + 3 || h > 500 || slopeAt(x, z, h) > 5) continue;
     growTree(acc, x, h, z, r, 0.85 + r() * 0.6, f > 0.82 && r() < 0.1 ? 'redwood' : '');
   }
+  { const fr = mulberry32(((x0 * 31) | 0) ^ ((z0 * 17) | 0) ^ 0x6c0d);   // (its own dice: nothing else in the square moves)
+    if (realm === 'over' && floodAt(x0 + CHUNK / 2, z0 + CHUNK / 2) > 0.5) for (let k = 0; k < 14; k++) { const x = x0 + fr() * CHUNK, z = z0 + fr() * CHUNK, h = height(x, z); if (h < WATER - 0.5 && h > WATER - 6 && fr() < 0.7) _snag(acc, x, h, z, fr, 0.9 + fr() * 0.9); } }
   { const x = x0 + r() * CHUNK, z = z0 + r() * CHUNK, h = height(x, z);   // now and then, one of the old ones
     if (r() < 0.09 && forestAt(x, z) > 0.55 && h > WATER + 6 && h < 300 && slopeAt(x, z, h) < 2.5 && !nearSite(x, z, 120)) growTree(acc, x, h, z, r, 1, 'giant'); }
   for (let k = 0, n = tier.deco * (TOUCH ? 1.2 : 2.2); k < n; k++) {   // under the trees: bushes, fallen trunks; in the open: flowers
@@ -1411,7 +1432,7 @@ function updateLeaves(dt) {
   worldFx.uGale.value = storm;
 }
 
-const nearSite = (x, z, r) => BEACONS.some(b => (x - b.x) ** 2 + (z - b.z) ** 2 < r * r) || volcanoNear(x, z, r) || riverF(x, z) < 1.6;   // (nothing grows or is built on the volcanoes, or in a river)
+const nearSite = (x, z, r) => BEACONS.some(b => (x - b.x) ** 2 + (z - b.z) ** 2 < r * r) || volcanoNear(x, z, r) || riverF(x, z) < 1.6 || CRATERS.some(c => (x - c.x) ** 2 + (z - c.z) ** 2 < c.R * c.R * 1.7);   // (nothing grows or is built on the volcanoes, or in a river)
 
 // one wind for everything that drifts: clouds, their shadows, snow, the ribbons of air
 const WIND = new THREE.Vector3(0.93, 0, 0.37);
@@ -1793,7 +1814,7 @@ function updateHeavens(dt) {
     _hq.copy(stars.quaternion).invert();   // (placed where the sky is now, so it falls across what he is looking at)
     M.a.set(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e)).multiplyScalar(8300).applyQuaternion(_hq);
     M.d.set(-Math.sin(a) + rnd(0.5), -0.55 - Math.random() * 0.5, Math.cos(a) + rnd(0.5)).normalize().applyQuaternion(_hq);
-    M.l.material.opacity = 0.01;
+    M.l.material.opacity = 0.01; audio.sfx.meteor?.();
   }
 }
 stars.renderOrder = -1;
@@ -3566,7 +3587,20 @@ function applyQuiet() { if (AC) audio.setMuted(muted || QUIET.forced || QUIET.hi
 document.addEventListener('visibilitychange', () => { QUIET.hidden = document.hidden; applyQuiet(); });
 function setMuted(m) { muted = m; applyQuiet(); toast(m ? 'SOUND OFF' : 'SOUND ON'); }
 const chime = (notes, gap) => audio.sfx.chime(notes, gap), whoosh = up => audio.sfx.whoosh(up);
+// Water and fire are heard from where they are: the nearest falls and the nearest fires each say something every second
+// or so, placed in the world, so a waterfall is on his left when it is on his left and a burning wood is behind him when
+// he has flown past it.
+const AMB3 = { t: 0 };
+function updateAmbience3D(dt) {
+  if ((AMB3.t -= dt) > 0 || state === 'title' || state === 'loading' || state === 'prologue') return;
+  AMB3.t = 0.85 + Math.random() * 0.4;
+  const c = camera.position, near = (list, pos, max, n) => list.map(o => { const P = pos(o); return P ? [(P.x - c.x) ** 2 + (P.y - c.y) ** 2 + (P.z - c.z) ** 2, P] : null; }).filter(e => e && e[0] < max * max).sort((a, b) => a[0] - b[0]).slice(0, n);
+  for (const [, P] of near([...waterfalls], f => f.visible !== false && f.parent?.visible !== false ? (f.userData.foot || f.userData.lip) : null, 520, 2)) audio.at3(P.x, P.y, P.z, () => audio.sfx.fallGrain?.(1), { ref: 34, max: 560, life: 2600 });
+  const fires = realm === 'under' ? [...pyres] : [...BLAZE.list.slice(0, 60), ...(PANTHEON.fires || []), ...CRATERS.filter(k => time - k.t < 26).map(k => ({ x: k.x, y: terrainAt(k.x, k.z), z: k.z }))];
+  for (const [, P] of near(fires, f => ({ x: f.x, y: f.y ?? c.y, z: f.z }), 230, 2)) audio.at3(P.x, P.y, P.z, () => audio.sfx.crackle?.(1), { ref: 14, max: 260, life: 2000 });
+}
 function updateAudio(dt) {
+  updateAmbience3D(dt);
   { const c = camera.position; camera.getWorldDirection(_n); audio.listen?.(c.x, c.y, c.z, _n.x, _n.y, _n.z); }   // (the ears are where the lens is)
   if (!AC) return;
   if (state === 'prologue') {   // over Crete: the flight score, then the long fall
@@ -4060,6 +4094,7 @@ function landWinged(hs, vy, water) {
   for (let i = 0; i < 40; i++) emit(p.pos.x + rnd(3), p.pos.y + 1.4, p.pos.z + rnd(3), rnd(5), 1 + Math.random() * 3, rnd(5), 0.7, pick(EMBER));
   if (!water && (hs > 90 || vy < -45)) {
     p.fallCause = 'crash'; p.vel.set(0, 0, 0);
+    if (kmh > 260) crater(player.pos.x, player.pos.z, clamp(10 + kmh / 60, 14, 22));   // (coming in that fast leaves a mark)
     die('crash', kmh);
     return;
   }
@@ -4186,7 +4221,7 @@ function humanDive() {
   const bed = overHeight(p.pos.x, p.pos.z);
   if (bed > WATER - 14) { toast('TOO SHALLOW TO DIVE HERE · SWIM OUT'); return false; }
   p.dive = { t: 0, bed, deep: Math.min(30, WATER - bed - 3), told: false }; p.grounded = false; p.swim = false; p.vel.set(0, 0, 0); SEA.trans = true;   // (the sea closes over the lens too)
-  ripple(p.pos.x, p.pos.z, 1); audio.sfx.splash?.(false); toast(TOUCH ? 'UNDER · PUSH FORWARD TO GO DEEPER' : 'UNDER · W DEEPER · S BACK UP');
+  ripple(p.pos.x, p.pos.z, 1); audio.sfx.plunge?.(); toast(TOUCH ? 'UNDER · PUSH FORWARD TO GO DEEPER' : 'UNDER · W DEEPER · S BACK UP');
   return true;
 }
 function updateHumanDive(dt) {
@@ -4203,6 +4238,7 @@ function updateHumanDive(dt) {
   if (H.foreL) H.foreL.rotation.x = H.foreR.rotation.x = -pull * 0.5;
   H.legL.rotation.x = kick * 0.36; H.legR.rotation.x = -kick * 0.36; if (H.head) H.head.rotation.x = -0.45;
   if (Math.random() < 0.5) emit(p.pos.x + rnd(0.5), p.pos.y + 1 + rnd(0.5), p.pos.z + rnd(0.5), rnd(0.6), 1.5 + Math.random() * 2.5, rnd(0.6), 0.9 + Math.random() * 0.8, [0.7, 0.85, 0.95], 5);   // his breath, going up
+  if ((D.bT = (D.bT || 0) - dt) < 0) { D.bT = 0.45 + Math.random() * 0.5; audio.sfx.bubble?.(); }
   p.flame = Math.max(0.12, p.flame - dt * 0.03);   // (water is no friend of his fire)
   if (vy > 0 && p.pos.y > WATER - 0.9) { p.pos.y = WATER; p.dive = null; p.grounded = true; resetPose(); ripple(p.pos.x, p.pos.z, 0.8); audio.sfx.splash?.(false); return; }   // back up into the air
   if (p.pos.y < WATER - D.deep) {   // through: out of the roof of the Underworld, falling
@@ -5237,6 +5273,7 @@ function slipstream(dt) {
 }
 function updatePeers(dt) {
   if (!NET.peers.size) return;
+  if (aloneNow()) { for (const P of NET.peers.values()) if (P.av) { P.av.man.group.visible = P.av.bird.group.visible = false; if (P.label) P.label.style.display = 'none'; } return; }
   const me = realm === 'under' ? 1 : 0, now = performance.now();
   for (const P of NET.peers.values()) {
     if (!P.s) continue;
@@ -5626,7 +5663,7 @@ try { new PerformanceObserver(l => { for (const e of l.getEntries()) HEALTH.byte
 function healthCount(ch) {   // the shared channel: what goes out and what comes in
   const s0 = ch.send.bind(ch), on0 = ch.on.bind(ch);
   ch.send = (m, o) => { HEALTH.out++; if (HEALTH.me) try { HEALTH.ws += JSON.stringify(m.payload || '').length + 60; } catch {} return s0(m, o); };
-  ch.on = (type, f, cb) => on0(type, f, type === 'broadcast' ? x => { HEALTH.in++; if (HEALTH.me) try { HEALTH.ws += JSON.stringify(x.payload || '').length + 60; } catch {} return cb(x); } : cb);
+  ch.on = (type, f, cb) => on0(type, f, type === 'broadcast' ? x => { HEALTH.in++; if (HEALTH.me) try { HEALTH.ws += JSON.stringify(x.payload || '').length + 60; } catch {} if (state === 'prologue' && f.event !== 's') return; return cb(x); } : cb);
 }
 const hAgo = t => { const sec = Math.max(0, Math.round((performance.now() - t) / 1000)); return sec < 90 ? `${sec}s ago` : `${Math.round(sec / 60)}m ago`; };
 const hSize = b => b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`;
@@ -5847,7 +5884,7 @@ function perchLand() {
   p.perch = true; p.grounded = true; p.speed = 0; p.vy = 0; p.pitch = 0; p.bank = 0; p.turn = 0;
   p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9; p.fallTop = p.pos.y;
   for (let i = 0; i < 30; i++) emit(p.pos.x + rnd(2), p.pos.y - 0.6, p.pos.z + rnd(2), rnd(4), Math.random() * 3, rnd(4), 0.8, pick(EMBER));
-  audio.sfx.land?.(0.4); toast('ON THE GROUND · AS THE BIRD');
+  audio.sfx.land?.(0.4); audio.sfx.perch?.(); toast('ON THE GROUND · AS THE BIRD');
 }
 function perchUp() {
   const p = player;
@@ -5868,7 +5905,7 @@ function updatePerch(dt) {
   dir3.set(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
   // standing still on a high place he opens his wings to the wind; on a place with a name, the lens draws back and goes slowly round him and the view
   { let L = null; for (const s of skyIslands) if (s.name && (!s.realm || s.realm === realm) && Math.abs(p.pos.y - 0.9 - s.top) < 3.5 && (p.pos.x - s.x) ** 2 + (p.pos.z - s.z) ** 2 < s.r2 * 1.2) { L = s; break; }
-    if (L !== p.look) { p.look = L; if (L) { toast(`${L.name} · A PERCH`); audio.sfx.reveal?.(); if (!(L.seen)) { L.seen = true; witness(`came down as the bird on ${L.name.toLowerCase()}`, true); } } }
+    if (L !== p.look) { p.look = L; if (L) { toast(`${L.name} · A PERCH`); audio.sfx.lookout?.(); if (!(L.seen)) { L.seen = true; witness(`came down as the bird on ${L.name.toLowerCase()}`, true); } } }
     p.perchIdle = ml < 0.1 ? (p.perchIdle || 0) + dt : 0;
     if (L) p.flame = Math.min(1, p.flame + dt / 5); }
   const open = smoothstep(p.look ? 0.5 : 1.6, p.look ? 1.6 : 3, p.perchIdle);
@@ -8141,7 +8178,7 @@ function setRealm(to, x = player.pos.x, z = player.pos.z, yaw = player.yaw) {
   for (const l of pyreLights) l.intensity = 0;
   hades.active = false; hades.group.visible = false;
   for (const s of souls) s.ok = false;
-  udClear(); player.ferry = null; if (UNDER.hall) UNDER.hall.visible = under; if (STYX.group) STYX.group.visible = under; if (FERRY.group) FERRY.group.visible = under; RIV.group.visible = !under; waterMat.uniforms.uStyx.value.w = 0;
+  udClear(); player.ferry = null; if (CRETE.group) CRETE.group.visible = !under; if (UNDER.hall) UNDER.hall.visible = under; if (STYX.group) STYX.group.visible = under; if (FERRY.group) FERRY.group.visible = under; RIV.group.visible = !under; waterMat.uniforms.uStyx.value.w = 0;
   if (under) { if (!UNDER.arrive) UNDER.arrive = { x, z }; placeHades(x, z, yaw); if (STYX.on) UNDER.side = styxAt(x, z) >= 0 ? 1 : -1; waterMat.uniforms.uStyx.value.set(STYX.x, STYX.z, STYX.R, STYX.on ? 1 : 0); }
   else if (!story.met.has('hermes') && state !== 'loading') { const h = godById.hermes; spawnGod(h, MYKONOS.x, MYKONOS.z + 5, true, true); h.pinned = true; h.place = 'HERMES'; }
   if (!under) { placeQuestGods(); zeusHome(); }
@@ -8740,7 +8777,7 @@ function updateLava(dt) {
 // ── Eruptions. Every so often one of them blows (sooner if he is close): the ground shakes and booms, the blue lake heaves
 //    up in a column of fire with ash boiling above it, and bombs of blue lava are thrown out in arcs all round — they land
 //    burning, set the trees alight and hiss in the water, and one that lands on him is the same as falling in.
-const ERUPT = { bombs: [], mesh: null, N: TOUCH ? 60 : 110, told: false, col: null, ash: null, puffs: [], AN: TOUCH ? 28 : 48 };
+const ERUPT = { bombs: [], mesh: null, N: TOUCH ? 70 : 150, told: false, col: null, ash: null, puffs: [], AN: TOUCH ? 28 : 48 };
 // the column: a tower of blue fire standing up out of the lake, flames running up it
 function eruptColumn() {
   if (ERUPT.col) return ERUPT.col;
@@ -8797,7 +8834,7 @@ function updateEruptions(dt) {
       emit(v.x + Math.cos(a) * r, v.lava + 2, v.z + Math.sin(a) * r, rnd(7), 30 + Math.random() * 55, rnd(7), 1.1 + Math.random() * 1.1, pick(BLUEFIRE), -7, 2.6);
     }
     for (let i = 0; i < (far ? 1 : 3); i++) emit(v.x + rnd(35), v.lava + 50 + Math.random() * 80, v.z + rnd(35), rnd(6), 10 + Math.random() * 12, rnd(6), 6, pick(ASH_DARK), 4, 7);   // ash, boiling up
-    if (!far && (v.bombT -= dt) < 0) { v.bombT = (TOUCH ? 0.2 : 0.1) / (0.35 + k); launchBomb(v); }
+    if (!far && (v.bombT -= dt) < 0) { v.bombT = (TOUCH ? 0.17 : 0.075) / (0.35 + k); launchBomb(v); }
     { const C = eruptColumn(), up = smoothstep(0, 0.9, v.erupt0 - v.erupt);   // (the tower of fire: up fast, and sinking back as it ends)
       C.visible = true; C.position.set(v.x, v.lava - 4, v.z); C.scale.set(v.Rl * 0.55, 420 * up * (0.4 + 0.6 * k), v.Rl * 0.55); C.material.uniforms.uK.value = k * up; ERUPT.colV = v; }
     if ((v.puffT -= dt) < 0 && ERUPT.puffs.length < ERUPT.AN) { v.puffT = 0.22 / (0.4 + k); ERUPT.puffs.push({ x: v.x + rnd(30), y: v.lava + 120 + Math.random() * 120, z: v.z + rnd(30), vx: rnd(6), vy: 18 + Math.random() * 16, vz: rnd(6), r: 18 + Math.random() * 16, t: 0, T: 14 + Math.random() * 8, sp: Math.random() * 6 }); }
@@ -8808,7 +8845,7 @@ function updateEruptions(dt) {
 }
 function launchBomb(v) {
   if (ERUPT.bombs.length >= ERUPT.N) return;
-  const a = Math.random() * 6.28, spd = 35 + Math.random() * 85;
+  const a = Math.random() * 6.28, spd = 35 + Math.random() * 110;
   ERUPT.bombs.push({ x: v.x + rnd(v.Rl * 0.4), y: v.lava + 3, z: v.z + rnd(v.Rl * 0.4), vx: Math.cos(a) * spd, vy: 60 + Math.random() * 90, vz: Math.sin(a) * spd, s: 2.4 + Math.random() * 3.6, t: 0 });
 }
 function updateBombs(dt) {
@@ -8842,8 +8879,34 @@ function updateBombs(dt) {
   }
   m.count = n; m.instanceMatrix.needsUpdate = true; m.visible = n > 0 && realm === 'over';
 }
+let craterQ = [], craterT = 0;
+function crater(x, z, R) {
+  if (realm !== 'over' || overHeight(x, z) < WATER + 1 || Math.hypot(x - MOUNT.x, z - MOUNT.z) < 300 || CRATERS.some(c => (x - c.x) ** 2 + (z - c.z) ** 2 < (c.R * 0.6) ** 2)) return false;
+  const c = { x, z, R, d: R * 0.34, t: time }; CRATERS.push(c); const old = CRATERS.length > 28 ? CRATERS.shift() : null;
+  RELIEF.hc.clear();
+  for (const k of old ? [c, old] : [c]) for (const [dx, dz] of [[0, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]]) { const key = `${Math.floor((k.x + dx * k.R * 1.6) / CHUNK)},${Math.floor((k.z + dz * k.R * 1.6) / CHUNK)}`; if (!craterQ.includes(key)) craterQ.push(key); }
+  return true;
+}
+// the country is cut again where it was hit, a square at a time (the new one is up before the old one goes: nothing blinks)
+function updateCraters(dt) {
+  if (craterQ.length && (craterT -= dt) < 0) {
+    craterT = 0.3; const key = craterQ.shift(), old = chunks.get(key);
+    if (old && realm === 'over') {
+      for (let i = BLAZE.list.length - 1; i >= 0; i--) if (BLAZE.list[i].ck === key) { BLAZE.key.delete(BLAZE.list[i].k); BLAZE.list.splice(i, 1); }   // (what was burning there is not the same trees any more)
+      const [cx, cz] = key.split(',').map(Number), g = buildChunk(cx, cz); scene.remove(old); disposeFeatures(old); old.traverse(o => o.geometry && o.geometry !== sailGeo && o.geometry.dispose()); chunks.set(key, g);
+      for (const c of CRATERS) if (time - c.t < 6 && Math.floor(c.x / CHUNK) === cx && Math.floor(c.z / CHUNK) === cz) igniteNear(c.x, c.z, c.R + 14, false);   // (and the wood round a fresh crater catches)
+    }
+  }
+  for (const c of CRATERS) { const age = time - c.t; if (age > 26 || Math.random() > 0.6 * (1 - age / 26)) continue;   // for a while it burns in the bottom, and smokes
+    const y = terrainAt(c.x, c.z); emit(c.x + rnd(c.R * 0.35), y + 0.4, c.z + rnd(c.R * 0.35), rnd(1.5), 2 + Math.random() * 5, rnd(1.5), 0.8 + Math.random(), pick(BLUEFIRE), 4, 1.2);
+    if (Math.random() < 0.25) emit(c.x + rnd(c.R * 0.5), y + 1, c.z + rnd(c.R * 0.5), rnd(1), 3 + Math.random() * 3, rnd(1), 2.5 + Math.random() * 2, [0.32, 0.32, 0.35], 3, 3); }
+}
 function bombLand(b, g) {
   const wet = g < WATER, y = Math.max(g, WATER) + 0.5;
+  if (!wet && crater(b.x, b.z, b.s * 3.6 + 12)) {   // (big enough for the land to hold its shape: twenty to thirty-odd metres across the bowl)   // it does not just land: it digs, and what was there goes up and out in a ring
+    for (let i = 0; i < 26; i++) { const a = Math.random() * 6.28, o = 8 + Math.random() * 22; emit(b.x + Math.cos(a) * 2, y, b.z + Math.sin(a) * 2, Math.cos(a) * o, 8 + Math.random() * 20, Math.sin(a) * o, 1.2 + Math.random() * 1.2, i % 3 ? [0.2, 0.19, 0.18] : [0.42, 0.36, 0.28], -14, 1.6); }
+    audio.at3(b.x, y, b.z, () => { audio.sfx.impact?.(); audio.sfx.thud?.(); }, { ref: 45, max: 1400 });
+  }
   for (let i = 0; i < 16; i++) emit(b.x, y, b.z, rnd(9), 5 + Math.random() * 12, rnd(9), 0.8 + Math.random() * 0.6, wet ? [0.85, 0.92, 1.0] : pick(BLUEFIRE), wet ? -10 : -6);
   if (wet) { ripple(b.x, b.z, 1.6); for (let i = 0; i < 6; i++) emit(b.x, WATER + 1, b.z, rnd(2), 3 + Math.random() * 4, rnd(2), 2.5, [0.6, 0.62, 0.66], 3, 3); return; }   // (it hisses into steam)
   igniteNear(b.x, b.z, 10, false); scorchFlowers(b.x, b.z, 8);
@@ -8897,7 +8960,8 @@ function igniteNear(x, z, r, net) { let best = null, bd = 1e9; treesNear(x, z, r
 // what a fire t seconds old does to its tree: the leaves catch, flare, shrivel to black knots; the wood goes black; later it all comes back
 function paintFire(f) {
   const g = chunks.get(f.ck); if (!g?.userData.deco) return;
-  const t = g.userData.trees[f.i], geo = g.userData.deco.geometry, Pa = geo.attributes.position, Ca = geo.attributes.color, Sa = geo.attributes.sway;
+  const t = g.userData.trees?.[f.i]; if (!t) return;   // (the ground under it has been cut again since: that tree is gone)
+  const geo = g.userData.deco.geometry, Pa = geo.attributes.position, Ca = geo.attributes.color, Sa = geo.attributes.sway;
   if (f.g !== g) { f.g = g; f.P = Pa.array.slice(t.v0 * 3, t.v1 * 3); f.C = Ca.array.slice(t.v0 * 3, t.v1 * 3); }   // (a fresh chunk: remember the tree as it was)
   const P = Pa.array, C = Ca.array, S = Sa.array, T = f.t, cy = lerp(t.y0, t.top, 0.62);
   const back = smoothstep(F_REGROW, F_GREEN, T), shrivel = smoothstep(F_SHRIVEL[0], F_SHRIVEL[1], T) * 0.9 * (1 - back);
@@ -9624,7 +9688,7 @@ function paintSelf() {
 function setPatron(id) {
   if (!PATRONS[id]) return;
   PATRON.id = id; PATRON.picking = false; try { localStorage.setItem('icarus.patron', id); } catch {}
-  fireMat.userData.tint.value.copy(patronCol(id)); paintSelf(); NET.lastSent = null;
+  fireMat.userData.tint.value.copy(patronCol(id)); paintSelf(); audio.sfx.halo?.(); NET.lastSent = null;
   const name = godById[id]?.name || id; toast(`YOUR PATRON · ${name.toUpperCase()}`); witness(`chose ${name} as his patron`); worldDeed('patron', id);
   $('patron').classList.add('hidden');
 }
@@ -10133,6 +10197,7 @@ function placeNamed(name) {
   if (/\b(objective|quest|mission|marker|next (one|god|stop)|where i('m| am) (meant|supposed) to (go|be))\b/.test(n)) { const c = chainInfo(); if (c && c.g) return { x: c.g.x, y: c.g.gy ?? groundAt(c.g.x, c.g.z), z: c.g.z, label: 'your objective' }; }
   if (/\b(waypoint|my mark|the mark|pin)\b/.test(n) && AP.wp) return { x: AP.wp.x, y: AP.wp.y, z: AP.wp.z, label: 'your mark' };
   if (/\bmy island|patron/.test(n)) { const I = PANTHEON.isles.find(I => I.id === PATRON.id); if (I) return { x: I.x, y: I.top, z: I.z, label: 'your island' }; }
+  if (/crete|labyrinth|daedalus|the tower|where (i|it) began/.test(n)) return { x: CRETE.x, y: WATER + 190, z: CRETE.z - 260, label: 'Crete' };
   if (/volcano|lava|blue fire/.test(n)) { const v = VOLCANOES.slice().sort((a, b) => Math.hypot(a.x - p.pos.x, a.z - p.pos.z) - Math.hypot(b.x - p.pos.x, b.z - p.pos.z))[0]; return { x: v.x + v.R0, y: groundAt(v.x + v.R0, v.z), z: v.z, label: 'the volcano' }; }
   if (/summit|olympus|mountain|top|throne|zeus/.test(n)) return { x: MOUNT.x, y: SUMMIT, z: MOUNT.z + 6, label: 'the summit' };
   if (/temple/.test(n) && temples.length) { const T = temples.slice().sort((a, b) => Math.hypot(a.x - p.pos.x, a.z - p.pos.z) - Math.hypot(b.x - p.pos.x, b.z - p.pos.z))[0]; return { x: T.x, y: T.y, z: T.z + T.hd + 4, label: 'the temple' }; }
@@ -10382,6 +10447,7 @@ function openPhoto(free) {
 // that the next drawn frame fills.
 function snapPhoto() {
   if (state !== 'photo' || photo.snap) return;
+  audio.sfx.shutter?.();
   photo.snap = true; photo.clip = 0;
   photo.blob = new Promise(r => photo.blobR = r);
   try {
@@ -12675,7 +12741,7 @@ function mapTile(tx, tz) {
 }
 function openMap() {
   if (state !== 'play' || player.cine || player.sub || mapV.open) return;
-  state = 'map'; mapV.open = true; mapV.pull = 0; mapV.hover = null; mapV.down = null;
+  state = 'map'; mapV.open = true; mapV.pull = 0; mapV.hover = null; mapV.down = null; audio.sfx.mapOpen?.();
   for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
   const dpr = Math.min(devicePixelRatio, 2); mapCv.width = innerWidth * dpr; mapCv.height = innerHeight * dpr;
   // it opens out of where he is standing: close in on him, then the country spreads
@@ -12688,6 +12754,7 @@ function openMap() {
   mapEl.classList.add('open'); audio.sfx.ui();
 }
 function closeMap() {
+  if (mapV.open) audio.sfx.mapClose?.();
   if (!mapV.open) return;
   mapV.open = false; mapEl.classList.remove('open');
   if (state === 'map') state = 'play';
@@ -12751,7 +12818,7 @@ function reliefH(wx, wz) { const k = Math.round(wx / 40) * 100003 + Math.round(w
 $('mapMode').textContent = mapV.relief ? 'FLAT' : 'RELIEF';
 $('mapMode').addEventListener('click', e => { e.stopPropagation(); mapMode(); $('mapMode').blur(); audio.sfx.ui?.(); });
 for (const ev of ['pointerdown', 'pointerup', 'touchstart']) $('mapMode').addEventListener(ev, e => e.stopPropagation(), { passive: true });
-function mapMode(on = !mapV.relief) { mapV.relief = on; try { localStorage.setItem('icarus.map3d', on ? '1' : '0'); } catch {} $('mapMode').textContent = on ? 'FLAT' : 'RELIEF'; }
+function mapMode(on = !mapV.relief) { if (mapV.open) audio.sfx.mapFlip?.(); mapV.relief = on; try { localStorage.setItem('icarus.map3d', on ? '1' : '0'); } catch {} $('mapMode').textContent = on ? 'FLAT' : 'RELIEF'; }
 function reliefContours(N) {
   const n = RELIEF.n, h = N.h, half = (n - 1) / 2, wxOf = i => N.gx + (i - half) * N.cell, wzOf = i => N.gz + (i - half) * N.cell, cells = mapCells[realm];
   let hi = WATER + 30; for (let i = 0; i < h.length; i++) if (h[i] > hi) hi = h[i];
@@ -12844,7 +12911,7 @@ function updateMap(dt) {
     if (label) { x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = 'rgba(244,234,210,.75)'; x.fillText(label, px, py + 15); }
   };
   if (realm === 'over') {
-    mark(MOUNT.x, MOUNT.z, '▲', 'O L Y M P U S', '#eef2f8');
+    mark(MOUNT.x, MOUNT.z, '▲', 'O L Y M P U S', '#eef2f8'); mark(CRETE.x, CRETE.z, '▦', 'C R E T E', '#e8c890');
     if (R3) { const mx = sx(MOUNT.x), my = sy3(MOUNT.z, SUMMIT); x.strokeStyle = 'rgba(226,172,78,.7)'; x.beginPath(); x.moveTo(mx, my - 12); x.lineTo(mx, my - 58); x.stroke(); x.fillStyle = '#ffc46a'; x.beginPath(); x.arc(mx, my - 58, 2.2, 0, 6.3); x.fill();   // (the summit's height, on a pin)
       x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = 'rgba(244,234,210,.75)'; x.fillText(`${Math.round(SUMMIT - WATER).toLocaleString()} M`, mx, my - 68); }
     for (const b of BEACONS) if (mapKnown(b.x, b.z)) mark(b.x, b.z, b.lit ? '◆' : '◇', '', b.lit ? '#ffc46a' : '#bfe6ff');
@@ -13475,6 +13542,31 @@ function buildCrete() {
   _mat.makeScale(0, 0, 0); for (let i = 0; i < FN; i++) feathers.setMatrixAt(i, _mat);
   return { sc, sky, halo, disc, seaU, feathers, fp, fi: 0 };
 }
+// the same island, stood in the world: everything of it but its own sky, sun and sea
+function creteWorld() {
+  if (CRETE.group) return;
+  const B = buildCrete(), g = CRETE.group = new THREE.Group();
+  for (const o of [...B.sc.children]) { if (o.isLight || o === B.sky || o === B.halo || o === B.disc || o === B.feathers || o.material?.isShaderMaterial) { o.geometry?.dispose(); o.material?.dispose?.(); continue; } g.add(o); }
+  g.position.set(CRETE.x - PRO_C.x, WATER, CRETE.z - PRO_C.z); g.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(g); CRETE.R = Math.max(b.max.x - CRETE.x, CRETE.x - b.min.x, b.max.z - CRETE.z, CRETE.z - b.min.z);
+  g.visible = realm === 'over'; scene.add(g);
+  lookout('THE TOWER OF DAEDALUS', CRETE.x, WATER + PRO_C.y + 50.6, CRETE.z, 8.6, 'over');
+  lookout('CRETE · THE LABYRINTH', CRETE.x, WATER + PRO_C.y + 0.4, CRETE.z, 190, 'over');
+}
+// Whoever is in the opening is on Crete for anyone who has been through it already and has flown out to watch: on the
+// tower, then in the air, then falling. He himself sees and hears nobody until he has come down on Olympus.
+function proNet(dt) {
+  if (!API.mp) return;
+  if (!NET.sb) netStart();
+  if (!NET.on || !NET.ch || (NET.sendT -= dt) > 0) return;
+  NET.sendT = 0.4;
+  const src = pro.pov ? pro.pos : pro.son?.group.position; if (!src) return;
+  const x = CRETE.x + (src.x - PRO_C.x), y = WATER + src.y, z = CRETE.z + (src.z - PRO_C.z), r1 = q => Math.round(q * 10) / 10, L = pro.netL;
+  pro.netL = { x, y, z };
+  NET.ch.send({ type: 'broadcast', event: 's', payload: { i: NET.id, n: heroName, p: [r1(x), r1(y), r1(z)], v: L ? [r1((x - L.x) / 0.4), r1((y - L.y) / 0.4), r1((z - L.z) / 0.4)] : [0, 0, 0],
+    y: Math.round((pro.yaw || 0) * 100) / 100, pi: 0, b: 0, f: pro.pov ? (pro.falling ? 't' : 'w') : 'h', r: 0, g: pro.pov ? 0 : 1, w: 1, pt: PATRON.id || undefined, c: 1 } });
+}
+const aloneNow = () => state === 'prologue' || state === 'dead' && death.first && death.phase === 'drop';   // (not yet come down on Olympus: nobody else is there for him)
 function proClip(name) {
   if (!AC) return Promise.resolve(null);
   return fetch(`voice/${name}.mp3`).then(r => r.ok ? r.arrayBuffer() : null).then(b => b ? new Promise(res => AC.decodeAudioData(b, res, () => res(null))) : null).catch(() => null);
@@ -13573,6 +13665,7 @@ function proFeather(x, y, z, vx, vy, vz) {
   f.life = 2.6; f.p.set(x, y, z); f.v.set(vx, vy, vz); f.a = Math.random() * 6.28; f.w = rnd(7);
 }
 function updatePrologue(dt) {
+  proNet(dt);
   // the moment his father reaches for him and misses is the one moment that runs slow
   const near = pro.falling && !pro.hitT && (pro.dPass ? pro.t - pro.dPass < 0.24 : pro.dd < 30);
   pro.slow = lerp(pro.slow, near ? 0.2 : 1, damp(near ? 9 : 4, dt)); dt *= pro.slow;
@@ -14585,7 +14678,7 @@ function tick(dt) {
   updateClouds(dt);
   updateSea(dt); updateSkim(dt); updateShore(); updateRivers(dt);
   updateRings(dt);
-  updateWorldLife(dt); updateLeaves(dt); updateLava(dt); updateEruptions(dt); updateArena(dt); updateGrass(dt); updateFlowers(dt); updateWeather(dt); updateTwisters(dt); updateFire(dt); updateFlies(dt); updateFriends(dt); updatePantheon(dt); updateGusts(dt); updateHigh(dt);
+  updateWorldLife(dt); updateLeaves(dt); updateLava(dt); updateEruptions(dt); updateCraters(dt); updateArena(dt); updateGrass(dt); updateFlowers(dt); updateWeather(dt); updateTwisters(dt); updateFire(dt); updateFlies(dt); updateFriends(dt); updatePantheon(dt); updateGusts(dt); updateHigh(dt);
   updateTemple(); updateCurrents(dt); updateDay(dt); updateStorm(dt); updateOthers(dt);
   if (realm === 'over') { updateBeacons(dt); updateAnimals(dt); updateBirds(dt); updateGods(dt); }
   else updateUnder(dt);
@@ -14632,7 +14725,7 @@ setTimeout(() => {
   $('ctl').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation(); $('ctl').classList.remove('open'); if (b.dataset.c === 'tilt') useTilt(); else useStick(); });
   $('ctlBtn').addEventListener('click', e => { e.stopPropagation(); if (tilt.on) { useStick(); toast('THE STICK · LEFT THUMB'); } else useTilt(); });
   if (realm === 'over') zeusHome();
-  buildPantheon();
+  buildPantheon(); creteWorld();
   placeFixed();
   if (realm === 'under') setRealm('under');
   streamChunks(Math.floor(player.pos.x / CHUNK), Math.floor(player.pos.z / CHUNK), 60);
@@ -14647,7 +14740,7 @@ setTimeout(() => {
   $('title').classList.remove('hidden');
   state = 'title';
   titleStart();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);

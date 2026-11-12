@@ -653,6 +653,27 @@ export function createAudio() {
     },
     ui() { if (!ctx) return; tn({ t: T(), dur: 0.05, f0: 880, a: 0.003, vol: 0.05 }); },
     thud() { sfx.land(0.85); },
+    // ── small made things, one for each thing he can do, so that nothing happens in silence ──
+    // coming down on a high place as the bird: the wings settle, and two notes a fifth apart say he has arrived
+    perch() { if (!ctx) return; const t = T(); nz(pink, { t, dur: 0.28, f0: 700, f1: 240, q: 0.7, a: 0.02, vol: 0.14 }); bell(392, t + 0.05, 0.07, sfxWet); bell(587.33, t + 0.19, 0.06, sfxWet); },
+    // a place with a name and a view: three notes going up, the last one held
+    lookout() { if (!ctx) return; const t = T(); [440, 554.37, 659.25].forEach((f, i) => bell(f, t + i * 0.16, 0.085, sfxWet)); bell(880, t + 0.52, 0.05, sfxWet); },
+    // under the water: the surface closing over, then his breath going up past his ears
+    plunge() { if (!ctx) return; const t = T(); nz(brown, { t, dur: 0.9, type: 'lowpass', f0: 1400, f1: 180, a: 0.02, vol: 0.5 }); nz(pink, { t: t + 0.05, dur: 0.4, f0: 2200, f1: 500, q: 0.8, a: 0.01, vol: 0.12 }); },
+    bubble(k = 1) { if (!ctx) return; const t = T(); for (let i = 0; i < 3; i++) { const f = rnd(380, 900); tn({ t: t + i * rnd(0.05, 0.11), dur: 0.07, f0: f, f1: f * 1.6, a: 0.004, vol: 0.05 * k, pan: rnd(-0.6, 0.6) }); } },
+    // the map: a sheet shaken out, and laid away; and turned from flat to standing
+    mapOpen() { if (!ctx) return; const t = T(); nz(pink, { t, dur: 0.32, f0: 900, f1: 3200, q: 0.6, a: 0.05, vol: 0.1 }); tn({ t: t + 0.24, dur: 0.09, f0: 660, f1: 990, a: 0.004, vol: 0.05 }); },
+    mapClose() { if (!ctx) return; const t = T(); nz(pink, { t, dur: 0.26, f0: 3000, f1: 800, q: 0.6, a: 0.02, vol: 0.09 }); tn({ t: t + 0.12, dur: 0.08, f0: 880, f1: 520, a: 0.004, vol: 0.045 }); },
+    mapFlip() { if (!ctx) return; const t = T(); tn({ t, dur: 0.06, f0: 740, a: 0.003, vol: 0.05 }); tn({ t: t + 0.07, dur: 0.1, f0: 1110, a: 0.003, vol: 0.05 }); },
+    // the photo camera: the two blades of a shutter
+    shutter() { if (!ctx) return; const t = T(); nz(pink, { t, dur: 0.035, type: 'highpass', f0: 2600, a: 0.001, vol: 0.3 }); nz(pink, { t: t + 0.085, dur: 0.05, type: 'highpass', f0: 1800, a: 0.001, vol: 0.24 }); tn({ t, dur: 0.05, f0: 180, f1: 90, a: 0.002, vol: 0.12 }); },
+    // a god chosen: the ring of light settling over his head
+    halo() { if (!ctx) return; const t = T(); [1046.5, 1318.5, 1568, 2093].forEach((f, i) => bell(f, t + i * 0.09, 0.06, sfxWet)); nz(pink, { t, dur: 1.1, type: 'highpass', f0: 6000, f1: 9000, q: 0.5, a: 0.3, vol: 0.035 }); },
+    // a star falling: almost nothing
+    meteor() { if (!ctx) return; tn({ t: T(), dur: 0.5, f0: 2600, f1: 1300, a: 0.05, vol: 0.02, pan: rnd(-0.7, 0.7) }); },
+    // (for sounds placed in the world) falling water, a breath of it; and a fire spitting
+    fallGrain(k = 1) { if (!ctx) return; const t = T(); nz(brown, { t, dur: 1.5, type: 'lowpass', f0: rnd(700, 1100), f1: rnd(500, 800), a: 0.5, vol: 0.5 * k }); nz(pink, { t, dur: 1.3, type: 'highpass', f0: rnd(2400, 3600), q: 0.5, a: 0.5, vol: 0.09 * k }); },
+    crackle(k = 1) { if (!ctx) return; const t = T(); for (let i = 0, n = 2 + Math.floor(Math.random() * 4); i < n; i++) nz(pink, { t: t + Math.random() * 0.7, dur: rnd(0.012, 0.04), type: 'highpass', f0: rnd(1500, 4200), a: 0.001, vol: rnd(0.12, 0.3) * k }); nz(brown, { t, dur: 0.8, type: 'lowpass', f0: 320, a: 0.25, vol: 0.14 * k }); },
     // his heart, when the ground is coming up too fast: lub-dub, low, felt more than heard
     // steam: what a cloud says when something burning goes through it
     sizzle(k = 0.5) {
