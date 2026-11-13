@@ -8,6 +8,9 @@
 import { json, refuse, limited, clip } from './_lib.js';
 import { createHash } from 'node:crypto';
 import { rememberDeed, isDeed } from './_pantheon.js';
+import { ALL } from './_gods.js';
+// deeds the server itself sees happen, which a page cannot claim: meeting a god, a course of rings, the torches, a god's strike
+const SERVER_DEEDS = new Set(['met', 'arena', 'torch', 'smitten']);
 
 const URL_ = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -29,10 +32,12 @@ async function rest(path, { method = 'GET', body, prefer, range } = {}) {
   if (!KEY.startsWith('sb_')) h.Authorization = `Bearer ${KEY}`;   // (a legacy service-role JWT also goes as the bearer)
   if (prefer) h.Prefer = prefer;
   if (range) h.Range = range;
-  const r = await fetch(`${URL_}/rest/v1/${path}`, { method, headers: h, body: body === undefined ? undefined : JSON.stringify(body) });
-  const text = await r.text();
-  let data = null; try { data = text ? JSON.parse(text) : null; } catch {}
-  return { ok: r.ok, status: r.status, data, count: +(r.headers.get('content-range') || '').split('/')[1] || 0 };
+  try {
+    const r = await fetch(`${URL_}/rest/v1/${path}`, { method, headers: h, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(6000) });
+    const text = await r.text();
+    let data = null; try { data = text ? JSON.parse(text) : null; } catch {}
+    return { ok: r.ok, status: r.status, data, count: +(r.headers.get('content-range') || '').split('/')[1] || 0 };
+  } catch { return { ok: false, status: 0, data: null, count: 0 }; }   // (slow or down: the caller carries on with what it knows)
 }
 
 // ───────── the same, in memory, for the dev server
@@ -44,19 +49,19 @@ const memKey = (r, x, z) => `${r}:${x}:${z}`;
 
 // How many courses of rings burn for each god, the whole world over (the page hangs that many rings over the god's
 // throne). Counted from the claims, at most once a minute.
-const HELD = { at: 0, v: null };
+const HELD = { at: 0, v: null, w: null };
 async function held(realm) {
   if (realm !== 'over') return null;
-  const v = {}, add = pats => { for (const p of Array.isArray(pats) ? pats : []) if (PATRON_IDS.has(p)) v[p] = (v[p] || 0) + 1; };
-  if (!LIVE) { for (const a of MEM.rings.values()) if (a.realm === realm && !String(a.id).startsWith('torch')) add(a.patrons); return v; }
-  if (HELD.v && Date.now() - HELD.at < 60_000) return HELD.v;
+  const v = {}, w = {}, add = pats => { const P = [...new Set((Array.isArray(pats) ? pats : []).filter(p => PATRON_IDS.has(p)))]; for (const p of P) { v[p] = (v[p] || 0) + 1; for (const q of P) if (q !== p) ((w[p] ||= {})[q] = (w[p][q] || 0) + 1); } };   // (and which houses hold courses together)
+  if (!LIVE) { for (const a of MEM.rings.values()) if (a.realm === realm && !String(a.id).startsWith('torch')) add(a.patrons); return { v, w }; }
+  if (HELD.v && Date.now() - HELD.at < 60_000) return { v: HELD.v, w: HELD.w };
   for (let page = 0; page < 3; page++) {
     const r = await rest('world_rings?select=patrons&realm=eq.over&id=not.like.torch*&order=id', { range: `${page * 1000}-${page * 1000 + 999}` });   // (the torches on the summit are held the same way, and are not courses)
-    if (!r.ok || !Array.isArray(r.data)) return HELD.v;   // (no table, or no answer: whatever was known before)
+    if (!r.ok || !Array.isArray(r.data)) return HELD.v ? { v: HELD.v, w: HELD.w } : null;   // (no table, or no answer: whatever was known before)
     for (const a of r.data) add(a.patrons);
     if (r.data.length < 1000) break;
   }
-  HELD.at = Date.now(); HELD.v = v; return v;
+  HELD.at = Date.now(); HELD.v = v; HELD.w = w; return { v, w };
 }
 async function look(realm, cx, cz, hash) {
   const x0 = cx - SPAN, x1 = cx + SPAN, z0 = cz - SPAN, z1 = cz + SPAN;
@@ -81,7 +86,7 @@ async function look(realm, cx, cz, hash) {
       rest(`world_marks?select=kind,x,y,z,god,seed,by_name,by_hash,at&realm=eq.${realm}&x=gte.${mx0}&x=lte.${mx1}&z=gte.${mz0}&z=lte.${mz1}&order=at.desc&limit=300`),
       rest(`travellers?select=hash,name,x,z,phase,seen&realm=eq.${realm}&seen=gte.${new Date(Date.now() - 14 * 864e5).toISOString()}&order=seen.desc&limit=60`),
       rest('world_cells?select=cx&limit=1', { prefer: 'count=estimated' }),
-      rest('travellers?select=hash&limit=1', { prefer: 'count=exact' }),
+      rest('travellers?select=hash&limit=1', { prefer: 'count=estimated' }),
       rest(`world_winds?select=id,pts,patron,by_name,by_hash,at&realm=eq.${realm}&cx=gte.${mx0}&cx=lte.${mx1}&cz=gte.${mz0}&cz=lte.${mz1}&order=at.desc&limit=40`),
       rest(`world_rings?select=id,patrons,names,at,len&realm=eq.${realm}&cx=gte.${mx0}&cx=lte.${mx1}&cz=gte.${mz0}&cz=lte.${mz1}&order=at.desc&limit=300`),
     ]);
@@ -102,7 +107,7 @@ async function look(realm, cx, cz, hash) {
     travellers: trav.map(t => ({ n: t.name, x: Math.round(t.x), z: Math.round(t.z), ph: t.phase, seen: t.seen })),
     winds: winds.map(w => ({ id: w.id, p: w.pts, c: w.patron, n: w.by_name, mine: !!hash && w.by_hash === hash, at: w.at })),
     arenas: arenas.map(a => ({ id: a.id, c: a.patrons, n: a.names, at: a.at, l: a.len | 0 })),
-    held: heldBy || undefined,
+    held: heldBy ? heldBy.v : undefined, heldWith: heldBy ? heldBy.w : undefined,
   };
 }
 
@@ -162,17 +167,21 @@ export async function POST(req) {
     // of another god flies it
     if (b.op === 'arena') {
       if (limited(req, 'world-arena', 10)) return json({ error: 'slow down' }, 429);
-      const id = String(b.id || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24);
+      const id = String(b.id || '').toLowerCase(); if (!/^[a-z0-9][a-z0-9_-]{1,23}$/.test(id)) return json({ error: 'bad claim' }, 400);
       const pats = [...new Set((Array.isArray(b.pats) ? b.pats : []).filter(p => PATRON_IDS.has(p)))].slice(0, 4);
       const names = [...new Set([name, ...(Array.isArray(b.names) ? b.names : []).map(name12)])].slice(0, 4);
       if (!id || !pats.length) return json({ error: 'bad claim' }, 400);
       const row = { id, realm, cx: fin(b.cx, 4e6), cz: fin(b.cz, 4e6), patrons: pats, names, by_hash: hash, at: new Date().toISOString(), len: int(b.len, 0, 400) ?? 0 };
-      const torch = id.startsWith('torch'); if (torch && (!/^torch[0-7]$/.test(id) || realm !== 'over')) return json({ error: 'bad claim' }, 400);   // (the eight torches on the summit are kept the same way)
+      const torch = id.startsWith('torch'); if (torch && (id !== 'torches' || realm !== 'over')) return json({ error: 'bad claim' }, 400);   // (the torches off the summit are kept the same way: one entry, whose they are)
       if (torch) row.len = 0;
       await rememberDeed(torch ? 'torch' : 'arena', { name, hash, god: pats[0] }).catch(() => {});   // (the gods hear whose colour it burns in now)
       if (!LIVE) { row.len = Math.max(row.len, MEM.rings.get(id)?.len || 0); MEM.rings.set(id, row); return json({ ok: true }); }
-      { const o = await rest(`world_rings?select=len&id=eq.${id}`); row.len = Math.max(row.len, Array.isArray(o.data) && o.data[0] ? o.data[0].len | 0 : 0); }   // (a course never gets shorter, whoever takes it)
-      const r = await rest('world_rings?on_conflict=id', { method: 'POST', body: row, prefer: 'resolution=merge-duplicates,return=minimal' });
+      const o = await rest(`world_rings?select=len,realm&id=eq.${encodeURIComponent(id)}`), old = Array.isArray(o.data) && o.data[0] || null;
+      row.len = Math.max(row.len, old ? old.len | 0 : 0);   // (a course never gets shorter, whoever takes it)
+      if (old && old.realm && old.realm !== realm) return json({ error: 'bad claim' }, 400);
+      // (taken from someone: whose it is changes, and nothing else — not where it is)
+      const r = old ? await rest(`world_rings?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: { patrons: row.patrons, names: row.names, by_hash: row.by_hash, at: row.at, len: row.len }, prefer: 'return=minimal' })
+        : await rest('world_rings?on_conflict=id', { method: 'POST', body: row, prefer: 'resolution=ignore-duplicates,return=minimal' });
       return r.ok ? json({ ok: true }) : json({ ok: false, kept: false });   // (no table yet: the claim is only live)
     }
     // a course flown further than it went: it is that long now, for everyone (it only ever grows, and only once someone holds it)
@@ -185,7 +194,7 @@ export async function POST(req) {
       return json({ ok: r.ok });
     }
     if (b.op === 'deed') {   // something the gods will talk about: the page names it, the words are the server's
-      if (!isDeed(b.k) || b.k === 'met' || b.k === 'arena' || b.k === 'torch' || limited(req, 'deed', 12)) return json({ ok: false });
+      if (!isDeed(b.k) || SERVER_DEEDS.has(b.k) || limited(req, 'deed', 12)) return json({ ok: false });
       return json({ ok: await rememberDeed(b.k, { name, hash, god: String(b.god || '') }) });
     }
     // something that stays: a shrine where he met a god (once per god), or the place he fell
@@ -195,7 +204,8 @@ export async function POST(req) {
       if (!kind) return json({ error: 'bad mark' }, 400);
       const row = { kind, realm, x: fin(b.x, 4e6), y: fin(b.y, 2e4), z: fin(b.z, 4e6), god: clip(String(b.god || ''), 16).toLowerCase().replace(/[^a-z]/g, ''),
         seed: int(b.seed, 0, 2 ** 31 - 1) ?? 0, by_name: name, by_hash: hash };
-      if (kind === 'met' && !row.god) return json({ error: 'bad mark' }, 400);
+      if (kind === 'met' && !Object.hasOwn(ALL, row.god)) return json({ error: 'bad mark' }, 400);
+      if (kind === 'fall') row.god = '';
       if (!LIVE) {
         if (kind === 'met' && MEM.marks.some(m => m.kind === 'met' && m.by_hash === hash && m.god === row.god)) return json({ ok: true, again: true });
         MEM.marks.push({ ...row, id: MEM.id++, at: new Date().toISOString() }); if (MEM.marks.length > 5000) MEM.marks.shift();
@@ -211,8 +221,9 @@ export async function POST(req) {
     if (b.op === 'sync') {
       if (limited(req, 'world-sync', 12)) return json({ error: 'slow down' }, 429);
       const row = { hash, name, realm, x: fin(b.x, 4e6), z: fin(b.z, 4e6), phase: clip(String(b.phase || ''), 16), seen: new Date().toISOString() };
-      if (b.save && typeof b.save === 'object') row.save = b.save;
-      if (b.map && typeof b.map === 'object') row.map = b.map;
+      const fits = (v, n) => { try { return JSON.stringify(v).length <= n; } catch { return false; } };   // (a save is small; a map of what he has seen, bigger; nothing past that is kept)
+      if (b.save && typeof b.save === 'object' && fits(b.save, 48_000)) row.save = b.save;
+      if (b.map && typeof b.map === 'object' && fits(b.map, 160_000)) row.map = b.map;
       let before = null;
       if (!LIVE) {
         const old = MEM.trav.get(hash); before = old ? { seen: old.seen, first_at: old.first_at } : null;
@@ -234,9 +245,9 @@ export async function POST(req) {
       } else {
         const s = encodeURIComponent(before.seen);
         const [c, m, p] = await Promise.all([
-          rest(`world_cells?select=cx&at=gt.${s}&by_name=neq.${encodeURIComponent(name)}&limit=1`, { prefer: 'count=exact' }),
-          rest(`world_marks?select=id&at=gt.${s}&by_hash=neq.${hash}&limit=1`, { prefer: 'count=exact' }),
-          rest(`travellers?select=hash&seen=gt.${s}&hash=neq.${hash}&limit=1`, { prefer: 'count=exact' }),
+          rest(`world_cells?select=cx&at=gt.${s}&by_name=neq.${encodeURIComponent(name)}&limit=1`, { prefer: 'count=estimated' }),
+          rest(`world_marks?select=id&at=gt.${s}&by_hash=neq.${hash}&limit=1`, { prefer: 'count=estimated' }),
+          rest(`travellers?select=hash&seen=gt.${s}&hash=neq.${hash}&limit=1`, { prefer: 'count=estimated' }),
         ]);
         cells = c.count; marks = m.count; people = p.count;
       }

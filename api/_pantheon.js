@@ -62,7 +62,7 @@ const DEEDS = {
   patron:  (n, g) => g && `${n} knelt at the thrones and chose ${g.name} as patron`,
   smitten: (n, g) => g && `${g.name} struck ${n} dead for insolence; ${n} woke on the summit again`,
   arena:   (n, g) => `${n} flew a whole course of rings${g ? ` and lit it in ${g.name}'s colour` : ''}`,
-  torch:   (n, g) => g && `${n} lit one of the torches on the summit of Olympus for ${g.name}; it burns in that colour for everyone now`,
+  torch:   (n, g) => g && `${n} flew for the first time and lit the torches off the summit of Olympus in ${g.name}'s colour; they burn in it for everyone now`,
   under:   n => `${n} went down under the sea, into the Underworld`,
   styx:    n => `${n} crossed the Styx in Charon's boat`,
   home:    n => `${n} came back up out of the Underworld alive`,
@@ -88,11 +88,11 @@ export async function rememberDeed(kind, { name, hash, god }) {
 export async function rememberTalk(god, { name, hash }, raw, key) {
   const note = cleanNote(raw);
   if (!note || !hash || !has(ALL, god) || tooSoon(`t:${hash}:${god}`, 40_000)) return false;
-  if (key) try {   // (and nothing a god would be ashamed to repeat)
+  if (key) try {   // (and nothing a god would be ashamed to repeat; if it cannot be checked, it is not kept)
     const r = await fetch('https://api.openai.com/v1/moderations', { method: 'POST', signal: AbortSignal.timeout(2500),
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'omni-moderation-latest', input: note }) });
-    if (r.ok && (await r.json()).results?.[0]?.flagged) return false;
-  } catch {}
+    if (!r.ok || (await r.json()).results?.[0]?.flagged !== false) return false;
+  } catch { return false; }
   return keep({ god, kind: 'talk', name: nameOf(name) || 'SOMEONE', by_hash: hash, note });
 }
 

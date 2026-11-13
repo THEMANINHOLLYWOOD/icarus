@@ -97,7 +97,7 @@
   #proAct.show { opacity:1; animation:proPulse 1.6s ease-in-out infinite; }
   @keyframes proPulse { 0%,100% { opacity:.55; } 50% { opacity:1; } }
   #hud > * { transition:opacity .8s; }
-  .cinema #hud > *:not(#dialog):not(#warn):not(#talk) { opacity:0; }
+  .cinema #hud > *:not(#dialog):not(#warn):not(#talk):not(#talkLeave) { opacity:0; }
   /* a conversation is subtitles too: their name, their words, his words small above; the place to type is one faint line */
   #talk { background:none !important; border:none !important; text-align:center; bottom:calc(var(--sb) + 10px) !important; padding:0 14px !important; transition:opacity .5s; }
   #talk.quiet { opacity:0; }
@@ -108,7 +108,9 @@
   #talkRow { margin-top:6px !important; justify-content:center; }
   #talkInput { flex:0 1 340px !important; background:none !important; text-align:center; font-size:12px !important; padding:3px 4px !important; border-bottom-color:rgba(244,234,210,.18) !important; }
   #talkHint { margin-top:3px !important; font-size:9px !important; opacity:.55; }
-  #talkLeave { position:fixed !important; right:calc(var(--sr) + 10px) !important; top:calc(var(--st) + 8px) !important; opacity:.5; border:none !important; font-size:10px !important; }
+  #talkLeave { position:fixed !important; right:calc(var(--sr) + 10px) !important; top:calc(var(--st) + 8px) !important; opacity:.5; border:none !important; font-size:10px !important; pointer-events:auto; transition:opacity .5s; }
+  body:not(.touch) #talkLeave { top:calc(var(--st) + 40px) !important; }   /* (under the site-health readout, which has that corner on a desktop) */
+  #talk.hidden + #talkLeave { display:none; } #talk.quiet + #talkLeave { opacity:0; pointer-events:none; }   /* (outside the panel, so the corner it sits in is the screen's: it goes and comes with the panel) */
   /* the name card */
   #card { position:fixed; left:7vw; bottom:24vh; z-index:7; pointer-events:none; opacity:0; }
   #card b { display:block; font-weight:600; font-size:clamp(30px, 8.5vw, 112px); line-height:1; letter-spacing:.14em; color:var(--ember); text-shadow:0 0 28px rgba(255,120,40,.55), 0 0 4px #000;
@@ -459,7 +461,12 @@
   .asciiui #menuBtn .wm, .asciiui #menuBtn::before, .asciiui #menuBtn::after, .asciiui #markFire, .asciiui #menuCount { opacity:0 !important; }
   .asciiui #menuBtn { min-width:calc(var(--cw, 9px) * 13); }
   .asciiui #card, .asciiui #toast { visibility:hidden; }
-  body.asciiui:not(.photo):not(.pro) #dialog, body.asciiui:not(.photo):not(.pro) #obj, body.asciiui:not(.photo):not(.pro) #quest { visibility:hidden; }   /* (typed into the picture instead) */
+  body.asciiui:not(.photo):not(.pro) #dialog, body.asciiui:not(.photo):not(.pro) #obj, body.asciiui:not(.photo):not(.pro) #quest, body.asciiui:not(.photo):not(.pro) #talkName, body.asciiui:not(.photo):not(.pro) #talkText, body.asciiui:not(.photo):not(.pro) #talkYou { visibility:hidden; }   /* (typed into the picture instead) */
+  body.asciiui:not(.photo):not(.pro) #talkChips button, body.asciiui:not(.photo):not(.pro) #talkLeave { color:transparent !important; background:transparent !important; border-color:transparent !important; text-shadow:none !important; overflow:hidden; white-space:nowrap; padding:0 !important; opacity:1 !important; }
+  body.asciiui:not(.photo):not(.pro) #talkInput { color:transparent !important; caret-color:transparent; border-bottom-color:transparent !important; background:transparent !important; }
+  body.asciiui:not(.photo):not(.pro) #talkInput::placeholder { color:transparent; }
+  body.asciiui:not(.photo):not(.pro) #talkHint { visibility:hidden; }
+  body.asciiui:not(.photo):not(.pro) #talkChips { gap:calc(var(--ch, 14px) * 0.5) calc(var(--cw, 9px) * 2); }
   .asciiui #bars { display:none; }   /* (the film's black bars are drawn in the grid too, so what is typed there is not under them) */
   /* each picture moves the way the thing itself does, when a hand is over it or has just pressed it */
   .ic * { transform-box:view-box; } .ic .w, .ic .s { opacity:.5; }
@@ -593,10 +600,10 @@
   <div id="dialog" class="hidden"><div id="dlgTitle"></div><div id="dlgText"></div></div>
   <div id="talk" class="hidden">
     <div id="talkName"></div><div id="talkYou"></div><div id="talkText"></div>
-    <button class="tbtn" id="talkLeave" type="button">LEAVE ✕</button>
     <div id="talkRow"><input id="talkInput" placeholder="say something…" autocomplete="off" enterkeyhint="send" maxlength="300"></div><div id="talkChips"></div>
     <div id="talkHint">enter to speak · esc to leave</div>
   </div>
+  <button class="tbtn" id="talkLeave" type="button">LEAVE ✕</button>
 </div>
 <div id="fade"></div>
 <div id="bars"><i></i><i></i></div>
@@ -748,6 +755,7 @@ function detectTier() {
     if (!gl) return 0;
     const ext = gl.getExtension('WEBGL_debug_renderer_info');
     const gpu = (ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) || '';
+    gl.getExtension('WEBGL_lose_context')?.loseContext();   // (a context only borrowed to read the name off it)
     if (/swiftshader|llvmpipe|software|basic render/i.test(gpu)) return 0;
     return 2;
   } catch { return 1; }
@@ -1674,6 +1682,7 @@ const leafPts = (() => {
   const m = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.42, vertexColors: true, fog: true })); m.frustumCulled = false; scene.add(m); return m;
 })();
 let leafN = 0;
+let leafSpawned = true;
 function updateLeaves(dt) {
   const c = camera.position, p = player, on = realm === 'over' && state !== 'prologue', bird = p.form === 'phoenix' ? clamp(p.speed / 90, 0.4, 2.5) : 0;
   leafPts.visible = on;
@@ -1685,6 +1694,7 @@ function updateLeaves(dt) {
     if (Math.random() > f) continue;
     const g = terrainAt(x, z);
     if (g < WATER + 2 || g > 520 || c.y - g > 160) continue;
+    leafSpawned = true;
     const o = i * 3, au = noise2(x / 900 - 12.1, z / 900 + 44.4) > 0.12, col = au ? COL.autumn[Math.floor(Math.random() * 4)] : WOOD.oak[Math.floor(Math.random() * 4)], lit = 0.75 + Math.random() * 0.5;
     leafPos[o] = x; leafPos[o + 1] = g + 5 + Math.random() * 14; leafPos[o + 2] = z;
     leafCol[o] = col[0] * lit; leafCol[o + 1] = col[1] * lit; leafCol[o + 2] = col[2] * lit;
@@ -1699,7 +1709,7 @@ function updateLeaves(dt) {
     leafPos[o] += (L.vx + Math.sin(t) * 1.1 + WIND.x * 1.6 * gale) * dt; leafPos[o + 1] += (L.vy + Math.cos(t * 1.7) * 0.5) * dt; leafPos[o + 2] += (L.vz + Math.cos(t * 0.8) * 1.1 + WIND.z * 1.6 * gale) * dt;
     if (leafPos[o + 1] < L.g + 0.15 || (leafPos[o] - c.x) ** 2 + (leafPos[o + 2] - c.z) ** 2 > 110 * 110) { L.on = false; leafPos[o + 1] = -99999; }
   }
-  leafPts.geometry.attributes.position.needsUpdate = true; leafPts.geometry.attributes.color.needsUpdate = true;
+  leafPts.geometry.attributes.position.needsUpdate = true; if (leafSpawned) { leafSpawned = false; leafPts.geometry.attributes.color.needsUpdate = true; }
   // at night the wood has its own small lights
   if (pal.stars > 0.5 && Math.random() < 0.5) { const x = c.x + rnd(55), z = c.z + rnd(55); if (Math.random() < forestAt(x, z)) { const g = terrainAt(x, z); if (g > WATER + 2 && Math.abs(c.y - g) < 60) emit(x, g + 0.6 + Math.random() * 3.5, z, rnd(0.5), rnd(0.25), rnd(0.5), 1.6 + Math.random() * 2, [0.75, 1.0, 0.3], 0); } }
   // the trees know where the bird is
@@ -1714,6 +1724,7 @@ const WIND = new THREE.Vector3(0.93, 0, 0.37);
 // shared by every piece of ground: cloud shadows sliding over the hills, and a waterline that breathes
 const worldFx = { uTime: { value: 0 }, uShade: { value: 1 }, uUnder: { value: 0 }, uWater: { value: WATER }, uBird: { value: new THREE.Vector4() }, uGale: { value: 0 }, uSunD: { value: new THREE.Vector3(0.4, 0.8, 0.3) }, uSlope: { value: 1 } };
 function patchWorld(mat, shore, sways) {
+  mat.customProgramCacheKey = () => 'world' + (shore ? 'S' : '') + (sways ? 'W' : '') + '|a3';   // (the flags change the shader: each kind compiled for itself)
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, worldFx);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWp;' + (sways ? '\nattribute float sway; uniform vec4 uBird; uniform float uGale, uTime; varying float vLeaf;' : ''))
@@ -1979,7 +1990,16 @@ function pushOut(pos, vel, m) {
       let nx, nz; if (ox > oz) { const sg = Math.sign(lx) || 1; nx = sg * b.c; nz = -sg * b.s; pos.x -= nx * ox; pos.z -= nz * ox; } else { const sg = Math.sign(lz) || 1; nx = sg * b.s; nz = sg * b.c; pos.x -= nx * oz; pos.z -= nz * oz; }
       const vn = vel.x * nx + vel.z * nz; if (vn < 0) { vel.x -= nx * vn; vel.z -= nz * vn; } hit = { x: b.x, z: b.z, r: b.hw, t: 0, soft: false, y0: b.y0, yb: b.y0, y1: b.y1, what: b.what }; }
   }
-  if (!S) return hit;
+  // (a trunk standing just over the line in the next square is as solid as one in this one: near an edge, the neighbours too)
+  const fx = pos.x / CHUNK - cx, fz = pos.z / CHUNK - cz, edge = (m + 6) / CHUNK, ox = fx < edge ? -1 : fx > 1 - edge ? 1 : 0, oz = fz < edge ? -1 : fz > 1 - edge ? 1 : 0;
+  hit = pushSolids(S, pos, vel, m) || hit;
+  if (ox) hit = pushSolids(chunks.get((cx + ox) + ',' + cz)?.userData.solids, pos, vel, m) || hit;
+  if (oz) hit = pushSolids(chunks.get(cx + ',' + (cz + oz))?.userData.solids, pos, vel, m) || hit;
+  if (ox && oz) hit = pushSolids(chunks.get((cx + ox) + ',' + (cz + oz))?.userData.solids, pos, vel, m) || hit;
+  return hit;
+}
+function pushSolids(S, pos, vel, m) {
+  if (!S) return null; let hit = null;
   for (let i = 0; i < S.length; i++) {
     const s = S[i], rr = (s.soft ? s.t : s.r) + m;
     if (rr <= m || pos.y > s.y1 || pos.y + 1.8 < s.yb) continue;
@@ -2633,13 +2653,13 @@ function updatePalette(dt) {
   if (realm === 'over' && WX.gold > 0.01) { const gk = WX.gold; sun.color.lerp(GOLD_C, gk * 0.9); sun.intensity *= 1 + gk * 0.5; scene.fog.color.lerp(GOLD_FOG, gk * 0.58); WX.goldK = gk; } else WX.goldK = 0;
   sun.target.position.copy(player.pos); sun.position.copy(player.pos).addScaledVector(sunDir, 1000);
   hemi.color.copy(pal.hemiS).lerp(GOLD_FOG, (WX.goldK || 0) * 0.6).lerp(BOLT_C, Math.min(1, skyFlash)); hemi.groundColor.copy(pal.hemiG).lerp(BOLT_C, Math.min(1, skyFlash) * 0.6); hemi.intensity = pal.hemiI * 0.74 * (realm === 'over' ? lerp(1, WX.light, 0.6) : 1) + skyFlash * 2.4;   // lightning lights the country, not just the screen
-  skyFlash = Math.max(0, skyFlash - 0.11 - skyFlash * 0.12) * (Math.random() < 0.85 ? 1 : 0.4);
+  skyFlash = Math.max(0, skyFlash - (0.11 + skyFlash * 0.12) * Math.min(dt, 0.1) * 60) * (Math.random() < 0.85 ? 1 : 0.4);
   cloudMat.emissive.copy(pal.cloud).multiplyScalar(0.7); seaMat.emissive.copy(pal.cloud).multiplyScalar(0.32);
   const wu = waterMat.uniforms;
   wu.uShallow.value.copy(pal.water); wu.uDeep.value.copy(pal.water).multiplyScalar(0.38); wu.uZen.value.copy(pal.zen); wu.uHor.value.copy(pal.hor);
   wu.uSunCol.value.copy(pal.sun).multiplyScalar(pal.sunI / 2.3); wu.uSunDir.value.copy(sunDir); wu.uTime.value = time;
   worldFx.uTime.value = time;
-  updateHeavens(1 / 60);
+  updateHeavens(Math.min(dt, 0.1));
 }
 
 // ───────────────────────── particles ─────────────────────────
@@ -3078,6 +3098,7 @@ function clothInit() {
   C.x = new Float32Array(n * 3); C.px = new Float32Array(n * 3); C.a = new Float32Array(n * 3);
   C.pin0 = new Float32Array(W * 3); C.pin1 = new Float32Array(W * 3);
   C.idx = human.cape.geometry.index.array; C.deg = new Float32Array(n);
+  C.vl = new Float32Array(n); for (let i = W; i < n; i++) { const j = i * 3, k = (i - W) * 3; C.vl[i] = Math.hypot(b[j] - b[k], b[j + 1] - b[k + 1], b[j + 2] - b[k + 2]) * 1.1; }   // (how far each point may hang below the one above it: worked out once)
   for (let t = 0; t < C.idx.length; t++) C.deg[C.idx[t]]++;
   // what it can't pass through: tapered capsules along each bone, in that bone's own space (y0 r0 → y1 r1, z squashed by zk)
   C.cols = [
@@ -3109,7 +3130,7 @@ function animateCape(dt) {
     C.pin1[i] = e[0] * X + e[4] * Y + e[8] * Z + e[12]; C.pin1[i + 1] = e[1] * X + e[5] * Y + e[9] * Z + e[13]; C.pin1[i + 2] = e[2] * X + e[6] * Y + e[10] * Z + e[14]; }
   _cw.set(C.pin1[0], C.pin1[1], C.pin1[2]);
   let bx = 0, by = 0, bz = 0;
-  if (!C.ok || time - C.lastT > 0.4 || _cw.distanceTo(C.anchor) > 6 || !(x[n * 3 - 2] === x[n * 3 - 2])) { clothReset(); C.ok = true; C.acc = 0; C.pin0.set(C.pin1); }   // first time, a jump, a long absence, or a NaN
+  if (!C.ok || time - C.lastT > 0.4 || _cw.distanceTo(C.anchor) > 6 || !(x[n * 3 - 2] === x[n * 3 - 2])) { clothReset(); C.ok = true; C.acc = 0; C.aeroOk = false; C.pin0.set(C.pin1); }   // first time, a jump, a long absence, or a NaN
   else if (dt > 0) {
     // Going fast (a dive, a long fall), the threads can't pull the cloth along quickly enough: carry it with him, and let
     // the air he is rushing through, not the lag, be what streams it out behind.
@@ -3136,7 +3157,8 @@ function animateCape(dt) {
   const floor = groundAt(p.pos.x, p.pos.z, p.pos.y + 1) + 0.02, swim = !!p.swim;
   const h = 1 / 150, h2 = h * h, idx = C.idx, cons = C.cons, nc = cons.length;
   for (let st = 0; st < steps; st++) {
-    A.fill(0);
+    // (the air changes far more slowly than the cloth steps: its push is worked out every other step and held between)
+    if ((C.aeroTick = (C.aeroTick || 0) ^ 1) || !C.aeroOk) { C.aeroOk = true; A.fill(0);
     // aerodynamics, a face at a time: force ∝ |v|·(v·n)·area along the face's normal (ρ·Cd/2 over the cloth's weight per m²)
     for (let t = 0; t < idx.length; t += 3) {
       const ia = idx[t] * 3, ib = idx[t + 1] * 3, ic = idx[t + 2] * 3;
@@ -3155,7 +3177,7 @@ function animateCape(dt) {
       // and a little skin friction along the face, so the air drags it as well as pushing it
       const fr = 0.12 * C.aero, fx = nx * f + rx * fr, fy = ny * f + ry * fr, fz = nz * f + rz * fr;
       A[ia] += fx; A[ia + 1] += fy; A[ia + 2] += fz; A[ib] += fx; A[ib + 1] += fy; A[ib + 2] += fz; A[ic] += fx; A[ic + 1] += fy; A[ic + 2] += fz;
-    }
+    } }
     // move
     for (let i = W; i < n; i++) {
       const j = i * 3, k = 1 / Math.max(1, C.deg[i]);
@@ -3182,7 +3204,7 @@ function animateCape(dt) {
     }
     // cloth barely stretches: one pass down from the collar holds each point within a tenth of its length of the one above
     for (let i = W; i < n; i++) {
-      const j = i * 3, k = (i - W) * 3, L = Math.hypot(b[j] - b[k], b[j + 1] - b[k + 1], b[j + 2] - b[k + 2]) * sc * 1.1;
+      const j = i * 3, k = (i - W) * 3, L = C.vl[i] * sc;
       const dx = x[j] - x[k], dy = x[j + 1] - x[k + 1], dz = x[j + 2] - x[k + 2], d = Math.hypot(dx, dy, dz);
       if (d > L) { const g = L / d; x[j] = x[k] + dx * g; x[j + 1] = x[k + 1] + dy * g; x[j + 2] = x[k + 2] + dz * g; }
     }
@@ -3335,13 +3357,17 @@ function makePhoenix() {
   fireSolid(A, tube([[0, 0.05, 1.75], [0, 0.05, 1.2], [0, 0, 0.5], [0, -0.05, -0.3], [0, 0, -0.95], [0, 0.12, -1.38]], [0.1, 0.34, 0.56, 0.62, 0.5, 0.3], 12,
     [F.deep, F.root, hdr(F.root, 1.1), hdr(F.mid, 1.1), hdr(F.hot, 1.15), hdr(F.hot, 1.2)], 0.9, 1));
   // an S of neck, a small fierce head, a hooked beak
-  fireSolid(A, tube([[0, 0.1, -1.25], [0, 0.4, -1.72], [0, 0.74, -1.96], [0, 0.98, -2.26]], [0.3, 0.2, 0.165, 0.17], 9, [hdr(F.hot, 1.2), hdr(F.hot, 1.25), hdr(F.tip, 1.1), hdr(F.tip, 1.15)]));
-  _m2.compose(_p.set(0, 1.02, -2.42), _q.identity(), _s.set(0.86, 0.9, 1.25)); fireSolid(A, new THREE.SphereGeometry(0.24, 12, 9), _m2, () => hdr(F.tip, 1.2));
-  _m2.compose(_p.set(0, 0.98, -2.86), _q.setFromEuler(_e2.set(-Math.PI / 2 - 0.16, 0, 0)), _s.set(1, 1, 0.8)); fireSolid(A, new THREE.ConeGeometry(0.105, 0.52, 6), _m2, () => [1.5, 1.35, 1.0]);
-  _m2.compose(_p.set(0, 0.92, -2.76), _q.setFromEuler(_e2.set(-Math.PI / 2 + 0.1, 0, 0)), _s.set(0.8, 1, 0.5)); fireSolid(A, new THREE.ConeGeometry(0.08, 0.32, 5), _m2, () => [1.2, 1.0, 0.7]);
-  for (const s of [-1, 1]) { _m2.compose(_p.set(s * 0.15, 1.08, -2.5), _q.identity(), _s.set(1, 1, 1)); fireSolid(A, new THREE.SphereGeometry(0.05, 6, 5), _m2, () => white); }
+  // (the upper neck and the head are a part of their own, turning about a joint half way up the neck: he looks about)
+  const AH = newFire(), NECK = new THREE.Vector3(0, 0.4, -1.72);
+  fireSolid(A, tube([[0, 0.1, -1.25], [0, 0.4, -1.72]], [0.3, 0.2], 9, [hdr(F.hot, 1.2), hdr(F.hot, 1.25)]));
+  _m2.compose(_p.copy(NECK), _q.identity(), _s.set(1, 1, 1)); fireSolid(A, new THREE.SphereGeometry(0.2, 9, 7), _m2, () => hdr(F.hot, 1.25));
+  fireSolid(AH, tube([[0, 0.4, -1.72], [0, 0.74, -1.96], [0, 0.98, -2.26]], [0.2, 0.165, 0.17], 9, [hdr(F.hot, 1.25), hdr(F.tip, 1.1), hdr(F.tip, 1.15)]));
+  _m2.compose(_p.set(0, 1.02, -2.42), _q.identity(), _s.set(0.86, 0.9, 1.25)); fireSolid(AH, new THREE.SphereGeometry(0.24, 12, 9), _m2, () => hdr(F.tip, 1.2));
+  _m2.compose(_p.set(0, 0.98, -2.86), _q.setFromEuler(_e2.set(-Math.PI / 2 - 0.16, 0, 0)), _s.set(1, 1, 0.8)); fireSolid(AH, new THREE.ConeGeometry(0.105, 0.52, 6), _m2, () => [1.5, 1.35, 1.0]);
+  _m2.compose(_p.set(0, 0.92, -2.76), _q.setFromEuler(_e2.set(-Math.PI / 2 + 0.1, 0, 0)), _s.set(0.8, 1, 0.5)); fireSolid(AH, new THREE.ConeGeometry(0.08, 0.32, 5), _m2, () => [1.2, 1.0, 0.7]);
+  for (const s of [-1, 1]) { _m2.compose(_p.set(s * 0.15, 1.08, -2.5), _q.identity(), _s.set(1, 1, 1)); fireSolid(AH, new THREE.SphereGeometry(0.05, 6, 5), _m2, () => white); }
   // crest: seven plumes thrown back off the crown
-  for (let i = 0; i < 7; i++) featherAt(A, (i - 3) * 0.04, 1.2, -2.38, (i - 3) * -0.13, 1.3 + (3 - Math.abs(i - 3)) * 0.34, 0.17, F.hot, F.tip, white, 0, -0.5 - (3 - Math.abs(i - 3)) * 0.13);
+  for (let i = 0; i < 7; i++) featherAt(AH, (i - 3) * 0.04, 1.2, -2.38, (i - 3) * -0.13, 1.3 + (3 - Math.abs(i - 3)) * 0.34, 0.17, F.hot, F.tip, white, 0, -0.5 - (3 - Math.abs(i - 3)) * 0.13);
   // the body is feathered too: overlapping rows from the throat back over the shoulders, and a fan of coverts over the root of the tail
   for (const [z, r, len, c] of [[-1.5, 0.3, 0.5, 2], [-1.15, 0.36, 0.6, 2], [-0.8, 0.5, 0.75, 1], [-0.4, 0.6, 0.85, 1], [0.05, 0.6, 0.9, 0], [0.5, 0.52, 0.9, 0], [0.9, 0.4, 0.95, 0]])
     for (let j = 0; j < 7; j++) { const a = (j - 3) * 0.42 + (z * 3 % 0.3); featherAt(A, Math.sin(a) * r, Math.cos(a) * r * 0.9 + (z < -1 ? 0.25 + (-1 - z) * 0.5 : 0), z, -a * 0.25, len, 0.3, [F.deep, F.root, F.mid][c], [F.root, F.mid, F.hot][c], [F.mid, F.hot, F.tip][c], -a, -0.1); }
@@ -3352,7 +3378,8 @@ function makePhoenix() {
     fireSolid(A, tube([[s * 0.26, -0.4, 0.15], [s * 0.27, -0.56, 0.7], [s * 0.27, -0.52, 1.25]], [0.12, 0.07, 0.05], 6, [F.mid, F.hot, F.tip]));
     for (let k = -1; k <= 1; k++) { _m2.compose(_p.set(s * 0.27 + k * 0.07, -0.55, 1.42), _q.setFromEuler(_e2.set(Math.PI / 2 + 0.3, 0, k * 0.3)), _s.set(1, 1, 1)); fireSolid(A, new THREE.ConeGeometry(0.03, 0.3, 4), _m2, () => [1.3, 1.1, 0.8]); }
   }
-  g.add(new THREE.Mesh(fireGeo(A), fireMat));
+  const body = new THREE.Mesh(fireGeo(A), fireMat); g.add(body);
+  const head = new THREE.Group(); head.position.copy(NECK); head.rotation.order = 'YXZ'; { const hm = new THREE.Mesh(fireGeo(AH), fireMat); hm.position.copy(NECK).negate(); head.add(hm); } g.add(head);
 
   const wings = [-1, 1].map(side => {
     const w = makeWing(); w.root.scale.x = side < 0 ? 1 : -1; w.root.position.set(0, 0.22, -0.55);
@@ -3392,7 +3419,7 @@ function makePhoenix() {
   const light = new THREE.PointLight(0xff9a4a, 3, 140, 0);
   g.add(light);
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
-  return { group: g, wings, tails, light };
+  return { group: g, wings, tails, light, body, head };
 }
 // the tail is a set of chains: each link eases toward its place behind the one before, so turns and dives whip through it
 function updateTails(dt, snap, P = phoenix) {
@@ -4107,7 +4134,10 @@ const fitDpr = () => Math.max(1, Math.min(devicePixelRatio || 1, tier.dpr, Math.
 //    buffer the size of the grid: for each cell a character, which ink, how bright, and how dark the tile behind it.
 //    Rows are counted from the bottom of the screen, the way the picture counts them.
 const UIL = { nx: 0, ny: 0, cw: 9, ch: 14, buf: null, tex: null, used: false, was: false, on: false };
-const UIB = { nx: 0, ny: 0, buf: null, tex: null, used: false, was: false };   // (the big sheet: one of its cells is four of the other's)
+const UIB = { nx: 0, ny: 0, buf: null, tex: null, used: false, was: false };
+// (a box on the page, remembered for a moment: reading one forces the browser to lay the page out, and these hardly move)
+const RECT = new WeakMap(); let rectGen = 0; addEventListener('resize', () => rectGen++);
+function rectOf(el, ms = 400) { const now = performance.now(), c = RECT.get(el); if (c && c.g === rectGen && now - c.t < ms) return c.r; const r = el.getBoundingClientRect(); RECT.set(el, { r, t: now, g: rectGen }); return r; }   // (the big sheet: one of its cells is four of the other's)
 function uibText(c, r, str, ci = 0, b = 255) { const B = UIB.buf, nx = UIB.nx; if (r < 0 || r >= UIB.ny) return; for (let k = 0; k < str.length; k++) { const x = c + k; if (x < 0 || x >= nx) continue; const cc = str.charCodeAt(k), i = (r * nx + x) * 4; B[i] = cc > 32 && cc < 127 ? cc : cc === 8217 || cc === 8216 ? 39 : cc === 8220 || cc === 8221 ? 34 : cc === 8212 || cc === 8211 ? 45 : cc === 8230 ? 46 : 32; B[i + 1] = ci; B[i + 2] = b; } UIB.used = true; }
 function uibPlate(c0, r0, c1, r1, a) { const B = UIB.buf, nx = UIB.nx; c0 = Math.max(0, c0); c1 = Math.min(nx - 1, c1); r0 = Math.max(0, r0); r1 = Math.min(UIB.ny - 1, r1); for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const i = (r * nx + c) * 4 + 3; if (a > B[i]) B[i] = a; } if (c1 >= c0 && r1 >= r0) UIB.used = true; }
 function uilSize(nx, ny, cw, ch) {
@@ -4176,6 +4206,7 @@ function applyTier(i, announce, persist = true) {
   const sh = tier.shadows > 0;
   if (sh !== renderer.shadowMap.enabled) scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => m.needsUpdate = true); });
   renderer.shadowMap.enabled = sh; sun.castShadow = sh;
+  if (!sh && sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
   if (sh && sun.shadow.mapSize.x !== tier.shadows) { sun.shadow.mapSize.set(tier.shadows, tier.shadows); sun.shadow.map?.dispose(); sun.shadow.map = null; }
   postMat.uniforms.uGlow.value = tier.glow * (LOOK.cur?.glow ?? 1); postMat.uniforms.uPersist.value = asciiOn && tier.glow > 0 ? 0.74 : 0; postMat.uniforms.uDof.value = tier.dof || 0;
   cloudSea.count = tier.clouds;
@@ -4369,7 +4400,7 @@ function fireFrom(n, spread, up, life) {
       rnd(1.5) + p.vel.x * 0.6, up * (0.4 + Math.random()), rnd(1.5) + p.vel.z * 0.6, life * (0.5 + Math.random() * 0.7), pick(EMBER));
 }
 function resetPose() {
-  human.rig.position.y = 1.0; human.rig.rotation.set(0, 0, 0); human.head.rotation.set(0, 0, 0);
+  human.rig.position.set(0, 1.0, 0); human.rig.rotation.set(0, 0, 0); human.head.rotation.set(0, 0, 0);
   human.rig.scale.set(1, 1, 1); human.chest.rotation.set(0, 0, 0);
   human.footL.rotation.set(0, 0, 0); human.footR.rotation.set(0, 0, 0); human.handL.rotation.set(0, 0, 0); human.handR.rotation.set(0, 0, 0);
   setCurl(human.handL, RELAX, 1); setCurl(human.handR, RELAX, 1);
@@ -4391,6 +4422,7 @@ function setWingSide(i, f, fold, wfold, sweep, stretch) {
 // and flexes and the outside one lifts; diving, they fold into a teardrop a little at a time. Every joint is eased toward
 // where it is going, so nothing ever snaps.
 const WR = { t: -9, th: 0, A: 0, beat: 0, j: [new Float32Array(5), new Float32Array(5)] };
+const FOLDW = [-0.5, 0.35, 0.28, 0.8, 0.84];   // (at rest: the wings let down along his sides and drawn back, the hand half folded)
 function flyWings(dt, o) {
   const p = player, now = time;
   if (now - WR.t > 0.25) for (let i = 0; i < 2; i++) {   // (coming back from some other pose: start from where the wings are)
@@ -4412,12 +4444,13 @@ function flyWings(dt, o) {
     const sd = i === 0 ? 1 : -1, ph = i * 1.9;
     const trim = Math.sin(now * 1.3 + ph) * 0.026 + Math.sin(now * 3.7 + ph * 0.6) * 0.012;   // a gliding wing is never quite still
     const inside = bank * sd;                                                                // + for the wing on the inside of the turn
-    const f = 0.24 - sp * 0.1 - dive * 0.06 + trim - inside * 0.17 + A * (0.95 * stroke + 0.12);
-    const fold = lerp(-0.34 + sp * 0.12 + Math.max(0, inside) * 0.16, 0.78, dive) + A * (0.42 * upE + 0.18 * lagE * 0.4);
-    const wfold = fold * 0.6 + A * 0.55 * upW;
-    const sweep = 0.04 + sp * 0.22 + dive * 0.86 - A * 0.2 * Math.sin(th) + (o.boost ? 0.08 : 0);
-    const stretch = 1.12 - dive * 0.35 + (1 - sp) * 0.06 + A * 0.14 * Math.max(0, -stroke);
-    const J = WR.j[i], k = damp(16, dt);
+    let f = 0.24 - sp * 0.1 - dive * 0.06 + trim - inside * 0.17 + A * (0.95 * stroke + 0.12);
+    let fold = lerp(-0.34 + sp * 0.12 + Math.max(0, inside) * 0.16, 0.78, dive) + A * (0.42 * upE + 0.18 * lagE * 0.4);
+    let wfold = fold * 0.6 + A * 0.55 * upW;
+    let sweep = 0.04 + sp * 0.22 + dive * 0.86 - A * 0.2 * Math.sin(th) + (o.boost ? 0.08 : 0);
+    let stretch = 1.12 - dive * 0.35 + (1 - sp) * 0.06 + A * 0.14 * Math.max(0, -stroke);
+    const J = WR.j[i], k = damp(16, dt), fk = o.fold || 0;
+    if (fk > 0) { const W = FOLDW; f = lerp(f, W[0], fk); fold = lerp(fold, W[1], fk); wfold = lerp(wfold, W[2], fk); sweep = lerp(sweep, W[3], fk); stretch = lerp(stretch, W[4], fk); }   // (standing: the wings folded along his sides)
     J[0] = lerp(J[0], f, k); J[1] = lerp(J[1], fold, k); J[2] = lerp(J[2], wfold, k); J[3] = lerp(J[3], sweep, damp(10, dt)); J[4] = lerp(J[4], stretch, damp(10, dt));
     setWingSide(i, J[0], J[1], J[2], J[3], J[4]);
   }
@@ -4463,7 +4496,6 @@ function spaceAction() {
   }
   if (p.grounded && !p.sliding) {
     if (udNear(9)) return { kind: 'nova', label: 'burn them back' };
-    if (realm === 'over' && TORCH.built) { const T = torchNear(p.pos); if (T && torchCol(T) !== PATRON.id) return { kind: 'torch', T, label: PATRON.id ? `light it for ${godById[PATRON.id]?.name || PATRON.id}` : 'light the torch' }; }
     if (realm === 'over') { const S = seatNear(p.pos); if (S) return PATRON.id ? { kind: 'audience', id: S.id, seat: S, label: `kneel · speak with ${godById[S.id]?.name || cap(S.id)}${heldBy(S.id) ? ` · holds ${heldBy(S.id)} ring course${heldBy(S.id) > 1 ? 's' : ''}` : ''}` } : { kind: 'pray', id: S.id, seat: S, label: `pray to ${godById[S.id]?.name || cap(S.id)}` }; }
     const c = otherById.charon;
     if (STYX.on && UNDER.crossed && UNDER.side > 0 && c?.active && !ferryOut() && Math.hypot(p.pos.x - c.x, p.pos.z - c.z) < 13) return { kind: 'ferry', label: 'cross with the ferryman' };
@@ -4502,7 +4534,6 @@ function pressSpace() {
   if (act.kind === 'boil') return boilWater();
   if (act.kind === 'pray') return startPrayer(act.id, act.seat);
   if (act.kind === 'audience') return startPrayer(act.id, act.seat, 'audience');
-  if (act.kind === 'torch') return torchLight(act.T);
   if (act.kind === 'ferry') return startFerry();
   if (act.kind === 'kindle') return kindle();
   if (act.kind === 'animal') return touchAnimal(act.a);
@@ -4655,7 +4686,7 @@ function updateCine(dt) {
   p.pos.y = Math.max(p.pos.y, floorAt() + 5);
   if (k >= 1) {
     p.cine = null; p.scale = 1; fireLight.intensity = 0;
-    if (!flags.morphed) { flags.wideT = 7; witness('threw himself off the mountain top, burned alive in mid-air, and came out of the fire as a phoenix'); TUT.later = ['flight', 3, time + 9]; }   // his first sight of himself: very wide, then in behind him
+    if (!flags.morphed) { torchStart(); flags.wideT = 7; witness('threw himself off the mountain top, burned alive in mid-air, and came out of the fire as a phoenix'); TUT.later = ['flight', 3, time + 9]; }   // his first sight of himself: very wide, then in behind him
     if (story.phase === 'leap' || story.phase === 'summit') { story.phase = 'gods'; say(GODS_INTRO, '', true); flags.flapHintT = 16; if (!story.titans) startTitans(); saveSoon(); }
     else if (!flags.morphed) flags.flapHintT = 10;
     flags.morphed = true;
@@ -4830,7 +4861,7 @@ function becomeHuman() {
   const p = player;
   if (p.form !== 'phoenix') return;
   const floor = Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER), alt = p.pos.y - floor;
-  p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; fireLight.intensity = 0; p.perch = false;
+  p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; fireLight.intensity = 0; p.perch = false; p.takeoff = null;
   for (let i = 0; i < 260; i++) {
     _v.set(rnd(), rnd(), rnd()).normalize().multiplyScalar(4 + Math.random() * 16);
     emit(p.pos.x + rnd(3), p.pos.y + rnd(1), p.pos.z + rnd(3), _v.x + dir3.x * p.speed * 0.3, _v.y, _v.z + dir3.z * p.speed * 0.3, 1 + Math.random(), pick(ASH));
@@ -5260,10 +5291,16 @@ function skydive(dt, pull = 0, turn = 0) {
 // One pose, described as a handful of joint angles. Every state below only says where each joint should be; the body
 // eases toward that (fast when he is running, slow when he is standing about), so nothing ever snaps from one thing to another.
 // (Signs: a leg or arm turned +x swings forward; the chest or head turned +x leans back or looks up.)
-const POSE0 = { py: 1, rx: 0, ry: 0, rz: 0, cx: 0, cy: 0, cz: 0, csy: 1, csz: 1, nx: 0, ny: 0, nz: 0,
+const POSE0 = { py: 1, px: 0, rx: 0, ry: 0, rz: 0, cx: 0, cy: 0, cz: 0, csy: 1, csz: 1, nx: 0, ny: 0, nz: 0,
   alx: 0, aly: 0, alz: 0, arx: 0, ary: 0, arz: 0, flx: 0.15, flz: 0, frx: 0.15, frz: 0, wlx: 0, wlz: 0, wrx: 0, wrz: 0,
   llx: 0, llz: 0, lrx: 0, lrz: 0, slx: -0.05, srx: -0.05, tlx: 0, trx: 0 };
-const PT = { ...POSE0 }, PC = { ...POSE0 };
+const PT = { ...POSE0 }, PC = { ...POSE0 }, PV = Object.fromEntries(Object.keys(POSE0).map(k => [k, 0]));
+// ── How each part of him follows what he means to do. Not an easing — a spring with weight in it: the legs carry him and
+//    go where they are put with no overshoot (a foot that wobbles slides on the ground); the arms hang from the shoulders and
+//    swing on past and back when he stops or turns; the head is carried, and settles; the hips take a landing and come
+//    back up. [how fast, against how fast he means to move · how much it is damped: 1 none past, less swings through]
+const SPRING = {};
+for (const k of Object.keys(POSE0)) SPRING[k] = /^(l|s|t)[lr]/.test(k) ? [1.7, 1.0] : /^(a|f|w)[lr]/.test(k) ? [0.95, 0.5] : /^n/.test(k) ? [0.9, 0.62] : /^c/.test(k) ? [1.0, 0.78] : [1.15, 0.7];
 const body = { last: -9, ph: 0, bph: 0, exert: 0, lookT: 1, lookY: 0, lookX: 0, blinkT: 2.5, blink: 0, yaw: 0, turn: 0, hs: 0, acc: 0, gph: 0, gest: 0, mouth: 0, voice: 0, tired: 0 };
 function readBody() {
   const H = human, C = PC;
@@ -5274,12 +5311,18 @@ function readBody() {
   C.flx = H.foreL.rotation.x; C.flz = H.foreL.rotation.z; C.frx = H.foreR.rotation.x; C.frz = H.foreR.rotation.z;
   C.wlx = H.handL.rotation.x; C.wlz = H.handL.rotation.z; C.wrx = H.handR.rotation.x; C.wrz = H.handR.rotation.z;
   C.llx = H.legL.rotation.x; C.llz = H.legL.rotation.z; C.lrx = H.legR.rotation.x; C.lrz = H.legR.rotation.z;
-  C.slx = H.shinL.rotation.x; C.srx = H.shinR.rotation.x; C.tlx = H.footL.rotation.x; C.trx = H.footR.rotation.x;
+  C.slx = H.shinL.rotation.x; C.srx = H.shinR.rotation.x; C.tlx = H.footL.rotation.x; C.trx = H.footR.rotation.x; C.px = H.rig.position.x;
+  for (const k in PV) PV[k] = 0;   // (picked up from wherever another movement left him, at rest)
 }
 function applyBody(dt, rate) {
-  const a = damp(rate, dt), C = PC, H = human;
-  for (const k in PT) C[k] += (PT[k] - C[k]) * a;
-  H.rig.position.y = C.py; H.rig.rotation.set(C.rx, C.ry, C.rz);
+  const C = PC, H = human, n = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / n;
+  for (const k in PT) {
+    const [wk, z] = SPRING[k], w = rate * wk * 1.25, kk = w * w, cc = 2 * z * w; let c = C[k], v = PV[k];
+    for (let i = 0; i < n; i++) { v += (kk * (PT[k] - c) - cc * v) * h; c += v * h; }
+    if (!Number.isFinite(c)) { c = PT[k]; v = 0; }
+    C[k] = c; PV[k] = v;
+  }
+  H.rig.position.y = C.py; H.rig.position.x = C.px; H.rig.rotation.set(C.rx, C.ry, C.rz);
   H.chest.rotation.set(C.cx, C.cy, C.cz); H.chest.scale.set(1, C.csy, C.csz);
   H.head.rotation.set(C.nx, C.ny, C.nz);
   H.armL.rotation.set(C.alx, C.aly, C.alz); H.armR.rotation.set(C.arx, C.ary, C.arz);
@@ -5445,29 +5488,52 @@ function bodyLanguage(dt, hs, swimming) {
   } else {
     // ── on his feet: the gait. Stride length grows with speed, so his feet never slide on the ground.
     const stride = lerp(4.6, 8.4, run);
-    body.ph += hs / stride * 6.2832 * dt * (p.sliding ? 0.2 : 1);
+    // turning on the spot, he steps round: the feet go through a few short steps as the body comes about
+    const pivot = idle * smoothstep(0.6, 2.2, Math.abs(body.turn)) * (swimming ? 0 : 1);
+    body.ph += (hs / stride * 6.2832 * (p.sliding ? 0.2 : 1) + pivot * 7.5) * dt;
     p.walkPhase = body.ph;
-    const ph = body.ph, s1 = Math.sin(ph), A = mv * (p.sliding ? 0.25 : 1) * (swimming ? 0.45 : 1);
+    const ph = body.ph, s1 = Math.sin(ph), A = Math.max(mv, pivot * 0.45) * (p.sliding ? 0.25 : 1) * (swimming ? 0.45 : 1);
     const thigh = q => lerp(Math.sin(q) * 0.55, Math.sin(q) > 0 ? Math.sin(q) * 1.15 : Math.sin(q) * 0.62, run);
-    const shin = q => lerp(-Math.max(0, Math.sin(q - 1.3)) * 1.0 - 0.06, -Math.max(0, Math.sin(q - 0.7)) * 2.05 - 0.3, run);
+    // the knee bends twice in a step: a little as the heel takes his weight, a lot as the foot swings through
+    const take = q => { const d = wrapAngle(q - 1.95); return Math.exp(-(d * d) / 0.12); };
+    const shin = q => lerp(-Math.max(0, Math.sin(q - 1.3)) * 1.0 - 0.06 - take(q) * 0.24, -Math.max(0, Math.sin(q - 0.7)) * 2.05 - 0.3, run);
     const foot = q => lerp(Math.sin(q + 1.0) * 0.42 - 0.05, Math.sin(q + 0.6) * 0.6 + 0.12, run);
     T.llx = thigh(ph) * A; T.lrx = thigh(ph + Math.PI) * A;
     T.slx = lerp(-0.05, shin(ph), A); T.srx = lerp(-0.05, shin(ph + Math.PI), A);
     T.tlx = foot(ph) * A; T.trx = foot(ph + Math.PI) * A;
     // the arms go against the legs; running, the elbows lock near a right angle and pump
-    const swing = lerp(0.42, 1.05, run) * A;
-    T.alx = -s1 * swing + run * 0.15 * A; T.arx = s1 * swing + run * 0.15 * A;
+    // (the arms are a beat behind the legs, and the elbow bends as the arm comes forward)
+    const swing = lerp(0.42, 1.05, run) * A, sa = Math.sin(ph - 0.28);
+    T.alx = -sa * swing + run * 0.15 * A; T.arx = sa * swing + run * 0.15 * A;
     T.alz = -0.07 - run * 0.06; T.arz = 0.07 + run * 0.06;
-    T.flx = lerp(0.18, 1.5, run * A) + run * A * Math.max(0, s1) * 0.3; T.frx = lerp(0.18, 1.5, run * A) + run * A * Math.max(0, -s1) * 0.3;
+    T.flx = lerp(0.18, 1.5, run * A) + Math.max(0, -sa) * lerp(0.32, 0.3, run) * A; T.frx = lerp(0.18, 1.5, run * A) + Math.max(0, sa) * lerp(0.32, 0.3, run) * A;
     T.wlx = T.wrx = 0.08 + run * 0.25;
     if (run > 0.4) curlL = curlR = [0.6, 0.72, 0.78, 0.78, 0.78];
     // the walk rides up over each planted foot; the run is lowest when a foot is under him and floats in between
     T.py = 1 + lerp(Math.abs(Math.cos(ph)) * 0.04 - 0.02, Math.abs(s1) * 0.075 - 0.035, run) * A;
     T.rx = -0.04 * run * A; T.ry = s1 * lerp(0.1, 0.06, run) * A; T.rz = s1 * 0.04 * A * (1 - run);
+    T.px = Math.cos(ph) * lerp(0.028, 0.012, run) * A;   // his weight goes over onto each foot in turn
+    T.nx -= (T.py - 1) * 0.9;   // (and his head rides it out, so his eyes stay level)
     T.cx = (-0.05 - run * 0.26) * A - clamp(body.acc * 0.012, -0.16, 0.16); T.cy = -s1 * lerp(0.12, 0.2, run) * A;
     T.nx = run * 0.22 * A; T.ny = -T.cy * 0.6;
     T.rz += -clamp(body.turn * hs * 0.012, -0.32, 0.32);   // he leans into a turn
     rate = lerp(9, 18, mv);
+    // ── his feet on the ground as it is: on a slope or a step the leg on the high side bends, the hips sit down onto the
+    //    low side, and each sole lies along the slope instead of in the air
+    if (!swimming && !p.sliding) {
+      const plant = (1 - run) * (1 - smoothstep(0.5, 1, A) * 0.6);
+      if (plant > 0.02 && (body.gT = (body.gT || 0) - dt) <= 0) {
+        body.gT = 0.06; const y0 = H.group.rotation.y, rx = Math.cos(y0) * 0.11, rz = -Math.sin(y0) * 0.11, fx = -Math.sin(y0) * 0.16, fz = -Math.cos(y0) * 0.16, P = p.pos, top = P.y + 0.6;
+        const gL = groundAt(P.x - rx, P.z - rz, top), gR = groundAt(P.x + rx, P.z + rz, top), gF = groundAt(P.x + fx, P.z + fz, top), gB = groundAt(P.x - fx, P.z - fz, top);
+        body.gL = clamp(gL - P.y, -0.35, 0.35); body.gR = clamp(gR - P.y, -0.35, 0.35); body.gS = Math.atan(clamp((gF - gB) / 0.32, -1.2, 1.2));
+      }
+      if (plant > 0.02 && body.gL !== undefined) {
+        const low = Math.min(body.gL, body.gR), kn = h => Math.acos(clamp(1 - Math.max(0, h) / (2 * 0.44), -1, 1));
+        const aL = kn(body.gL - low) * plant, aR = kn(body.gR - low) * plant;
+        T.py += low * plant; T.llx += aL; T.slx -= 2 * aL; T.tlx += aL; T.lrx += aR; T.srx -= 2 * aR; T.trx += aR;
+        T.tlx += body.gS * plant * 0.85; T.trx += body.gS * plant * 0.85; T.rx += body.gS * plant * 0.12;   // (and he leans a little into the hill)
+      }
+    }
     // ── standing: weight on one leg and then the other, a look round now and then, and the breath in his chest
     if (idle > 0.01) {
       const w = Math.sin(time * 0.37) * 0.5 + 0.5;
@@ -5687,6 +5753,7 @@ async function startCam() {
   cam.loading = true; U.btn.style.opacity = 1; toast('CAMERA: LOADING HAND TRACKING…');
   try {
     cam.stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false });
+    if (!cam.loading) { cam.stream.getTracks().forEach(t => t.stop()); cam.stream = null; return; }   // (turned off while it was being asked for)
     U.v.srcObject = cam.stream; await U.v.play(); cam.video = U.v;
     const V = await import(`${MP}/vision_bundle.mjs`);
     const files = await V.FilesetResolver.forVisionTasks(`${MP}/wasm`);
@@ -5695,7 +5762,7 @@ async function startCam() {
       V.HandLandmarker.createFromOptions(files, { ...opt('https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'), numHands: 2, minHandDetectionConfidence: 0.5, minTrackingConfidence: 0.5 }),
       V.PoseLandmarker.createFromOptions(files, { ...opt('https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task'), numPoses: 1 }),
     ]);
-    if (!cam.loading) return;   // turned off while it was loading
+    if (!cam.loading) { cam.stream?.getTracks().forEach(t => t.stop()); cam.stream = null; try { cam.hands?.close(); cam.pose?.close(); } catch {} cam.hands = cam.pose = null; return; }   // turned off while it was loading: let it all go
     cam.on = true; U.box.style.display = ''; toast('CAMERA ON · YOUR HANDS AND YOUR FACE ARE HIS · H TO STOP');
     // the face comes a moment after (its model is the biggest of the three), and the hands work without it if it never does
     { const model = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', F = { runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true };
@@ -5837,6 +5904,7 @@ function aimJoint(j, dirBody, k) {
   _qc.setFromUnitVectors(DOWN, _va.normalize());
   j.quaternion.slerp(_qc, k); j.updateMatrixWorld(true);
 }
+const _mX = new THREE.Vector3(), _mY = new THREE.Vector3(), _mZ = new THREE.Vector3();
 function applyMirror(dt) {
   readCam();
   const p = player, fresh = (cam.on || XR.on) && performance.now() - cam.seen < 600;
@@ -5850,8 +5918,8 @@ function applyMirror(dt) {
     if (A) { aimJoint(up, A.up, k); aimJoint(fore, A.fo, k); }
     if (H) {
       // the hand's own frame: the fingers point out of it, the thumb is on one side
-      const Y = H.fd.clone().negate(), Z = H.ac.clone().negate(); Z.addScaledVector(Y, -Z.dot(Y)).normalize();
-      const X = new THREE.Vector3().crossVectors(Y, Z);
+      const Y = _mY.copy(H.fd).negate(), Z = _mZ.copy(H.ac).negate(); Z.addScaledVector(Y, -Z.dot(Y)).normalize();
+      const X = _mX.crossVectors(Y, Z);
       _qc.setFromRotationMatrix(_mb.makeBasis(X, Y, Z));
       human.group.getWorldQuaternion(_qa); _qc.premultiply(_qa).premultiply(hand.parent.getWorldQuaternion(_qb).invert());
       hand.quaternion.slerp(_qc, k * 0.85);
@@ -5932,8 +6000,10 @@ function peerOf(id) {
 }
 function dropPeer(id, P) {
   if (P.seen && performance.now() - CHAT.joinedAt > 4000) chatLine('', `${P.name} LANDED · GONE`, 'sys');
-  if (P.av) { scene.remove(P.av.man.group, P.av.bird.group); P.av.bird.group.traverse(o => o.geometry && o.geometry.dispose()); P.av.fire.dispose(); P.av.cape.dispose(); }
-  P.label?.remove();
+  if (P.av) { scene.remove(P.av.man.group, P.av.bird.group);
+    for (const g of [P.av.man.group, P.av.bird.group]) g.traverse(o => { if (!o.isMesh) return; o.geometry?.dispose(); for (const m of [].concat(o.material)) if (m && m !== INK && m !== capeMat && m !== fireMat) m.dispose?.(); });
+    P.av.fire.dispose(); P.av.cape.dispose(); P.av.halo?.dispose?.(); }
+  P.label?.remove(); P.fmk?.remove(); if (P.fbeam) { scene.remove(P.fbeam); P.fbeam.material.dispose(); P.fbeam = null; }
   NET.peers.delete(id);
 }
 // nobody gets to talk faster than this; anything malformed is ignored
@@ -5998,9 +6068,9 @@ for (const ev of ['pointerdown', 'pointerup', 'touchstart']) $('newcomer').addEv
 // what this player is doing, a few times a second
 function netSend(dt) {
   if (!NET.on) return;
-  const p = player, n = 1 + [...NET.peers.values()].filter(P => P.s).length;
-  const rate = clamp(80 / (n * n), 0.6, 6);   // everyone's messages, and every copy of them, inside the free plan's hundred a second
   if ((NET.sendT -= dt) > 0) return;
+  const p = player; let n = 1; for (const P of NET.peers.values()) if (P.s) n++;
+  const rate = clamp(80 / (n * n), 0.6, 6);   // everyone's messages, and every copy of them, inside the free plan's hundred a second
   const f = p.form === 'phoenix' ? (p.sub ? 'p' : 'p') : p.tumble ? 't' : p.climb ? 'c' : p.wings && !p.grounded ? 'w' : 'h';
   const v = p.form === 'phoenix' ? _v.copy(dir3).multiplyScalar(p.speed) : _v.copy(p.vel);
   const yaw = p.form === 'phoenix' ? p.yaw : human.group.rotation.y;
@@ -6112,7 +6182,7 @@ function updatePeers(dt) {
     const bird = P.form === 'p', sp = Math.hypot(P.s.vx, P.s.vz);
     A.bird.group.visible = bird; A.man.group.visible = !bird;
     if (bird) {
-      const G = A.bird.group; G.position.copy(P.pos); G.rotation.set(-P.pitch * 0.8, P.yaw, P.bank);
+      const G = A.bird.group; G.position.copy(P.pos); G.rotation.set(P.pitch * 0.8, P.yaw, P.bank);   // (nose up as it climbs: a positive turn about x lifts the beak)
       P.ph += dt * (1.2 + Math.hypot(P.s.vx, P.s.vy, P.s.vz) / 60);
       const f = P.wing > 0.15 ? P.wing : 0.24 + Math.sin(P.ph * 1.4) * 0.06, dive = smoothstep(-0.2, -0.8, P.pitch);
       A.bird.wings.forEach((w, i) => { w.shoulder.rotation.z = -f; w.elbow.rotation.z = -lerp(-0.34, 0.75, dive); w.wrist.rotation.z = w.elbow.rotation.z * 0.6; w.root.rotation.y = dive * 0.9 * (i === 0 ? 1 : -1); w.shoulder.scale.x = 1.12 - dive * 0.35; });
@@ -6136,20 +6206,19 @@ function updatePeers(dt) {
 const WP_ARROWS = ['→', '↗', '↑', '↖', '←', '↙', '↓', '↘'];
 function placeWaypoint(P, d, said, bird) {
   const el = P.label;
-  if (state === 'title' || state === 'prologue' || state === 'map' || state === 'photo') { el.style.display = 'none'; return; }
+  if (state === 'title' || state === 'prologue' || state === 'map' || state === 'photo') { if (el._d !== 0) { el._d = 0; el.style.display = 'none'; } return; }
   _v.set(P.pos.x, P.pos.y + (bird ? 5 : 2.6), P.pos.z).project(camera);
   let x = _v.x, y = _v.y;
   const behind = _v.z > 1;
   if (behind) { x = -x; y = -y; if (Math.abs(x) < 1e-3 && Math.abs(y) < 1e-3) y = -1; }
   const mx = 1 - 46 / innerWidth * 2, my = 1 - 40 / innerHeight * 2, edge = behind || Math.abs(x) > mx || Math.abs(y) > my;
   if (edge) { const m = Math.max(Math.abs(x) / mx, Math.abs(y) / my, 1e-4); x /= m; y /= m; }
-  el.style.display = '';
-  el.style.left = ((x * 0.5 + 0.5) * innerWidth) + 'px'; el.style.top = ((-y * 0.5 + 0.5) * innerHeight) + 'px';
+  if (el._d !== 1) { el._d = 1; el.style.display = ''; }
+  { const L = ((x * 0.5 + 0.5) * innerWidth).toFixed(1) + 'px', Tp = ((-y * 0.5 + 0.5) * innerHeight).toFixed(1) + 'px'; if (el._l !== L) { el._l = L; el.style.left = L; } if (el._t !== Tp) { el._t = Tp; el.style.top = Tp; } }
   const trk = TRACK.id === P.id, aim = TRACK.aim === P && !trk, dy = P.pos.y - player.pos.y;
-  el.className = 'mk peer wp' + (edge ? ' edge' : '') + (d > 900 && !said && !trk ? ' far' : '') + (said ? ' lit' : '') + (trk ? ' trk' : aim ? ' aim' : '');
+  { const cn = 'mk peer wp' + (edge ? ' edge' : '') + (d > 900 && !said && !trk ? ' far' : '') + (said || P.talking ? ' lit' : '') + (trk ? ' trk' : aim ? ' aim' : ''); if (el._c !== cn) { el._c = cn; el.className = cn; } }
   const glyph = edge ? WP_ARROWS[(Math.round(Math.atan2(y, x) / (Math.PI / 4)) + 8) % 8] : said ? '“' : P.talking ? '◉' : trk ? '◎' : FRIENDS.has(P.name) ? '♦' : '◆';
-  if (P.talking) el.classList.add('lit');
-  el.firstChild.textContent = glyph;
+  if (el._g !== glyph) { el._g = glyph; el.firstChild.textContent = glyph; }
   el.lastChild.textContent = said ? `${P.name}: ${said}`
     : trk ? `${P.name} · ${fmtDist(d)}${Math.abs(dy) > 15 ? ` · ${dy > 0 ? '▲' : '▼'} ${Math.round(Math.abs(dy))} m` : ''}${following(P) ? ' · FOLLOWING' : ''}`
     : aim ? `${P.name} · ${fmtDist(d)} · ${TOUCH ? 'TAP TO TRACK' : 'L TO TRACK'}`
@@ -6169,10 +6238,12 @@ function whoList() {
 function updateWho(dt) {
   const el = $('who'), show = (who.open || who.pinned) && state !== 'title' && state !== 'loading' && state !== 'prologue';
   el.classList.toggle('on', show);
-  const list = NET.peers.size ? whoList() : [];
-  const btn = $('whoBtn'); btn.classList.toggle('some', list.length > 0 && state === 'play'); btn.textContent = `◆ ${list.length + 1}`;
-  $('menuCount').textContent = list.length > 0 && state === 'play' ? String(list.length + 1) : '';
+  let nn = 0; { const now = performance.now(); for (const P of NET.peers.values()) if (P.s && now - P.s.t < 15000) nn++; }
+  const some = nn > 0 && state === 'play', bt = `◆ ${nn + 1}`, mc = some ? String(nn + 1) : '';
+  if (who.bt !== bt || who.some !== some) { who.bt = bt; who.some = some; const btn = $('whoBtn'); btn.classList.toggle('some', some); btn.textContent = bt; }
+  if (who.mc !== mc) { who.mc = mc; $('menuCount').textContent = mc; }
   if (!show || (who.t -= dt) > 0) return;
+  const list = NET.peers.size ? whoList() : [];
   who.t = 0.25;
   const esc = t => String(t).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
   const wbtn = (n, k, g, text, on, title) => `<s data-n="${esc(n)}" data-k="${k}" data-g="${g}" title="${title}" class="${on ? 'on' : ''}">${text}</s>`;
@@ -6393,7 +6464,7 @@ function vcUpdate(dt) {
   // and the button: shown once there is a microphone; lit while someone near you is talking
   const b = $('micBtn');
   b.classList.toggle('on', !!mic.stream && state !== 'title' && state !== 'prologue');
-  b.classList.toggle('muted', VC.muted); b.querySelector('.x').style.display = VC.muted ? '' : 'none';
+  if (b._m !== VC.muted) { b._m = VC.muted; b.classList.toggle('muted', VC.muted); (b._x ||= b.querySelector('.x')).style.display = VC.muted ? '' : 'none'; }
   b.classList.toggle('talk', !!talk);
   $('menuBtn').classList.toggle('talk', !!talk);
 }
@@ -6493,7 +6564,7 @@ function menuRefresh() {   // (the switches redrawn where they are: nothing is r
 // the strip comes down from the top, burning.
 function menuShow(on) {
   if (MENU.open === on) return;
-  MENU.open = on; const m = $('menu'), btn = $('menuBtn');
+  MENU.open = on; MENU.tc = performance.now(); const m = $('menu'), btn = $('menuBtn');
   btn.classList.toggle('open', on); btn.setAttribute('aria-expanded', on ? 'true' : 'false');
   if (on) { if (state === 'play') { MENU.cineWas = cinema.manual; MENU.cineHeld = true; cinema.manual = true; }
     menuBuild(); void m.offsetWidth; m.classList.add('open'); MENU.rt = 0; MENU.t0 = performance.now(); audio.sfx.menuOpen?.(); }   // (laid out closed first, so the drop is animated)
@@ -6559,7 +6630,7 @@ const AIC = {
   rec: [[" .-. ", "( o )", " '-' "], [" .-. ", "( O )", " '-' "], [" .-. ", "( @ )", " '-' "]],
 };
 function auiMenu() {
-  const mr = $('menu').getBoundingClientRect(); if (mr.bottom <= 1) return;
+  const opening = performance.now() - (MENU.tc || 0) < 750, mr = rectOf($('menu'), opening ? 0 : 250); if (mr.bottom <= 1) return;
   const nx = UIL.nx, r1 = uilRow(mr.bottom - 1), its = menuItems(), bs = $('menuRow').children, age = (performance.now() - MENU.t0) / 1000;
   uilPlate(0, r1, nx - 1, UIL.ny - 1, 251);
   const F = AF.strip ||= afMake(nx, 4, 2.5); F.want = MENU.open ? 1 : 0; afDraw(F, 0, r1 + 1);
@@ -6567,7 +6638,7 @@ function auiMenu() {
   for (let i = 0; i < its.length; i++) {
     const b = bs[i], it = its[i]; if (!b) continue;
     const k = MENU.open ? clamp((age - 0.1 - i * 0.03) / 0.22, 0, 1) : 1; if (k <= 0) continue;
-    const r = b.getBoundingClientRect(), cx = uilCol(r.left + r.width / 2), top = uilRow(r.top + 7), hot = b.classList.contains('hot'), on = !!it.on, A = AIC[it.ic] || AIC.guide;
+    const r = rectOf(b, opening ? 0 : 250), cx = uilCol(r.left + r.width / 2), top = uilRow(r.top + 7), hot = b.classList.contains('hot'), on = !!it.on, A = AIC[it.ic] || AIC.guide;
     const fr = hot && A.length > 1 ? A[Math.floor(time * 5.5) % A.length] : A[0], ci = hot ? 2 : on ? 1 : 0, br = (hot ? 255 : on ? 240 : 165) * k | 0;
     for (let l = 0; l < 3; l++) uilText(cx - 2, top - l, fr[l], ci, br);
     if (hot) { uilPut(cx - 4, top - 1, 62, 1, 200); uilPut(cx + 4, top - 1, 60, 1, 200); }   // (> and <, either side: this one)
@@ -6577,7 +6648,7 @@ function auiMenu() {
   }
 }
 function auiMark() {
-  const r = $('menuBtn').getBoundingClientRect(), txt = 'I C A R U S', c0 = Math.min(UIL.nx - 1 - txt.length, uilCol(r.right - 8) - txt.length), row = Math.max(1, uilRow(r.top + r.height * 0.66)), up = MENU.open || MENU.hot;
+  const r = rectOf($('menuBtn'), 600), txt = 'I C A R U S', c0 = Math.min(UIL.nx - 1 - txt.length, uilCol(r.right - 8) - txt.length), row = Math.max(1, uilRow(r.top + r.height * 0.66)), up = MENU.open || MENU.hot;
   uilPlate(c0 - 1, row - 1, c0 + txt.length, row, 150); uilPlate(c0 - 1, row + 1, c0 + txt.length, row + 3, 70);
   const F = AF.mark ||= afMake(txt.length + 2, 3, 2.3); F.want = MENU.open ? 1 : MENU.hot ? 0.9 : 0.36; afDraw(F, c0 - 1, row + 1);
   for (let k = 0; k < txt.length; k++) { const f = Math.sin(time * (up ? 9 : 3.1) + k * 1.7); uilPut(c0 + k, row, txt.charCodeAt(k), f > 0.25 ? 2 : 1, (212 + f * 43) | 0); }
@@ -6590,7 +6661,7 @@ function auiToast() {
   const now = performance.now(); if (now > TOAST.until || !TOAST.msg) return;
   const nx = UIL.nx, k = Math.min(1, (now - TOAST.t0) / 160, (TOAST.until - now) / 320), max = nx - 6, words = TOAST.msg.split(' '), lines = [''];
   for (const w of words) { const L = lines.length - 1, t = lines[L] ? lines[L] + ' ' + w : w; if (lines[L] && t.length > max) lines.push(w); else lines[L] = t; }
-  const mr = MENU.open ? $('menu').getBoundingClientRect().bottom : 0, top = Math.min(UIL.ny - 2, uilRow(Math.max(mr + UIL.ch * 1.2, UIL.ch * 1.6)));
+  const mr = MENU.open ? rectOf($('menu'), 250).bottom : 0, top = Math.min(UIL.ny - 2, uilRow(Math.max(mr + UIL.ch * 1.2, UIL.ch * 1.6)));
   lines.slice(0, 3).forEach((ln, i) => { const shown = ln.slice(0, Math.ceil(ln.length * Math.min(1, (now - TOAST.t0) / 220 + 0.25))), c0 = (nx - ln.length) >> 1; uilPlate(c0 - 2, top - i, c0 + ln.length + 1, top - i, 190 * k | 0); uilText(c0, top - i, shown, 0, 235 * k | 0); uilPut(c0 - 2, top - i, 42, 1, 220 * k | 0); });
 }
 
@@ -6666,6 +6737,47 @@ function auiTitle(dt) {
 // every frame: the grid wiped, and whatever of the interface is up typed into it again
 // What is being said to him, and what he is trying to do, are typed into the picture too: the line at the foot of the
 // screen with whose it is above it, and the one or two lines at the top left that say what he is about.
+// ── A conversation, typed into the picture too: the god's words where the panel would show them, their name (and how
+//    they feel) over them in their colour, and what he last said above that, quieter. The reply buttons and the line he
+//    types into stay as they are, under it: they are for pressing.
+function auiTalk() {
+  const tt = $('talkText'); if (!tt || $('talk').classList.contains('hidden')) return;
+  const text = (tt.textContent || '').trim(), name = ($('talkName').textContent || '').trim(), you = ($('talkYou').textContent || '').trim();
+  const bx = UIB.nx, bh = UIL.ch * 2, max = Math.max(18, Math.min(bx - 6, 60)), whole = String(talk.text || '').replace(/\[[^\]]*\]\s*/g, '').trim(), full = whole && text && whole.startsWith(text.slice(0, Math.max(1, text.length - 1))) ? whole : text;
+  const lines = ['']; if (full) for (const w of full.split(/\s+/)) { const L = lines.length - 1, t = lines[L] ? lines[L] + ' ' + w : w; if (lines[L] && t.length > max) lines.push(w); else lines[L] = t; }
+  const show = lines.slice(-4), skip = lines.length - show.length; let left = text.length; for (let k = 0; k < skip; k++) left -= lines[k].length + 1;
+  const r = rectOf(tt, 120), base = Math.max(1, Math.floor((innerHeight - r.bottom) / bh));
+  if (full) show.forEach((ln, i) => { const row = base + (show.length - 1 - i), c0 = (bx - ln.length) >> 1, n = clamp(left, 0, ln.length); left -= ln.length + 1; if (n <= 0) return; uibPlate(c0 - 1, row, c0 + n, row, 205); uibText(c0, row, ln.slice(0, n), 0, 245); });
+  let top = base + Math.max(1, show.length);
+  if (name) { const t = name.toUpperCase().slice(0, max), c0 = (bx - t.length) >> 1, g = talk.god, ink = g && godInk(g); if (ink) postMat.uniforms.uSayCol.value.set(ink).lerp(_wtW, 0.4); uibPlate(c0 - 1, top, c0 + t.length, top, 150); uibText(c0, top, t, ink ? 3 : 1, 230); top++; }
+  if (you && you !== '…') { const t = you.slice(0, max), c0 = (bx - t.length) >> 1; uibPlate(c0 - 1, top, c0 + t.length, top, 120); uibText(c0, top, t, 0, 150); }
+  auiTalkKeys();
+}
+// the things to press in a conversation, typed in the grid where the buttons are: [ a reply ]  [ thank you - goodbye ]  [ >_ ];
+// LEAVE in the corner; the line he types into, with its caret. The buttons are still there, unseen, sized to the letters.
+const asciiOf = t => String(t || '').replace(/[—–]/g, '-').replace(/…/g, '...').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/✕/g, 'X').replace(/✎/g, '>_').replace(/[^\x20-\x7e]/g, '');
+function auiTalkKeys() {
+  const cw = UIL.cw, ch = UIL.ch, blink = (time * 2.2) % 1 < 0.6;
+  const key = (b, lab, ci, quiet) => {
+    const w = Math.round((lab.length + 4) * cw), h = Math.round(ch * 1.7); if (b._aw !== w || b._ah !== h) { b._aw = w; b._ah = h; b.style.width = w + 'px'; b.style.height = h + 'px'; RECT.delete(b); }
+    const r = rectOf(b, 120); if (r.width < 2) return;
+    const hot = b.matches(':hover') || b.matches(':active') || document.activeElement === b, row = uilRow(r.top + r.height / 2), c0 = uilCol(r.left + r.width / 2) - ((lab.length + 4) >> 1);
+    uilPlate(c0, row, c0 + lab.length + 3, row, hot ? 235 : 200);
+    uilPut(c0, row, 91, hot ? 2 : 1, hot ? 255 : quiet ? 120 : 170); uilPut(c0 + lab.length + 3, row, 93, hot ? 2 : 1, hot ? 255 : quiet ? 120 : 170);
+    uilText(c0 + 2, row, lab, hot ? 2 : ci, hot ? 255 : quiet ? 150 : 225);
+    if (hot) { uilPut(c0 - 2, row, 62, 2, 230); uilPut(c0 + lab.length + 5, row, 60, 2, 230); }
+  };
+  for (const b of $('talkChips').children) { const lab = asciiOf(b.textContent).slice(0, 48); if (lab) key(b, lab, b.classList.contains('bye') ? 1 : 0, b.classList.contains('bye')); }
+  { const b = $('talkLeave'); if (b) key(b, 'LEAVE X', 1, true); }
+  const inp = $('talkInput'); if (inp) { const r = rectOf(inp, 120);
+    if (r.width > 2) { const n = Math.max(6, Math.floor(r.width / cw) - 4), focus = document.activeElement === inp, v = asciiOf(inp.value), row = uilRow(r.top + r.height / 2);
+      const shown = v ? (v.length > n - 1 ? v.slice(v.length - n + 1) : v) : '', ph = v ? '' : asciiOf(inp.placeholder), t = shown || ph, c0 = uilCol(r.left + r.width / 2) - ((t.length + 3) >> 1);
+      uilPlate(c0 - 1, row, c0 + t.length + 3, row, focus ? 215 : 170);
+      uilPut(c0, row, 62, focus ? 2 : 1, focus ? 255 : 150); uilText(c0 + 2, row, t, shown ? 0 : 0, shown ? 240 : 95);
+      if (focus && blink) uilPut(c0 + 2 + shown.length, row, 95, 2, 255);
+      for (let c = c0; c <= c0 + Math.max(t.length + 2, 8); c++) uilPut(c, row - 1, 45, 0, focus ? 90 : 45, 60); } }   // (and a faint rule under it)
+  const hn = $('talkHint'); if (hn && !TOUCH) { const r = rectOf(hn, 400), t = asciiOf(hn.textContent).toUpperCase(); if (r.width > 2 && t) { const row = uilRow(r.top + r.height / 2), c0 = uilCol(r.left + r.width / 2) - (t.length >> 1); uilText(c0, row, t, 0, 85); } }
+}
 function auiSay() {
   const nx = UIL.nx, ny = UIL.ny;
   if (state === 'play' || state === 'map') { const o = ($('obj').textContent || '').trim(), q = ($('quest').textContent || '').trim(), max = Math.max(20, (nx >> 1) - 2);
@@ -6680,7 +6792,7 @@ function auiSay() {
   const show = lines.slice(first, first + 3), base = 1 + (UIL.bar > 0.5 ? 0 : 1);
   show.forEach((ln, i) => { const r = base + (show.length - 1 - i), c0 = (bx - ln.length) >> 1, n = clamp(left, 0, ln.length); left -= ln.length + 1; if (n <= 0) return; uibPlate(c0 - 1, r, c0 + n, r, 200); uibText(c0, r, ln.slice(0, n), 0, 245); });
   if (title) { const t = title.toUpperCase().slice(0, max), r = base + show.length, c0 = (bx - t.length) >> 1, g = gods.find(g => title.startsWith(g.name)) || (title.startsWith('Hades') ? hades : null), ink = g && godInk(g);
-    if (ink) postMat.uniforms.uSayCol.value.set(ink); uibPlate(c0 - 1, r, c0 + t.length, r, 140); uibText(c0, r, t, ink ? 3 : 1, 225); }
+    if (ink) postMat.uniforms.uSayCol.value.set(ink).lerp(_wtW, 0.4); uibPlate(c0 - 1, r, c0 + t.length, r, 140); uibText(c0, r, t, ink ? 3 : 1, 225); }
 }
 function drawAsciiUi(dt) {
   const cl = document.body.classList, on = asciiOn && !XR.on && !!UIL.buf;
@@ -6697,7 +6809,7 @@ function drawAsciiUi(dt) {
     if (TOMB.say && shown) { const S = TOMB.say; uilPlate(S.c - (S.t1.length >> 1) - 1, S.r - (S.t2 ? 1 : 0), S.c + ((S.t1.length + 1) >> 1), S.r, 150); uilText(S.c - (S.t1.length >> 1), S.r, S.t1, 0, 235); if (S.t2) uilText(S.c - (S.t2.length >> 1), S.r - 1, S.t2, 1, 200); }
     if (shown && !REC.on) auiMark();
     if (state !== 'title' && !REC.on) { auiMenu(); auiToast(); }
-    if (state !== 'title' && !cl.contains('pro') && !cl.contains('photo')) auiSay();   // (also while he is dying, or the film is running: what is said is always there to be read)
+    if (state !== 'title' && !cl.contains('pro') && !cl.contains('photo')) { if (state === 'talk') auiTalk(); else auiSay(); }   // (also while he is dying, or the film is running: what is said is always there to be read)
   }
   if (UIL.used || UIL.was) UIL.tex.needsUpdate = true;
   postMat.uniforms.uUiOn.value = UIL.used ? 1 : 0;
@@ -7013,6 +7125,9 @@ function chatCommand(text) {
     case 'sethome': { const name = (arg || 'HOME').toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 14) || 'HOME', y = Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y + 3), WATER), was = WP.list.find(w => w.h && w.n === name);
       if (was) Object.assign(was, { x: Math.round(p.pos.x), y: Math.round(y), z: Math.round(p.pos.z), r: realm === 'under' ? 1 : 0 }); else { if (WP.list.length >= 8) WP.list.shift(); WP.list.push({ x: Math.round(p.pos.x), y: Math.round(y), z: Math.round(p.pos.z), n: name, r: realm === 'under' ? 1 : 0, h: 1 }); }
       wpSave(); sys(`HOME · ${name} · SET HERE · /home ${name.toLowerCase()} BRINGS YOU BACK`); return true; }
+    case 'house': case 'houses': { const H = myHouses().map(g => godById[g]?.name || g); const lm = low.match(/^(leave|drop|quit)\s+(.+)$/);
+      if (lm) { const id = Object.keys(PATRONS).find(k => k === lm[2].trim() || (godById[k]?.name || '').toLowerCase() === lm[2].trim()); if (id) houseLeave(id); else toast('NO GOD BY THAT NAME'); return true; }
+      chatLine('', H.length ? `YOU FLY FOR ${H.join(' AND ').toUpperCase()} · ASK A GOD TO TAKE YOU INTO THEIR HOUSE · /house leave NAME` : 'YOU FLY FOR NO HOUSE YET · KNEEL AT A THRONE', 'sys'); return true; }
     case 'look': case 'looks': case 'style': case 'visuals': { if (!arg) { lookShow(true); return true; } const K = lookNamed(arg) || (arg.length > 30 && !/\s/.test(arg) ? lookFrom(arg) : null); if (K) lookApply(K, true); else lookAsk(arg); return true; }
     case 'home': { const L = homes(), h = arg ? L.find(w => w.n.toLowerCase() === low) : L[L.length - 1];
       if (h) { if (!flags.morphed) sys('YOU HAVE TO HAVE FLOWN ONCE TO BE CARRIED'); else { if (state === 'map') closeMap(); startWarp(h.x, h.z, h.y + 2); sys(`→ ${h.n}`); } }
@@ -7090,7 +7205,7 @@ function updateNet(dt) {
   if (!NET.sb && API.mp && state !== 'title' && state !== 'loading' && state !== 'prologue') netStart();
   if (NET.on && NET.ch && NET.ch.state === 'closed') { NET.on = false; if (!NET.retry) NET.retry = setTimeout(() => { NET.retry = 0; netJoin(); }, 1500); }
   netSend(dt); updatePeers(dt); netCollide(); vcUpdate(dt);
-  const n = [...NET.peers.values()].filter(P => P.s && performance.now() - P.s.t < 15000).length;
+  let n = 0; { const now = performance.now(); for (const P of NET.peers.values()) if (P.s && now - P.s.t < 15000) n++; }   // (counted in place: no list made every frame)
   if (n !== NET.count) { NET.count = n; if (n > 0 && !NET.warned) { NET.warned = true; toast(n === 1 ? 'SOMEONE ELSE IS FLYING' : `${n} OTHERS ARE FLYING`); } }
 }
 
@@ -7099,15 +7214,78 @@ const dir3 = new THREE.Vector3();
 // and can do everything he could do on his feet — talk to a god, kindle a fire, go up to an animal — before it goes up again.
 function perchLand() {
   const p = player;
-  p.perch = true; p.grounded = true; p.speed = 0; p.vy = 0; p.pitch = 0; p.bank = 0; p.turn = 0;
+  p.perch = true; p.takeoff = null; p.perchT = 0; p.grounded = true; p.speed = 0; p.vy = 0; p.pitch = 0; p.bank = 0; p.turn = 0;
   p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * birdK(); p.fallTop = p.pos.y;
   for (let i = 0; i < 30; i++) emit(p.pos.x + rnd(2), p.pos.y - 0.6, p.pos.z + rnd(2), rnd(4), Math.random() * 3, rnd(4), 0.8, pick(EMBER));
   audio.sfx.land?.(0.4); audio.sfx.perch?.(); toast('ON THE GROUND · AS THE BIRD');
   if (!p.look) scorch(p.pos.x, p.pos.z, 2.4, p.pos.y);   // (where a bird of fire sets down, the grass knows it)
 }
 function perchUp() {
-  const p = player;
-  p.perch = false; p.perchGo = null; p.look = null; p.perchIdle = 0; p.grounded = false; p.speed = 34; p.vy = 14; p.pitch = 0.55; audio.sfx.flap?.(0.9); WR.beat = 1;
+  const p = player; if (p.takeoff) return;
+  p.perch = false; p.perchGo = null; p.look = null; p.perchIdle = 0; p.grounded = false; p.speed = 0; p.vy = 0;
+  p.takeoff = { t: 0, sq: 0, sprung: false, beatT: 0, y0: p.pos.y };   // (down on his legs first: then the spring, then the wings)
+}
+// A bird going up off the ground: it drops a little on its legs with its wings lifting, throws itself up off them, and the
+// first beats are the biggest, nose high, until it has the air under it and levels into flight.
+function updateTakeoff(dt) {
+  const p = player, T = p.takeoff, K = birdK(); T.t += dt; const t = T.t;
+  const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), CR = 0.2;
+  if (t < CR) {
+    T.sq = Math.sin(clamp(t / CR, 0, 1) * Math.PI * 0.5); p.speed = 0; p.vy = 0;
+    p.pitch = lerp(p.pitch, -0.12, damp(12, dt)); WR.beat = 0;
+    flyWings(dt, { boost: false, dive: 0.15, climb: 0 }); WR.th = Math.PI * 0.85;   // (wings up, ready to come down)
+    p.pos.y = lerp(p.pos.y, groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * K, damp(14, dt));
+  } else {
+    if (!T.sprung) { T.sprung = true; p.vy = 15; p.speed = 10; WR.beat = 1; WR.th = 0; audio.sfx.flap?.(1); netFx('flap');
+      for (let i = 0; i < 36; i++) { const a = i / 36 * 6.283; emit(p.pos.x + Math.cos(a) * 1.2 * K, p.pos.y - 0.7 * K, p.pos.z + Math.sin(a) * 1.2 * K, Math.cos(a) * 7, 0.6 + Math.random() * 1.5, Math.sin(a) * 7, 0.5 + Math.random() * 0.4, pick(EMBER)); }
+      T.beatT = time + 0.3; }
+    const u = clamp((t - CR) / 1.0, 0, 1);
+    T.sq = Math.max(0, T.sq - dt / 0.07);
+    if (time > T.beatT && u < 0.85) { T.beatT = time + 0.3 + u * 0.12; WR.beat = 1; p.vy += 5.5 * (1 - u * 0.6); audio.sfx.flap?.(0.75 - u * 0.3); netFx('flap'); }
+    p.vy -= 11 * dt; p.vy = clamp(p.vy, -4, 18);
+    p.speed = lerp(p.speed, 36, damp(1.5 + u * 1.5, dt));
+    p.pitch = lerp(p.pitch, lerp(0.78, 0.3, u), damp(5, dt)); p.bank = lerp(p.bank, 0, damp(6, dt)); p.turn = 0;
+    flyWings(dt, { boost: false, dive: 0, climb: 1 - u * 0.5 });
+    p.pos.x += fx * p.speed * dt; p.pos.z += fz * p.speed * dt; p.pos.y += p.vy * dt;
+    p.pos.y = Math.max(p.pos.y, groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * K);
+    if (u >= 1) { p.takeoff = null; p.speed = Math.max(p.speed, 34); p.vy = clamp(p.vy, 3, 10); }
+  }
+  dir3.set(fx * Math.cos(p.pitch), Math.sin(p.pitch), fz * Math.cos(p.pitch)); p.fallTop = p.pos.y; p.glideT = 0;
+}
+// ── The bird alive. On the ground it stands up on its legs, breathes, and is never still for long: the head goes from
+//    one thing to another in quick small jerks and holds; now and then it preens under a wing, shakes its feathers out,
+//    stretches both wings and folds them, flicks its tail. In the air the head looks into the turn before the body does.
+const BIRDI = { stand: 0, hy: 0, hp: 0, hr: 0, vy: 0, vp: 0, ty: 0, tp: 0, next: 0, act: '', at: 0, aT: 0, side: 1, big: 4, stretch: 0, shake: 0, flick: 0 };
+function phxAlive(dt) {
+  const p = player, G = phoenix.group, P = BIRDI, down = p.perch && !p.perchGo, K = birdK(), still = down && (p.perchIdle || 0) > 0.35;
+  P.stand = lerp(P.stand, down ? 1 : 0, damp(down ? 5 : 9, dt));
+  // where the head wants to be
+  if (still) {
+    if ((P.next -= dt) <= 0) { P.next = 0.5 + Math.random() * 2.2;
+      if (Math.random() < 0.3) { const c = camera.position, a = Math.atan2(-(c.x - p.pos.x), -(c.z - p.pos.z)); P.ty = clamp(wrapAngle(a - p.yaw), -1.3, 1.3); P.tp = 0.12; }   // (at you)
+      else { P.ty = (Math.random() * 2 - 1) * 1.15; P.tp = (Math.random() - 0.4) * 0.45; } }
+    if ((P.big -= dt) <= 0 && !P.act) { const r = Math.random(); P.act = r < 0.34 ? 'preen' : r < 0.6 ? 'shake' : r < 0.82 ? 'stretch' : 'flick'; P.at = 0; P.aT = { preen: 1.9, shake: 0.75, stretch: 2.1, flick: 0.45 }[P.act]; P.side = Math.random() < 0.5 ? -1 : 1; P.big = 5 + Math.random() * 8;
+      if (P.act === 'shake') { audio.sfx.flap?.(0.22); for (let i = 0; i < 26; i++) { _v.set(rnd(1.4), rnd(0.8) + 0.3, rnd(2.2)).multiplyScalar(K).applyEuler(G.rotation).add(p.pos); emit(_v.x, _v.y, _v.z, rnd(3), 1 + Math.random() * 3, rnd(3), 0.5 + Math.random() * 0.4, pick(EMBER)); } } }
+  } else { P.ty = down ? 0 : clamp(p.turn * 0.45, -0.7, 0.7); P.tp = down ? 0 : clamp(-p.pitch * 0.2, -0.25, 0.2); if (!down) { P.act = ''; P.big = 3 + Math.random() * 4; } }
+  let ty = P.ty, tp = P.tp, tr = 0, env = 0;
+  if (P.act) { P.at += dt; const u = P.at / P.aT; env = Math.sin(clamp(u, 0, 1) * Math.PI); if (u >= 1 || !still) { P.act = ''; env = 0; }
+    if (P.act === 'preen') { const e = smoothstep(0, 0.25, u) * (1 - smoothstep(0.8, 1, u)); ty = lerp(ty, P.side * 2.35, e); tp = lerp(tp, -0.75 + Math.sin(P.at * 15) * 0.09, e); tr = P.side * 0.5 * e; }
+    if (P.act === 'stretch') { ty = lerp(ty, 0, env); tp = lerp(tp, 0.35, env); } }
+  P.stretch = P.act === 'stretch' ? env : lerp(P.stretch, 0, damp(6, dt));
+  P.shake = P.act === 'shake' ? env : 0; P.flick = P.act === 'flick' ? env : 0;
+  // the head: a stiff spring, so it snaps to a new place and holds there, the way a bird's head does
+  const kS = still ? 260 : 90, kD = still ? 26 : 17;
+  P.vy += (wrapAngle(ty - P.hy) * kS - P.vy * kD) * Math.min(dt, 0.05); P.hy += P.vy * Math.min(dt, 0.05);
+  P.vp += ((tp - P.hp) * kS - P.vp * kD) * Math.min(dt, 0.05); P.hp += P.vp * Math.min(dt, 0.05);
+  P.hr = lerp(P.hr, tr, damp(8, dt));
+  const walk = down && !still ? Math.sin(time * 9) * 0.12 : 0;   // (walking: the head bobs with the steps)
+  phoenix.head.rotation.set(P.hp + walk - P.stand * 0.24, P.hy, P.hr);   // (the body stands nose-up: the head is held level against it)
+  // the body: up on his legs, breathing; a shake that goes through all of him; the tail flicked up
+  const st = P.stand, br = Math.sin(time * 2.1);
+  G.rotation.x += 0.3 * st - P.flick * 0.16 + Math.sin(P.at * 38) * P.shake * 0.05;   // (up on his legs; a flick tips the tail up)
+  G.rotation.z += (Math.sin(time * 0.7) * 0.03 + Math.sin(P.at * 44) * P.shake * 0.14) * st;
+  const tk = p.takeoff ? p.takeoff.sq : 0; G.position.y += (0.08 * br * st - tk * 0.4) * K * PHX_S * 0.5; if (tk) G.rotation.x -= tk * 0.25;
+  phoenix.body.scale.set(1 + 0.02 * br * st + 0.07 * P.shake, 1 + 0.035 * br * st + 0.08 * P.shake, 1 + 0.015 * br * st);
 }
 // Where the bird could set down, shown in the world and nowhere else: a ring of light lying on the place — a named perch
 // he is flying toward, or the ground just ahead of him when he comes in low and slow — with a second ring drawing in to
@@ -7194,12 +7372,14 @@ function updatePerch(dt) {
     if (L !== p.look) { p.look = L; if (L) { toast(`${L.name} · A PERCH`); audio.sfx.lookout?.(); if (!(L.seen)) { L.seen = true; witness(`came down as the bird on ${L.name.toLowerCase()}`, true); } } }
     p.perchIdle = ml < 0.1 ? (p.perchIdle || 0) + dt : 0;
     if (L) p.flame = Math.min(1, p.flame + dt / 5); }
-  const open = smoothstep(p.look ? 0.5 : 1.6, p.look ? 1.6 : 3, p.perchIdle);
-  flyWings(dt, { boost: false, dive: 1 - open, climb: 0 });   // wings folded while he walks; out when he stands
-  if (!dragging) camYaw += p.look && p.perchIdle > 1.8 ? dt * 0.09 : wrapAngle(p.yaw - camYaw) * damp(ml > 0.1 ? 1.2 : 0, dt);
+  p.perchT = (p.perchT || 0) + dt;
+  const open = Math.max(p.look ? smoothstep(0.5, 1.6, p.perchIdle) : 0, BIRDI.stretch);
+  flyWings(dt, { boost: false, dive: 0, climb: 0, fold: 1 - open });   // wings folded while he walks or stands; out to the wind on a perch with a name, or stretched now and then
+  if (!dragging) camYaw += p.look && p.perchIdle > 1.8 ? dt * 0.09 : p.perchIdle > 7 ? dt * 0.035 * smoothstep(7, 11, p.perchIdle) : wrapAngle(p.yaw - camYaw) * damp(ml > 0.1 ? 1.2 : 0, dt);   // (left alone a while, the lens goes slowly round him)
 }
 function updatePhoenix(dt) {
   const p = player;
+  if (p.takeoff) { if (p.sub || state === 'dead') p.takeoff = null; else return updateTakeoff(dt); }
   if (p.perch) return updatePerch(dt);
   if (p.sub) return updateSub(dt);
   if (p.perchGo) return updatePerchGo(dt);
@@ -7959,7 +8139,7 @@ function placeHerd(herd, minR, maxR) {
     const x = P.x + Math.cos(a) * d, z = P.z + Math.sin(a) * d, h = height(x, z);
     if (h > WATER + 2 && h > sp.h[0] && h < sp.h[1]) { herd.cx = x; herd.cz = z; herd.gen++; return; }
   }
-  herd.cx = P.x + 5000; herd.cz = P.z; herd.gen++;   // nowhere fitting: park it out of sight for now
+  herd.cx = P.x + 5000; herd.cz = P.z; herd.gen++; herd.retry = time + 2;   // nowhere fitting: park it out of sight for now, and look again in a while
 }
 for (const sp of SPECIES) {
   sp.look = quad(sp.o);
@@ -7985,7 +8165,7 @@ function updateAnimals(dt) {
   const alt = P.y - groundAt(P.x, P.z, P.y);
   for (const sp of SPECIES) {
     const n = Math.floor(sp.n * animalK);
-    for (const h of sp.herds) if ((h.cx - P.x) ** 2 + (h.cz - P.z) ** 2 > 1100 * 1100) placeHerd(h, 450, 950);
+    for (const h of sp.herds) if (time > (h.retry || 0) && (h.cx - P.x) ** 2 + (h.cz - P.z) ** 2 > 1100 * 1100) placeHerd(h, 450, 950);
     for (let i = 0; i < n; i++) {
       const a = sp.list[i];
       if (a.gen !== a.herd.gen) {
@@ -8546,16 +8726,16 @@ function nearGod() {
 //    grain and leaves on a slow wind, Athena still rings of olive and a line of light, Aphrodite petals, Dionysus vine and
 //    grape, Hera a crown and the eyes of a peacock's tail, Hades a dark with cold fire under it. Talking to one is talking
 //    to the weather — and at the height of a face there is a light, which is where he looks, and over it the ring.
-const _pc = new THREE.Color();
+const _pc = new THREE.Color(), _emC = [0, 0, 0];
 function godPresence(g, dt, talking) {
   const cam = camera.position, d2 = (g.x - cam.x) ** 2 + (g.z - cam.z) ** 2; if (d2 > 420 * 420) return;
   if (g.form) { const U = g.form.userData.U; g.form.visible = true; U.uTalk.value = lerp(U.uTalk.value, talking ? 1 : 0, damp(3, dt)); g.flashK = Math.max(0, (g.flashK || 0) - dt * 3.2); U.uFlash.value = g.flashK;
     if (g.form.userData.spin) g.form.userData.spin.scale.setScalar(1 + 0.12 * Math.sin(time * 3.1) + 0.2 * U.uTalk.value);
     if (g.form.userData.face) { const f = g.form.userData.face; f.rotation.y = Math.atan2(camera.position.x - g.x, camera.position.z - g.z) - g.yaw; } }
   const kind = PRES[g.id] || 'motes', full = formOf(g) === 'god' ? 1 : 0.6, e = (talking ? 1.4 : 1) * (d2 > 150 * 150 ? 0.5 : 1), x = g.x, y = g.group.position.y, z = g.z, E = g.eye, H = E * 1.2, T = time + (g.auraT || 0) * 40;
-  _pc.set(PATRONS[g.id]?.[0] || (g === hades ? '#6f8cff' : '#ffe2a0')); const c = [_pc.r, _pc.g, _pc.b], hot = [c[0] * 2.2 + 0.3, c[1] * 2.2 + 0.3, c[2] * 2.2 + 0.3];
+  const c = g.pCol ||= (() => { _pc.set(PATRONS[g.id]?.[0] || (g === hades ? '#6f8cff' : '#ffe2a0')); return [_pc.r, _pc.g, _pc.b]; })(), hot = g.pHot ||= [c[0] * 2.2 + 0.3, c[1] * 2.2 + 0.3, c[2] * 2.2 + 0.3];
   g.pT = (g.pT || 0) + Math.min(dt, 0.05) * 22 * full * e; const n = Math.min(10, g.pT | 0); g.pT -= n; if (!n) return;
-  const K = 0.38, em = (px, py, pz, vx, vy, vz, life, col, buoy, size) => emit(px, py, pz, vx, vy, vz, life, [col[0] * K, col[1] * K, col[2] * K], buoy, size);   // (dimmer than fire: so many of them together must not go white)
+  const K = 0.38, em = (px, py, pz, vx, vy, vz, life, col, buoy, size) => { _emC[0] = col[0] * K; _emC[1] = col[1] * K; _emC[2] = col[2] * K; emit(px, py, pz, vx, vy, vz, life, _emC, buoy, size); };   // (dimmer than fire: so many of them together must not go white)
   const R = Math.random, near = d2 < 70 * 70;
   // the light where a face would be
   if (R() < 0.6) em(x + rnd(0.1), y + E + rnd(0.1), z + rnd(0.1), rnd(0.25), rnd(0.25), rnd(0.25), 0.28, hot, 0, 1.1 * full + (talking ? 0.4 + Math.sin(time * 9) * 0.25 : 0));
@@ -9261,9 +9441,11 @@ function caveRoof(cx, cz, rng, acc, group) {
   }
   if (throat) {   // the way up: the hole in the roof, the day standing in it like a column, and water coming down round its edge
     const S = throat, g = Math.max(height(S.x, S.z), WATER), H = UNDER.ceil - g;
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(S.R * 0.8, S.R * 1.7, H + 40, 18, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff1d2, transparent: true, opacity: 0.13, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    CAVE.beamM ||= new THREE.MeshBasicMaterial({ color: 0xfff1d2, transparent: true, opacity: 0.13, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(S.R * 0.8, S.R * 1.7, H + 40, 18, 1, true), CAVE.beamM || new THREE.MeshBasicMaterial({ color: 0xfff1d2, transparent: true, opacity: 0.13, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
     beam.position.set(S.x, g + (H + 40) / 2, S.z); beam.frustumCulled = false; group.add(beam);
-    const sky = new THREE.Mesh(new THREE.CircleGeometry(S.R * 1.12, 28), new THREE.MeshBasicMaterial({ color: 0xe6f1ff, fog: false, side: THREE.DoubleSide })); sky.rotation.x = Math.PI / 2; sky.position.set(S.x, UNDER.ceil - 1.6, S.z); group.add(sky);
+    CAVE.skyM ||= new THREE.MeshBasicMaterial({ color: 0xe6f1ff, fog: false, side: THREE.DoubleSide });
+    const sky = new THREE.Mesh(new THREE.CircleGeometry(S.R * 1.12, 28), CAVE.skyM); sky.rotation.x = Math.PI / 2; sky.position.set(S.x, UNDER.ceil - 1.6, S.z); group.add(sky);
     for (let k = 0; k < 3; k++) { const a = S.yaw + k * 2.094; fall(S.x + Math.cos(a) * S.R * 1.3, UNDER.ceil - 2, S.z + Math.sin(a) * S.R * 1.3, -a + Math.PI / 2, 9 + k * 3, H + 4); }
     U.throat = S;
   }
@@ -9984,6 +10166,7 @@ function boilWater() {
   if (P.y > WATER - 6) ripple(P.x, P.z, 2.4);
 }
 function updateFish(dt) {
+  FISH.fr = (FISH.fr | 0) + 1;   // (each fish looks at the seabed under it every few frames, not all of them at once)
   const p = player, P = p.pos; let m = FISH.mesh;
   if ((FISH.chk -= dt) <= 0) {   // is there sea near enough to matter?
     FISH.chk = 1.2;
@@ -10022,7 +10205,7 @@ function updateFish(dt) {
       const top = S.K.sp * (f.flee > 0 ? 3.4 : 1.25), al = Math.hypot(ax, ay, az) || 1, sc = Math.min(1, top / al);
       f.vx = lerp(f.vx, ax * sc, damp(f.flee > 0 ? 7 : 2.4, dt)); f.vy = lerp(f.vy, ay * sc, damp(2.4, dt)); f.vz = lerp(f.vz, az * sc, damp(f.flee > 0 ? 7 : 2.4, dt));
       f.x += f.vx * dt; f.y += f.vy * dt; f.z += f.vz * dt;
-      const bed = (f.i + frameN) % 6 === 0 ? (f.bed = terrainAt(f.x, f.z)) : f.bed ?? -1e4;
+      const bed = (f.i + FISH.fr) % 6 === 0 || f.bed === undefined ? (f.bed = terrainAt(f.x, f.z)) : f.bed;
       f.y = clamp(f.y, Math.min(bed + 0.5 + f.size * 0.4, WATER - 0.6), WATER - 0.3 - f.size * 0.18);
       const hv = Math.hypot(f.vx, f.vz);
       if (hv > 0.15) f.yaw += wrapAngle(Math.atan2(-f.vx, -f.vz) - f.yaw) * damp(8, dt);
@@ -10039,7 +10222,7 @@ function updateFish(dt) {
     } else if (f.st === 1) {   // in the air
       f.t += dt; f.vy -= 24 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.z += f.vz * dt;
       f.pit = Math.atan2(f.vy, Math.hypot(f.vx, f.vz) + 0.01); f.roll += (f.spin || 0) * dt; if (Math.hypot(f.vx, f.vz) > 0.3) f.yaw = Math.atan2(-f.vx, -f.vz);
-      const g = (f.i + frameN) % 4 === 0 ? (f.bed = terrainAt(f.x, f.z)) : f.bed ?? -1e4;
+      const g = (f.i + FISH.fr) % 4 === 0 || f.bed === undefined ? (f.bed = terrainAt(f.x, f.z)) : f.bed;
       if (f.vy < 0 && f.y < Math.max(WATER, g) + 0.05) {
         if (g > WATER) { f.y = g + 0.1; f.vy = 3; f.vx *= 0.4; f.vz *= 0.4; if (f.t > 6) { f.S.ok && (f.x = f.S.x, f.z = f.S.z, f.y = f.S.y); f.st = 0; } }   // (on the beach: it flaps there a while, and is let off)
         else { fishSplash(f, false); f.st = 0; f.flee = 1.2; f.y = WATER - 0.4; f.vy = -2; f.roll = 0; }
@@ -10358,7 +10541,8 @@ function strike(x, y, z, big = 0.6) {
   boltT = 0.24;
   skyFlash = Math.max(skyFlash, Math.min(1, 0.4 + big * 0.6) * smoothstep(4500, 300, Math.hypot(x - camera.position.x, z - camera.position.z)));
   const d = Math.hypot(x - camera.position.x, z - camera.position.z);
-  flash = Math.max(flash, (0.18 + big * 0.3) * smoothstep(3500, 200, d));   // (most of the light is in the world now: the hills themselves go white) postMat.uniforms.uFlashCol.value.setRGB(0.75, 0.85, 1.1);
+  flash = Math.max(flash, (0.18 + big * 0.3) * smoothstep(3500, 200, d));   // (most of the light is in the world now: the hills themselves go white)
+  postMat.uniforms.uFlashCol.value.setRGB(0.75, 0.85, 1.1);
   camShake = Math.max(camShake, big * smoothstep(500, 50, d));
   setTimeout(() => { audio.sfx.thunder(); if (d < 700) audio.sfx.crack(); }, Math.min(4000, d / 0.34));
 }
@@ -11442,8 +11626,8 @@ function updateGrass(dt) {
     const [tx, tz] = G.queue.shift(), t = grassTile(tx, tz);
     if (t) { G.tiles.set(tx + ',' + tz, t); G.dirty = true; } else { G.key = ''; break; }   // (not ready: ask again next frame)
   }
-  if (G.dirty) {
-    G.dirty = false; let n = 0; const MA = m.instanceMatrix.array, CA = m.instanceColor.array;
+  if (G.dirty && (!G.queue?.length || time - (G.dT || 0) > 0.12)) {
+    G.dT = time; G.dirty = false; let n = 0; const MA = m.instanceMatrix.array, CA = m.instanceColor.array;
     for (const t of G.tiles.values()) { const cap = XR.on ? 9000 : G.max; if (n >= cap) break; const k = Math.min(t.n, cap - n); if (!k) continue; MA.set(t.M.subarray(0, k * 16), n * 16); CA.set(t.C.subarray(0, k * 3), n * 3); n += k; }
     m.count = n; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true;
     const F = FLOWERS.mesh, FMA = F.instanceMatrix.array, FCA = F.instanceColor.array, fcap = XR.on ? 2000 : FLOWERS.max; let fnn = 0;
@@ -11576,7 +11760,7 @@ function modelCloud(obj, N, out, world) {
 const _sq = new THREE.Quaternion(), _se = new THREE.Euler(), _so = new THREE.Vector3();
 function shiftFrame() {
   const p = player;
-  if (p.form === 'phoenix') _sq.setFromEuler(_se.set(-p.pitch * 0.8, p.yaw, p.bank, 'YXZ')); else _sq.setFromAxisAngle(UP, human.group.rotation.y);
+  if (p.form === 'phoenix') _sq.setFromEuler(_se.set(p.pitch * 0.8, p.yaw, p.bank, 'YXZ')); else _sq.setFromAxisAngle(UP, human.group.rotation.y);
   _so.copy(p.form === 'phoenix' ? p.pos : human.group.position);
   return _sq;
 }
@@ -11990,7 +12174,7 @@ function tearTree(g, ck, i, t, cutY, fx, fz, sp) {
   for (let v = t.v0; v < t.v1; v++) { if (A[v * 3 + 1] <= cutY) continue; if (n++ % 9 === 0) cols.push([A[v * 3], A[v * 3 + 1], A[v * 3 + 2], C[v * 3], C[v * 3 + 1], C[v * 3 + 2]]);
     A[v * 3] = t.x + (A[v * 3] - t.x) * 0.12; A[v * 3 + 1] = cutY + Math.random() * 0.5; A[v * 3 + 2] = t.z + (A[v * 3 + 2] - t.z) * 0.12; }
   if (!n) return false;
-  Pa.needsUpdate = true; t.torn = true;
+  Pa.addUpdateRange(t.v0 * 3, (t.v1 - t.v0) * 3); Pa.needsUpdate = true; t.torn = true;
   const sol = g.userData.solids; const sy = []; if (sol) for (let k = t.s0; k < t.s1; k++) { const q = sol[k]; if (!q) continue; sy.push([k, q.y1]); if (q.y1 > cutY) q.y1 = q.soft ? -1e9 : cutY; }
   TEAR.list.push({ g, ck, i, t, keep, sy, at: time });
   { const f = BLAZE.list.find(f => f.k === ck + ':' + i); if (f && f.g === g && f.P) f.P.set(A.subarray(t.v0 * 3, t.v1 * 3)); }   // (if it is burning, it burns as what is left of it)
@@ -12018,7 +12202,7 @@ function updateTear(dt) {
   for (let n = TEAR.list.length - 1; n >= 0; n--) { const T = TEAR.list[n], live = chunks.get(T.ck) === T.g && T.g.userData.trees?.[T.i] === T.t;
     if (!live) { TEAR.list.splice(n, 1); continue; }
     if (time - T.at < 150 || (T.t.x - p.pos.x) ** 2 + (T.t.z - p.pos.z) ** 2 < 260 * 260 || BLAZE.key.has(T.ck + ':' + T.i)) continue;
-    const Pa = T.g.userData.deco.geometry.attributes.position; Pa.array.set(T.keep, T.t.v0 * 3); Pa.needsUpdate = true; const sol = T.g.userData.solids; if (sol) for (const [k, y1] of T.sy) if (sol[k]) sol[k].y1 = y1;
+    const Pa = T.g.userData.deco.geometry.attributes.position; Pa.array.set(T.keep, T.t.v0 * 3); Pa.addUpdateRange(T.t.v0 * 3, T.keep.length); Pa.needsUpdate = true; const sol = T.g.userData.solids; if (sol) for (const [k, y1] of T.sy) if (sol[k]) sol[k].y1 = y1;
     T.t.torn = false; TEAR.list.splice(n, 1); }
 }
 function updateStone(dt) {
@@ -12466,81 +12650,277 @@ const col3 = hex => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
 // course counts the moment he takes it, and still counts if the world has not heard yet)
 const HELD = { t: -9, n: {} };
 const heldBy = id => { if (time - HELD.t > 1) { HELD.t = time; HELD.n = {}; for (const [k, c] of ARENA.claims) if (!k.startsWith('torch') && c.pats) for (const g of c.pats) HELD.n[g] = (HELD.n[g] || 0) + 1; } return Math.max(ARENA.held?.[id] || 0, HELD.n[id] || 0); };
-// ── The torches. Round the thrones, a little way out, eight torches hang in the air: a pole of cane, a bowl, a flame.
-//    Each burns in the colour of the god of whoever lit it last, and goes on burning that colour for everyone, until
-//    someone who flies for another god comes and lights it for theirs. A newcomer's first act on the mountain can be to
-//    take one. (Kept by the world the way a course of rings is kept: who holds it, and for whom.)
-const TORCH = { list: [], built: false, n: 8 };
-const torchCol = T => { const cl = ARENA.claims.get(T.id), g = cl && cl.pats && cl.pats[0]; return PATRONS[g] ? g : ''; };
+// ── The torches. Over the cairns that mark the way to the edge, and on out into the air past it along the line of the
+//    first flight, torches hang on nothing. Each new flier, the first time they fly, lights them one by one as they go
+//    past — in the colour of their god's fire — and that is the colour they burn in for everyone, until the next one who
+//    has never flown comes up the mountain and flies them in theirs. (Kept by the world as one entry: whose they are.)
+const TORCH = { list: [], built: false, lighting: false, t0: 0, lit: 0, posted: false, ripple: 0 };
+const torchHouse = () => { const cl = ARENA.claims.get('torches'), g = cl && cl.pats && cl.pats[0]; return PATRONS[g] ? g : ''; };
 function torchBuild() {
-  TORCH.built = true; const cx = MOUNT.x, cz = MOUNT.z + 6, cane = new THREE.MeshLambertMaterial({ color: 0x8a6a3c }), bowlM = new THREE.MeshLambertMaterial({ color: 0x3a2c22 });
-  for (let i = 0; i < TORCH.n; i++) { const a = (i + 0.5) / TORCH.n * 6.2832 + 0.2, x = cx + Math.sin(a) * 28.5, z = cz + Math.cos(a) * 28.5, y = groundAt(x, z), g = new THREE.Group();
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.075, 2.3, 6), cane); pole.position.y = 1.15; const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.12, 0.34, 8), bowlM); bowl.position.y = 2.42;
-    const wrap = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.3, 6), bowlM); wrap.position.y = 1.5;
-    const fm = new THREE.MeshBasicMaterial({ color: 0x555555 }), flame = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.8, 7), fm); flame.position.y = 2.95;
-    g.add(pole, bowl, wrap, flame); g.scale.setScalar(1.55); g.position.set(x, y + 0.9, z); PANTHEON.group.add(g);
-    TORCH.list.push({ i, id: 'torch' + i, x, y, z, g, flame, fm, was: null, ph: i * 1.7, flare: 0 }); }
+  TORCH.built = true; const bowlM = new THREE.MeshLambertMaterial({ color: 0x3a2c22 }), cane = new THREE.MeshLambertMaterial({ color: 0x8a6a3c });
+  const nx = EDGE.x - START.x, nz = EDGE.z - START.z, L = Math.hypot(nx, nz), ux = nx / L, uz = nz / L, add = (x, y, z, big) => {
+    const g = new THREE.Group(), k = big ? 2.1 : 1;
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.12, 0.36, 9), bowlM); g.add(bowl);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.02, 0.9, 6), cane); stem.position.y = -0.6; g.add(stem);
+    const fm = new THREE.MeshBasicMaterial({ color: 0x555555, toneMapped: false }), flame = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.85, 7), fm); flame.position.y = 0.6; g.add(flame);
+    const gm = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }), glow = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8), gm); glow.position.y = 0.62; g.add(glow);
+    g.scale.setScalar(k * 1.35); g.position.set(x, y, z); scene.add(g);
+    TORCH.list.push({ i: TORCH.list.length, x, y, z, g, flame, fm, gm, k, col: '', ph: TORCH.list.length * 1.7, flare: 0, R: big ? 26 : 4.5 });
+  };
+  for (const i of [1, 3, 5]) for (const s of [-1, 1]) {   // over the cairns, either side of the way
+    const t = (i + 0.5) / 6, d = 5 + t * (L - 6), w = 3.4 - t * 0.7, x = START.x + ux * d - uz * s * w, z = START.z + uz * d + ux * s * w, h = 0.45 + t * 0.8;
+    add(x, groundAt(x, z) + h * 1.25 + 2.2, z, false);
+  }
+  for (let i = 0; i < 10; i++) {   // and out over the drop, along the line he will fly, falling away with him
+    const d = 34 + i * 46, sd = (i % 2 ? 1 : -1) * (13 + i * 0.6), x = EDGE.x + ux * d - uz * sd, z = EDGE.z + uz * d + ux * sd;
+    add(x, SUMMIT + 4 - i * 15 - i * i * 0.6, z, true);
+  }
+  const h0 = torchHouse(); for (const T of TORCH.list) T.col = h0;
 }
-function torchNear(P, r = 3.4) { for (const T of TORCH.list) if ((P.x - T.x) ** 2 + (P.z - T.z) ** 2 < r * r && Math.abs(P.y - T.y) < 6) return T; return null; }
-function torchLight(T) {
-  if (!PATRON.id) { toast('CHOOSE YOUR GOD FIRST — THE FLAME TAKES THEIR COLOUR'); showPatron(); return; }
-  const pats = [PATRON.id], names = [heroName], cl = { pats, names, at: Date.now() };
-  ARENA.claims.set(T.id, cl); arenaSave(); T.flare = 1; questEvent.torch = true;
-  if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'arena', payload: { i: NET.id, k: 'claim', id: T.id, pats, names } });
-  worldPost({ op: 'arena', id: T.id, cx: Math.round(T.x), cz: Math.round(T.z), pats, names, len: 0 });
-  const c = pcol(PATRON.id), hot = c.map(v => v * 2);
-  for (let i = 0; i < 90; i++) emit(T.x + rnd(0.3), T.y + 5.2 + Math.random(), T.z + rnd(0.3), rnd(4), 2 + Math.random() * 7, rnd(4), 0.6 + Math.random() * 0.7, i % 3 ? hot : c, 2.5, 0.6);
-  shock(T.x, T.y + 5.2, T.z, new THREE.Color(PATRONS[PATRON.id][0]).getHex(), 12, 0.7, true); audio.at3?.(T.x, T.y + 4, T.z, () => { audio.sfx.whoomph?.(); audio.sfx.ignite?.(); }, { vol: 1.2, ref: 14, max: 500 }); flash = Math.max(flash, 0.12);
-  toast(`IT BURNS FOR ${(godById[PATRON.id]?.name || PATRON.id).toUpperCase()} NOW · UNTIL SOMEONE LIGHTS IT FOR ANOTHER`); witness(`lit one of the torches on the summit for ${godById[PATRON.id]?.name || PATRON.id}`, true);
-}
-function updateTorches(dt) {
-  if (!TORCH.built) { if (PANTHEON.group && PANTHEON.seats.length) torchBuild(); return; }
-  const c = camera.position, near = (c.x - MOUNT.x) ** 2 + (c.z - MOUNT.z) ** 2 < 420 * 420;
-  for (const T of TORCH.list) {
-    T.g.position.y = T.y + 0.9 + Math.sin(time * 1.1 + T.ph) * 0.22; T.g.rotation.y = Math.sin(time * 0.5 + T.ph) * 0.4; T.g.rotation.z = Math.sin(time * 0.8 + T.ph * 2) * 0.05;
-    const g = torchCol(T); if (g !== T.was) { if (T.was !== null && g) T.flare = 1; T.was = g; }
-    T.flare = Math.max(0, T.flare - dt * 0.8);
-    const k = 0.85 + 0.25 * Math.sin(time * 11 + T.ph) * Math.sin(time * 7.3 + T.i) + T.flare * 1.6;
-    if (g) T.fm.color.set(PATRONS[g][0]).multiplyScalar(1.5 * k); else T.fm.color.setRGB(0.25, 0.24, 0.26);
-    T.flame.scale.set(0.9 + T.flare, (g ? 1 : 0.35) * (0.9 + 0.25 * Math.sin(time * 9 + T.ph)) + T.flare, 0.9 + T.flare);
-    if (near && g && Math.random() < 0.55) { const cc = pcol(g); emit(T.x + rnd(0.2), T.g.position.y + 4.3, T.z + rnd(0.2), rnd(0.4), 1.8 + Math.random() * 2.6, rnd(0.4), 0.5 + Math.random() * 0.55, Math.random() < 0.5 ? cc.map(v => v * 1.9) : cc, 3.4, 0.55); }
-    else if (near && !g && Math.random() < 0.05) emit(T.x, T.g.position.y + 4.1, T.z, rnd(0.1), 0.6, rnd(0.1), 1.2, [0.4, 0.4, 0.42], 1, 0.4);
+// his first flight: from the moment he is sent to the edge until he has flown on past the last of them
+function torchStart() { if (!TORCH.built || TORCH.spent) return; if (!TORCH.lighting) { TORCH.lighting = true; TORCH.lit = 0; TORCH.posted = false; } TORCH.t0 = time; }   // (again at the leap: the clock runs from there)
+function torchLight(T, house) {
+  T.col = house; T.flare = 1;
+  const c = pcol(house), hot = c.map(v => v * 2);
+  if ((T.x - camera.position.x) ** 2 + (T.z - camera.position.z) ** 2 < 900 * 900) {
+    for (let i = 0; i < 60; i++) emit(T.x + rnd(0.4 * T.k), T.y + 0.9 * T.k + Math.random(), T.z + rnd(0.4 * T.k), rnd(4 * T.k), 2 + Math.random() * 7, rnd(4 * T.k), 0.5 + Math.random() * 0.6, i % 3 ? hot : c, 2.5, 0.6 * T.k);
+    shock(T.x, T.y + 0.8 * T.k, T.z, new THREE.Color(PATRONS[house][0]).getHex(), 7 * T.k, 0.6, true);
+    audio.at3?.(T.x, T.y, T.z, () => { audio.sfx.whoomph?.(); }, { vol: 1.1, ref: 12 * T.k, max: 900 });
   }
 }
-const SHR = { mesh: null, n: 0, told: '' };
+function updateTorches(dt) {
+  if (!TORCH.built) { if (chunks.size) torchBuild(); return; }
+  const p = player, P = p.pos, c = camera.position, near = (c.x - EDGE.x) ** 2 + (c.z - EDGE.z) ** 2 < 900 * 900;
+  // the new flier lights them as he passes: from the cairns on the way to the edge, then out into the air
+  if (!TORCH.lighting && !TORCH.spent && !flags.morphed && PATRON.id && state === 'play' && (P.x - EDGE.x) ** 2 + (P.z - EDGE.z) ** 2 < 60 * 60) torchStart();
+  if (TORCH.lighting) {
+    const house = PATRON.id;
+    if (flags.morphed && (!house || time - TORCH.t0 > 150 || (p.grounded && p.form === 'human' && time - TORCH.t0 > 20))) { TORCH.lighting = false; TORCH.spent = true; }
+    else if (!house) {}
+    else for (const T of TORCH.list) { if (T.mine) continue; const r = T.R * (p.form === 'phoenix' ? 1 : 0.8);
+      if ((P.x - T.x) ** 2 + (P.z - T.z) ** 2 < r * r && Math.abs(P.y - T.y) < r * 1.2 + 6) { T.mine = true; torchLight(T, house); TORCH.lit++; questEvent.torch = true;
+        if (!TORCH.posted) { TORCH.posted = true; const pats = [house], names = [heroName]; ARENA.claims.set('torches', { pats, names, at: Date.now() }); arenaSave();
+          if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'arena', payload: { i: NET.id, k: 'claim', id: 'torches', pats, names } });
+          worldPost({ op: 'arena', id: 'torches', cx: Math.round(EDGE.x), cz: Math.round(EDGE.z), pats, names, len: 0 });
+          toast(`THE TORCHES TAKE ${(godById[house]?.name || house).toUpperCase()}'S FIRE FROM YOU`); witness(`lit the torches off the summit in ${godById[house]?.name || house}'s colour, on his first flight`, true); }
+        if (TORCH.lit === TORCH.list.length) { TORCH.lighting = false; TORCH.spent = true; toast('EVERY TORCH BURNS IN YOUR COLOUR · UNTIL THE NEXT ONE FLIES'); } } }
+  }
+  // someone else's colour, arriving: they take it one after another, down the line
+  { const h = torchHouse(); if (h && !TORCH.lighting && TORCH.list.some(T => T.col !== h)) { TORCH.ripple += dt; for (const T of TORCH.list) if (T.col !== h && TORCH.ripple > T.i * 0.22) { T.col = h; T.flare = 1; } } else TORCH.ripple = 0; }
+  for (const T of TORCH.list) {
+    T.g.position.y = T.y + Math.sin(time * 1.1 + T.ph) * 0.22 * T.k; T.g.rotation.z = Math.sin(time * 0.8 + T.ph * 2) * 0.06; T.g.rotation.x = Math.sin(time * 0.6 + T.ph) * 0.05;
+    T.flare = Math.max(0, T.flare - dt * 0.7);
+    const g = T.col, k = 0.85 + 0.25 * Math.sin(time * 11 + T.ph) * Math.sin(time * 7.3 + T.i) + T.flare * 1.6;
+    if (g) { T.fm.color.copy(_tcol(g)).multiplyScalar(1.5 * k); T.gm.color.copy(_tcol(g)).multiplyScalar(0.16 + 0.3 * T.flare); } else { T.fm.color.setRGB(0.22, 0.21, 0.23); T.gm.color.setRGB(0, 0, 0); }
+    T.flame.scale.set(0.9 + T.flare, (g ? 1 : 0.3) * (0.9 + 0.25 * Math.sin(time * 9 + T.ph)) + T.flare, 0.9 + T.flare);
+    if (!near) continue;
+    if (g && Math.random() < 0.5) { const cc = pcol(g); emit(T.x + rnd(0.15 * T.k), T.g.position.y + 1.15 * T.k, T.z + rnd(0.15 * T.k), rnd(0.35), 1.6 + Math.random() * 2.4, rnd(0.35), 0.5 + Math.random() * 0.5, Math.random() < 0.5 ? cc.map(v => v * 1.9) : cc, 3, 0.55 * T.k); }
+    else if (!g && Math.random() < 0.05) emit(T.x, T.g.position.y + 1.0 * T.k, T.z, rnd(0.1), 0.6, rnd(0.1), 1.2, [0.4, 0.4, 0.42], 1, 0.4);
+  }
+}
+const _TC = {}, _tcol = g => _TC[g] ||= new THREE.Color(PATRONS[g][0]);
+// ── Round Olympus, out of the sea of cloud below the summit, stand the spires: needles of rock a few hundred metres high,
+//    each with a name and a flat top to come down on, grass and a pine or two up there in the wind. Three are hollow near
+//    the top — a grotto you can walk or fly into, its walls grown with crystal that burns in a god's colour. Two pour a
+//    river off their tops down into the cloud. Steam comes up out of vents on some of them, and while it blows it carries
+//    a bird up with it. And on the line of the first flight, among the torches, a gate of stone hangs in the air.
+const CRAGS = { built: false, list: [], vents: [], gate: null, group: new THREE.Group(), glowM: null, toldVent: 0, inCave: '' };
+const CRAG_SET = [   // (where round the mountain: φ from north, π is the way of the first flight; how far out; how high above the cloud)
+  { f: Math.PI - 0.5, r: 560, h: 330, R: 30, name: 'THE NEEDLE OF AEOLUS', cave: 'THE GROTTO OF THE NYMPHS', vent: 1, god: 'artemis' },
+  { f: Math.PI + 0.55, r: 640, h: 430, R: 34, name: 'THE HORN OF ZEPHYRUS', fall: 1 },
+  { f: Math.PI - 1.1, r: 720, h: 250, R: 27, name: "BOREAS'S TOOTH", vent: 1 },
+  { f: Math.PI + 1.2, r: 560, h: 520, R: 36, name: "THE EAGLE'S ROCK", cave: 'THE CAVE OF ECHO', god: 'apollo' },
+  { f: Math.PI - 1.85, r: 610, h: 380, R: 32, name: 'THE TOWER OF NOTUS', fall: 1 },
+  { f: Math.PI + 1.95, r: 760, h: 300, R: 29, name: 'THE SPINDLE OF THE FATES', cave: 'THE HOLLOW OF PAN', vent: 1, god: 'dionysus' },
+  { f: -0.6, r: 650, h: 450, R: 34, name: "THE CROW'S ROCK" },
+  { f: 0.7, r: 590, h: 350, R: 30, name: 'THE ANVIL', vent: 1 },
+  { f: 0.05, r: 880, h: 230, R: 26, name: "THE SHEPHERD'S CRAG" },
+];
+function cragsBuild() {
+  CRAGS.built = true; scene.add(CRAGS.group);
+  const acc = newAcc(), gacc = newAcc(), rk = new THREE.IcosahedronGeometry(1, 0).toNonIndexed(), step = tierIdx === 0 ? 20 : 14, cap = new THREE.IcosahedronGeometry(1, 0).toNonIndexed(), xtal = new THREE.OctahedronGeometry(1, 0).toNonIndexed();
+  const S = CRAGS, hsh = (i, k) => { const v = Math.sin(i * 91.3 + k * 47.1) * 43758.5453; return v - Math.floor(v); };
+  const stone = (y, i) => { const b = 0.42 + 0.06 * Math.sin(y * 0.11 + i) + 0.04 * Math.sin(y * 0.37); return [b * 1.08, b * 0.98, b * 0.86]; };   // (bands in the rock: it was laid down, once)
+  CRAG_SET.forEach((D, i) => {
+    const x = MOUNT.x + Math.sin(D.f) * D.r, z = MOUNT.z + Math.cos(D.f) * D.r, g0 = terrainAt(x, z) - 20, top = CLOUD_SEA + D.h, R0 = D.R, Rt = R0 * 0.62, H = top - g0;
+    const C = { i, x, z, top, R0, Rt, name: D.name, D, cave: null };
+    const Rat = y => lerp(R0, Rt, Math.pow(clamp((y - g0) / H, 0, 1), 0.7)) * (1 + 0.06 * Math.sin(y * 0.05 + i));
+    const cy0 = D.cave ? top - 46 : Infinity, cy1 = cy0 + 17, mouth = D.f;   // (the grotto: from its floor to its roof; it opens away from the mountain)
+    // the column: under the cloud, where hardly anyone sees it, one plain tapering pillar; above it, drums of rock, each a
+    //    ring of great blocks, rough and leaning a little, banded
+    const yc = Math.max(g0, CLOUD_SEA - 70);
+    if (yc > g0 + 5) { const col = new THREE.CylinderGeometry(Rat(yc) * 0.95, R0 * 1.12, yc - g0 + 6, 10, 1, true).toNonIndexed(); _mat.compose(_p.set(x, (g0 + yc) / 2, z), _q.setFromAxisAngle(UP, i), _s.set(1, 1, 1)); addGeo(acc, col, _mat, stone(g0, i)); }
+    for (const [ya, yb] of D.cave ? [[yc, cy0], [cy1, top]] : [[yc, top]]) { const core = new THREE.CylinderGeometry(Rat(yb) * 0.85, Rat(ya) * 0.85, yb - ya, 9, 1, true).toNonIndexed(); _mat.compose(_p.set(x, (ya + yb) / 2, z), _q.setFromAxisAngle(UP, i * 2), _s.set(1, 1, 1)); addGeo(acc, core, _mat, stone(ya, i + 1)); }   // (the heart of it: not where the grotto is)
+    for (let y = yc; y < top - 3; y += step) {
+      const r = Rat(y), n = Math.max(6, Math.round(r * 0.26)), inCave = y > cy0 - 2 && y < cy1;
+      for (let k = 0; k < n; k++) { const a = k / n * 6.283 + hsh(i, y + k) * 0.5, off = wrapAngle(a - mouth);
+        if (inCave && Math.abs(off) < 0.55) continue;   // (the mouth)
+        const rr = inCave ? r : r * (0.8 + hsh(k, y) * 0.1), sz = 6 + hsh(y, k) * 5;
+        part(acc, rk, x + Math.sin(a) * rr, y + step * 0.5, z + Math.cos(a) * rr, sz * 1.2, step * 0.62 + sz * 0.3, sz, stone(y, i), a, hsh(k, i) * 0.6, hsh(i, k) * 0.5); }
+    }
+    // the top: a cap of rock, grass on it, a pine or two
+    part(acc, cap, x, top - 2.5, z, Rt * 1.08, 4, Rt * 1.08, stone(top, i)); part(acc, cap, x, top - 0.3, z, Rt * 0.98, 1.2, Rt * 0.98, [0.32, 0.46, 0.2]);
+    for (let k = 0; k < 2 + (i % 3); k++) { const a = hsh(i, k + 9) * 6.283, rr = Rt * (0.3 + hsh(k, i + 3) * 0.45), px = x + Math.sin(a) * rr, pz = z + Math.cos(a) * rr, sc = 1.2 + hsh(k, i) * 0.9;
+      part(acc, G.trunk, px, top, pz, sc, sc, sc, [0.3, 0.22, 0.14]); part(acc, G.pine, px, top, pz, sc, sc, sc, [0.12, 0.3, 0.16]); part(acc, G.pine2, px, top, pz, sc, sc, sc, [0.14, 0.34, 0.18]); }
+    C.isle = lookout(D.name, x, top + 0.6, z, Rt * 0.9, 'over');
+    // what stops a bird or a man: the column in four drums, narrowing
+    for (let k = 0; k < 4; k++) { const ya = g0 + H * k / 4, yb = g0 + H * (k + 1) / 4, r = Rat((ya + yb) / 2) * 0.86;
+      if (D.cave && yb > cy0 && ya < cy1) { if (ya < cy0) ROCKS.cyls.push({ x, z, r, y0: ya, y1: cy0, what: D.name.toLowerCase(), S }); if (yb > cy1) ROCKS.cyls.push({ x, z, r, y0: cy1, y1: yb, what: D.name.toLowerCase(), S }); }
+      else ROCKS.cyls.push({ x, z, r, y0: ya, y1: k === 3 ? top : yb, what: D.name.toLowerCase(), S }); }
+    if (D.cave) {   // the grotto: its walls are stones standing in a ring, open at the mouth; its floor; its roof; and crystal
+      const r = Rat(cy0), inner = r - 7;
+      for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283; if (Math.abs(wrapAngle(a - mouth)) < 0.6) continue; ROCKS.cyls.push({ x: x + Math.sin(a) * (r - 2), z: z + Math.cos(a) * (r - 2), r: 5, y0: cy0, y1: cy1, what: D.cave.toLowerCase(), S }); }
+      ROCKS.floors.push({ x, z, c: 1, s: 0, hw: inner * 0.72, hd: inner * 0.72, top: cy0, S });
+      part(acc, cap, x, cy0 - 1.5, z, inner, 2, inner, [0.22, 0.2, 0.2]);   // (the floor, dark)
+      part(acc, cap, x, cy1 + 1.5, z, r * 0.95, 3, r * 0.95, [0.16, 0.15, 0.15]);   // (the roof, darker)
+      { const lin = new THREE.CylinderGeometry(inner + 1, inner + 1, cy1 - cy0, 14, 1, true, mouth + 0.6 + Math.PI / 2, 6.283 - 1.2).toNonIndexed(); lin.scale(-1, 1, 1);   // (inside it is dark: the stone seen from within)
+        _mat.compose(_p.set(x, (cy0 + cy1) / 2, z), _q.identity(), _s.set(1, 1, 1)); addGeo(acc, lin, _mat, [0.1, 0.09, 0.1]); }
+      const gc = new THREE.Color(PATRONS[D.god]?.[0] || '#9fe8ff'), gl = [gc.r * 1.8, gc.g * 1.8, gc.b * 1.8];
+      for (let k = 0; k < 26; k++) { const a = mouth + Math.PI + (hsh(k, i) - 0.5) * 4.6, rr = inner * (0.55 + hsh(i, k) * 0.4), up = hsh(k + 3, i) < 0.35, h = 2 + hsh(k, k) * 5;
+        part(gacc, xtal, x + Math.sin(a) * rr, up ? cy1 - h * 0.6 : cy0 + h * 0.5, z + Math.cos(a) * rr, 0.6 + hsh(k, 2) * 0.9, h, 0.6 + hsh(2, k) * 0.9, gl.map(v => v * (0.6 + hsh(k, 7) * 0.5)), a, (hsh(k, 5) - 0.5) * 0.7, (hsh(5, k) - 0.5) * 0.7); }
+      C.cave = { name: D.cave, x, z, y: cy0, r: inner, col: gl, isle: lookout(D.cave, x, cy0, z, inner * 0.7, 'over'), ax: x + Math.sin(mouth) * (r + 4), az: z + Math.cos(mouth) * (r + 4) };
+    }
+    if (D.fall) {   // a river off the top, out over a lip of rock, down into the cloud
+      const a = D.f + 0.3, lip = R0 + 4, fx = x + Math.sin(a) * lip, fz = z + Math.cos(a) * lip, len = top - CLOUD_SEA + 30;
+      for (let k = 0; k < 4; k++) { const t = k / 3, rr = lerp(Rt * 0.7, lip, t); part(acc, rk, x + Math.sin(a) * rr, top - 2 - t * 3, z + Math.cos(a) * rr, 7, 3.5, 6, stone(top, i), a); }
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(12, len), waterfallMat); m.position.set(fx, top - 3 - len / 2, fz); m.rotation.y = a + Math.PI / 2; m.renderOrder = 2;
+      m.userData.lip = new THREE.Vector3(fx, top - 3, fz); m.userData.foot = new THREE.Vector3(fx, top - 3 - len, fz); CRAGS.group.add(m); waterfalls.add(m); C.fall = m;
+    }
+    if (D.vent) { const a = D.f + 2.2, vx = x + Math.sin(a) * Rt * 0.45, vz = z + Math.cos(a) * Rt * 0.45;
+      for (let k = 0; k < 7; k++) { const b = k / 7 * 6.283; part(acc, rk, vx + Math.sin(b) * 3.2, top + 0.4, vz + Math.cos(b) * 3.2, 1.6, 1.1, 1.6, [0.3, 0.27, 0.25], b); }
+      CRAGS.vents.push({ x: vx, y: top + 0.8, z: vz, P: 16 + i * 1.7, ph: i * 3.1, on: 0, was: 0 }); }
+    S.list.push(C);
+  });
+  // two vents more, on the shoulders of the mountain itself where they stand up out of the cloud
+  for (const f of [Math.PI + 0.35, Math.PI - 0.3, 0.9, -1.4]) { if (CRAGS.vents.length >= 6) break; let best = null;
+    for (let r = 300; r <= 420; r += 20) { const x = MOUNT.x + Math.sin(f) * r, z = MOUNT.z + Math.cos(f) * r, g = terrainAt(x, z); if (g > CLOUD_SEA + 30 && (!best || r > best.r)) best = { x, z, g, r }; }
+    if (best) { for (let k = 0; k < 7; k++) { const b = k / 7 * 6.283; part(acc, rk, best.x + Math.sin(b) * 3.2, best.g + 0.2, best.z + Math.cos(b) * 3.2, 1.6, 1.1, 1.6, [0.3, 0.27, 0.25], b); }
+      CRAGS.vents.push({ x: best.x, y: best.g + 0.6, z: best.z, P: 19, ph: f * 7, on: 0, was: 0 }); } }
+  // the gate: a broken ring of stone hanging in the air across the way of the first flight, among the torches
+  { const nx = EDGE.x - START.x, nz = EDGE.z - START.z, L = Math.hypot(nx, nz), ux = nx / L, uz = nz / L, d = 34 + 4.5 * 46, gx = EDGE.x + ux * d, gz = EDGE.z + uz * d, gy = SUMMIT + 4 - 4.5 * 15 - 20 * 0.6 - 4, RR = 38;
+    const gate = CRAGS.gate = { x: gx, y: gy, z: gz, R: RR, th: Math.atan2(ux, uz) };
+    for (let k = 0; k < 30; k++) { const a = k / 30 * 6.283; if (k === 7 || k === 8 || k === 22) continue;   // (broken in places)
+      const lx = Math.cos(a) * RR, ly = Math.sin(a) * RR, wx = gx + lx * uz, wz = gz - lx * ux, wy = gy + ly;
+      part(acc, rk, wx, wy, wz, 5.2 + hsh(k, 1) * 2, 4.6 + hsh(1, k) * 2, 6 + hsh(k, 3) * 2, stone(wy, k), a, hsh(k, 4), hsh(4, k));
+      ROCKS.cyls.push({ x: wx, z: wz, r: 4.6, y0: wy - 4.5, y1: wy + 4.5, what: 'the gate in the air', S }); }
+    for (let k = 0; k < 5; k++) driftAdd(gx + rnd(30), gy + rnd(30), gz + rnd(30), 1.5 + Math.random() * 2, [0.5, 0.46, 0.4]);   // (and pieces of it, loose)
+  }
+  ROCKS.mat ||= new THREE.MeshLambertMaterial({ vertexColors: true });
+  const m = new THREE.Mesh(accToGeo(acc), ROCKS.mat); m.castShadow = m.receiveShadow = true; CRAGS.group.add(m);
+  CRAGS.glowM = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+  const gm = new THREE.Mesh(accToGeo(gacc), CRAGS.glowM); CRAGS.group.add(gm);
+}
+function updateCrags(dt) {
+  if (!CRAGS.built) { if (chunks.size && realm === 'over') cragsBuild(); return; }
+  const over = realm === 'over'; CRAGS.group.visible = over; if (!over) return;
+  const p = player, P = p.pos, c = camera.position, near = (c.x - MOUNT.x) ** 2 + (c.z - MOUNT.z) ** 2 < 2600 * 2600, fly = state === 'play' && (p.form === 'phoenix' && !p.perch || p.wings && !p.grounded);
+  if (!near) return;
+  CRAGS.glowM.color.setScalar(0.85 + 0.15 * Math.sin(time * 1.3));   // (the crystal breathes)
+  // the vents: they gather, they blow, they rest
+  for (const V of CRAGS.vents) {
+    const t = ((time + V.ph) % V.P), build = t > V.P - 3.5, blow = t < 6.5, d2 = (c.x - V.x) ** 2 + (c.z - V.z) ** 2;
+    V.on = lerp(V.on, blow ? 1 : 0, damp(blow ? 3 : 1.2, dt));
+    if (blow && !V.was && d2 < 700 * 700) audio.at3?.(V.x, V.y, V.z, () => { audio.sfx.hiss?.(1.4); audio.sfx.whoomph?.(); }, { vol: 1.3, ref: 30, max: 700 });
+    V.was = blow;
+    if (d2 < 1500 * 1500) {
+      if (build && Math.random() < 0.25) emit(V.x + rnd(2), V.y, V.z + rnd(2), rnd(0.6), 1 + Math.random() * 2, rnd(0.6), 1 + Math.random(), [0.82, 0.84, 0.88], 2, 1 + Math.random());
+      if (V.on > 0.05) for (let k = 0, n = Math.round(V.on * 4); k < n; k++) emit(V.x + rnd(2.5), V.y + Math.random() * 3, V.z + rnd(2.5), rnd(3), 26 + Math.random() * 22 * V.on, rnd(3), 2.2 + Math.random() * 1.6, [0.86, 0.88, 0.92], 3, 3 + Math.random() * 4);
+    }
+    // a bird (or a man on wax wings) in the column goes up with it
+    if (fly && V.on > 0.2) { const hx = P.x - V.x, hz = P.z - V.z, up = P.y - V.y;
+      if (hx * hx + hz * hz < 14 * 14 && up > -4 && up < 140) { p.vy += 70 * V.on * dt * (1 - up / 160); if (p.form === 'phoenix') p.speed = Math.max(p.speed, 30); p.flame = Math.min(1, p.flame + dt * 0.2);
+        if (time - CRAGS.toldVent > 25) { CRAGS.toldVent = time; toast('THE STEAM CARRIES YOU UP'); } } }
+  }
+  // the falls throw mist where they go into the cloud
+  for (const C of CRAGS.list) if (C.fall && Math.random() < 0.3) { const F = C.fall.userData.foot; if ((c.x - F.x) ** 2 + (c.z - F.z) ** 2 < 1200 * 1200) emit(F.x + rnd(8), CLOUD_SEA + 10 + Math.random() * 10, F.z + rnd(8), rnd(4), 2 + Math.random() * 3, rnd(4), 3 + Math.random() * 2, MIST, 1, 6 + Math.random() * 5); }
+  // inside a grotto: its name, once; the crystal glitters; sound comes back off the walls
+  let inside = '';
+  for (const C of CRAGS.list) { const K = C.cave; if (!K) continue; const dx = P.x - K.x, dz = P.z - K.z, dy = P.y - K.y;
+    if (dx * dx + dz * dz < (K.r + 2) ** 2 && dy > -2 && dy < 18) inside = K.name;
+    if ((c.x - K.x) ** 2 + (c.z - K.z) ** 2 < 220 * 220 && Math.random() < 0.35) { const a = Math.random() * 6.283, rr = K.r * (0.5 + Math.random() * 0.45); emit(K.x + Math.sin(a) * rr, K.y + 1 + Math.random() * 14, K.z + Math.cos(a) * rr, 0, 0.3, 0, 0.6 + Math.random() * 0.6, K.col, 0, 0.5); } }
+  if (inside !== CRAGS.inCave) { CRAGS.inCave = inside; if (inside && state === 'play') { toast(inside); audio.setEcho?.(1); witness(`went into ${inside.toLowerCase()}, inside one of the spires round Olympus`, true); } else audio.setEcho?.(0); }
+}
+
+// ── Houses. He can fly for one god, or for two: ask a god to take him into their house and, if they will, he wears their
+//    colour; the god he flew for before stays his second house. Whatever he wins, he wins for both: the rings he claims burn
+//    half in one colour and half in the other, and they are counted on Olympus for both houses — split rings, half and half.
+PATRON.also = (() => { try { const v = localStorage.getItem('icarus.also'); return PATRONS[v] && v !== PATRON.id ? v : ''; } catch { return ''; } })();
+const myHouses = () => [PATRON.id, PATRON.also].filter((v, i, a) => v && PATRONS[v] && a.indexOf(v) === i);
+function houseSave() { try { localStorage.setItem('icarus.also', PATRON.also || ''); } catch {} }
+function houseJoin(id) {
+  if (!PATRONS[id]) return false; const nm = g => (godById[g]?.name || g).toUpperCase();
+  if (!PATRON.id) { setPatron(id); return true; }
+  if (PATRON.id === id) { toast(`YOU ALREADY FLY FOR ${nm(id)}`); return false; }
+  const was = PATRON.id; setPatron(id); PATRON.also = was; houseSave();
+  toast(`YOU FLY FOR ${nm(id)} NOW · AND STILL FOR ${nm(was)}`); witness(`swore himself to ${godById[id]?.name || id} as well, and flies for two houses now: ${godById[id]?.name || id} and ${godById[was]?.name || was}`, true);
+  titleCard(nm(id), `and ${nm(was).toLowerCase()} · your two houses`, 2600, PATRONS[id][0]); audio.sfx.fanfare?.(0); return true;
+}
+function houseLeave(id) {
+  if (!id || !PATRONS[id]) return false; const nm = g => (godById[g]?.name || g).toUpperCase();
+  if (PATRON.also === id) { PATRON.also = ''; houseSave(); toast(`YOU NO LONGER FLY FOR ${nm(id)}`); return true; }
+  if (PATRON.id === id && PATRON.also) { const keep = PATRON.also; PATRON.also = ''; houseSave(); setPatron(keep); toast(`YOU FLY FOR ${nm(keep)} ALONE NOW`); return true; }
+  toast('A FLIER NEEDS ONE HOUSE AT LEAST'); return false;
+}
+// ── The rings each house holds, shown on Olympus: round each god's pillar, wide flat rings the size of Saturn's; and at the
+//    throne, small rings stacked like bracelets, one for each course. A course held with another house is half in each
+//    colour. When a house wins one, its new ring grows into place where everyone can see it.
+const SHR = { mesh: null, big: null, told: '', disp: {}, seenT: {}, list: {}, listT: -9 };
+const _q2 = new THREE.Quaternion(), _ZAX = new THREE.Vector3(0, 0, 1), _qPI = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI), _c2 = new THREE.Color();
+function houseRings(id) {
+  if (time - SHR.listT > 1) { SHR.listT = time; SHR.list = {};
+    const W = {}; for (const [k, c] of ARENA.claims) { if (k.startsWith('torch') || !c.pats) continue; for (const a of c.pats) for (const b of c.pats) if (a !== b) ((W[a] ||= {})[b] = (W[a][b] || 0) + 1); }
+    for (const g of Object.keys(PATRONS)) { const n = heldBy(g), w = { ...(W[g] || {}) }, sv = ARENA.heldWith?.[g] || {}; for (const q in sv) w[q] = Math.max(w[q] || 0, sv[q] | 0);
+      const L = []; for (const q of Object.keys(w).sort()) for (let i = 0; i < w[q] && L.length < n; i++) L.push(q);
+      while (L.length < n) L.unshift(''); SHR.list[g] = L; } }
+  return SHR.list[id] || [];
+}
+const backOut2 = x => { const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+// how many of a house's rings are showing, moving toward how many it holds: one at a time, so each new one can be seen arriving
+function ringsShown(id, n, dt, at) {
+  const seen = time - (SHR.seenT[id] ?? -99) < 3; SHR.seenT[id] = time;
+  if (SHR.disp[id] === undefined || !seen) { SHR.disp[id] = n; return n; }
+  const d = SHR.disp[id], nd = n > d ? Math.min(n, d + dt * 0.7) : Math.max(n, d - dt * 1.2);
+  if (Math.floor(nd) !== Math.floor(d) && nd > d && at) { const c = pcol(id); for (let i = 0; i < 70; i++) { const a = Math.random() * 6.28; emit(at.x + Math.cos(a) * at.r, at.y, at.z + Math.sin(a) * at.r, rnd(2), 2 + Math.random() * 4, rnd(2), 1 + Math.random(), c.map(v => v * 2), 1, 0.9); } if ((at.x - camera.position.x) ** 2 + (at.z - camera.position.z) ** 2 < 400 * 400) audio.sfx.chime?.([659.25, 987.77, 1318.5], 0.07); }
+  return SHR.disp[id] = nd;
+}
 function updateShrineRings(dt) {
   if (!PANTHEON.seats.length) return;
-  if (!SHR.mesh) { const m = SHR.mesh = new THREE.InstancedMesh(new THREE.TorusGeometry(1, 0.11, 8, 30), new THREE.MeshBasicMaterial(), 12 * 10 * 2); m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.count = 0; PANTHEON.group.add(m); }
-  const m = SHR.mesh, c = camera.position, p = player.pos; let n = 0;
-  const hang = (id, x, y, z, k, yaw) => {
-    const held = heldBy(id), show = Math.min(9, held), col = PATRONS[id][0];
-    if (!held) { _mat.compose(_p.set(x, y + 0.25 * k, z), _q.setFromEuler(_e.set(Math.PI / 2, 0, 0)), _s.set(0.8 * k, 0.8 * k, 0.8 * k)); m.setMatrixAt(n, _mat); m.setColorAt(n++, _c1.setRGB(0.3, 0.3, 0.33)); return; }
-    for (let j = 0; j < show; j++) { const a = time * (0.5 + j * 0.07) * (j % 2 ? -1 : 1) + j * 0.9, big = j === show - 1 && held > 9 ? 1 + Math.min(1.2, (held - 9) * 0.06) : 1, s = k * big * (1 + 0.06 * Math.sin(time * 2.2 + j));
-      _mat.compose(_p.set(x, y + (1.2 + j * 0.95) * k + Math.sin(time * 1.1 + j * 0.8) * 0.12 * k, z), _q.setFromEuler(_e.set(Math.PI / 2 + Math.sin(a) * 0.35, a + yaw, Math.cos(a * 0.7) * 0.3)), _s.set(s, s, s));
-      m.setMatrixAt(n, _mat); const fl = 1.7 + 0.5 * Math.sin(time * 4 + j * 1.3); m.setColorAt(n++, _c1.set(col).multiplyScalar(fl)); }
+  if (!SHR.mesh) { const m = SHR.mesh = new THREE.InstancedMesh(new THREE.TorusGeometry(1, 0.13, 6, 14, Math.PI), new THREE.MeshBasicMaterial({ toneMapped: false }), 12 * 32 * 2 + 12 * 12 * 2); m.setColorAt(0, _c1.setRGB(1, 1, 1)); m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.count = 0; PANTHEON.group.add(m); }
+  if (!SHR.big) { const b = SHR.big = new THREE.InstancedMesh(new THREE.TorusGeometry(1, 0.035, 5, 64, Math.PI), new THREE.MeshBasicMaterial({ toneMapped: false }), 12 * 9 * 2); b.setColorAt(0, _c1.setRGB(1, 1, 1)); b.frustumCulled = false; b.instanceMatrix.setUsage(THREE.DynamicDrawUsage); b.count = 0; PANTHEON.group.add(b); }
+  const m = SHR.mesh, B = SHR.big, c = camera.position, p = player.pos; let n = 0, k = 0;
+  const half = (M, i, pos, q, sc, col) => { _mat.compose(pos, q, sc); M.setMatrixAt(i, _mat); M.setColorAt(i, col); };
+  // bracelets: a stack of thin rings, slowly turning, each a little tipped; a shared one is half one colour, half the other
+  const bracelets = (id, x, y, z, k0, max) => {
+    const L = houseRings(id), shown = ringsShown(id + ':b', L.length, dt, { x, y: y + Math.min(L.length, max) * 0.065 * k0, z, r: 0.25 * k0 });
+    if (!L.length) { _q.setFromEuler(_e.set(Math.PI / 2, 0, 0)); half(m, n++, _p.set(x, y, z), _q, _s.setScalar(0.2 * k0), _c1.setRGB(0.32, 0.32, 0.35)); half(m, n++, _p, _q2.copy(_q).multiply(_qPI), _s, _c1); return; }
+    const cnt = Math.min(Math.ceil(shown), max);
+    for (let j = 0; j < cnt; j++) { const f = clamp(shown - j, 0, 1); if (f <= 0) break; const e = backOut2(f), q = L[j], tilt = 0.12 * Math.sin(j * 1.7), spin = time * (0.35 + (j % 3) * 0.08) * (j % 2 ? -1 : 1) + j;
+      _q.setFromEuler(_e.set(Math.PI / 2 + tilt, spin, 0, 'YXZ')); const yy = y + j * 0.065 * k0 + Math.sin(time * 1.3 + j * 0.6) * 0.012 * k0, r = 0.2 * k0 * e * (1 + 0.05 * Math.sin(time * 2 + j)), fl = 1.6 + 0.4 * Math.sin(time * 3 + j * 0.9) + (1 - f) * 2;
+      half(m, n++, _p.set(x, yy, z), _q, _s.set(r, r, r), _c1.copy(_tcol(id)).multiplyScalar(fl));
+      half(m, n++, _p, _q2.copy(_q).multiply(_qPI), _s, _c1.copy(_tcol(q || id)).multiplyScalar(fl)); }
   };
-  if ((c.x - MOUNT.x) ** 2 + (c.z - MOUNT.z) ** 2 < 900 * 900 && c.y > SUMMIT - 300) for (const S of PANTHEON.seats) hang(S.id, S.x + Math.sin(S.th) * 1.0, S.y + 6.2, S.z + Math.cos(S.th) * 1.0, 1.15, S.th);   // (over the back of the throne, above the god's sign)
-  for (const I of PANTHEON.isles) if ((c.x - I.x) ** 2 + (c.z - I.z) ** 2 < 800 * 800) hang(I.id, I.x, I.top + 9.5, I.z, 2.6, 0);
+  if ((c.x - MOUNT.x) ** 2 + (c.z - MOUNT.z) ** 2 < 900 * 900 && c.y > SUMMIT - 300) for (const S of PANTHEON.seats) { const c = Math.cos(S.th), sn = Math.sin(S.th); bracelets(S.id, S.x - 2.3 * c + 0.2 * sn, S.y + 1.5, S.z + 2.3 * sn + 0.2 * c, 1.25, 24); }   // (on the altar at the god's left hand, over the offerings)
+  for (const I of PANTHEON.isles) if ((c.x - I.x) ** 2 + (c.z - I.z) ** 2 < 800 * 800) bracelets(I.id, I.x, I.top + 6, I.z, 3.2, 12);
   m.count = n; if (n) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
-  // and round each god's pylon, for the whole summit to see: the same count as rings the size of Saturn's — wide flat
-  // bands, one outside another, tilted, turning slowly; a god who holds nothing has one thin grey one
-  if (!SHR.big) { const b = SHR.big = new THREE.InstancedMesh(new THREE.TorusGeometry(1, 0.035, 5, 96), new THREE.MeshBasicMaterial(), 12 * 9); b.frustumCulled = false; b.instanceMatrix.setUsage(THREE.DynamicDrawUsage); b.count = 0; PANTHEON.group.add(b); }
-  const B = SHR.big; let k = 0;
+  // round each pillar: the same, as rings the size of Saturn's, wide and flat, tilted, turning slowly; nothing held, one grey
   if ((c.x - MOUNT.x) ** 2 + (c.z - MOUNT.z) ** 2 < 2600 * 2600 && c.y > CLOUD_SEA - 200) for (const P of CROWN.pylons) {
-    const held = heldBy(P.id), show = Math.max(1, Math.min(9, held)), tilt = 0.36 + 0.1 * Math.sin(P.i * 2.1), prec = time * 0.045 * (P.i % 2 ? 1 : -1) + P.i, y = P.g + P.H * 0.64;
-    for (let j = 0; j < show; j++) { const R = 24 + j * 5.2 + (held > 9 && j === show - 1 ? Math.min(14, (held - 9) * 0.8) : 0), wob = Math.sin(time * 0.5 + j * 0.9 + P.i) * 0.015;
-      _mat.compose(_p.set(P.x, y, P.z), _q.setFromEuler(_e.set(Math.PI / 2 + tilt + wob, prec, 0, 'YXZ')), _s.set(R, R, R * (held ? 0.5 : 0.2))); B.setMatrixAt(k, _mat);
-      const fl = held ? 1.5 + 0.45 * Math.sin(time * 1.7 + j * 1.1 + P.i) + P.k * 0.8 : 0.32; B.setColorAt(k++, held ? _c1.set(P.hex).multiplyScalar(fl) : _c1.setRGB(fl, fl, fl * 1.05)); }
+    const L = houseRings(P.id), held = L.length, tilt = 0.36 + 0.1 * Math.sin(P.i * 2.1), prec = time * 0.045 * (P.i % 2 ? 1 : -1) + P.i, y = P.g + P.H * 0.64;
+    const shown = ringsShown(P.id + ':p', Math.min(9, held), dt, { x: P.x, y, z: P.z, r: 24 }), cnt = held ? Math.ceil(shown) : 1;
+    for (let j = 0; j < cnt; j++) { const f = held ? clamp(shown - j, 0, 1) : 1; if (f <= 0) break; const e = held ? backOut2(f) : 1, q = held ? L[Math.max(0, held - Math.min(9, held) + j)] : '';
+      const R = (24 + j * 5.2 + (held > 9 && j === 8 ? Math.min(14, (held - 9) * 0.8) : 0)) * e, wob = Math.sin(time * 0.5 + j * 0.9 + P.i) * 0.015;
+      _q.setFromEuler(_e.set(Math.PI / 2 + tilt + wob, prec, 0, 'YXZ')); const sc = _s.set(R, R, R * (held ? 0.5 : 0.2)), fl = held ? 1.5 + 0.45 * Math.sin(time * 1.7 + j * 1.1 + P.i) + P.k * 0.8 + (1 - f) * 2.5 : 0.32;
+      if (held) { half(B, k++, _p.set(P.x, y, P.z), _q, sc, _c1.copy(_tcol(P.id)).multiplyScalar(fl)); half(B, k++, _p, _q2.copy(_q).multiply(_qPI), sc, _c1.copy(_tcol(q || P.id)).multiplyScalar(fl)); }
+      else { half(B, k++, _p.set(P.x, y, P.z), _q, sc, _c1.setRGB(fl, fl, fl * 1.05)); half(B, k++, _p, _q2.copy(_q).multiply(_qPI), sc, _c1); } }
   }
   B.count = k; if (k) { B.instanceMatrix.needsUpdate = true; if (B.instanceColor) B.instanceColor.needsUpdate = true; }
   // standing at a throne: what that god holds, said once
   if (state === 'play' && player.grounded) { const S = PANTHEON.seats.find(S => (p.x - S.x) ** 2 + (p.z - S.z) ** 2 < 4.5 * 4.5); const key = S ? S.id + heldBy(S.id) : '';
-    if (S && key !== SHR.told) { SHR.told = key; const h = heldBy(S.id), nm = (godById[S.id]?.name || S.id).toUpperCase(); toast(h ? `${nm} HOLDS ${h} COURSE${h === 1 ? '' : 'S'} OF RINGS` : `${nm} HOLDS NO RINGS · FLY A COURSE FOR THEM`); } else if (!S) SHR.told = ''; }
+    if (S && key !== SHR.told) { SHR.told = key; const L = houseRings(S.id), h = L.length, sh = L.filter(Boolean).length, nm = (godById[S.id]?.name || S.id).toUpperCase(); toast(h ? `${nm} HOLDS ${h} COURSE${h === 1 ? '' : 'S'} OF RINGS${sh ? ` · ${sh} SHARED WITH OTHER HOUSES` : ''}` : `${nm} HOLDS NO RINGS YET`); } }
 }
 function updatePantheon(dt) {
   const G = PANTHEON.group; if (!G) { if (realm === 'over' && state !== 'loading') buildPantheon(); return; }
   if (G.userData.ring) G.userData.ring.rotateY(dt * 0.03);
-  crownAnimate(G, dt); if (realm === 'over') { updateCrownLife(dt); updateShrineRings(dt); updateTorches(dt); }
+  crownAnimate(G, dt); if (realm === 'over') { updateCrownLife(dt); updateShrineRings(dt); updateTorches(dt); } updateCrags(dt);
   // above the clouds, round the mountain, nothing with wings runs out of fire: it is the one place a bird can always get back up from
   { const q = player; if (state === 'play' && realm === 'over' && (q.form === 'phoenix' || q.wings) && q.pos.y > CLOUD_SEA + 40 && (q.pos.x - MOUNT.x) ** 2 + (q.pos.z - MOUNT.z) ** 2 < 3300 * 3300) {
       if (q.flame < 0.55 && !CROWN.hiTold) { CROWN.hiTold = true; toast('ABOVE THE CLOUDS OF OLYMPUS · YOUR FIRE DOES NOT RUN DOWN HERE'); }
@@ -12767,7 +13147,7 @@ function apUnmark() { AP.wp = null; AP.beam.visible = false; AP.el.style.display
 //    colour: a wind like any other, so the bird can simply get into it and be carried. Only he sees it, unless he has
 //    said his friends may; then they see it too, and can ride it after him. And any mark can be flown to for him.
 const WP = { list: [], sel: -1, share: false, see: true, gT: 0, sentT: -99 };
-try { const o = JSON.parse(localStorage.getItem('icarus.marks') || '{}'); if (Array.isArray(o.list)) WP.list = o.list.filter(w => w && Number.isFinite(w.x) && Number.isFinite(w.y) && Number.isFinite(w.z)).slice(0, 8).map(w => ({ x: w.x, y: w.y, z: w.z, n: String(w.n || 'MARK').slice(0, 14), r: w.r ? 1 : 0 })); WP.share = !!o.share; } catch {}
+try { const o = JSON.parse(localStorage.getItem('icarus.marks') || '{}'); if (Array.isArray(o.list)) WP.list = o.list.filter(w => w && Number.isFinite(w.x) && Number.isFinite(w.y) && Number.isFinite(w.z)).slice(0, 8).map(w => ({ x: w.x, y: w.y, z: w.z, n: String(w.n || 'MARK').slice(0, 14), r: w.r ? 1 : 0, h: w.h ? 1 : 0 })); WP.share = !!o.share; } catch {}
 const wpSave = () => { try { localStorage.setItem('icarus.marks', JSON.stringify({ list: WP.list, share: WP.share })); } catch {} };
 const wpHome = () => ({ x: MOUNT.x, y: SUMMIT + 2, z: MOUNT.z + 6, n: 'HOME', home: true, r: 0 });
 const wpAll = () => [wpHome(), ...WP.list.filter(w => (w.r || 0) === (realm === 'under' ? 1 : 0))];
@@ -13252,7 +13632,7 @@ function momentNow() {
 async function albumAdd(blob, extra = null) {
   try {
     let src = blob; if (extra?.thumbFrom) src = extra.thumbFrom;
-    const bmp = await createImageBitmap(src), c = document.createElement('canvas'); c.width = 400; c.height = Math.max(1, Math.round(bmp.height * 400 / bmp.width)); const x = c.getContext('2d'); x.drawImage(bmp, 0, 0, c.width, c.height);
+    const bmp = await createImageBitmap(src), c = document.createElement('canvas'); c.width = 400; c.height = Math.max(1, Math.round(bmp.height * 400 / bmp.width)); const x = c.getContext('2d'); x.drawImage(bmp, 0, 0, c.width, c.height); bmp.close?.();   // (the decoded picture is let go at once: it holds the whole frame)
     if (extra?.kind === 'video') { x.fillStyle = 'rgba(5,7,13,.55)'; x.beginPath(); x.arc(c.width / 2, c.height / 2, 30, 0, 6.283); x.fill(); x.fillStyle = '#ffe9c0'; x.beginPath(); x.moveTo(c.width / 2 - 9, c.height / 2 - 14); x.lineTo(c.width / 2 + 15, c.height / 2); x.lineTo(c.width / 2 - 9, c.height / 2 + 14); x.fill(); }   // (a recording: marked as one)
     const thumb = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.8)), id = Date.now(), mom = extra?.mom || momentNow();
     const row = { id, at: id, full: extra?.kind === 'video' ? thumb : blob, thumb, by: heroName, mom }; if (extra?.kind === 'video') { row.kind = 'video'; row.video = blob; row.path = extra.path; row.dur = extra.dur; }
@@ -13325,13 +13705,14 @@ function recStart() {
 }
 function recStop() { if (!REC.on) return; REC.on = false; document.body.classList.remove('rec'); $('recChip').classList.remove('on'); try { REC.mr.stop(); } catch {} }
 async function recDone() {
+  try { REC.mr?.stream?.getVideoTracks().forEach(t => t.stop()); } catch {} try { audio.master?.disconnect(REC.tap); } catch {}   // (stop grabbing the screen and the sound)
   const blob = new Blob(REC.chunks, { type: (REC.type || 'video/webm').split(';')[0] }), dur = (performance.now() - REC.t0) / 1000, path = REC.path.map(v => Math.round(v * 100) / 100); REC.chunks = [];
   if (blob.size < 2000 || dur < 0.8) { toast('TOO SHORT TO KEEP'); return; }
   // its first frame, for the album's wall
   let frame = null;
-  try { const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.src = URL.createObjectURL(blob);
+  let vu = null; try { const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.src = vu = URL.createObjectURL(blob);
     await new Promise((res, rej) => { v.onloadeddata = res; v.onerror = rej; setTimeout(rej, 4000); }); v.currentTime = Math.min(0.2, dur / 2); await new Promise(res => { v.onseeked = res; setTimeout(res, 1500); });
-    const c = document.createElement('canvas'); c.width = v.videoWidth || 640; c.height = v.videoHeight || 360; c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); frame = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85)); URL.revokeObjectURL(v.src); } catch {}
+    const c = document.createElement('canvas'); c.width = v.videoWidth || 640; c.height = v.videoHeight || 360; c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); frame = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85)); } catch {} finally { if (vu) URL.revokeObjectURL(vu); }
   if (!frame) { const c = document.createElement('canvas'); c.width = 640; c.height = 360; const x = c.getContext('2d'); x.fillStyle = '#0a0d16'; x.fillRect(0, 0, 640, 360); frame = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.8)); }
   const ok2 = await albumAdd(blob, { kind: 'video', thumbFrom: frame, mom: REC.mom, path, dur });
   toast(ok2 ? `KEPT · ${Math.round(dur)} SECONDS · IT WILL FLY AGAIN WHERE YOU FLEW IT` : 'COULD NOT KEEP THE RECORDING HERE');
@@ -13687,7 +14068,7 @@ function updateDialog(dt) {
     if (cur.age > dur + 0.9 && !(voiceSrc && cur.voiceDur)) dlg.cur = null;
   } else if (dlg.shown < t.length) dlg.shown = Math.min(t.length, dlg.shown + dt * (cur.voice ? 26 : 48));
   else { dlg.hold += dt; if (dlg.hold > (cur.voice ? 0.9 : 2.4 + t.length * 0.035) && cur.age > (cur.voiceEnd || 0)) dlg.cur = null; }
-  if (dlg.cur) { $('dlgTitle').textContent = cur.title; $('dlgText').textContent = t.slice(0, Math.floor(dlg.shown)); }
+  if (dlg.cur) { const n = Math.floor(dlg.shown); if (dlg.wT !== cur.title) $('dlgTitle').textContent = dlg.wT = cur.title; if (dlg.wS !== t || dlg.wN !== n) { dlg.wS = t; dlg.wN = n; $('dlgText').textContent = t.slice(0, n); } }   // (the page is touched only when the words change)
 }
 // the story is over, and the screen says so until the player decides otherwise
 let endReady = false;
@@ -13979,7 +14360,7 @@ async function godSay(playerText, o = {}) {
     const r = await fetch('/api/god', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ god: g.id, code: WORLD.code, form: g.bolt ? 'bolt' : formOf(g), stage: g.history.filter(m => m.role === 'god').length, messages: g.history.slice(-40), gossip: story.gossip.filter(x => x.god !== g.id).slice(-30), met: [...story.met, ...story.known],
         quest: q ? { kind: q.kind, goal: goalOf(q), reward: q.reward, done: q.done } : null, perks: Object.keys(perks).filter(k => perks[k]), time: dayName(), storm: storm > 0.3, name: heroName !== 'ICARUS' ? heroName : '', scared: !!g.scared, tone: playerText && !aside ? toneNow(playerText) : '', errand: story.errands?.[g.id] || null, next: (() => { const c = !g.other && g !== hades && chainInfo(); return c && c.g !== g ? { id: c.g.id, dir: c.dir, km: +(c.d / 1000).toFixed(1) } : null; })(),
-        manners: mannersOf(g), parting: !!o.parting,
+        manners: mannersOf(g), parting: !!o.parting, houses: myHouses(),
         saga: story.saga ? { title: story.saga.title, why: story.saga.why, i: story.saga.i + 1, n: story.saga.steps.length, now: (() => { const q = questOf(story.saga.god); return q ? goalOf(q) : ''; })(), mine: story.saga.god === g.id, by: story.saga.god } : null, sagaDone: story.sagaOwed && story.sagaOwed.god === g.id ? story.sagaOwed.title : '',
         self: (story.self || []).slice(-14), rank: rankOf(), objective: (GREAT.line || $('obj').textContent || '').replace(/^[◇◆]\s*/, '').slice(0, 150), great: greatFor(g.id),
         witness: { deaths: flags.deaths, crashes: stats.crashes, perfect: stats.perfect, events: story.events.slice(-12).map(e => `${ago(e.t)}: he ${e.text}`) } }) });
@@ -14043,7 +14424,8 @@ function learnSelf(t) {
 function giveGift() { if (talk.gift) { const [id, from] = talk.gift; talk.gift = null; grantPerk(id, from); } }
 function applyAct(g, j) {
   if (story.sagaOwed && story.sagaOwed.god === g.id) story.sagaOwed = null;   // (they have had their say about how it went)
-  if (j.act === 'saga') { if (sagaStart(g, j.saga)) { talk.quest = { id: g.id, name: g.name, saga: true }; toast(`A STORY BEGINS · ${story.saga.title.toUpperCase()}`); audio.sfx.chime?.(); } }
+  if (j.act === 'join') { if (houseJoin(g.id)) { godSound(g, 'choir', 'high'); g.mood = 'proud'; } }
+  else if (j.act === 'saga') { if (sagaStart(g, j.saga)) { talk.quest = { id: g.id, name: g.name, saga: true }; toast(`A STORY BEGINS · ${story.saga.title.toUpperCase()}`); audio.sfx.chime?.(); } }
   else if (j.act === 'quest' && !(story.saga && story.saga.god === g.id)) setQuest(g, j.kind, j.n, j.reward);
   else if (j.act === 'scare') scare(g);
   else if (j.act === 'gift') { talk.gift = [j.gift, g.name]; talk.after = giveGift; }
@@ -14136,7 +14518,7 @@ function depart(g) {
   say([`${g.revealed ? g.name : 'They'} ${g.fixed || g.home ? 'will not say another word' : 'turned and went'}.`]);
 }
 function smite(g) {
-  const p = player; worldDeed('smitten', g.id);
+  const p = player;   // (the others hear of it from the server, where the strike was decided)
   strike(p.pos.x, p.pos.y, p.pos.z, 1);
   for (let i = 0; i < 120; i++) emit(p.pos.x + rnd(1), p.pos.y + Math.random() * 2, p.pos.z + rnd(1), rnd(12), Math.random() * 10, rnd(12), 0.9, [1.6, 1.7, 2.2], 0);
   witness(`was struck dead where he stood by ${g.name}, for his mouth`);
@@ -14823,21 +15205,24 @@ function gustPoint(g, u, out) {   // the point a fraction u of the way down it
 }
 const _gustQ = new THREE.Vector3(), _gustD = new THREE.Vector3();
 // the nearest stream to `pos` he could be riding: distance, how far down it, its direction there (in _gustD), the point (in _gustQ)
+const _gb = { g: null, d: 0, u: 0, dx: 0, dy: 0, dz: 0, qx: 0, qy: 0, qz: 0 };   // (the answer is the same object each time: read it, don't keep it)
 function gustAt(pos) {
-  let best = null;
+  let bd = Infinity, bg = null, bi = 0, bt = 0; const here = realm === 'under' ? 1 : 0;
   for (const g of GUST.list) {
-    if ((g.realm || 0) !== (realm === 'under' ? 1 : 0)) continue;
+    if ((g.realm || 0) !== here) continue;
     if ((pos.x - g.cx) ** 2 + (pos.y - g.cy) ** 2 + (pos.z - g.cz) ** 2 > (g.r + 40) ** 2) continue;
     const P = g.pts, n = P.length / 3;
     for (let i = 0; i < n - 1; i++) {
       const ax = P[i * 3], ay = P[i * 3 + 1], az = P[i * 3 + 2], dx = P[i * 3 + 3] - ax, dy = P[i * 3 + 4] - ay, dz = P[i * 3 + 5] - az, l2 = dx * dx + dy * dy + dz * dz || 1;
-      const t = clamp(((pos.x - ax) * dx + (pos.y - ay) * dy + (pos.z - az) * dz) / l2, 0, 1), qx = ax + dx * t, qy = ay + dy * t, qz = az + dz * t;
-      const d = Math.hypot(pos.x - qx, pos.y - qy, pos.z - qz);
-      if (!best || d < best.d) { const l = Math.sqrt(l2); best = { g, d, u: (g.cum[i] + l * t) / g.len, dx: dx / l, dy: dy / l, dz: dz / l, qx, qy, qz }; }
+      const t = clamp(((pos.x - ax) * dx + (pos.y - ay) * dy + (pos.z - az) * dz) / l2, 0, 1), ex = pos.x - ax - dx * t, ey = pos.y - ay - dy * t, ez = pos.z - az - dz * t, d2 = ex * ex + ey * ey + ez * ez;
+      if (d2 < bd) { bd = d2; bg = g; bi = i; bt = t; }
     }
   }
-  if (best) { _gustD.set(best.dx, best.dy, best.dz); _gustQ.set(best.qx, best.qy, best.qz); }
-  return best;
+  if (!bg) return null;
+  const P = bg.pts, i = bi, t = bt, ax = P[i * 3], ay = P[i * 3 + 1], az = P[i * 3 + 2], dx = P[i * 3 + 3] - ax, dy = P[i * 3 + 4] - ay, dz = P[i * 3 + 5] - az, l = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1, B = _gb;
+  B.g = bg; B.d = Math.sqrt(bd); B.u = (bg.cum[i] + l * t) / bg.len; B.dx = dx / l; B.dy = dy / l; B.dz = dz / l; B.qx = ax + dx * t; B.qy = ay + dy * t; B.qz = az + dz * t;
+  _gustD.set(B.dx, B.dy, B.dz); _gustQ.set(B.qx, B.qy, B.qz);
+  return B;
 }
 // a breath out
 function gustBlow() {
@@ -14868,7 +15253,7 @@ function gustFinish() {
   worldPost({ op: 'wind', id: g.id, pts: g.pts, patron: g.c, realm: g.realm ? 'under' : 'over' })?.then(j => { if (j?.ok) { g.kept = true; gustSave(); } });
   witness('blew a river of wind across the sky for anyone to ride');
 }
-function gustTrim() {
+function gustTrim() { GUST.nearT = 0;
   const now = Date.now();
   GUST.list = GUST.list.filter(g => g.kept || now - g.born < GUST_LIFE);   // (the ones the world keeps stay; the rest last half an hour)
   while (GUST.list.length > GUST.cap) {   // too many: the furthest one that isn't his goes
@@ -14924,7 +15309,9 @@ function updateGusts(dt) {
   if ((G.trimT = (G.trimT || 0) - dt) <= 0) { G.trimT = 5; const n0 = G.list.length; gustTrim(); if (G.list.length !== n0) gustSave(); }
   // the streaks: the nearest six streams get six strands each, running down them in spirals
   const R = G.rib, P = p.pos, here = realm === 'under' ? 1 : 0, now = Date.now();
-  const near = cinema.on ? [] : G.list.filter(g => (g.realm || 0) === here).map(g => [g, Math.hypot(P.x - g.cx, P.y - g.cy, P.z - g.cz) - g.r]).filter(([, d]) => d < 3500).sort((a, b) => a[1] - b[1]).slice(0, 6);
+  if (cinema.on) G.near = []; else if (!G.near || (G.nearT = (G.nearT || 0) - dt) <= 0) { G.nearT = 0.5;   // (which six are nearest: asked twice a second, not every frame)
+    G.near = G.list.filter(g => (g.realm || 0) === here).map(g => [g, Math.hypot(P.x - g.cx, P.y - g.cy, P.z - g.cz) - g.r]).filter(([, d]) => d < 3500).sort((a, b) => a[1] - b[1]).slice(0, 6); }
+  const near = G.near;
   G.slots.forEach((S, k) => {
     const g = near[k]?.[0];
     if (!g) { if (S.id) { S.id = ''; for (let j = 0; j < 6; j++) { R.clear(k * 6 + j); R.write(k * 6 + j, 0, 0, 0, 0, false); } } return; }
@@ -15110,6 +15497,7 @@ function updateHoops(dt) {
 const ARENA = { cell: 1700, courses: new Map(), claims: new Map(), run: null, near: [], refreshT: 0, prev: new THREE.Vector3(), prevOk: false, peerDone: [], MAX: 160, sparkT: 0, el: null, qel: null, toldT: -99 };
 const PCOL = {}; const pcol = id => PCOL[id] || (PCOL[id] = (() => { const c = new THREE.Color(PATRONS[id]?.[0] || '#ffffff'); return [c.r, c.g, c.b]; })());
 try { for (const [id, c] of JSON.parse(localStorage.getItem('icarus.arenas') || '[]')) if (c && Array.isArray(c.pats)) ARENA.claims.set(id, c); } catch {}
+const CLCOL = new WeakMap();   // (each claim's colours, worked out once)
 const arenaSave = () => { try { localStorage.setItem('icarus.arenas', JSON.stringify([...ARENA.claims].slice(-300))); } catch {} };
 function makeCourse(id, x, z, r, n) {
   const yaw = r() * 6.283, bend = (r() - 0.5) * 0.5, wave = r() * 6;
@@ -15182,11 +15570,12 @@ function updateArena(dt) {
   }
   // the rings, in their owners' colours (and, on a course he is flying, his own as he takes each one)
   const run = ARENA.run, mine = PATRON.id && pcol(PATRON.id), A = arA.array; let n = 0;
+  const mineCols = mine ? (ARENA._mc && ARENA._mc[0] === mine ? ARENA._mc : (ARENA._mc = [mine])) : null;
   for (const c of ARENA.near) {
-    const cl = ARENA.claims.get(c.id);
+    const cl = ARENA.claims.get(c.id), clCols = cl ? (CLCOL.get(cl) || (CLCOL.set(cl, cl.pats.slice(0, 3).map(pcol)), CLCOL.get(cl))) : null, inRun = run && run.c === c, at = !inRun && !run ? arenaPeerAt(c) : 0;   // (worked out once a course, not once a ring)
     for (let i = 0; i < c.rings.length && n < ARENA.MAX; i++, n++) {
-      const r = c.rings[i], inRun = run && run.c === c, passed = inRun && i < run.i, at = !inRun && !run ? arenaPeerAt(c) : 0, next = inRun ? i === run.i : !run && (i === 0 && c.d < 1100 || at > 0 && i === at);
-      const cols = passed && mine ? [mine] : cl ? cl.pats.slice(0, 3).map(pcol) : null;
+      const r = c.rings[i], passed = inRun && i < run.i, next = inRun ? i === run.i : !run && (i === 0 && c.d < 1100 || at > 0 && i === at);
+      const cols = passed && mineCols ? mineCols : clCols;
       for (let k = 0; k < 3; k++) { const v = cols ? cols[Math.min(k, cols.length - 1)] : [1, 1, 1]; arC[k].array.set(v, n * 3); }
       A[n * 4] = passed && run.passT[i] != null ? time - run.passT[i] : c.pf && c.pf[i] != null && time - c.pf[i] < 3 ? time - c.pf[i] : -1;   // (a flash as he goes through it, and as anyone else does)
       A[n * 4 + 1] = next ? 1 : 0; A[n * 4 + 2] = cols ? cols.length : 1; A[n * 4 + 3] = cols ? 1 : 0;
@@ -15268,15 +15657,15 @@ function arenaFinish(c) {
   if (!c.gen) ARENA.run = null;   // (a course that goes on keeps his run going with it)
   if (!PATRON.id) { toast('CHOOSE YOUR GOD — THE RINGS BURN IN THEIR COLOUR'); showPatron(); return; }
   const t = performance.now();
-  if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'arena', payload: { i: NET.id, k: 'done', id: c.id, p: PATRON.id, n: heroName } });
+  if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'arena', payload: { i: NET.id, k: 'done', id: c.id, p: PATRON.id, p2: PATRON.also || undefined, n: heroName } });
   setTimeout(() => arenaClaim(c, t), 1600);
 }
 function arenaClaim(c, t) {
-  const group = [{ p: PATRON.id, n: heroName }];
-  for (const f of ARENA.peerDone) if (f.id === c.id && Math.abs(f.t - t) < 8000 && !group.some(g => g.n === f.n)) { group.push({ p: f.p, n: f.n }); befriend(f.P); }
-  const pats = [...new Set(group.map(g => g.p))].slice(0, 3), names = group.map(g => g.n).slice(0, 4), was = ARENA.claims.get(c.id);
+  const group = [{ p: PATRON.id, p2: PATRON.also, n: heroName }];
+  for (const f of ARENA.peerDone) if (f.id === c.id && Math.abs(f.t - t) < 8000 && !group.some(g => g.n === f.n)) { group.push({ p: f.p, p2: f.p2, n: f.n }); befriend(f.P); }
+  const pats = [...new Set(group.flatMap(g => [g.p, g.p2]).filter(v => PATRONS[v]))].slice(0, 3), names = group.map(g => g.n).slice(0, 4), was = ARENA.claims.get(c.id);
   const cl = { pats, names, at: Date.now(), len: Math.max(was?.len || 0, ARENA.run && ARENA.run.c === c ? ARENA.run.i : 0) || undefined };
-  ARENA.claims.set(c.id, cl); arenaSave(); questEvent.arena = c.id;
+  ARENA.claims.set(c.id, cl); arenaSave(); questEvent.arena = c.id; SHR.listT = HELD.t = -9;
   if (ARENA.held) { for (const q of was?.pats || []) if (!pats.includes(q)) ARENA.held[q] = Math.max(0, (ARENA.held[q] || 0) - 1); for (const q of pats) if (!was?.pats.includes(q)) ARENA.held[q] = (ARENA.held[q] || 0) + 1; }
   if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'arena', payload: { i: NET.id, k: 'claim', id: c.id, pats, names } });
   worldPost({ op: 'arena', id: c.id, cx: Math.round(c.rings[0].x), cz: Math.round(c.rings[0].z), pats, names, len: cl.len || 0 });
@@ -15288,7 +15677,7 @@ function arenaClaim(c, t) {
 function gotArena(m) {
   if (!m || !ok(m.i) || typeof m.id !== 'string' || !/^[a-z0-9_-]{1,24}$/.test(m.id)) return;
   const P = peerOf(m.i); if (flood(P)) return;
-  if (m.k === 'done' && PATRONS[m.p]) { ARENA.peerDone = ARENA.peerDone.filter(f => performance.now() - f.t < 15000); ARENA.peerDone.push({ id: m.id, p: m.p, n: cleanName(m.n), t: performance.now(), P }); return; }
+  if (m.k === 'done' && PATRONS[m.p]) { ARENA.peerDone = ARENA.peerDone.filter(f => performance.now() - f.t < 15000); ARENA.peerDone.push({ id: m.id, p: m.p, p2: PATRONS[m.p2] ? m.p2 : '', n: cleanName(m.n), t: performance.now(), P }); return; }
   if (m.k === 'pass') {   // someone has gone through a ring of a course: it flashes for everyone, and that is where they can be joined
     const c = ARENA.courses.get(m.id), n = clamp(m.n | 0, 0, 400); if (!c || aloneNow()) return;
     c.peerAt = { i: n + 1, t: performance.now(), P }; (c.pf ||= {})[n] = time; P.ring = { ...(P.ring || {}), t: performance.now(), x: c.rings[n]?.x ?? 0, y: c.rings[n]?.y ?? 0, z: c.rings[n]?.z ?? 0 };
@@ -15304,7 +15693,8 @@ function gotArena(m) {
   if (m.k !== 'claim' || !Array.isArray(m.pats)) return;
   const pats = m.pats.filter(p => PATRONS[p]).slice(0, 3); if (!pats.length) return;
   const names = (Array.isArray(m.names) ? m.names : []).map(cleanName).slice(0, 4), cl = { pats, names, at: Date.now(), len: ARENA.claims.get(m.id)?.len };
-  ARENA.claims.set(m.id, cl); arenaSave();
+  { const was = ARENA.claims.get(m.id); if (ARENA.held && !m.id.startsWith('torch')) { for (const q of was?.pats || []) if (!pats.includes(q)) ARENA.held[q] = Math.max(0, (ARENA.held[q] || 0) - 1); for (const q of pats) if (!was?.pats?.includes(q)) ARENA.held[q] = (ARENA.held[q] || 0) + 1; } }
+  ARENA.claims.set(m.id, cl); arenaSave(); SHR.listT = HELD.t = -9;
   const c = ARENA.courses.get(m.id);
   if (c && state === 'play' && Math.hypot(c.rings[0].x - player.pos.x, c.rings[0].z - player.pos.z) < 3000 && !names.includes(heroName)) toast(`${arenaOwners(cl)} TOOK THE RINGS · ${arenaGods(cl)}`);
 }
@@ -15751,7 +16141,7 @@ function gatherBolt(dt) {
   const G = GREAT, p = player, P = p.pos, bird = p.form === 'phoenix' && !p.perch, down = p.grounded || p.perch, play = state === 'play';
   if (!G.got.iron) {
     if (!G.iron || !CRATERS.includes(G.iron)) { G.iron = CRATERS.slice().sort((a, b) => (a.x - P.x) ** 2 + (a.z - P.z) ** 2 - (b.x - P.x) ** 2 - (b.z - P.z) ** 2)[0] || null;
-      if (!G.iron && play) { const s = findShelf(P.x, P.z, 700, 1500); if (s && crater(s.x, s.z, 26)) { G.iron = CRATERS[CRATERS.length - 1]; strike(s.x, s.y, s.z, 1); toast('SOMETHING FELL OUT OF THE SKY'); } } }
+      if (!G.iron && play && time > (G.ironTryT || 0)) { G.ironTryT = time + 2; const s = findShelf(P.x, P.z, 700, 1500); if (s && crater(s.x, s.z, 26)) { G.iron = CRATERS[CRATERS.length - 1]; strike(s.x, s.y, s.z, 1); toast('SOMETHING FELL OUT OF THE SKY'); } } }
     const c = G.iron; if (!c) return null;
     if (play && down && (P.x - c.x) ** 2 + (P.z - c.z) ** 2 < (c.R * 0.9) ** 2) { G.got.iron = 1; G.focus = 'bolt'; toast('STAR-IRON · STILL WARM'); audio.sfx.kindle?.(); for (let i = 0; i < 50; i++) emit(P.x + rnd(3), P.y + Math.random() * 2, P.z + rnd(3), rnd(5), 3 + Math.random() * 8, rnd(5), 0.6 + Math.random() * 0.6, pick(EMBER), 4); saveSoon(); }
     return { x: c.x, y: terrainAt(c.x, c.z) + 6, z: c.z, label: 'IRON FROM THE SKY · STAND IN THE CRATER' };
@@ -16023,7 +16413,8 @@ function worldLook() {
       .map(m => ({ k: m.k === 'met' ? 'met' : 'fall', x: m.x, y: m.y, z: m.z, g: String(m.g || ''), s: m.s | 0, n: String(m.n || 'SOMEONE').slice(0, 12), mine: m.n === heroName, at: m.at }));
     WORLD.trav = (Array.isArray(j.travellers) ? j.travellers : []).filter(t => t && Number.isFinite(t.x) && Number.isFinite(t.z)).map(t => ({ n: String(t.n || 'SOMEONE').slice(0, 12), x: t.x, z: t.z, seen: t.seen }));
     gustMerge(j.winds, R);
-    if (R === 'over') { arenaMerge(j.arenas); if (j.held && typeof j.held === 'object') { ARENA.held = {}; for (const k in j.held) if (PATRONS[k]) ARENA.held[k] = clamp(j.held[k] | 0, 0, 9999); ARENA.heldAt = time; } }
+    if (R === 'over') { arenaMerge(j.arenas); if (j.held && typeof j.held === 'object') { ARENA.held = {}; for (const k in j.held) if (PATRONS[k]) ARENA.held[k] = clamp(j.held[k] | 0, 0, 9999); ARENA.heldAt = time; }
+      if (j.heldWith && typeof j.heldWith === 'object') { ARENA.heldWith = {}; for (const a in j.heldWith) if (PATRONS[a] && j.heldWith[a] && typeof j.heldWith[a] === 'object') { ARENA.heldWith[a] = {}; for (const b in j.heldWith[a]) if (PATRONS[b]) ARENA.heldWith[a][b] = clamp(j.heldWith[a][b] | 0, 0, 9999); } } SHR.listT = -9; }
     placeShrines();
   }).catch(() => { WORLD.looking = false; WORLD.lookT = 150; });
 }
@@ -16179,7 +16570,9 @@ function cellLook(x, z) {
 function mapTile(tx, tz) {
   const key = tx + ',' + tz;
   let t = mapTiles.get(key);
-  if (!t) { t = { cv: document.createElement('canvas'), stale: true, any: false }; t.cv.width = t.cv.height = TILE * TPX * 2; mapTiles.set(key, t); }
+  if (t) { mapTiles.delete(key); mapTiles.set(key, t); }   // (the most recently looked at last: the longest unseen go first)
+  else { t = { cv: document.createElement('canvas'), stale: true, any: false }; t.cv.width = t.cv.height = TILE * TPX * 2; mapTiles.set(key, t);
+    if (mapTiles.size > 180) for (const [k, o] of mapTiles) { if (mapTiles.size <= 150) break; o.cv.width = o.cv.height = 0; mapTiles.delete(k); } }   // (each one is a quarter of a megabyte of picture: no more than the map can show kept)
   if (t.stale) {
     t.stale = false; t.any = false;
     const x = t.cv.getContext('2d'), S = mapCells[realm];
@@ -16652,7 +17045,7 @@ function updateWarp(dt) {
   dir3.set(-Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(p.yaw) * Math.cos(p.pitch));
   if (W.home) {   // home: set down on the summit, on his feet, his fire whole
     W.home = false; W.walkP = null; const gy = groundAt(START.x, START.z, SUMMIT + 40), fy = Math.atan2(MOUNT.x - EDGE.x, MOUNT.z - EDGE.z);
-    p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.tumble = false; p.sub = null; fireLight.intensity = 0; phoenix.tails.forEach(tl => tl.ok = false); resetPose(); setBurn(0);
+    p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; fireLight.intensity = 0; phoenix.tails.forEach(tl => tl.ok = false); resetPose(); setBurn(0);
     p.pos.set(START.x, gy, START.z); p.vel.set(0, 0, 0); p.grounded = true; p.fallTop = gy; p.fallCause = ''; p.flame = 1; human.group.rotation.y = fy; camYaw = fy; checkpoint.copy(p.pos);
     for (let i = 0; i < 50; i++) emit(START.x + rnd(1), gy + Math.random() * 2.2, START.z + rnd(1), rnd(2.5), 1 + Math.random() * 3.5, rnd(2.5), 0.6 + Math.random() * 0.6, pick(BIFROST));
     state = 'play'; godDir.landT = 0; return;
@@ -16660,7 +17053,7 @@ function updateWarp(dt) {
   if (W.walkP) {   // to someone on foot: down beside them, a man, already walking their way
     const F = W.walkP; W.walkP = null;
     if (F.pos && F.form === 'h' && F.gr && (F.pos.x - W.to.x) ** 2 + (F.pos.z - W.to.z) ** 2 < 220 * 220) { const fy = F.yaw || 0, x = F.pos.x + Math.cos(fy) * 2.4, z = F.pos.z - Math.sin(fy) * 2.4, gy = groundAt(x, z, F.pos.y + 4);
-      p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.tumble = false; p.sub = null; fireLight.intensity = 0; phoenix.tails.forEach(tl => tl.ok = false); resetPose(); setBurn(0);
+      p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; fireLight.intensity = 0; phoenix.tails.forEach(tl => tl.ok = false); resetPose(); setBurn(0);
       p.pos.set(x, gy, z); p.vel.set(-Math.sin(fy) * 3, 0, -Math.cos(fy) * 3); p.grounded = true; p.fallTop = gy; p.fallCause = ''; human.group.rotation.y = fy; camYaw = fy;
       for (let i = 0; i < 40; i++) emit(x + rnd(0.8), gy + Math.random() * 2, z + rnd(0.8), rnd(2), 1 + Math.random() * 3, rnd(2), 0.6 + Math.random() * 0.5, pick(EMBER)); toast(`BESIDE ${F.name}`); }
   }
@@ -16860,8 +17253,9 @@ function updateCamera(dt) {
   } else if (p.form === 'human' || p.perch) {
     const air = p.wings && !p.grounded;
     const view = p.perch && p.look && p.perchIdle > 1.8 ? smoothstep(1.8, 4.5, p.perchIdle) : 0;   // (on a perch with a name: back, and level with the horizon)
-    const dist = p.tumble ? clamp(camDist, 5.5, 8) : air ? Math.max(camDist, 22) : lerp(camDist, Math.max(camDist, 19), view), pitch = p.tumble ? 0.95 : air ? Math.max(camPitch, 0.3) : lerp(camPitch, 0.1, view);   // falling: close above him, the ground coming up past his shoulders
-    camTarget.set(p.pos.x, p.pos.y + 1.6, p.pos.z);
+    const wide = p.perch ? smoothstep(0, 1.6, p.perchT || 0) * (0.7 + 0.3 * smoothstep(0.2, 2.2, p.perchIdle || 0)) : 0, K = p.perch ? birdK() : 1;   // (the bird down: the lens goes wide at once, the place round him in it)
+    const dist = p.tumble ? clamp(camDist, 5.5, 8) : air ? Math.max(camDist, 22) : lerp(lerp(camDist, Math.max(camDist, 34 * K), wide), Math.max(camDist, 46 * K), view), pitch = p.tumble ? 0.95 : air ? Math.max(camPitch, 0.3) : lerp(lerp(camPitch, 0.17, wide), 0.1, view);   // falling: close above him, the ground coming up past his shoulders
+    camTarget.set(p.pos.x, p.pos.y + (p.perch ? 2.4 * K : 1.6), p.pos.z);
     const cp = Math.cos(pitch);
     camWant.set(camTarget.x + Math.sin(camYaw) * cp * dist, camTarget.y + Math.sin(pitch) * dist, camTarget.z + Math.cos(camYaw) * cp * dist);
     if (p.dive) camWant.y = Math.max(camWant.y, groundAt(camWant.x, camWant.z, camWant.y + 6) + 1.2);   // (under the water with him, when he dives)
@@ -16876,7 +17270,7 @@ function updateCamera(dt) {
     postMat.uniforms.uSpeed.value = lerp(postMat.uniforms.uSpeed.value, p.tumble ? 0.6 : 0, damp(3, dt));
     camera.position.lerp(camWant, damp(p.tumble ? 18 : p.grounded ? 12 : 6, dt));
     lookAt.copy(camTarget); camera.lookAt(camTarget);
-    camera.fov = lerp(camera.fov, 62 * fovK(), damp(3, dt));
+    camera.fov = lerp(camera.fov, (62 + (p.perch ? 8 * smoothstep(0, 1.6, p.perchT || 0) : 0)) * fovK(), damp(2.2, dt));
   } else {
     if (!dragging) camYawOff = lerp(camYawOff, 0, damp(1.5, dt));
     const y = p.yaw + camYawOff;
@@ -17698,7 +18092,7 @@ function updateLessons(dt) {
   if (TUT.done < 3 && flags.morphed && !TUT.later && !TUT.cur && !TUT.q.length && state === 'play' && player.form === 'phoenix' && !player.perch && !player.cine && (TUT.flyT = (TUT.flyT || 0) + dt) > 6) { TUT.flyT = -1e9; teach('flight', 3); }
   if (state !== 'play' || player.cine) { el.classList.remove('on'); return; }
   const P = player.pos;
-  if (TUT.walk0 && player.grounded) { TUT.moved += P.distanceTo(TUT.walk0); TUT.walk0.copy(P); } else TUT.walk0 = P.clone();
+  if (!TUT.walk0) TUT.walk0 = P.clone(); else { if (player.grounded) TUT.moved += P.distanceTo(TUT.walk0); TUT.walk0.copy(P); }
   if (!TUT.cur) {
     if ((TUT.gap -= dt) > 0 || !TUT.q.length) return;
     TUT.cur = TUT.q.shift(); TUT.t = 0; TUT.cur.t0 = time;
@@ -18005,9 +18399,10 @@ function updateModels(dt) {
     phoenix.group.position.copy(p.pos);
     if (ghostP) phoenix.group.scale.setScalar(Math.max(0.001, gk * gk) * PHX_S * bigName(heroName) * (1 + 0.15 * perks.wings));
     else {
-      phoenix.group.rotation.set(-p.pitch * 0.8 - p.wingF * 0.06, p.yaw, p.bank);
+      phoenix.group.rotation.set(p.pitch * 0.8 - p.wingF * 0.06, p.yaw, p.bank);   // (nose up as he climbs, down as he dives)
       phoenix.group.scale.setScalar(Math.max(0.001, pop * p.scale) * PHX_S * bigName(heroName) * (1 + 0.15 * perks.wings));
       phoenix.group.position.y += p.wingF * -0.35;
+      phxAlive(dt);
     }
     phoenix.light.position.copy(phoenix.group.position);
     phoenix.light.intensity = (tierIdx === 2 ? 5.5 : 3.4) * (0.55 + 0.6 * p.flame) * (0.82 + 0.2 * Math.sin(time * 17) + 0.12 * Math.sin(time * 31.7 + 1.3));   // his fire breathes, and what is under him sees it
@@ -18163,17 +18558,17 @@ function xrFrame() {
   // three binds the headset's own framebuffer before it calls us: whatever else happens, the picture goes back there
   // (it used to be sent to the page's canvas instead, which nobody in the headset can see: the black screen)
   const target = renderer.getRenderTarget();
-  try { xrStep(); } catch (e) { if (!XR.err) { XR.err = String(e && e.message || e).slice(0, 120); console.warn('xr', e); XR.hudKey = ''; } }
+  const raw = Math.min(clock.getDelta(), 0.05);
+  try { xrStep(raw); } catch (e) { if (!XR.err) { XR.err = String(e && e.message || e).slice(0, 120); console.warn('xr', e); XR.hudKey = ''; } }
   const sc = XR.scene || scene;
   XR.cam.near = xrFP() ? 0.06 : Math.max(0.05, camera.near); XR.cam.far = camera.far;
-  try { xrHud(Math.min(clock.getDelta() + 0.016, 0.05), sc); } catch {}
+  try { xrHud(raw, sc); } catch {}
   try { xrMenuStep(); xmapStep(); } catch (e) { if (!XR.err2) { XR.err2 = true; console.warn('xr ui', e); } }
   XR.rig.updateMatrixWorld(true);
   renderer.setRenderTarget(target);
   renderer.render(sc, XR.cam);
 }
-function xrStep() {
-  const raw = Math.min(clock.getDelta(), 0.05);
+function xrStep(raw) {
   XR.frames++;
   // where the headset put your head at the start is "his eyes"; leaning away from it moves you from there
   if (!XR.h0 && XR.frames > 4) XR.h0 = XR.cam.position.clone();
@@ -18360,6 +18755,12 @@ function xrMirror(o, hy) {
 const XM = { open: false, mesh: null, cv: null, x: null, tex: null, items: [], key: '', hot: -1, t0: 0, cols: 4, touchT: 0, W: 0.66, H: 0.36 };
 function xrMenuItems() {
   const p = player, fly = p.form === 'phoenix';
+  if (XM.page === 'album') {   // his pictures, one at a time, on the sheet itself
+    const n = XALB.list.length, ph = XALB.list[XALB.i];
+    return [{ label: 'PREVIOUS', keep: true, f: () => xalbGo(-1) }, { label: 'NEXT', keep: true, f: () => xalbGo(1) },
+      { label: ph && ph.mom ? 'GO BACK THERE' : n ? 'NO PLACE' : 'TAKE ONE', keep: !(ph && ph.mom) && !!n, f: () => { if (ph && ph.mom) { XM.page = ''; memoGo(ph); } else if (!n) { XM.page = ''; voiceRun('snap'); } } },
+      { label: 'BACK', keep: true, f: () => { XM.page = ''; } }];
+  }
   if (XM.page === 'who') {   // who is flying: touch one and be carried to them
     const L = [...NET.peers.values()].filter(P => P.seen && !P.memory).sort((a, b) => a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos)).slice(0, 10);
     return [...L.map(P => ({ label: `${P.name} ${fmtDist(P.pos.distanceTo(p.pos)).toUpperCase()}`, f: () => { XM.page = ''; warpToPeer(P); } })), ...(L.length ? [] : [{ label: 'NOBODY ELSE YET', keep: true, f: () => {} }]), { label: 'BACK', keep: true, f: () => { XM.page = ''; } }];
@@ -18373,6 +18774,7 @@ function xrMenuItems() {
     { label: 'PLAYERS', keep: true, f: () => { XM.page = 'who'; } },
     { label: `LOOK ${(LOOK.cur || LOOK0).name.toUpperCase()}`, keep: true, f: () => lookApply(looks[(li + 1) % looks.length], true) },
     { label: 'PHOTO', f: () => voiceRun('snap') },
+    { label: 'ALBUM', keep: true, f: () => xalbOpen() },
     { label: 'HELP', f: () => { guideShow(true, false); toast('ASK HER ANYTHING · SHE IS LISTENING'); } },
     { label: muted ? 'MUTED' : 'SOUND', on: !muted, keep: true, f: () => setMuted(!muted) },
     { label: 'MARK HERE', f: () => voiceRun('mark_here') },
@@ -18380,15 +18782,24 @@ function xrMenuItems() {
     { label: 'STEP OUT', f: () => { try { XR.sess?.end(); } catch {} } },
   ];
 }
+const XALB = { list: [], i: 0, img: null, at: -1, busy: false };
+async function xalbOpen() { XM.page = 'album'; XALB.busy = true; try { XALB.list = (await albumTx('readonly', st => st.getAll())).sort((a, b) => b.at - a.at); } catch { XALB.list = []; } XALB.i = 0; XALB.at = -1; XALB.busy = false; xalbLoad(); XM.key = ''; }
+function xalbGo(d) { const n = XALB.list.length; if (!n) return; XALB.i = (XALB.i + d + n) % n; xalbLoad(); }
+async function xalbLoad() { const ph = XALB.list[XALB.i]; if (!ph || XALB.at === XALB.i) return; XALB.at = XALB.i; try { const bm = await createImageBitmap(ph.thumb || ph.full); XALB.img?.close?.(); XALB.img = bm; } catch { XALB.img = null; } XM.key = ''; }
 function xrMenuDraw() {
-  const x = XM.x, W = 1024, H = 560, it = XM.items, cols = XM.cols, rows = Math.ceil(it.length / cols), tw = (W - 40) / cols, th = (H - 96) / rows;
+  const x = XM.x, W = 1024, H = 560, it = XM.items, cols = XM.cols, rows = Math.ceil(it.length / cols), top0 = XM.page === 'album' ? 436 : 78, tw = (W - 40) / cols, th = (H - 18 - top0) / rows;
   const god = getComputedStyle(document.documentElement).getPropertyValue('--god').trim() || '#ff8a3a';
   x.clearRect(0, 0, W, H); x.fillStyle = 'rgba(5,6,11,.95)'; x.beginPath(); x.roundRect(4, 4, W - 8, H - 8, 26); x.fill();
   x.strokeStyle = god; x.globalAlpha = 0.55; x.lineWidth = 3; x.stroke(); x.globalAlpha = 1;
   x.font = 'bold 30px Menlo, Consolas, monospace'; x.textAlign = 'left'; x.textBaseline = 'middle'; x.fillStyle = god; x.fillText('I C A R U S', 34, 46);
   x.textAlign = 'right'; x.font = '22px Menlo, Consolas, monospace'; x.fillStyle = 'rgba(255,236,208,.55)'; x.fillText('look and pinch · or touch', W - 34, 46);
   x.textAlign = 'center';
-  it.forEach((m, i) => { const cx = 20 + (i % cols) * tw, cy = 78 + Math.floor(i / cols) * th, hot = i === XM.hot;
+  if (XM.page === 'album') {   // the picture, as big as the sheet allows, and which one of how many
+    const n = XALB.list.length; x.font = '22px Menlo, Consolas, monospace'; x.fillStyle = 'rgba(255,236,208,.6)'; x.textAlign = 'right'; x.fillText(n ? `${XALB.i + 1} of ${n}` : '', W - 34, 46); x.textAlign = 'center';
+    if (XALB.img) { const bw = W - 60, bh = 350, k = Math.min(bw / XALB.img.width, bh / XALB.img.height), dw = XALB.img.width * k, dh = XALB.img.height * k; x.drawImage(XALB.img, (W - dw) / 2, 78 + (bh - dh) / 2, dw, dh); }
+    else { x.font = '26px Menlo, Consolas, monospace'; x.fillStyle = 'rgba(255,236,208,.6)'; x.fillText(XALB.busy ? 'opening…' : n ? 'loading…' : 'nothing kept yet', W / 2, 250); }
+  }
+  it.forEach((m, i) => { const cx = 20 + (i % cols) * tw, cy = top0 + Math.floor(i / cols) * th, hot = i === XM.hot;
     x.fillStyle = hot ? god : m.on ? 'rgba(255,200,140,.26)' : 'rgba(255,255,255,.1)'; x.globalAlpha = hot ? 0.9 : 1; x.beginPath(); x.roundRect(cx + 8, cy + 8, tw - 16, th - 16, 16); x.fill(); x.globalAlpha = 1;
     x.strokeStyle = m.on ? god : 'rgba(255,236,208,.25)'; x.lineWidth = m.on ? 3 : 1.5; x.stroke();
     x.font = `bold ${m.label.length > 16 ? 23 : 30}px Menlo, Consolas, monospace`; x.fillStyle = hot ? '#0b0b10' : '#fff6e6';
@@ -18416,8 +18827,8 @@ function xrMenuAt(o, d) {
   if (ld) { if (Math.abs(ld.z) < 1e-4) return -1; const t = -lo.z / ld.z; if (t < 0 || t > 6) return -1; hx = lo.x + ld.x * t; hy = lo.y + ld.y * t; }
   else { if (Math.abs(lo.z) > 0.022) return -1; hx = lo.x; hy = lo.y; }
   const u = hx / XM.W + 0.5, v = 0.5 - hy / XM.H; if (u < 0 || u > 1 || v < 0 || v > 1) return -1;
-  const W = 1024, Hh = 560, cols = XM.cols, rows = Math.ceil(XM.items.length / cols), px = u * W, py = v * Hh; if (py < 78) return -1;
-  const c = Math.floor((px - 20) / ((W - 40) / cols)), r = Math.floor((py - 78) / ((Hh - 96) / rows)), i = r * cols + c;
+  const W = 1024, Hh = 560, cols = XM.cols, rows = Math.ceil(XM.items.length / cols), top0 = XM.page === 'album' ? 436 : 78, px = u * W, py = v * Hh; if (py < top0) return -1;
+  const c = Math.floor((px - 20) / ((W - 40) / cols)), r = Math.floor((py - top0) / ((Hh - 18 - top0) / rows)), i = r * cols + c;
   return c >= 0 && c < cols && r >= 0 && i < XM.items.length ? i : -1;
 }
 const _xmat = new THREE.Matrix4();
@@ -18430,14 +18841,14 @@ function xrMenuPinch() {
 }
 function xrMenuStep() {
   if (!XM.open || !XM.mesh) return;
-  if (time - XM.t0 > 14 || (state !== 'play' && state !== 'talk')) { xrMenuShow(false); return; }
+  if (time - XM.t0 > (XM.page === 'album' ? 90 : 14) || (state !== 'play' && state !== 'talk')) { xrMenuShow(false); return; }
   XM.items = xrMenuItems();
   // a fingertip on a tile presses it
   let hot = XM.hot; if (time - XM.touchT > 0.5) hot = -1;
   for (const side of ['left', 'right']) { const j = xrJoints(side), tip = j && j['index-finger-tip']; if (!tip) continue;
     const i = xrMenuAt(XR.rig.localToWorld(_xm[2].set(tip.x, tip.y, tip.z))); if (i >= 0) { hot = i; if (time - XM.touchT > 0.7) { XM.touchT = time; xrMenuDo(i); } } }
   XM.hot = hot;
-  const key = XM.items.map(m => m.label + (m.on ? 1 : 0)).join('|') + hot;
+  const key = XM.items.map(m => m.label + (m.on ? 1 : 0)).join('|') + hot + XM.page + (XM.page === 'album' ? XALB.i + ':' + !!XALB.img + XALB.busy : '');
   if (key !== XM.key) { XM.key = key; xrMenuDraw(); }
 }
 // ── The map, in the room: the country around him as a model on the air beside you — the sea, the hills, the mountain —
@@ -18651,7 +19062,8 @@ function tick(dt) {
   updateDialog(dt);
   updateTalk(dt);
   updateHUD(dt); updateHealth(); updateWho(dt); updateMarks(dt); updateMemo(dt); updateRec(dt); updateMenuFx(); updateGuide(dt); drawAsciiUi(dt);
-  { const pl = player, can = state === 'play' && pl.form === 'human' && !!pl.swim && realm === 'over' && !pl.cine; if (can !== HUDQ.dive) { HUDQ.dive = can; $('diveBtn').classList.toggle('on', can); } }   // (the way under shows while he swims) updateLessons(dt); updateExplainer(dt); updatePrayPrompt(dt); updateTitleSync(); updateGodWorld(dt);
+  { const pl = player, can = state === 'play' && pl.form === 'human' && !!pl.swim && realm === 'over' && !pl.cine; if (can !== HUDQ.dive) { HUDQ.dive = can; $('diveBtn').classList.toggle('on', can); } }   // (the way under shows while he swims)
+  updateLessons(dt); updateExplainer(dt); updatePrayPrompt(dt); updateTitleSync(); updateGodWorld(dt);
   chart(dt); try { updateWorld(dt); } catch (e) { if (!WORLD.err) { WORLD.err = String(e); console.warn('world', e); } } updateQuests(dt); updateGreat(dt); updateMap(dt); updateRemoteBeams(dt); updateNewcomer();
   updateAudio(dt);
   sky.position.copy(camera.position); stars.position.copy(camera.position);
@@ -18705,7 +19117,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, TORCH, torchLight, torchNear, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);

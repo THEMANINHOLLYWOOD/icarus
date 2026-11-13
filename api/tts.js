@@ -26,9 +26,9 @@ export async function POST(req) {
       method: 'POST', signal: AbortSignal.timeout(20000),
       headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
       body: JSON.stringify({ text: said, model_id: model, voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.45, use_speaker_boost: true } }),
-    }); } catch { fail = `elevenlabs timeout (${model})`; continue; }
+    }); } catch { fail = 'voice timeout'; continue; }
     if (r.ok) return new Response(r.body, { headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store', 'X-Voice-Model': model } });
-    fail = `elevenlabs ${r.status} (${model}): ${(await r.text()).slice(0, 200)}`;
+    fail = `voice ${r.status}`; console.error('elevenlabs', r.status, model, (await r.text().catch(() => '')).slice(0, 200));
     if (r.status === 401 || r.status === 402 || r.status === 429) break;   // out of credit or locked out: another model won't help
   }
   return json({ error: fail }, 502);

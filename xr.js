@@ -70,8 +70,10 @@ export function makeHands() {
       for (let i = 0; i < 3; i++) S.v[i] += (clamp(iv[i], -8, 8) - S.v[i]) * k2;
     } else S.v = [0, 0, 0];
     S.prev = palm;
-    S.hist.push([H.t, palm.y, palm.z]); while (S.hist.length && H.t - S.hist[0][0] > 0.33) S.hist.shift();
-    const dy = S.hist.length ? palm.y - Math.min(...S.hist.map(h => h[1])) : 0, dropY = S.hist.length ? Math.max(...S.hist.map(h => h[1])) - palm.y : 0;
+    { const e = S.hist.length && H.t - S.hist[0][0] > 0.33 ? S.hist.shift() : null; if (e) { e[0] = H.t; e[1] = palm.y; e[2] = palm.z; S.hist.push(e); } else S.hist.push([H.t, palm.y, palm.z]); }   // (the oldest entry is reused for the newest)
+    while (S.hist.length && H.t - S.hist[0][0] > 0.33) S.hist.shift();
+    let lo = Infinity, hi = -Infinity; for (let i = 0; i < S.hist.length; i++) { const y = S.hist[i][1]; if (y < lo) lo = y; if (y > hi) hi = y; }
+    const dy = S.hist.length ? palm.y - lo : 0, dropY = S.hist.length ? hi - palm.y : 0;
     // the thumb, for a thumbs-up or a thumbs-down: out from the fist and pointing up or down
     const tt = joints['thumb-tip'], tpx = joints['thumb-phalanx-proximal'];
     const thumb = tt && tpx ? { up: tt.y - w.y > 0.05 && tt.y - tpx.y > 0.02, down: w.y - tt.y > 0.05 && tpx.y - tt.y > 0.02 } : null;
@@ -141,7 +143,7 @@ export function makeHands() {
       // push: both palms facing ahead, shoved out
       if (l.n.z > 0.6 && r.n.z > 0.6 && l.v[2] > 1.1 && r.v[2] > 1.1 && ready('push', 1)) out.events.push('push');
     } else { H.spreadHeld = 0; H.spreadFired = false; H.foldHeld = 0; H.folded = false; H.joinHeld = 0; H.joined = false; }
-    H.flaps = H.flaps.filter(x => H.t - x < 2.5); out.flapRate = H.flaps.length;
+    while (H.flaps.length && H.t - H.flaps[0] >= 2.5) H.flaps.shift(); out.flapRate = H.flaps.length;   // (in time order: the old ones are at the front)
 
     // offer: one palm up, open, still, in front
     const up = [l, r].find(h => h && h.open && h.n.y > 0.72 && h.palm.z > 0.15 && Math.hypot(...h.v) < 0.35);

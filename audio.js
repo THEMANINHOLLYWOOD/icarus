@@ -57,7 +57,7 @@ export function createAudio() {
   let song = null;   // the soundtrack, once it has been started
   const SCORE = false;   // the score that used to be generated when the soundtrack was not playing: off, for good
   let omen = null;   // a dark stretch of it, looped, for the night before the leap
-  let master, limiter, muteGain, subF, reverb, revIn, sfxBus, sfxWet, ambBus, musicBus, voiceBus, duckM, duckA;
+  let echoSend = null, master, limiter, muteGain, subF, reverb, revIn, sfxBus, sfxWet, ambBus, musicBus, voiceBus, duckM, duckA;
   let surround = null; const ear = { x: 0, y: 0, z: 0, fx: 0, fz: -1 };   // (six speakers, if the machine has them; and where the listener is and faces)
   let white, pink, brown, crackle;
   const samples = {};
@@ -163,7 +163,7 @@ export function createAudio() {
     reverb = ctx.createConvolver(); reverb.buffer = makeIR();
     revIn = gain(1); chain(revIn, reverb, gain(0.9), master);
 
-    sfxBus = gain(MIX.sfx); sfxBus.connect(master); chain(sfxBus, gain(0.16), revIn);
+    sfxBus = gain(MIX.sfx); sfxBus.connect(master); echoSend = gain(0.16); chain(sfxBus, echoSend, revIn);   // (how much of every sound goes to the hall: more inside rock)
     sfxWet = gain(MIX.sfx * 0.8); sfxWet.connect(master); chain(sfxWet, gain(0.7), revIn);
     duckA = gain(1); duckA.connect(master); ambBus = gain(MIX.amb); ambBus.connect(duckA);
     duckM = gain(1); duckM.connect(master); chain(duckM, gain(0.34), revIn);
@@ -1093,7 +1093,8 @@ export function createAudio() {
     at3(x, y, z, fn, o = {}) {
       if (!ctx || live > cap()) return;
       const g = gain(Math.min(1.5, o.vol ?? 1)), pn = ctx.createPanner();
-      pn.panningModel = quality === 'low' || surround ? 'equalpower' : 'HRTF'; pn.distanceModel = 'inverse';   // (for two ears: the shape of a head. For a room of speakers: plain left and right, and the rear ones for what is behind) pn.refDistance = o.ref ?? 12; pn.maxDistance = o.max ?? 600; pn.rolloffFactor = o.roll ?? 1.1;
+      pn.panningModel = quality === 'low' || surround ? 'equalpower' : 'HRTF'; pn.distanceModel = 'inverse';   // (for two ears: the shape of a head. For a room of speakers: plain left and right, and the rear ones for what is behind)
+      pn.refDistance = o.ref ?? 12; pn.maxDistance = o.max ?? 600; pn.rolloffFactor = o.roll ?? 1.1;
       if (pn.positionX) { pn.positionX.value = x; pn.positionY.value = y; pn.positionZ.value = z; } else pn.setPosition(x, y, z);
       chain(g, pn, sfxBus); const real = sfxBus; sfxBus = g;
       if (surround) { const dx = x - ear.x, dz = z - ear.z, d = Math.hypot(dx, dz) || 1, behind = Math.max(0, -(dx * ear.fx + dz * ear.fz) / d); if (behind > 0.05) { const rb = gain(behind * 0.9 * Math.min(1, (o.ref ?? 12) / Math.max(o.ref ?? 12, d * 0.6))); pn.connect(rb); rb.connect(surround.rearIn); setTimeout(() => { try { rb.disconnect(); } catch {} }, o.life ?? 6000); } }
@@ -1101,7 +1102,9 @@ export function createAudio() {
       setTimeout(() => { try { g.disconnect(); pn.disconnect(); } catch {} }, o.life ?? 6000);
     },
     update, sfx, sting, song: songStart, songPrep, songStop, omen: omenStart, omenStop, get songOn() { return !!(song && song.on); },
-    get songTime() { return song && song.on && !song.el.paused && song.el.readyState >= 2 ? song.el.currentTime : -1; },   // (where the song really is, for whatever has to land on a word) get reverbIn() { return revIn; },
+    get songTime() { return song && song.on && !song.el.paused && song.el.readyState >= 2 ? song.el.currentTime : -1; },   // (where the song really is, for whatever has to land on a word)
+    get reverbIn() { return revIn; },
+    setEcho(k) { if (!ctx || !echoSend) return; echoSend.gain.setTargetAtTime(0.16 + 0.9 * clamp(k || 0), ctx.currentTime, 0.6); },   // inside a cave: every sound comes back off the walls
     stats: () => ({ live, made, intensity, mode, step: stepN, samples: Object.keys(samples) }),
   };
   return api;

@@ -14,10 +14,10 @@ export async function POST(req) {
   const fd = new FormData();
   fd.append('file', new Blob([buf], { type }), `speech.${ext}`);
   fd.append('model', process.env.OPENAI_STT_MODEL || 'gpt-4o-mini-transcribe');
-  const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: fd,
-  });
-  if (!r.ok) { console.error('openai stt', r.status, (await r.text()).slice(0, 300)); return json({ error: `openai ${r.status}` }, 502); }
-  const data = await r.json();
-  return json({ text: (data.text || '').trim() });
+  try {
+    const r = await fetch('https://api.openai.com/v1/audio/transcriptions', { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: fd, signal: AbortSignal.timeout(15000) });
+    if (!r.ok) { console.error('openai stt', r.status, (await r.text().catch(() => '')).slice(0, 300)); return json({ error: 'not heard' }, 502); }
+    const data = await r.json();
+    return json({ text: String(data.text || '').trim().slice(0, 1000) });
+  } catch (e) { console.error('openai stt', e?.name || e); return json({ error: 'not heard' }, 504); }
 }

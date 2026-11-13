@@ -17,12 +17,17 @@ export const clip = (s, n) => (typeof s === 'string' ? s.replace(/\s+/g, ' ').tr
 
 // best-effort per-IP limiter; serverless instances don't share memory, so this only blunts bursts
 const hits = new Map();
+// (one address: an IPv6 address counts by its /64, since one machine holds a whole /64 and can walk through it)
+const ipKey = ip => { if (!ip.includes(':')) return ip; const h = ip.replace(/^\[|\]$/g, '').split('%')[0].split(':'); if (h.includes('')) { const i = h.indexOf(''), fill = Array(Math.max(0, 9 - h.length)).fill('0'); h.splice(i, 1, ...fill); } return h.slice(0, 4).map(x => x || '0').join(':') + '::/64'; };
 export function limited(req, bucket, perMinute) {
-  const ip = (req.headers.get('x-forwarded-for') || 'local').split(',')[0].trim();
+  const ip = ipKey((req.headers.get('x-forwarded-for') || 'local').split(',')[0].trim());
   const key = `${bucket}:${ip}`, now = Date.now();
   const arr = (hits.get(key) || []).filter(t => now - t < 60_000);
   arr.push(now);
-  hits.set(key, arr);
-  if (hits.size > 5000) hits.clear();
+  hits.delete(key); hits.set(key, arr);   // (most recently used last)
+  if (hits.size > 5000) {   // (sweep what has gone quiet; if that is not enough, the longest quiet go first — nobody's count is wiped to make room)
+    for (const [k, v] of hits) if (!v.length || now - v[v.length - 1] >= 60_000) hits.delete(k);
+    for (const k of hits.keys()) { if (hits.size <= 4000) break; hits.delete(k); }
+  }
   return arr.length > perMinute;
 }
