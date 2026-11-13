@@ -408,6 +408,7 @@
   #health { display:none; position:fixed; right:calc(var(--sr) + 12px); top:calc(var(--st) + 10px); z-index:21; font-size:10px; letter-spacing:.12em; color:var(--dim); text-align:right; pointer-events:none; }
   #health.on { display:block; }
   .photo #health, .pro #health, body:has(#menu.open) #health { display:none; }
+  body:has(#menu.open) #tut, body:has(#ctl.open) #tut { opacity:0 !important; }   /* (the lesson waits while the menu is down: they share the top of the screen) */
   #healthPill { pointer-events:auto; cursor:pointer; display:inline-flex; align-items:center; gap:7px; min-height:26px; padding:4px 8px; border:0; border-radius:13px; background:none; color:inherit; font:inherit; letter-spacing:inherit; text-shadow:0 0 6px #000; -webkit-tap-highlight-color:transparent; }
   #healthPill:focus-visible { outline:1px solid var(--ember); }
   #healthPill i { width:6px; height:6px; border-radius:50%; background:#7fd6a0; box-shadow:0 0 7px rgba(127,214,160,.8); flex:none; }
@@ -714,6 +715,12 @@ function a3Patch(mat, sh) {
     get() { if (!this._obcW) { const own = this._obc, m = this; this._obcW = function (sh, r) { if (own) own.call(m, sh, r); a3Patch(m, sh); }; } return this._obcW; },
     set(fn) { this._obc = fn; this._obcW = null; } });
   MP.customProgramCacheKey = function () { return (this._obc ? this._obc.toString() : '') + '|a3'; };
+  // (three.js draws a see-through two-sided material twice, back faces then front, and makes its shader be looked up again
+  //  on each pass. Light that adds up comes out the same either way round: those are drawn once.)
+  Object.defineProperty(MP, 'forceSinglePass', { configurable: true, get() { return this._fsp || this.blending === THREE.AdditiveBlending; }, set(v) { this._fsp = !!v; } });
+  // (what is hidden is not drawn: its place in the world is not worked out again every frame either — it is the moment it shows)
+  const UMW = THREE.Object3D.prototype.updateMatrixWorld;
+  THREE.Object3D.prototype.updateMatrixWorld = function (force) { if (!this.visible && !force) return; UMW.call(this, force); };
 }
 
 // ───────────────────────── utils ─────────────────────────
@@ -748,7 +755,7 @@ const TIERS = [
   { name: 'ULTRA', rt: 0.85, cell: 2, viewR: 9, fog: 3400, shadows: 2048, glow: 0.7,  deco: 104, animals: 1,   clouds: 320, dpr: 2, dof: 1 },
 ];
 // phones run the top tier too, on a budget a phone GPU can hold; if frames still drop it steps down quietly
-if (TOUCH && !VISION) { Object.assign(TIERS[2], { rt: 0.6, viewR: 7, fog: 2900, shadows: 1024, deco: 72, clouds: 200, dpr: 2, cell: 3 }); Object.assign(TIERS[1], { rt: 0.5, shadows: 0, clouds: 160, cell: 3 }); Object.assign(TIERS[0], { cell: 4 }); }   // (a phone: letters a little bigger than a computer's, and finer than they were)
+if (TOUCH && !VISION) { Object.assign(TIERS[2], { rt: 0.6, viewR: 7, fog: 2900, shadows: 0, deco: 72, clouds: 200, dpr: 2, cell: 3 }); Object.assign(TIERS[1], { rt: 0.5, shadows: 0, clouds: 160, cell: 3 }); Object.assign(TIERS[0], { cell: 4 }); }   // (a phone: letters a little bigger than a computer's, and finer than they were)
 function detectTier() {
   try {
     const gl = document.createElement('canvas').getContext('webgl2');
@@ -3051,11 +3058,54 @@ function makeHuman(mask = true, who = WHO_ME) {
   M(sph(0.035, 8, 6), bronze, -0.17, 0.5, -0.1, chest);
   const sashHold = new THREE.Group(); sashHold.position.set(-0.16, 0.14, 0.05); sashHold.rotation.y = Math.PI; rig.add(sashHold);
   const scarf = M(new THREE.PlaneGeometry(0.11, 0.52).translate(0, -0.26, 0), sashMat, 0, 0, 0, sashHold);
-  rig.traverse(o => { if (o.isMesh) o.castShadow = true; });
   const mats = [skin, cloth, clothIn, leather, hair, bronze, wax, cMat, sashMat];
-  inkOutline(rig);
-  return { group: g, rig, chest, head, mouth, lids, face, legL, legR, shinL, shinR, footL, footR, armL, armR, foreL, foreR, handL, handR, scarf, cape, capeLen, capeW: CW, capeBase: Float32Array.from(capeGeo.attributes.position.array),
+  const out = { group: g, rig, chest, head, mouth, lids, face, legL, legR, shinL, shinR, footL, footR, armL, armR, foreL, foreR, handL, handR, scarf, cape, capeLen, capeW: CW, capeBase: Float32Array.from(capeGeo.attributes.position.array),
     mats, base: mats.map(m => m.color.clone()), baseE: mats.map(m => m.emissive.clone()) };
+  mergeStill(rig, out);   // (the parts that only ever move with the joint they hang from are one mesh per joint and material)
+  rig.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  inkOutline(rig);
+  // (and the fine work — fingers, the small pieces of the face, the drawn outline — for when he is close enough to see it)
+  out.fine = []; out.fineOn = true; rig.updateMatrixWorld(true);
+  rig.traverse(o => { if (!o.isMesh || o === cape || o === scarf) return; if (o.userData.ink) return out.fine.push(o); o.geometry.computeBoundingSphere(); const s = o.getWorldScale(_s).x; if (o.geometry.boundingSphere.radius * s < 0.065) out.fine.push(o); });
+  return out;
+}
+// near enough to see it, all of him; further off, the fine work is not drawn (it would be smaller than a letter on the screen)
+function humanLod(H, d) { const on = H.fineOn ? d < 34 : d < 28; if (on === H.fineOn) return; H.fineOn = on; for (const o of H.fine) o.visible = on; }
+// A figure is put together from a great many small pieces, and each would be a separate thing for the graphics card to draw.
+// The pieces that never move on their own — everything not handed out by name to the code that poses the figure — are
+// joined: under each joint, the pieces of one material become one mesh. The figure looks and moves just as before.
+function mergeStill(root, named) {
+  const keep = new Set(), seen = new Set();
+  const walk = (v, d) => { if (!v || typeof v !== 'object' || seen.has(v) || d > 4) return; seen.add(v);
+    if (v.isObject3D) { keep.add(v); walk(v.userData, d + 1); for (const k of Object.keys(v)) if (k !== 'parent' && k !== 'children' && k !== 'userData') walk(v[k], d + 1); return; }   // (and whatever has been hung on it by name)
+    if (Array.isArray(v)) { for (const x of v) walk(x, d + 1); return; }
+    if (v.constructor === Object) for (const k in v) walk(v[k], d + 1); };
+  walk(named, 0);
+  const nodes = []; root.traverse(o => nodes.push(o));
+  for (const N of nodes) {
+    const by = new Map();
+    for (const c of N.children) {
+      if (!c.isMesh || c.isInstancedMesh || c.isSkinnedMesh || keep.has(c) || c.children.length || !c.visible || c.frustumCulled === false || Array.isArray(c.material)) continue;
+      const G = c.geometry; if (!G.attributes.position || Object.keys(G.morphAttributes || {}).length || Object.keys(c.userData).length) continue;
+      (by.get(c.material) || by.set(c.material, []).get(c.material)).push(c);
+    }
+    for (const [mat, list] of by) {
+      if (list.length < 2) continue;
+      const useCol = !!mat.vertexColors, useUV = list.every(c => c.geometry.attributes.uv), P = [], Nn = [], C = [], U = [];
+      for (const c of list) {
+        c.updateMatrix(); const g = (c.geometry.index ? c.geometry.toNonIndexed() : c.geometry.clone()); if (!g.attributes.normal) g.computeVertexNormals();
+        g.applyMatrix4(c.matrix);
+        const flip = c.matrix.determinant() < 0, pa = g.attributes.position.array, na = g.attributes.normal.array, ca = g.attributes.color?.array, ua = g.attributes.uv?.array, n = pa.length / 3;
+        for (let t = 0; t < n; t += 3) for (const k of flip ? [0, 2, 1] : [0, 1, 2]) { const v = t + k;   // (a piece mirrored into place has its faces turned the right way out again)
+          P.push(pa[v * 3], pa[v * 3 + 1], pa[v * 3 + 2]); Nn.push(na[v * 3], na[v * 3 + 1], na[v * 3 + 2]);
+          if (useCol) C.push(ca ? ca[v * 3] : 1, ca ? ca[v * 3 + 1] : 1, ca ? ca[v * 3 + 2] : 1); if (useUV) U.push(ua[v * 2], ua[v * 2 + 1]); }
+        g.dispose(); N.remove(c);
+      }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(Nn, 3));
+      if (useCol) geo.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); if (useUV) geo.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+      geo.computeBoundingSphere(); N.add(new THREE.Mesh(geo, mat));
+    }
+  }
 }
 // The hands. A curl is five numbers, thumb to little finger: 0 straight, 1 a fist. The joints ease toward them.
 const RELAX = [0.3, 0.32, 0.38, 0.45, 0.5], FIST = [0.95, 1, 1, 1, 1], OPEN = [0.05, 0.02, 0, 0.02, 0.06], SPREAD = [0, 0, 0, 0, 0], GRIP = [0.7, 0.85, 0.9, 0.9, 0.9];
@@ -3422,25 +3472,27 @@ function makePhoenix() {
   return { group: g, wings, tails, light, body, head };
 }
 // the tail is a set of chains: each link eases toward its place behind the one before, so turns and dives whip through it
+const _tinv = new THREE.Matrix4();
 function updateTails(dt, snap, P = phoenix) {
   const G = P.group; G.updateMatrixWorld();
-  const sc = G.scale.x, up = _n.set(0, 1, 0).transformDirection(G.matrixWorld);
+  const sc = G.scale.x, up = _n.set(0, 1, 0).transformDirection(G.matrixWorld), inv = _tinv.copy(G.matrixWorld).invert();
+  const own = P === phoenix, fan = own ? 1 - 0.78 * STOOP.tuck : 1, fast = own ? STOOP.fast : 0;   // (stooping, the tail closes to a blade and shivers)
   for (const t of P.tails) {
-    const seg = t.len / (t.N - 1) * sc, n = t.nodes, a = t.geo.attributes.position.array;
-    if (t.root) _p.copy(t.root); else _p.set(Math.sin(t.ang) * 0.25, 0.08, 1.6);
+    const seg = t.len / (t.N - 1) * sc, n = t.nodes, a = t.geo.attributes.position.array, ang = t.ang * fan;
+    if (t.root) _p.copy(t.root); else _p.set(Math.sin(ang) * 0.25, 0.08, 1.6);
     _p.applyMatrix4(G.matrixWorld);
-    _v.set(Math.sin(t.ang), -0.04, Math.cos(t.ang)).transformDirection(G.matrixWorld);
+    _v.set(Math.sin(ang), -0.04, Math.cos(ang)).transformDirection(G.matrixWorld);
     const fresh = snap || !t.ok || n[0].distanceToSquared(_p) > 3600;
     n[0].copy(_p); t.ok = true;
     for (let i = 1; i < t.N; i++) {
-      const wv = Math.sin(time * 5.5 - i * 0.55 + t.k * 1.7) * 0.05 * i * sc;
+      const wv = Math.sin(time * (5.5 + 26 * fast) - i * 0.55 + t.k * 1.7) * 0.05 * i * sc * (1 - 0.6 * fast);
       _s.copy(n[i - 1]).addScaledVector(_v, seg).addScaledVector(up, wv);
       if (fresh) n[i].copy(_s); else n[i].lerp(_s, damp(lerp(26, 9, i / t.N), dt));
       _s.subVectors(n[i], n[i - 1]).setLength(seg); n[i].copy(n[i - 1]).add(_s);
     }
     const px = Math.cos(t.ang), pz = -Math.sin(t.ang);
     for (let i = 0; i < t.N; i++) {
-      _s.copy(n[i]); G.worldToLocal(_s);
+      _s.copy(n[i]).applyMatrix4(inv);
       const h = t.half(i / (t.N - 1)), o = i * 6;
       a[o] = _s.x - px * h; a[o + 1] = _s.y; a[o + 2] = _s.z - pz * h;
       a[o + 3] = _s.x + px * h; a[o + 4] = _s.y; a[o + 5] = _s.z + pz * h;
@@ -3459,7 +3511,7 @@ phoenix.group.remove(phoenix.light); phoenix.light.intensity = 0; scene.add(phoe
 function haloFor(man, bird) {
   const mat = new THREE.MeshBasicMaterial({ color: 0xffe2a0 }), ring = (r, t) => { const m = new THREE.Mesh(new THREE.TorusGeometry(r, t, 8, 40), mat); m.rotation.x = Math.PI / 2; return m; };
   const a = ring(0.27, 0.036); a.position.set(0, 0.44, 0); man.head.add(a);
-  const b = ring(0.62, 0.075); b.position.set(0, 1.62, -2.4); b.rotation.x = Math.PI / 2 - 0.12; bird.group.add(b);
+  const b = ring(0.62, 0.075); b.position.set(0, 1.22, -0.68); b.rotation.x = Math.PI / 2 - 0.12; (bird.head || bird.group).add(b);   // (over the head, and turning with it)
   return mat;
 }
 const HALO = haloFor(human, phoenix);
@@ -4379,7 +4431,7 @@ function ctlChoose() {
   let saved = null; try { saved = localStorage.getItem('icarus.ctl'); } catch {}
   if (saved === 'stick') return useStick();
   if (saved === 'tilt') { tilt.want = true; return; }   // (on iPhones it has to be asked for again with a tap: the next one asks)
-  if (state === 'map' || state === 'photo' || state === 'talk' || state === 'warp') { setTimeout(ctlChoose, 1500); return; }   // (not over the map, or a god: it can wait until he is flying again)
+  if (state === 'map' || state === 'photo' || state === 'talk' || state === 'warp' || $('fsHint')?.classList.contains('on')) { setTimeout(ctlChoose, 1500); return; }   // (not over the map, or a god, or the full-screen hint: it can wait until he is flying again)
   $('ctl').classList.add('open');
 }
 const backOut = t => 1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2);
@@ -4449,7 +4501,11 @@ function flyWings(dt, o) {
     let wfold = fold * 0.6 + A * 0.55 * upW;
     let sweep = 0.04 + sp * 0.22 + dive * 0.86 - A * 0.2 * Math.sin(th) + (o.boost ? 0.08 : 0);
     let stretch = 1.12 - dive * 0.35 + (1 - sp) * 0.06 + A * 0.14 * Math.max(0, -stroke);
-    const J = WR.j[i], k = damp(16, dt), fk = o.fold || 0;
+    const tk = o.tuck || 0, pl = o.pull || 0, fl = o.flutter || 0;
+    if (tk > 0) { f -= 0.3 * tk; fold += 0.22 * tk; wfold += 0.3 * tk; sweep += 0.4 * tk; stretch -= 0.18 * tk; }   // (pinned to his sides: a teardrop of fire)
+    if (fl > 0) { const q = Math.sin(now * 41 + ph * 3) * Math.sin(now * 17 + i); wfold += q * 0.05 * fl; f += q * 0.02 * fl; }   // (the air tearing at what little of the wing is out)
+    if (pl > 0) { const e = pl * pl; f += 0.55 * e; fold -= 0.5 * e; wfold -= 0.4 * e; sweep -= (0.9 * dive + 0.35) * e; stretch += 0.22 * e; }   // (thrown wide all at once to stop the fall)
+    const J = WR.j[i], k = damp(pl > 0.3 ? 30 : tk > 0.5 ? 20 : 16, dt), fk = o.fold || 0;
     if (fk > 0) { const W = FOLDW; f = lerp(f, W[0], fk); fold = lerp(fold, W[1], fk); wfold = lerp(wfold, W[2], fk); sweep = lerp(sweep, W[3], fk); stretch = lerp(stretch, W[4], fk); }   // (standing: the wings folded along his sides)
     J[0] = lerp(J[0], f, k); J[1] = lerp(J[1], fold, k); J[2] = lerp(J[2], wfold, k); J[3] = lerp(J[3], sweep, damp(10, dt)); J[4] = lerp(J[4], stretch, damp(10, dt));
     setWingSide(i, J[0], J[1], J[2], J[3], J[4]);
@@ -6179,8 +6235,9 @@ function updatePeers(dt) {
     if (P.form !== 'p') { const g = groundAt(_p.x, _p.z, _p.y + 2); if (P.gr || _p.y < g) _p.y = Math.max(g, P.gr ? g : _p.y); }
     P.pos.lerp(_p, damp(P.form === 'p' ? 7 : 10, dt));
     P.yaw += wrapAngle(P.yawT - P.yaw) * damp(8, dt); P.pitch = lerp(P.pitch, P.pitchT, damp(6, dt)); P.bank = lerp(P.bank, P.bankT, damp(6, dt));
-    const bird = P.form === 'p', sp = Math.hypot(P.s.vx, P.s.vz);
-    A.bird.group.visible = bird; A.man.group.visible = !bird;
+    const bird = P.form === 'p', sp = Math.hypot(P.s.vx, P.s.vz), far = P.pos.distanceToSquared(camera.position) > (fogFar + 300) ** 2;   // (out past the fog: the mark on the edge of the screen says where; the figure is not drawn, nor worked out)
+    A.bird.group.visible = bird && !far; A.man.group.visible = !bird && !far;
+    if (!bird && !far) humanLod(A.man, Math.sqrt(P.pos.distanceToSquared(camera.position)));
     if (bird) {
       const G = A.bird.group; G.position.copy(P.pos); G.rotation.set(P.pitch * 0.8, P.yaw, P.bank);   // (nose up as it climbs: a positive turn about x lifts the beak)
       P.ph += dt * (1.2 + Math.hypot(P.s.vx, P.s.vy, P.s.vz) / 60);
@@ -6219,10 +6276,11 @@ function placeWaypoint(P, d, said, bird) {
   { const cn = 'mk peer wp' + (edge ? ' edge' : '') + (d > 900 && !said && !trk ? ' far' : '') + (said || P.talking ? ' lit' : '') + (trk ? ' trk' : aim ? ' aim' : ''); if (el._c !== cn) { el._c = cn; el.className = cn; } }
   const glyph = edge ? WP_ARROWS[(Math.round(Math.atan2(y, x) / (Math.PI / 4)) + 8) % 8] : said ? '“' : P.talking ? '◉' : trk ? '◎' : FRIENDS.has(P.name) ? '♦' : '◆';
   if (el._g !== glyph) { el._g = glyph; el.firstChild.textContent = glyph; }
-  el.lastChild.textContent = said ? `${P.name}: ${said}`
+  const txt = said ? `${P.name}: ${said}`
     : trk ? `${P.name} · ${fmtDist(d)}${Math.abs(dy) > 15 ? ` · ${dy > 0 ? '▲' : '▼'} ${Math.round(Math.abs(dy))} m` : ''}${following(P) ? ' · FOLLOWING' : ''}`
     : aim ? `${P.name} · ${fmtDist(d)} · ${TOUCH ? 'TAP TO TRACK' : 'L TO TRACK'}`
     : d > 40 ? `${P.name} · ${fmtDist(d)}` : P.name;
+  if (el._txt !== txt) { el._txt = txt; el.lastChild.textContent = txt; }
 }
 // Hold Tab: everyone who is here right now, in their colours, with how far away they are and which way to turn.
 const who = { open: false, t: 0, pinned: false };
@@ -7285,7 +7343,48 @@ function phxAlive(dt) {
   G.rotation.x += 0.3 * st - P.flick * 0.16 + Math.sin(P.at * 38) * P.shake * 0.05;   // (up on his legs; a flick tips the tail up)
   G.rotation.z += (Math.sin(time * 0.7) * 0.03 + Math.sin(P.at * 44) * P.shake * 0.14) * st;
   const tk = p.takeoff ? p.takeoff.sq : 0; G.position.y += (0.08 * br * st - tk * 0.4) * K * PHX_S * 0.5; if (tk) G.rotation.x -= tk * 0.25;
-  phoenix.body.scale.set(1 + 0.02 * br * st + 0.07 * P.shake, 1 + 0.035 * br * st + 0.08 * P.shake, 1 + 0.015 * br * st);
+  const S = STOOP, roll = S.roll > 0 ? Math.sin((1 - S.roll) * Math.PI) * (1 - S.roll * 0.3) : 0;
+  G.rotation.z += roll * 0.85 * S.side + Math.sin(time * 31) * 0.012 * S.fast;   // (the roll-in; and at full speed a tremor through him)
+  G.rotation.x += S.pull * S.pull * 0.45;   // (pulling out: up on his tail, wings wide, for a moment)
+  const lng = 0.09 * S.fast * S.tuck;
+  phoenix.body.scale.set((1 + 0.02 * br * st + 0.07 * P.shake) * (1 - lng * 0.6), (1 + 0.035 * br * st + 0.08 * P.shake) * (1 - lng * 0.6), (1 + 0.015 * br * st) * (1 + lng));
+}
+// ── The stoop. Going over into a dive he rolls in, the way a falcon does, a half turn toward the side he was leaning; the
+//    wings come half in, and as the speed builds they are pinned to his sides until he is a teardrop of fire, the tail closed
+//    to a blade. Past about two hundred and fifty metres a second the air breaks round him. At the bottom, pulling out, the
+//    wings are flung open all at once and the air he has been carrying goes off behind him like a shot. All of it in his
+//    own size: Andres's bird, twice as big, throws twice the fire and breaks twice the air.
+const STOOP = { on: false, roll: 0, side: 1, tuck: 0, fast: 0, pull: 0, peak: 0, boomed: false, glowT: 0, t: 0 };
+function stoopStep(dt, diving, dive) {
+  const p = player, D = STOOP, K = birdK();
+  D.fast = lerp(D.fast, smoothstep(130, 290, p.speed) * dive, damp(4, dt));
+  if (diving && !D.on && dive > 0.15 && state === 'play') { D.on = true; D.roll = 1; D.side = Math.abs(p.turn) > 0.08 ? Math.sign(p.turn) : -D.side; D.peak = p.speed; D.boomed = false; D.t = 0; audio.sfx.whoosh?.(false); }
+  if (D.on) { D.t += dt; D.peak = Math.max(D.peak, p.speed); }
+  if (D.on && (!diving || dive < 0.05)) { D.on = false; if (D.peak > 150 && D.t > 0.8 && state === 'play') stoopPull(D.peak); }
+  D.roll = Math.max(0, D.roll - dt / 0.8);
+  D.tuck = lerp(D.tuck, D.on ? dive * (0.45 + 0.55 * smoothstep(90, 220, p.speed)) : 0, damp(D.on ? 5 : 9, dt));
+  D.pull = Math.max(0, D.pull - dt / 0.85);
+  if (state !== 'play' || SH.def) return;
+  // the air breaking: once a dive, the first time past the speed of it
+  if (D.on && !D.boomed && p.speed > 250) { D.boomed = true;
+    shock(p.pos.x, p.pos.y, p.pos.z, 0xfff1d0, 16 * K, 0.45, false); shock(p.pos.x - dir3.x * 8 * K, p.pos.y - dir3.y * 8 * K, p.pos.z - dir3.z * 8 * K, 0xff9a40, 26 * K, 0.7, false);
+    audio.sfx.whoomph?.(); camShake = Math.max(camShake, 0.35 + 0.15 * (K - 1)); netFx?.('flap'); }
+  // a meteor: white heat off his breast streaming back the length of him
+  if (D.fast > 0.25 && (D.glowT -= dt) <= 0) { D.glowT = 0.016;
+    for (let i = 0, n = Math.round(1 + D.fast * 3 * Math.sqrt(K)); i < n; i++) {
+      _v.set(rnd(0.5), rnd(0.4) + 0.1, -2.2 + Math.random() * 1.4).multiplyScalar(K * PHX_S).applyEuler(phoenix.group.rotation).add(p.pos);
+      const back = 0.15 + Math.random() * 0.25;
+      emit(_v.x, _v.y, _v.z, dir3.x * p.speed * back + rnd(2), dir3.y * p.speed * back + rnd(2), dir3.z * p.speed * back + rnd(2), 0.25 + Math.random() * 0.3, Math.random() < 0.5 ? [2.6, 2.3, 1.7] : pick(EMBER), 0, (0.8 + Math.random() * 0.9) * K); } }
+}
+function stoopPull(peak) {
+  const p = player, D = STOOP, K = birdK(), k = clamp((peak - 150) / 150, 0, 1);
+  D.pull = 1; WR.beat = 1; WR.th = 0; D.roll = 0;
+  _v.copy(p.pos).addScaledVector(dir3, -10 * K);
+  shock(_v.x, _v.y, _v.z, 0xffd8a0, (14 + 18 * k) * K, 0.55, false);
+  audio.sfx.whoosh?.(true); audio.sfx.flap?.(1); if (k > 0.4) audio.sfx.whoomph?.();
+  camShake = Math.max(camShake, (0.2 + 0.25 * k) * (1 + 0.25 * (K - 1)));
+  for (const w of phoenix.wings) { w.tip.getWorldPosition(_p); for (let i = 0; i < Math.round((14 + 20 * k) * Math.sqrt(K)); i++) emit(_p.x + rnd(K), _p.y + rnd(K), _p.z + rnd(K), rnd(14) - dir3.x * 20, rnd(10), rnd(14) - dir3.z * 20, 0.5 + Math.random() * 0.5, pick(EMBER), 1, (0.7 + Math.random()) * K); }
+  netFx?.('flap');
 }
 // Where the bird could set down, shown in the world and nowhere else: a ring of light lying on the place — a named perch
 // he is flying toward, or the ground just ahead of him when he comes in low and slow — with a second ring drawing in to
@@ -7351,7 +7450,7 @@ function updatePerchMark(dt) {
   g.visible = R.a > 0.02; if (!g.visible) return;
   if (S) { _v.set(S.x, S.y + 0.4, S.z); if (was < 0.05) g.position.copy(_v); else g.position.lerp(_v, damp(S.name || p.perchGo ? 40 : 14, dt)); R.r = lerp(R.r, S.r, damp(8, dt)); }
   const [a, b, beam] = g.children, pull = 1 - (time * 0.7 % 1);
-  a.scale.setScalar(R.r * (1 + Math.sin(time * 3) * 0.03)); b.scale.setScalar(Math.max(0.05, R.r * pull)); beam.scale.set(0.07, 16 + R.r * 3, 0.07);
+  const RK = birdK(); a.scale.setScalar(R.r * RK * (1 + Math.sin(time * 3) * 0.03)); b.scale.setScalar(Math.max(0.05, R.r * RK * pull)); beam.scale.set(0.07 * RK, 16 * RK + R.r * 3, 0.07 * RK);   // (the ring as big as the bird coming down on it)
   R.mat.opacity = R.a * (p.perchGo ? 0.95 : 0.5 + 0.25 * Math.sin(time * 3));
 }
 function updatePerch(dt) {
@@ -7443,7 +7542,7 @@ function updatePhoenix(dt) {
     && groundAt(p.pos.x + dir3.x * toWater, p.pos.z + dir3.z * toWater, WATER) < WATER - 4;
   const ahead = Math.max(gAhead, WATER);
   // left alone he rides up over rising ground, as far as a bird can; folding his wings and diving, the ground is his to judge
-  if (!plunge && !diving && ahead + 10 + p.speed * 0.12 > p.pos.y + dir3.y * look) {
+  if (!plunge && !diving && ahead + 10 * birdK() + p.speed * 0.12 > p.pos.y + dir3.y * look) {   // (a bigger bird keeps further off the ground: its wings reach further down)
     const need = clamp(Math.atan2(ahead + 14 - p.pos.y, look) + 0.12, 0.4, 0.85);
     if (p.pitch < need - 0.05) p.pitch = lerp(p.pitch, need, damp(3, dt));
     if (need > 0.6 && Math.abs(ax) < 0.2) {   // too steep to climb: he leans away along the slope, toward whichever side is lower
@@ -7469,7 +7568,7 @@ function updatePhoenix(dt) {
     p.pos.y = UNDER.ceil - 10; p.vy = Math.min(p.vy, 0);
   }
   // water gives: he skips along it. The ground does not.
-  const wet = gHere < WATER, floor = wet ? WATER + 5 : gHere + 2.4;
+  const wet = gHere < WATER, floor = wet ? WATER + 5 : gHere + 2.4 * (0.5 + 0.5 * birdK());
   if (p.pos.y < floor) {
     const flat = gHere > terrainAt(p.pos.x, p.pos.z) + 0.5, e = 3;   // a roof, a floor, the turf of an island: level
     if (wet || flat) _n.set(0, 1, 0); else _n.set(terrainAt(p.pos.x - e, p.pos.z) - terrainAt(p.pos.x + e, p.pos.z), 2 * e, terrainAt(p.pos.x, p.pos.z - e) - terrainAt(p.pos.x, p.pos.z + e)).normalize();
@@ -7525,7 +7624,8 @@ function updatePhoenix(dt) {
   // the wings (see flyWings)
   p.flapPhase = Math.min(1, p.flapPhase + dt / 0.55);
   const dive = smoothstep(-0.2, -0.8, p.pitch);
-  flyWings(dt, { boost, dive, climb: clamp(pin, 0, 1) });
+  stoopStep(dt, diving, dive);
+  flyWings(dt, { boost, dive: dive * (1 - STOOP.pull), climb: clamp(pin, 0, 1), tuck: STOOP.tuck * (1 - STOOP.pull), flutter: STOOP.fast, pull: STOOP.pull });
 
   const n = SH.def ? 0 : boost || dive > 0.5 ? 4 : 2;
   for (let i = 0; i < n; i++) {
@@ -9291,7 +9391,7 @@ function updateFalls(dt) {
   _fv.subVectors(P, F.prev).divideScalar(Math.max(dt, 1e-3)); const sp = _fv.length(), jumped = !F.has || sp > 700 || state !== 'play';   // (carried somewhere by a god is not flying through anything)
   F.prev.copy(P); F.has = true;
   // where his wingtips are: seven and a half metres out either side of the bird; the wax wings of a man reach about two and a half
-  const pw = player, W = pw.form === 'phoenix' && !pw.perch ? 7.5 : pw.form === 'human' && pw.wings && !pw.grounded ? 2.6 : 0;
+  const pw = player, W = pw.form === 'phoenix' && !pw.perch ? 7.5 * birdK() : pw.form === 'human' && pw.wings && !pw.grounded ? 2.6 : 0;   // (the big bird's wings reach twice as far)
   if (W) { F.tip ||= [new THREE.Vector3(), new THREE.Vector3()]; const rot = pw.form === 'phoenix' ? phoenix.group.rotation : human.group.rotation; for (let t = 0; t < 2; t++) F.tip[t].set((t ? 1 : -1) * W, pw.form === 'phoenix' ? 0 : 1.3, 0.4).applyEuler(rot).add(P); }
   for (const f of waterfalls) {
     if (f.visible === false || (f.parent && f.parent.visible === false)) continue;
@@ -11984,16 +12084,76 @@ function parthenonAt() {   // the one hill: the broadest high shoulder of ground
   if (!best) return null;
   return ROCKS.parth = { id: 'parthenon', kind: 'parthenon', x: best.x, z: best.z, seed: 438, R: 120, yaw: Math.atan2(MOUNT.x - best.x, MOUNT.z - best.z) + Math.PI / 2 };
 }
+// ── A pillar of living rock: one mass, not stones piled up. Ring on ring up its height, each ring pushed in and out by
+//    the same slow noise, so the faces run on unbroken: vertical flutes where water has cut it, the beds of the stone in
+//    bands, a ledge here and there standing out (and the face under it in shadow), a lean, and at the foot a root that
+//    spreads into the ground it came out of. Each face is coloured by `paint` — the mountain's own rule for its rock, or
+//    the sandstone of the monasteries — so it is the same stone as what is round it.
+const _rpc = [0, 0, 0], _rpc2 = [0, 0, 0];
+function rockPillar(acc, o) {
+  const { x, z, y0, y1, R0, Rt, seed = 1, lean = 0.05, flare = 0.6, coarse = -Infinity, cave = null, crown = 1, paint, rad = null } = o;
+  const SEGS = 22, ph = seed * 1.37 % 100, la = seed * 2.71 % 6.283, H = y1 - y0, rings = [];
+  let ys = []; for (let y = y0; y < y1 - 2; y += y < coarse ? 26 : 7) ys.push(y); ys.push(y1);
+  if (cave) { ys = ys.filter(y => y < cave.y0 - 6 || y > cave.y1 + 6); for (let k = 0; k <= 5; k++) ys.push(cave.y0 + (cave.y1 - cave.y0) * k / 5); ys.push(cave.y0 - 3.5, cave.y1 + 3.5); ys.sort((a, b) => a - b); }   // (rings at its sill and its lintel, and through it)
+  for (const y of ys) {
+    const t = (y - y0) / H, bend = lean * H * (1 - t) * (1 - t) * 0.5;   // (it leans at the root, not the crown: the top stands where its top is)
+    const cx = x + Math.cos(la) * bend + noise2(ph + 0.3, y / 90) * R0 * 0.07, cz = z + Math.sin(la) * bend + noise2(ph - 4.1, y / 90) * R0 * 0.07;
+    const base = (rad ? rad(y) : lerp(R0, Rt, Math.pow(t, 0.75))) * (1 + flare * Math.pow(1 - t, 6)), u = ((y / 31 + ph * 0.37) % 1 + 1) % 1, ledge = u < 0.1 ? 0.085 * Math.sin(u / 0.1 * Math.PI) : 0;
+    const pts = [];
+    for (let i = 0; i < SEGS; i++) { const a = i / SEGS * 6.283;
+      const m = 1 + 0.12 * noise2(Math.cos(a) * 1.3 + ph, Math.sin(a) * 1.3 + y / 140) + 0.055 * Math.sin(a * 7 + ph + noise2(ph, y / 60) * 2) + 0.03 * Math.sin(y * 0.21 + ph) + ledge;
+      let r = base * m, kc = 0;
+      if (cave && y > cave.y0 - 4 && y < cave.y1 + 4) { kc = smoothstep(cave.w, cave.w * 0.55, Math.abs(wrapAngle(a - cave.ang))) * smoothstep(cave.y0 - 3.5, cave.y0, y) * smoothstep(cave.y1 + 3.5, cave.y1, y); r = lerp(r, cave.inner, kc); }   // (the mouth of a grotto: the face drawn back into the dark)
+      const jit = cave && y > cave.y0 - 4 && y < cave.y1 + 4 ? 0 : (i % 2 ? 0.4 : -0.4) * (y > y0 && y < y1 ? 1 : 0);
+      pts.push([cx + Math.cos(a) * r, y + jit, cz + Math.sin(a) * r, m, kc]); }
+    rings.push({ pts, cx, cz });
+  }
+  const P = acc.pos, N = acc.nor, C = acc.col, A = new THREE.Vector3(), B = new THREE.Vector3(), Cc = new THREE.Vector3(), nrm = new THREE.Vector3(), out = new THREE.Vector3();
+  const tri = (a, b, c, cx, cz) => {
+    A.set(a[0], a[1], a[2]); B.set(b[0], b[1], b[2]); Cc.set(c[0], c[1], c[2]);
+    nrm.subVectors(B, A).cross(out.subVectors(Cc, A)).normalize();
+    const mx = (a[0] + b[0] + c[0]) / 3, my = (a[1] + b[1] + c[1]) / 3, mz = (a[2] + b[2] + c[2]) / 3;
+    if (nrm.x * (mx - cx) + nrm.z * (mz - cz) < 0 && Math.abs(nrm.y) < 0.98) { nrm.negate(); const t = B.clone(); B.copy(Cc); Cc.copy(t); }   // (outward, whichever way the ring ran)
+    const col = paint(mx, my, mz, nrm.y, ((a[3] || 1) + (b[3] || 1) + (c[3] || 1)) / 3);
+    for (const V of [A, B, Cc]) { P.push(V.x, V.y, V.z); N.push(nrm.x, nrm.y, nrm.z); C.push(col[0], col[1], col[2]); if (acc.sway) acc.sway.push(0); if (acc.leg) acc.leg.push(0, 0, 0); }
+  };
+  for (let j = 0; j < rings.length - 1; j++) { const R1 = rings[j], R2 = rings[j + 1], cx = (R1.cx + R2.cx) / 2, cz = (R1.cz + R2.cz) / 2;
+    for (let i = 0; i < SEGS; i++) { const a = R1.pts[i], b = R1.pts[(i + 1) % SEGS], c = R2.pts[(i + 1) % SEGS], d = R2.pts[i];
+      if (a[4] > 0.8 && b[4] > 0.8 && c[4] > 0.8 && d[4] > 0.8) continue;   // (and there, no face at all: the way in)
+      tri(a, b, c, cx, cz); tri(a, c, d, cx, cz); } }
+  const T = rings[rings.length - 1], cy = y1 + crown * (1.5 + Rt * 0.1), apex = [T.cx, cy, T.cz, 1];
+  for (let i = 0; i < SEGS; i++) { const a = T.pts[i], b = T.pts[(i + 1) % SEGS]; A.set(a[0], a[1], a[2]); B.set(b[0], b[1], b[2]); Cc.set(apex[0], apex[1], apex[2]);
+    nrm.subVectors(B, A).cross(out.subVectors(Cc, A)).normalize(); if (nrm.y < 0) { nrm.negate(); const t = B.clone(); B.copy(Cc); Cc.copy(t); }   // (the crown: facing up)
+    const col = paint((a[0] + b[0] + apex[0]) / 3, cy, (a[2] + b[2] + apex[2]) / 3, nrm.y, 1);
+    for (const V of [A, B, Cc]) { P.push(V.x, V.y, V.z); N.push(nrm.x, nrm.y, nrm.z); C.push(col[0], col[1], col[2]); if (acc.sway) acc.sway.push(0); if (acc.leg) acc.leg.push(0, 0, 0); } }
+}
+// the mountain's stone: faces coloured by the same rule as the mountain's own faces at that height (its beds of lime and
+// schist, its lichen, snow wherever it can lie), with the flutes darker, the undersides of ledges in shadow, and streaks
+// where water runs down
+function paintMountainRock(x, y, z, ny, m) {
+  const steep = ny < 0.5, _pc = _rpc; terrainColor(x, z, steep ? Math.min(y, 640) : y, ny, _pc, 0);
+  if (steep) { terrainColor(x, z, y, ny, _rpc2, 0); for (let k = 0; k < 3; k++) _pc[k] = lerp(_pc[k], _rpc2[k], 0.22); }
+  let k = clamp((m - 0.94) * 2.6 + 0.9, 0.68, 1.1); if (ny < -0.2) k *= 0.62;
+  if (steep && noise2(x / 23 + z / 29, y / 160) > 0.45) k *= 0.8;   // (streaks where water runs down)
+  return [_pc[0] * k, _pc[1] * k, _pc[2] * k];
+}
+function paintSandstone(x, y, z, ny, m) {
+  const band = SANDST[((Math.floor(y / 8 + noise2(x / 40, z / 40) * 1.5) % 4) + 4) % 4];
+  let r = band[0], g = band[1], b = band[2], k = clamp((m - 0.94) * 2.6 + 0.9, 0.7, 1.1);
+  if (ny > 0.55) { const mo = smoothstep(0.55, 0.85, ny) * 0.7; r = lerp(r, 0.3, mo); g = lerp(g, 0.42, mo); b = lerp(b, 0.22, mo); }   // (moss and grass on what is level)
+  if (ny < -0.2) k *= 0.62;
+  if (ny < 0.5 && noise2(x / 19 + z / 23, y / 120) > 0.42) k *= 0.76;   // (where the rain runs down)
+  return [r * k, g * k, b * k];
+}
 function buildMeteora(S, acc) {
   const r = mulberry32(S.seed), n = 3 + Math.floor(r() * 3), tops = [];
   for (let i = 0; i < n; i++) {
     const a = r() * 6.283, d = i ? 55 + r() * 120 : 0, px = S.x + Math.cos(a) * d, pz = S.z + Math.sin(a) * d, g = overHeight(px, pz); if (g < WATER + 2) continue;
     if (tops.some(t => Math.hypot(t.x - px, t.z - pz) < t.R + 34)) continue;
     const H = 105 + r() * 135 - i * 9, R = 20 + r() * 17 - i * 1.5, top = g + H, N = 8;
-    for (let k = 0; k < N; k++) { const t = k / (N - 1), rr = R * (0.86 + 0.26 * Math.sin(t * 2.9 + 0.2)) * (k === N - 1 ? 0.9 : 1), hh = H / N * 1.5;   // the rock: drums worn round, one on another
-      part(acc, G.rock, px + (r() - 0.5) * R * 0.14, g - 4 + (H + 4) * (k + 0.5) / N, pz + (r() - 0.5) * R * 0.14, rr / 1.6 * 1.06, hh / 1.6 * 0.72, rr / 1.6 * 1.06, SANDST[(i + k) % 4], r() * 6.28); }
-    part(acc, G.islandTop, px, top - 2.6, pz, R * 0.9, 5, R * 0.9, SANDST[2]);
-    for (let k = 0; k < 5; k++) { const b = r() * 6.283, y = g + H * (0.2 + r() * 0.6); box(acc, 0.5, 14 + r() * 26, 0.5, px + Math.cos(b) * R * 0.98, y, pz + Math.sin(b) * R * 0.98, [0.33, 0.3, 0.27], 0, -b, 0); }   // (the dark streaks water has drawn down it)
+    rockPillar(acc, { x: px, z: pz, y0: g - 12, y1: top - 0.6, R0: R * 1.04, Rt: R * 0.86, seed: S.seed % 997 + i * 13, lean: 0.035 + r() * 0.04, flare: 0.9, crown: 0, paint: paintSandstone });   // the rock: one stone, rooted
+    part(acc, G.islandTop, px, top - 0.9, pz, R * 0.86, 1.4, R * 0.86, SANDST[2]);
+    for (let k = 0; k < 9; k++) { const b = r() * 6.283, d2 = R * (1.15 + r() * 0.9), bx = px + Math.cos(b) * d2, bz = pz + Math.sin(b) * d2, s = 2 + r() * 5; part(acc, G.rock, bx, overHeight(bx, bz) + s * 0.25, bz, s, s * 0.7, s * 1.1, SANDST[k % 4], r() * 6.28, r(), r()); }   // (what has come down off it, half in the grass)
     ROCKS.cyls.push({ x: px, z: pz, r: R * 0.96, y0: g - 6, y1: top - 0.6, what: 'a rock of the monasteries', S });
     S.looks.push(lookout(i < 2 ? `THE ${['GREAT', 'UPPER', 'HANGING', 'FAR', 'LEAST'][i]} MONASTERY` : 'A ROCK OF THE MONASTERIES', px, top, pz, R * 0.86, 'over'));
     tops.push({ x: px, z: pz, R, top, i });
@@ -12705,6 +12865,10 @@ function updateTorches(dt) {
           toast(`THE TORCHES TAKE ${(godById[house]?.name || house).toUpperCase()}'S FIRE FROM YOU`); witness(`lit the torches off the summit in ${godById[house]?.name || house}'s colour, on his first flight`, true); }
         if (TORCH.lit === TORCH.list.length) { TORCH.lighting = false; TORCH.spent = true; toast('EVERY TORCH BURNS IN YOUR COLOUR · UNTIL THE NEXT ONE FLIES'); } } }
   }
+  // on the first flight, the next of them out over the drop is marked: that is the way to fly
+  { const show = TORCH.lighting && flags.morphed && state === 'play' && p.form === 'phoenix', next = show && TORCH.list.find(T => !T.mine && T.R > 10);
+    if (next && !TORCH.el) { const el = TORCH.el = document.createElement('div'); el.className = 'mk wp'; el.innerHTML = '<b>✦</b><span></span>'; el.style.display = 'none'; $('markers').appendChild(el); }
+    if (TORCH.el) { if (next) { TORCH.el.style.color = PATRONS[PATRON.id]?.[0] || ''; placeMarker(TORCH.el, next.x, next.g.position.y + 3 * next.k, next.z, true, '✦', TORCH.lit < 6 ? 'FLY THROUGH THE TORCHES' : 'THE NEXT TORCH', true); } else if (TORCH.el.style.display !== 'none') TORCH.el.style.display = 'none'; } }
   // someone else's colour, arriving: they take it one after another, down the line
   { const h = torchHouse(); if (h && !TORCH.lighting && TORCH.list.some(T => T.col !== h)) { TORCH.ripple += dt; for (const T of TORCH.list) if (T.col !== h && TORCH.ripple > T.i * 0.22) { T.col = h; T.flare = 1; } } else TORCH.ripple = 0; }
   for (const T of TORCH.list) {
@@ -12746,20 +12910,12 @@ function cragsBuild() {
     const C = { i, x, z, top, R0, Rt, name: D.name, D, cave: null };
     const Rat = y => lerp(R0, Rt, Math.pow(clamp((y - g0) / H, 0, 1), 0.7)) * (1 + 0.06 * Math.sin(y * 0.05 + i));
     const cy0 = D.cave ? top - 46 : Infinity, cy1 = cy0 + 17, mouth = D.f;   // (the grotto: from its floor to its roof; it opens away from the mountain)
-    // the column: under the cloud, where hardly anyone sees it, one plain tapering pillar; above it, drums of rock, each a
-    //    ring of great blocks, rough and leaning a little, banded
-    const yc = Math.max(g0, CLOUD_SEA - 70);
-    if (yc > g0 + 5) { const col = new THREE.CylinderGeometry(Rat(yc) * 0.95, R0 * 1.12, yc - g0 + 6, 10, 1, true).toNonIndexed(); _mat.compose(_p.set(x, (g0 + yc) / 2, z), _q.setFromAxisAngle(UP, i), _s.set(1, 1, 1)); addGeo(acc, col, _mat, stone(g0, i)); }
-    for (const [ya, yb] of D.cave ? [[yc, cy0], [cy1, top]] : [[yc, top]]) { const core = new THREE.CylinderGeometry(Rat(yb) * 0.85, Rat(ya) * 0.85, yb - ya, 9, 1, true).toNonIndexed(); _mat.compose(_p.set(x, (ya + yb) / 2, z), _q.setFromAxisAngle(UP, i * 2), _s.set(1, 1, 1)); addGeo(acc, core, _mat, stone(ya, i + 1)); }   // (the heart of it: not where the grotto is)
-    for (let y = yc; y < top - 3; y += step) {
-      const r = Rat(y), n = Math.max(6, Math.round(r * 0.26)), inCave = y > cy0 - 2 && y < cy1;
-      for (let k = 0; k < n; k++) { const a = k / n * 6.283 + hsh(i, y + k) * 0.5, off = wrapAngle(a - mouth);
-        if (inCave && Math.abs(off) < 0.55) continue;   // (the mouth)
-        const rr = inCave ? r : r * (0.8 + hsh(k, y) * 0.1), sz = 6 + hsh(y, k) * 5;
-        part(acc, rk, x + Math.sin(a) * rr, y + step * 0.5, z + Math.cos(a) * rr, sz * 1.2, step * 0.62 + sz * 0.3, sz, stone(y, i), a, hsh(k, i) * 0.6, hsh(i, k) * 0.5); }
-    }
-    // the top: a cap of rock, grass on it, a pine or two
-    part(acc, cap, x, top - 2.5, z, Rt * 1.08, 4, Rt * 1.08, stone(top, i)); part(acc, cap, x, top - 0.3, z, Rt * 0.98, 1.2, Rt * 0.98, [0.32, 0.46, 0.2]);
+    // the column: one mass of the mountain's own stone, from its root (under the cloud, coarse: hardly anyone sees it there)
+    //    to its crown; where it has a grotto, the face is drawn back into the dark there
+    rockPillar(acc, { x, z, y0: g0, y1: top, R0, Rt, rad: y => Rat(y) * 1.03, seed: i * 7 + 3, lean: 0.015 + hsh(i, 2) * 0.02, flare: 1.1, coarse: CLOUD_SEA - 90,
+      cave: D.cave ? { y0: cy0, y1: cy1, ang: Math.PI / 2 - mouth, w: 0.85, inner: Rat(cy0) - 6 } : null, crown: 0.12, paint: paintMountainRock });
+    // the top: a little alpine turf, a pine or two
+    part(acc, cap, x, top + 0.15, z, Rt * 0.78, 0.45, Rt * 0.78, [0.34, 0.44, 0.22]);
     for (let k = 0; k < 2 + (i % 3); k++) { const a = hsh(i, k + 9) * 6.283, rr = Rt * (0.3 + hsh(k, i + 3) * 0.45), px = x + Math.sin(a) * rr, pz = z + Math.cos(a) * rr, sc = 1.2 + hsh(k, i) * 0.9;
       part(acc, G.trunk, px, top, pz, sc, sc, sc, [0.3, 0.22, 0.14]); part(acc, G.pine, px, top, pz, sc, sc, sc, [0.12, 0.3, 0.16]); part(acc, G.pine2, px, top, pz, sc, sc, sc, [0.14, 0.34, 0.18]); }
     C.isle = lookout(D.name, x, top + 0.6, z, Rt * 0.9, 'over');
@@ -12772,7 +12928,7 @@ function cragsBuild() {
       for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283; if (Math.abs(wrapAngle(a - mouth)) < 0.6) continue; ROCKS.cyls.push({ x: x + Math.sin(a) * (r - 2), z: z + Math.cos(a) * (r - 2), r: 5, y0: cy0, y1: cy1, what: D.cave.toLowerCase(), S }); }
       ROCKS.floors.push({ x, z, c: 1, s: 0, hw: inner * 0.72, hd: inner * 0.72, top: cy0, S });
       part(acc, cap, x, cy0 - 1.5, z, inner, 2, inner, [0.22, 0.2, 0.2]);   // (the floor, dark)
-      part(acc, cap, x, cy1 + 1.5, z, r * 0.95, 3, r * 0.95, [0.16, 0.15, 0.15]);   // (the roof, darker)
+      part(acc, cap, x, cy1 + 0.6, z, inner + 1.5, 1.6, inner + 1.5, [0.16, 0.15, 0.15]);   // (the roof, darker, inside the rock)
       { const lin = new THREE.CylinderGeometry(inner + 1, inner + 1, cy1 - cy0, 14, 1, true, mouth + 0.6 + Math.PI / 2, 6.283 - 1.2).toNonIndexed(); lin.scale(-1, 1, 1);   // (inside it is dark: the stone seen from within)
         _mat.compose(_p.set(x, (cy0 + cy1) / 2, z), _q.identity(), _s.set(1, 1, 1)); addGeo(acc, lin, _mat, [0.1, 0.09, 0.1]); }
       const gc = new THREE.Color(PATRONS[D.god]?.[0] || '#9fe8ff'), gl = [gc.r * 1.8, gc.g * 1.8, gc.b * 1.8];
@@ -13107,8 +13263,8 @@ function updateFlies(dt) {
     if (h < WATER + 0.5 || h > 520 || Math.random() > 0.25 + forestAt(x, z)) { P[o + 1] = -99999; continue; }
     P[o] = x; P[o + 1] = h + 0.5 + Math.random() * 2.5; P[o + 2] = z; F.gy[i] = h;
   }
-  const t = time;
-  for (let i = 0; i < F.N; i++) {
+  const t = time, half = TOUCH ? 2 : 1, par = (F.par = ((F.par || 0) + 1) % half); dt *= half;   // (on a phone, half of them each frame, each moved twice as far)
+  for (let i = par; i < F.N; i += half) {
     const o = i * 3; if (P[o + 1] < -9999) continue;
     const s = i * 1.37;
     V[o] += (Math.sin(t * 0.7 + s) * 0.9 - V[o] * 0.6) * dt; V[o + 2] += (Math.cos(t * 0.6 + s * 1.3) * 0.9 - V[o + 2] * 0.6) * dt;
@@ -14209,6 +14365,7 @@ function titleCard(big, small, ms = 1900, col = null) {
 }
 function startTalk(g, said = null) {
   if (state !== 'play') return;
+  if (MENU.open) menuShow(false);   // (a conversation has the screen: the menu goes up out of its way)
   state = 'talk'; talk.god = g; talk.token++; talk.busy = false; talk.text = ''; talk.shown = 0; talk.idx = 0; talk.final = false; talk.hold = 0;
   talk.idle = 0; talk.nudges = 0; talk.after = null; talk.speaking = 'god'; talk.intro = null; talk.scareT = 0; tcam.shot = ''; g.scared = false; talk.gift = null; talk.thanks = false; talk.theirs = false; talk.said = 0;
   for (const k in keys) keys[k] = false;
@@ -17071,14 +17228,13 @@ const markers = [...BEACONS, ...gods, hades, ...others].map(() => {
 const fmtDist = d => d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m';
 let hudT = 0;
 function placeMarker(el, x, y, z, show, glyph, label, lit) {
-  if (!show) { el.style.display = 'none'; return; }
+  if (!show) { if (el.style.display !== 'none') el.style.display = 'none'; return; }
   _v.set(x, y, z).project(camera);
-  if (_v.z > 1 || Math.abs(_v.x) > 1.1 || Math.abs(_v.y) > 1.1) { el.style.display = 'none'; return; }
-  el.style.display = '';
-  const px = (_v.x * 0.5 + 0.5) * innerWidth;
-  el.style.left = px + 'px';
-  el.style.top = ((-_v.y * 0.5 + 0.5) * innerHeight) + 'px';
-  el.classList.toggle('lit', lit); el.firstChild.textContent = glyph;
+  if (_v.z > 1 || Math.abs(_v.x) > 1.1 || Math.abs(_v.y) > 1.1) { if (el.style.display !== 'none') el.style.display = 'none'; return; }
+  if (el.style.display) el.style.display = '';   // (the page is written to only where something has changed)
+  const px = (_v.x * 0.5 + 0.5) * innerWidth, Lx = px.toFixed(1) + 'px', Ty = ((-_v.y * 0.5 + 0.5) * innerHeight).toFixed(1) + 'px';
+  if (el._l !== Lx) { el._l = Lx; el.style.left = Lx; } if (el._t !== Ty) { el._t = Ty; el.style.top = Ty; }
+  if (el._lit !== !!lit) { el._lit = !!lit; el.classList.toggle('lit', !!lit); } if (el._g !== glyph) { el._g = glyph; el.firstChild.textContent = glyph; }
   const L = el.lastChild; if (L.textContent !== label) L.textContent = label;
   // a long label near the edge of the screen slides back onto it (the mark itself stays on the place)
   if (el._ll !== label.length) { el._ll = label.length; el._lw = L.offsetWidth; }
@@ -18389,7 +18545,7 @@ function updateModels(dt) {
   const ghostH = gk > 0 && gh.form === 'human' && !isH, ghostP = gk > 0 && gh.form === 'phoenix' && isH;
   human.group.visible = (isH || ghostH) && !p.gone; phoenix.group.visible = !isH || ghostP;
   if (human.group.visible) {
-    human.group.position.copy(p.pos); if (p.swim) human.group.position.y += waterY(p.pos.x, p.pos.z) - WATER;   // he rides the swell
+    human.group.position.copy(p.pos); humanLod(human, XR.on ? 0 : camera.position.distanceTo(p.pos)); if (p.swim) human.group.position.y += waterY(p.pos.x, p.pos.z) - WATER;   // he rides the swell
     human.group.scale.setScalar(Math.max(0.001, ghostH ? gk * gk : pop) * MAN_SCALE);
     if (ghostH) { human.group.position.y += (1 - gk) * 1.4; setBurn(1, 2.5); }
     if (ear.level > 0.06 && state !== 'dead') human.head.rotation.x -= ear.level * 0.16 * (0.55 + 0.45 * Math.sin(time * 23));   // whatever the player is saying, he is saying
@@ -18417,7 +18573,7 @@ function updateModels(dt) {
     tips[k].tip.getWorldPosition(_v);
     const sp = isH ? Math.hypot(p.vel.x, p.vel.y, p.vel.z) : p.speed, b = (realm === 'under' ? 0.75 : 0.5) + Math.min(0.5, sp / 400);
     trailRib.lead(k, _v.x, _v.y, _v.z, Math.max(0.5, sp * 0.03));
-    trailRib.write(k, isH ? 0.07 : 0.1 + Math.abs(p.wingF) * 0.1, 1.0 * b, 0.38 * b, 0.08 * b, true);
+    trailRib.write(k, isH ? 0.07 : (0.1 + Math.abs(p.wingF) * 0.1) * birdK(), 1.0 * b, 0.38 * b, 0.08 * b, true);
   }
   trailRib.commit();
   const g = groundAt(p.pos.x, p.pos.z, p.pos.y + 0.5), alt = p.pos.y - Math.max(g, WATER);
@@ -19117,7 +19273,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);
