@@ -468,6 +468,22 @@
   body.asciiui:not(.photo):not(.pro) #talkInput::placeholder { color:transparent; }
   body.asciiui:not(.photo):not(.pro) #talkHint { visibility:hidden; }
   body.asciiui:not(.photo):not(.pro) #talkChips { gap:calc(var(--ch, 14px) * 0.5) calc(var(--cw, 9px) * 2); }
+  #quest { display:none !important; }
+  #qtrack { display:block; margin-top:6px; padding:3px 7px; background:rgba(5,7,13,.38); border:0; border-left:2px solid rgba(255,190,130,.55); color:#ffe9c8; font:inherit; font-size:11px; letter-spacing:.07em; text-align:left; line-height:1.55; max-width:min(560px, 46vw); pointer-events:auto; cursor:pointer; border-radius:0 3px 3px 0; }
+  #qtrack:empty { display:none; } #qtrack i { font-style:normal; color:var(--dim); } #qtrack:hover { background:rgba(255,190,130,.12); }
+  body.asciiui:not(.photo):not(.pro) #qtrack { position:fixed; margin:0; padding:0; color:transparent !important; background:transparent !important; border-color:transparent !important; }
+  body.asciiui:not(.photo):not(.pro) #qtrack * { color:transparent !important; }
+  #qlog { position:fixed; left:50%; top:50%; transform:translate(-50%, -48%) scale(.98); z-index:30; width:min(700px, calc(100vw - 24px)); max-height:min(80vh, calc(100vh - var(--st) - var(--sb) - 24px)); overflow-y:auto; display:none; opacity:0; transition:opacity .25s, transform .25s;
+    background:rgba(4,5,10,.93); border:1px solid rgba(255,190,130,.32); color:#f4ead2; font-family:ui-monospace, Menlo, Consolas, monospace; font-size:12px; letter-spacing:.04em; line-height:1.5; padding:0 14px 14px; box-shadow:0 0 40px rgba(0,0,0,.6); }
+  #qlog.on { display:block; opacity:1; transform:translate(-50%, -50%); }
+  #qlog .ql-top { position:sticky; top:0; display:flex; justify-content:space-between; align-items:center; padding:10px 0 6px; background:rgba(4,5,10,.97); color:#ffd8a8; letter-spacing:.2em; }
+  #qlog .ql-x { background:none; border:0; color:#ffd8a8; font:inherit; cursor:pointer; padding:6px; }
+  #qlog .ql-h { margin:12px 0 4px; color:#ffb070; letter-spacing:.16em; font-size:11px; }
+  #qlog .ql-q { display:block; width:100%; text-align:left; background:rgba(255,255,255,.025); border:0; border-left:2px solid transparent; color:inherit; font:inherit; padding:6px 8px; margin:3px 0; cursor:pointer; line-height:1.45; }
+  #qlog .ql-q:hover, #qlog .ql-q.on { background:rgba(255,190,130,.1); border-left-color:#ffb070; }
+  #qlog .ql-q span { color:#f4ead2; } #qlog i { font-style:normal; color:#9c958b; } #qlog u { text-decoration:none; color:#d8c8a0; }
+  #qlog .ql-i, #qlog .ql-d, #qlog .ql-e, #qlog .ql-tot { margin:3px 0; padding:0 8px; } #qlog .ql-e { color:#7d776e; } #qlog .ql-tot { color:#ffd8a8; }
+  .touch #qlog { font-size:11px; } .touch #qlog .ql-q { padding:8px; }
   .asciiui #bars { display:none; }   /* (the film's black bars are drawn in the grid too, so what is typed there is not under them) */
   /* each picture moves the way the thing itself does, when a hand is over it or has just pressed it */
   .ic * { transform-box:view-box; } .ic .w, .ic .s { opacity:.5; }
@@ -595,7 +611,7 @@
 
 <div id="hud" class="hidden">
   <div id="markers"></div>
-  <div id="status"><div id="obj"></div><div id="quest"></div><div id="mic"><i>●</i> <span id="micText"></span></div></div>
+  <div id="status"><div id="obj"></div><div id="quest"></div><button id="qtrack" type="button" aria-label="Quests"></button><div id="mic"><i>●</i> <span id="micText"></span></div></div>
   <div id="warn"></div>
   <div id="prompt" class="hidden"></div>
   <div id="dialog" class="hidden"><div id="dlgTitle"></div><div id="dlgText"></div></div>
@@ -1909,6 +1925,7 @@ function crownHit(x, y, z, m) {
   if (mx * mx + mz * mz > 345 * 345) return null;
   for (const b of CROWN.boxes) {
     if (y < b.y0 - m || y > b.y1 + m) continue;
+    if (b.pyl !== undefined && livingOpen(b.pyl, y)) continue;   // (the stone has stood aside here)
     const ex = x - b.x, ez = z - b.z, lx = ex * b.c - ez * b.s, lz = ex * b.s + ez * b.c, ox = Math.abs(lx) - b.hw, oz = Math.abs(lz) - b.hd;
     if (ox > m || oz > m) continue;
     const top = y - b.y1;
@@ -1988,14 +2005,14 @@ function pushOut(pos, vel, m) {
     if (ox > 0 || oz > 0) continue;
     let nx, nz; if (ox > oz) { const sg = Math.sign(lx) || 1; nx = sg * b.c; nz = -sg * b.s; pos.x -= nx * ox; pos.z -= nz * ox; } else { const sg = Math.sign(lz) || 1; nx = sg * b.s; nz = sg * b.c; pos.x -= nx * oz; pos.z -= nz * oz; }
     const vn = vel.x * nx + vel.z * nz; if (vn < 0) { vel.x -= nx * vn; vel.z -= nz * vn; }
-    hit = { x: b.x, z: b.z, r: b.hw, t: 0, soft: false, y0: b.y0, yb: b.y0, y1: b.y1, what: b.what };
+    hit = { x: b.x, z: b.z, r: b.hw, t: 0, soft: false, y0: b.y0, yb: b.y0, y1: b.y1, what: b.what, ref: b, type: 'box', list: CROWN.boxes };
   }
   if (realm === 'over') {   // (and the stone out in the country: its rocks and its walls)
     for (const c of ROCKS.cyls) { if (pos.y > c.y1 - 0.4 || pos.y + 1.8 < c.y0) continue; const ex = pos.x - c.x, ez = pos.z - c.z, rr = c.r + m, d2 = ex * ex + ez * ez; if (d2 >= rr * rr || d2 < 1e-4) continue;
-      const d = Math.sqrt(d2), nx = ex / d, nz = ez / d, vn = vel.x * nx + vel.z * nz; pos.x = c.x + nx * rr; pos.z = c.z + nz * rr; if (vn < 0) { vel.x -= nx * vn; vel.z -= nz * vn; } hit = { x: c.x, z: c.z, r: c.r, t: 0, soft: false, y0: c.y0, yb: c.y0, y1: c.y1, what: c.what }; }
+      const d = Math.sqrt(d2), nx = ex / d, nz = ez / d, vn = vel.x * nx + vel.z * nz; pos.x = c.x + nx * rr; pos.z = c.z + nz * rr; if (vn < 0) { vel.x -= nx * vn; vel.z -= nz * vn; } hit = { x: c.x, z: c.z, r: c.r, t: 0, soft: false, y0: c.y0, yb: c.y0, y1: c.y1, what: c.what, ref: c, type: 'cyl', list: ROCKS.cyls }; }
     for (const b of ROCKS.boxes) { if (pos.y > b.y1 - 0.4 || pos.y + 1.8 < b.y0) continue; const ex = pos.x - b.x, ez = pos.z - b.z, lx = ex * b.c - ez * b.s, lz = ex * b.s + ez * b.c, ox = Math.abs(lx) - b.hw - m, oz = Math.abs(lz) - b.hd - m; if (ox > 0 || oz > 0) continue;
       let nx, nz; if (ox > oz) { const sg = Math.sign(lx) || 1; nx = sg * b.c; nz = -sg * b.s; pos.x -= nx * ox; pos.z -= nz * ox; } else { const sg = Math.sign(lz) || 1; nx = sg * b.s; nz = sg * b.c; pos.x -= nx * oz; pos.z -= nz * oz; }
-      const vn = vel.x * nx + vel.z * nz; if (vn < 0) { vel.x -= nx * vn; vel.z -= nz * vn; } hit = { x: b.x, z: b.z, r: b.hw, t: 0, soft: false, y0: b.y0, yb: b.y0, y1: b.y1, what: b.what }; }
+      const vn = vel.x * nx + vel.z * nz; if (vn < 0) { vel.x -= nx * vn; vel.z -= nz * vn; } hit = { x: b.x, z: b.z, r: b.hw, t: 0, soft: false, y0: b.y0, yb: b.y0, y1: b.y1, what: b.what, ref: b, type: 'box', list: ROCKS.boxes }; }
   }
   // (a trunk standing just over the line in the next square is as solid as one in this one: near an edge, the neighbours too)
   const fx = pos.x / CHUNK - cx, fz = pos.z / CHUNK - cz, edge = (m + 6) / CHUNK, ox = fx < edge ? -1 : fx > 1 - edge ? 1 : 0, oz = fz < edge ? -1 : fz > 1 - edge ? 1 : 0;
@@ -4565,6 +4582,7 @@ function spaceAction() {
     }
     { const F = story.phase !== 'summit' && story.phase !== 'leap' && peerNear(5); if (F && !FRIENDS.has(F.name)) return { kind: 'friend', P: F, label: `make friends with ${F.name.toLowerCase()}` }; }   // (someone standing right in front of him)
   }
+  if (p.climb && p.climb.kind === 'stone') return p.flame > 0.08 && time >= (p.wjT || 0) ? { kind: 'wingleap', label: 'wing leap' } : { kind: 'jumpoff', label: 'leap off' };
   if (p.climb) return { kind: 'jumpoff', label: 'leap off' };
   // on the ground he jumps; in the air he burns. (At the lip of the mountain, the first time, the jump is the leap.)
   if (p.grounded && p.swim && story.phase !== 'summit' && story.phase !== 'leap' && realm === 'over' && !p.burnout && p.flame >= COST.rebirth) return { kind: 'breach', label: 'leap out and burn' };   // (in the sea: up out of it, and fire at the top)
@@ -4595,6 +4613,7 @@ function pressSpace() {
   if (act.kind === 'animal') return touchAnimal(act.a);
   if (act.kind === 'jump') return jump();
   if (act.kind === 'breach') return leapFromWater();
+  if (act.kind === 'wingleap') return wingLeap();
   if (act.kind === 'jumpoff') return jumpOff();
   const cost = COST[act.kind];
   if (p.burnout || p.flame < cost) {
@@ -5015,8 +5034,9 @@ function updateHuman(dt) {
     hs = p.quick ? lerp(hs, 15, damp(3.2, dt)) : lerp(hs, 15 - flare * 9 + tuck * 24, damp(1.15 + flare * 0.9, dt));
     const k = damp(2.2, dt), nx = lerp(dx, -Math.sin(yaw), k), nz = lerp(dz, -Math.cos(yaw), k), nl = Math.hypot(nx, nz) || 1;
     p.vel.x = nx / nl * hs; p.vel.z = nz / nl * hs;
-    p.vel.y = p.quick ? lerp(p.vel.y, -(7 + alt * 1.7), damp(7, dt))   // a swoop: steep at first, flattening as the ground arrives
-      : lerp(p.vel.y, -5.5 + flare * 3 - tuck * 18, damp(1.7 + flare, dt));
+    if (p.wjump && (p.wjump.t += dt) < p.wjump.T) { p.vel.y -= 13 * dt; hs = Math.min(hs, 4 + p.wjump.t * 10); p.vel.x = p.vel.x / (Math.hypot(p.vel.x, p.vel.z) || 1) * hs; p.vel.z = p.vel.z / (Math.hypot(p.vel.x, p.vel.z) || 1) * hs; }   // (a wing leap: it rises before it glides)
+    else p.vel.y = p.quick ? lerp(p.vel.y, -(7 + alt * 1.7), damp(7, dt))   // a swoop: steep at first, flattening as the ground arrives
+      : lerp(p.vel.y, -5.5 * (1 - IS.glide * 0.7) + flare * 3 - tuck * 18, damp(1.7 + flare, dt));
     p.wingOpen = Math.min(1, p.wingOpen + dt / 0.4);
     p.flame -= dt / 100 * (realm === 'under' ? UNDER_BURN : 1) / (1 + 0.4 * perks.ember);
     if (p.flame <= 0) { p.flame = 0; loseWings(); }
@@ -5084,6 +5104,11 @@ function updateHuman(dt) {
   }
   p.pos.x = nx; p.pos.z = nz;
   const touched = pushOut(p.pos, p.vel, 0.45);   // trunks, rocks, walls
+  if (touched && touched.ref && !touched.soft && !locked && touched.y1 - p.pos.y > 1.6 && p.form === 'human' && !p.swim && (p.climbStam ?? 1) > 0.1 && time > (p.regrabT || 0)) {   // stone: pylons, the needle, the spires, the rocks of the monasteries
+    const n = stoneNormal(touched, p.pos), push = ml > 0.05 ? -(mx * n[0] + mz * n[1]) / ml : 0, into = -(p.vel.x * n[0] + p.vel.z * n[1]);
+    if (p.grounded && ml > 0.5 && push > 0.55) { pressed = true; if ((p.climbPush = (p.climbPush || 0) + dt) > 0.22) { startClimbStone(touched); return; } }
+    else if (!p.grounded && (p.wings || push > 0.4 || into > 1.5) && p.vel.y < 14) { startClimbStone(touched); return; }   // (caught it)
+  }
   if (touched && p.grounded && !locked && ml > 0.5) {
     const tx = touched.x - p.pos.x, tz = touched.z - p.pos.z, tl = Math.hypot(tx, tz) || 1, toward = (mx * tx + mz * tz) / tl / Math.max(ml, 1e-3);
     if (touched.soft && touched.t > 0.2 && toward > 0.6) { if ((p.climbStam ?? 1) > 0.15) { pressed = true; if ((p.climbPush = (p.climbPush || 0) + dt) > 0.25) { startClimb('tree', tx / tl, tz / tl, touched); return; } } }
@@ -5715,6 +5740,7 @@ function jumpOff() {
   audio.sfx.whoosh(false);
 }
 function updateClimb(dt) {
+  if (player.climb.kind === 'stone') return updateClimbStone(dt);
   const p = player, C = p.climb, [ix, iz] = state === 'play' ? axes() : [0, 0];
   const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rX = Math.cos(camYaw), rZ = -Math.sin(camYaw);
   const mx = fx * iz + rX * ix, mz = fz * iz + rZ * ix, into = mx * C.dx + mz * C.dz, side = -mx * C.dz + mz * C.dx;
@@ -5756,6 +5782,89 @@ function updateClimb(dt) {
   p.fallTop = Math.max(p.fallTop, p.pos.y);
   if (p.climbStam <= 0) { dropClimb(1.2, true); return bodyLanguage(dt, 0, false); }
   bodyLanguage(dt, 0, false);
+}
+// ── Climbing stone: the pylons of Olympus, the needle, the spires out of the cloud, the rocks of the monasteries. He goes
+//    up a face hand over hand, along it, round its corners; where one block stands on another he goes on up onto it; at the
+//    top, if there is somewhere to stand, he pulls himself over. And on the wall he can open his wings and leap: a great
+//    beat that throws him up the face, paid for out of his fire (the cape shows it going), and then he glides — into the
+//    face again, where he takes hold. A moment's rest between leaps.
+function stoneNormal(t, P) {   // the outward face he is against: [nx, nz]
+  if (t.type === 'cyl') { const ex = P.x - t.ref.x, ez = P.z - t.ref.z, d = Math.hypot(ex, ez) || 1; return [ex / d, ez / d]; }
+  const b = t.ref, ex = P.x - b.x, ez = P.z - b.z, lx = ex * b.c - ez * b.s, lz = ex * b.s + ez * b.c;
+  return Math.abs(lx) - b.hw > Math.abs(lz) - b.hd ? [Math.sign(lx) * b.c, -Math.sign(lx) * b.s] : [Math.sign(lz) * b.s, Math.sign(lz) * b.c];
+}
+function startClimbStone(t) {
+  const p = player, n = stoneNormal(t, p.pos), fromAir = !p.grounded, hard = fromAir ? Math.max(0, -(p.vel.x * n[0] + p.vel.z * n[1])) : 0;
+  if (p.wings) { p.wings = false; setManWings(0, 0, 0, 0, 0); }
+  p.climb = { kind: 'stone', surf: { type: t.type, ref: t.ref, list: t.list }, t: 0, cph: 0, dx: -n[0], dz: -n[1], ax: undefined };
+  p.grounded = false; p.vel.set(0, 0, 0); p.climbPush = 0; p.land = null; p.wjump = null; p.tumble = false; p.fallTop = p.pos.y;
+  audio.sfx.grab?.(false); if (fromAir) { audio.sfx.land(clamp(hard / 14, 0.2, 0.7)); for (let i = 0; i < 14; i++) emit(p.pos.x - n[0] * 0.4 + rnd(0.6), p.pos.y + 1 + rnd(0.8), p.pos.z - n[1] * 0.4 + rnd(0.6), n[0] * 3 + rnd(2), rnd(2), n[1] * 3 + rnd(2), 0.6, pick(ASH), -4); }
+  if (!stats.toldStone) { stats.toldStone = true; toast(TOUCH ? 'CLIMB WITH THE STICK · TAP: A WING LEAP, PAID IN FIRE' : XR.on ? 'CLIMB: MOVE YOUR HANDS · BEAT YOUR WINGS: A WING LEAP' : 'W / S CLIMB · A / D ALONG · SPACE: A WING LEAP, PAID IN FIRE'); }
+}
+function updateClimbStone(dt) {
+  const p = player, C = p.climb, S = C.surf, [ix, iz] = state === 'play' ? axes() : [0, 0];
+  const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rX = Math.cos(camYaw), rZ = -Math.sin(camYaw);
+  const mx = fx * iz + rX * ix, mz = fz * iz + rZ * ix, into = mx * C.dx + mz * C.dz, side = -mx * C.dz + mz * C.dx;
+  C.t += dt; p.vel.set(0, 0, 0); p.grounded = false;
+  const up = into > 0.3 ? 1 : into < -0.3 ? -1 : 0, fast = boosting() && up > 0;
+  const st = p.climbStam = Math.max(0, (p.climbStam ?? 1) - dt * (up > 0 ? (fast ? 1 / 28 : 1 / 50) : 1 / 160) * (1 - IS.grip * 0.8)), slow = st < 0.25 ? 0.45 : 1;
+  // along the face (and round the corner when he comes to it)
+  const along = Math.abs(side) > 0.3 ? side * 1.7 * slow * dt : 0;
+  if (S.type === 'cyl') {
+    const c = S.ref, R = c.r + 0.45; let a = Math.atan2(p.pos.z - c.z, p.pos.x - c.x); a -= along / R;
+    p.pos.x = c.x + Math.cos(a) * R; p.pos.z = c.z + Math.sin(a) * R; C.dx = -Math.cos(a); C.dz = -Math.sin(a);
+  } else {
+    const b = S.ref; p.pos.x += -C.dz * along; p.pos.z += C.dx * along;
+    const ex = p.pos.x - b.x, ez = p.pos.z - b.z; let lx = ex * b.c - ez * b.s, lz = ex * b.s + ez * b.c;
+    if (C.ax === undefined) { if (Math.abs(lx) - b.hw > Math.abs(lz) - b.hd) { C.ax = 0; C.sg = Math.sign(lx) || 1; } else { C.ax = 1; C.sg = Math.sign(lz) || 1; } }
+    if (C.ax === 0 && Math.abs(lz) > b.hd + 0.3) { C.ax = 1; C.sg = Math.sign(lz); lx = clamp(lx, -b.hw + 0.3, b.hw - 0.3); }   // (round the corner)
+    else if (C.ax === 1 && Math.abs(lx) > b.hw + 0.3) { C.ax = 0; C.sg = Math.sign(lx); lz = clamp(lz, -b.hd + 0.3, b.hd - 0.3); }
+    if (C.ax === 0) { lx = C.sg * (b.hw + 0.45); lz = clamp(lz, -b.hd - 0.2, b.hd + 0.2); } else { lz = C.sg * (b.hd + 0.45); lx = clamp(lx, -b.hw - 0.2, b.hw + 0.2); }
+    p.pos.x = b.x + lx * b.c + lz * b.s; p.pos.z = b.z - lx * b.s + lz * b.c;
+    const nx = C.ax === 0 ? C.sg * b.c : C.sg * b.s, nz = C.ax === 0 ? -C.sg * b.s : C.sg * b.c; C.dx = -nx; C.dz = -nz;
+  }
+  // up and down it
+  const vs = (fast ? 4.2 : 2.6) * slow * (up < 0 ? 0.85 : 1);
+  if (up) { p.pos.y += up * vs * dt; C.cph += vs * dt * 2.4; }
+  if (Math.abs(side) > 0.3) C.cph += 1.7 * dt * 1.6;
+  const g = groundAt(p.pos.x, p.pos.z, p.pos.y + 0.5);
+  if (p.pos.y <= g + 0.02 && up <= 0) { p.pos.y = g; p.climb = null; p.grounded = true; p.land = { t: 0, T: 0.3, d: 0.4 }; return bodyLanguage(dt, 0, false); }
+  if (p.pos.y < S.ref.y0 - 0.5 && up < 0) { dropClimb(0.8, false); return bodyLanguage(dt, 0, false); }   // (off the bottom of a stone in the air)
+  // the top: another stone standing on this one, or somewhere to stand, or only the edge to hang from
+  if (p.pos.y >= S.ref.y1 - 0.25) {
+    let next = null;
+    for (const o of S.list || []) { if (o === S.ref || o.y0 < S.ref.y1 - 1.6 || o.y0 > S.ref.y1 + 8) continue;
+      const ex = p.pos.x - o.x, ez = p.pos.z - o.z;
+      if (S.type === 'cyl' ? Math.hypot(ex, ez) < (o.r || 0) + 4 : Math.abs(ex * o.c - ez * o.s) < o.hw + 3.5 && Math.abs(ex * o.s + ez * o.c) < o.hd + 3.5) { next = o; break; } }
+    if (next) { S.ref = next; C.ax = undefined; p.pos.y = Math.max(p.pos.y, next.y0 + 0.2); }
+    else {
+      const cx = S.ref.x - p.pos.x, cz = S.ref.z - p.pos.z, cd = Math.hypot(cx, cz) || 1, k = Math.min(3.5, cd * 0.7), tx = p.pos.x + cx / cd * k, tz = p.pos.z + cz / cd * k, top = groundAt(tx, tz, S.ref.y1 + 4);
+      if (top > S.ref.y1 - 1.6 && up > 0) { p.climb = null; p.grounded = true; p.pos.set(tx, top, tz); p.land = { t: 0, T: 0.45, d: 0.85 }; body.exert = Math.min(1, body.exert + 0.05); audio.sfx.land(0.3); p.climbStam = Math.min(1, (p.climbStam ?? 1) + 0.3); return bodyLanguage(dt, 0, false); }
+      p.pos.y = S.ref.y1 - 0.25;
+    }
+  }
+  { const hold = Math.floor(C.cph / Math.PI); if (hold !== C.hold) { if (C.hold !== undefined) audio.sfx.grab?.(false); C.hold = hold; } }
+  human.group.rotation.y += wrapAngle(Math.atan2(-C.dx, -C.dz) - human.group.rotation.y) * damp(10, dt);
+  if (XR.on) camYaw = Math.atan2(-C.dx, -C.dz);   // (in the headset: moving your hands climbs the face, whichever way you are looking)
+  else if (!dragging) { camYaw += wrapAngle(Math.atan2(-C.dx, -C.dz) - camYaw) * damp(1.4, dt); camPitch = lerp(camPitch, -0.12, damp(1.2, dt)); }   // (the lens out from the face, looking up it)
+  p.fallTop = p.pos.y;
+  if (p.climbStam <= 0) { dropClimb(1.2, true); return bodyLanguage(dt, 0, false); }
+  bodyLanguage(dt, 0, false);
+}
+// the wing leap: the wax wings thrown open against the stone, one beat, and up
+function wingLeap() {
+  const p = player, C = p.climb; if (!C) return;
+  if (time < (p.wjT || 0)) return toast('YOUR WINGS NEED A MOMENT');
+  if (p.flame < 0.08) return toast('NOT ENOUGH FIRE IN YOU FOR YOUR WINGS');
+  p.flame -= 0.06; p.wjT = time + 1.6;
+  const nx = -C.dx, nz = -C.dz, hi = boosting() ? 1.25 : 1;
+  p.climb = null; p.grounded = false; p.wings = true; p.wingOpen = 0.55; p.quick = false; p.tumble = false;
+  p.vel.set(0, 28 * hi * (1 + IS.leap * 0.6), 0); p.wjump = { t: 0, T: 0.95 }; p.regrabT = time + 0.75; p.fallTop = p.pos.y;   // (he takes hold again once he is well up it)
+  human.group.rotation.y = Math.atan2(C.dx, C.dz) + Math.PI;   // (still facing the stone: the glide brings him back to it)
+  for (let i = 0; i < 70; i++) emit(p.pos.x + nx * 0.6 + rnd(1.6), p.pos.y + 1.2 + rnd(0.6), p.pos.z + nz * 0.6 + rnd(1.6), rnd(5) + nx * 3, -2 - Math.random() * 7, rnd(5) + nz * 3, 0.5 + Math.random() * 0.5, i % 3 ? pick(EMBER) : [2.6, 2.2, 1.4], 1, 1);
+  shock(p.pos.x, p.pos.y + 1, p.pos.z, 0xffc070, 7, 0.45, false);
+  audio.sfx.wingsOpen?.(); audio.sfx.flap?.(1); netFx('wings'); camShake = Math.max(camShake, 0.15);
+  capeFx.uFull.value = 1;   // (the cape flares as the fire is spent)
 }
 // tripping: over a stone at a sprint, or going too fast down a hillside
 function startTrip() {
@@ -6033,6 +6142,7 @@ function netJoin() {
   ch.on('broadcast', { event: 'tear' }, ({ payload: m }) => gotTear(m)); ch.on('broadcast', { event: 'crater' }, ({ payload: m }) => gotCrater(m)); ch.on('broadcast', { event: 'kick' }, ({ payload: m }) => gotKick(m)); ch.on('broadcast', { event: 'look' }, ({ payload: m }) => gotLook(m));
   ch.on('broadcast', { event: 'ring' }, ({ payload: m }) => gotRing(m));
   ch.on('broadcast', { event: 'arena' }, ({ payload: m }) => gotArena(m));
+  ch.on('broadcast', { event: 'qshare' }, ({ payload: m }) => gotQshare(m));
   ch.on('broadcast', { event: 'wind' }, ({ payload: m }) => gotWind(m));
   ch.on('broadcast', { event: 'guide' }, ({ payload: m }) => gotGuide(m));
   ch.on('broadcast', { event: 'warp' }, ({ payload: m }) => gotWarp(m));
@@ -6568,6 +6678,7 @@ function menuItems() {
     { ic: mic.denied ? 'micx' : 'mic', label: mic.denied ? 'no mic' : 'voice', key: 'V', on: !!mic.stream && !VC.muted, keep: true, f: menuMic },
     { ic: 'hand', label: 'hands', key: 'H', on: cam.on || cam.loading || XR.on, keep: !XR.supported, f: () => handsToggle() },
     { ic: 'map', label: 'map', key: 'M', f: () => { if (state === 'play') openMap(); } },
+    { ic: 'quest', label: 'quests', key: 'J', badge: String(qlActive().length || ''), on: QL.open, f: () => qlShow(!QL.open) },
     { ic: 'who', label: 'players', key: 'Tab', badge: String(flyers), on: who.pinned, f: () => { who.pinned = !who.pinned; who.open = who.pinned; } },
     { ic: 'cam', label: 'camera', key: 'F', f: () => { if (state === 'play') openPhoto(true); } },
     ...(perks.bolt ? [{ ic: 'bolt', label: 'bolt', key: 'X', f: () => { throwBolt(); } }] : []),
@@ -6670,6 +6781,7 @@ function makeFire(cv, cw, ch, cool) {
 // the pictures in the strip, drawn the only way this world draws anything: three lines of five characters, and a second
 // and third drawing of each for when a hand is on it (a mouth that speaks, wings that beat, a shutter, a flame)
 const AIC = {
+  quest: [[" /\\  ", "<-+->", " \\/  "], [" /\\  ", "<-*->", " \\/  "]],
   mic: [[" (|) ", "  |  ", " _|_ "], ["((|))", "  |  ", " _|_ "]], micx: [[" (x) ", "  |  ", " _|_ "]],
   hand: [[" |||,", " |||/", " '-' "], [",||| ", "/||| ", " '-' "]],
   map: [[" _ _ ", "|.|.|", "|_|_|"], [" _ _ ", "|x|.|", "|_|_|"], [" _ _ ", "|.|x|", "|_|_|"]],
@@ -6719,7 +6831,7 @@ function auiToast() {
   const now = performance.now(); if (now > TOAST.until || !TOAST.msg) return;
   const nx = UIL.nx, k = Math.min(1, (now - TOAST.t0) / 160, (TOAST.until - now) / 320), max = nx - 6, words = TOAST.msg.split(' '), lines = [''];
   for (const w of words) { const L = lines.length - 1, t = lines[L] ? lines[L] + ' ' + w : w; if (lines[L] && t.length > max) lines.push(w); else lines[L] = t; }
-  const mr = MENU.open ? rectOf($('menu'), 250).bottom : 0, top = Math.min(UIL.ny - 2, uilRow(Math.max(mr + UIL.ch * 1.2, UIL.ch * 1.6)));
+  const mr = MENU.open ? rectOf($('menu'), 250).bottom : 0, top = Math.min(UIL.ny - 2 - (QL.rows && !MENU.open ? QL.rows + 1 : 0), uilRow(Math.max(mr + UIL.ch * 1.2, UIL.ch * 1.6)));   // (under the quest at the top left, not across it)
   lines.slice(0, 3).forEach((ln, i) => { const shown = ln.slice(0, Math.ceil(ln.length * Math.min(1, (now - TOAST.t0) / 220 + 0.25))), c0 = (nx - ln.length) >> 1; uilPlate(c0 - 2, top - i, c0 + ln.length + 1, top - i, 190 * k | 0); uilText(c0, top - i, shown, 0, 235 * k | 0); uilPut(c0 - 2, top - i, 42, 1, 220 * k | 0); });
 }
 
@@ -6840,7 +6952,10 @@ function auiSay() {
   const nx = UIL.nx, ny = UIL.ny;
   if (state === 'play' || state === 'map') { const o = ($('obj').textContent || '').trim(), q = ($('quest').textContent || '').trim(), max = Math.max(20, (nx >> 1) - 2);
     if (o) { const t = o.length > max ? o.slice(0, max - 1) + '…' : o; uilPlate(1, ny - 2, t.length + 2, ny - 2, 120); uilText(2, ny - 2, t.toUpperCase(), 0, 170); }
-    if (q) { const t = q.length > max ? q.slice(0, max - 1) + '…' : q; uilPlate(1, ny - 3, t.length + 2, ny - 3, 120); uilText(2, ny - 3, t.toUpperCase(), 1, 200); } }
+    { const qt = $('qtrack'), r0 = o ? ny - 3 : ny - 2, L1 = QL.line ? (QL.line.length > max ? QL.line.slice(0, max - 1) + '.' : QL.line).toUpperCase() : '', L2 = QL.line2 ? QL.line2.slice(0, max) : '';
+      if (L1) { const w = Math.max(L1.length, L2.length) + 3; uilPlate(1, r0 - (L2 ? 1 : 0), w, r0, 150); uilPut(2, r0, 42, 1, 255); const k = L1.indexOf(' · '); uilText(4, r0, k > 0 ? L1.slice(0, k) : L1, 1, 235); if (k > 0) uilText(4 + k, r0, L1.slice(k), 0, 205); if (L2) uilText(4, r0 - 1, L2, 0, 150);
+        if (qt) { const top = (ny - r0 - 1) * UIL.ch, h = (L2 ? 2 : 1) * UIL.ch, wpx = w * UIL.cw; if (qt._g !== top + ',' + h + ',' + wpx) { qt._g = top + ',' + h + ',' + wpx; qt.style.left = UIL.cw + 'px'; qt.style.top = top + 'px'; qt.style.width = wpx + 'px'; qt.style.height = h + 'px'; } } }
+      QL.rows = L1 ? (o ? 1 : 0) + (L2 ? 2 : 1) : o ? 1 : 0; } }
   const D = $('dialog'); if (!D || D.classList.contains('hidden')) return;
   const text = ($('dlgText').textContent || '').trim(), title = ($('dlgTitle').textContent || '').trim(); if (!text) return;
   const cur = dlg.cur, whole = cur ? String((cur.pages ? cur.pages[cur.page || 0] : cur.text) || '').trim() : '', full = whole && whole.startsWith(text.slice(0, Math.max(1, text.length - 1))) ? whole : text;
@@ -7527,7 +7642,7 @@ function updatePhoenix(dt) {
   p.wasRiding = p.riding;
   const sp = Math.sin(p.pitch);
   const BK = 1 + (birdK() - 1) * 0.3, RK = 1 + (birdK() - 1) * 0.6;   // (the big bird: a stronger stroke, and the currents take it further and faster)
-  const target = ((boost ? 125 : 64) - (sp > 0 ? sp * 75 : sp * 240)) * (1 + 0.12 * perks.swift) * BK;   // nose down: up to ~300 m/s
+  const target = ((boost ? 125 : 64) - (sp > 0 ? sp * 75 : sp * 240)) * (1 + 0.12 * perks.swift + IS.swift) * BK;   // nose down: up to ~300 m/s
   p.speed = clamp(lerp(p.speed, target, damp(sp < -0.3 ? 1.7 : boost ? 1.1 : 0.55, dt)), 18, 330 * RK);
   if (p.riding) p.speed = lerp(p.speed, 310 * RK, damp(1.6 * RK, dt));
   p.vy = lerp(p.vy, diving ? 0 : lerp(-3.5, -1.1, glide), damp(0.85, dt));
@@ -7617,7 +7732,7 @@ function updatePhoenix(dt) {
   slipstream(dt);
   if (perks.tide && gHere < WATER && p.pos.y < WATER + 12) p.flame = Math.min(1, p.flame + dt * 0.07);
   if (p.skyT > 0.8) { burnOut('sun'); return; }
-  if (!p.riding) p.flame -= (dt / 85 * (boost ? 2.8 : 1) * (1 - 0.55 * glide) * (realm === 'under' ? UNDER_BURN : 1) + heat * dt / 6) / (1 + 0.4 * perks.ember);
+  if (!p.riding) p.flame -= (dt / 85 * (boost ? 2.8 : 1) * (1 - 0.55 * glide) * (realm === 'under' ? UNDER_BURN : 1) + heat * dt / 6) / (1 + 0.4 * perks.ember + IS.ember);
   if (perks.fire && !boost && !p.riding) p.flame = Math.min(1, p.flame + dt * 0.0055 * perks.fire);   // (the stolen fire: it feeds itself)
   if (p.flame <= 0) { p.flame = 0; burnOut('ember'); return; }
 
@@ -12565,17 +12680,82 @@ const PANTHEON = { group: null, fires: [], isles: [], seen: '', markEl: null, se
 // something with wings; and behind the house of Zeus a needle of stacked, twisting stone goes up to the Eyrie, the
 // highest place in the world there is to stand. Every top is somewhere to come down on.
 const ORDINAL = ['FIRST', 'SECOND', 'THIRD', 'FOURTH', 'FIFTH', 'SIXTH', 'SEVENTH', 'EIGHTH', 'NINTH'];
+// ── The pylons are living stone. Each is laid up in courses, and each course is two halves; fly at one and, a moment before
+//    you would strike it, the courses round the height you are coming in at draw apart — a lens of open air, wide enough
+//    for your wings, the cut faces glowing in the god's colour — and when you have gone through, they close up behind you.
+//    (One mesh for all the stone of all twelve, one for their lit faces; only a pylon that is opening or closing is touched.)
+const LIVING = { groups: [], slabs: [], strips: [], built: false, stone: null, glow: null };
+function livingPylon(i, x, z, th, g, H, TOP, marble, lit) {
+  const G = { i, x, z, th, c: Math.cos(th), s: Math.sin(th), g, top: TOP, hw: 8.5, hd: 4, k: 0, hold: 0, gy: g + H * 0.5, ax: 0, moving: false, col: lit, s0: LIVING.slabs.length, t0: LIVING.strips.length, sndT: -9 };
+  const lay = (y0, y1, w, d, list, lz, col) => { const n = Math.max(1, Math.round((y1 - y0) / 6)), hs = (y1 - y0) / n; for (let k = 0; k < n; k++) list.push({ G, y: y0 + hs * (k + 0.5), h: hs * 0.985, w, d, lz, col, j: list.length }); };
+  lay(g, g + H * 0.55, 17, 8, LIVING.slabs, 0, marble); lay(g + H * 0.55, TOP, 12, 5.5, LIVING.slabs, 0, marble);
+  lay(g + H * 0.12, g + H * 0.98, 1.4, 0.5, LIVING.strips, -4.2, lit);
+  G.s1 = LIVING.slabs.length; G.t1 = LIVING.strips.length; LIVING.groups.push(G);
+}
+function livingBuild(grp) {
+  if (LIVING.built || !LIVING.slabs.length) return; LIVING.built = true;
+  const box = new THREE.BoxGeometry(1, 1, 1), mk = (n, mat) => { const m = new THREE.InstancedMesh(box, mat, n * 2); m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); grp.add(m); return m; };
+  LIVING.stone = mk(LIVING.slabs.length, new THREE.MeshLambertMaterial({ color: 0xffffff })); LIVING.stone.castShadow = LIVING.stone.receiveShadow = true;
+  LIVING.glow = mk(LIVING.strips.length, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }));
+  for (const G of LIVING.groups) livingPose(G, true);
+}
+const _lm = new THREE.Matrix4(), _lq = new THREE.Quaternion(), _lp = new THREE.Vector3(), _ls = new THREE.Vector3(), _lc = new THREE.Color(), _UPY = new THREE.Vector3(0, 1, 0);
+const livingGap = () => 9 + 5 * (player.form === 'phoenix' ? birdK() : 0.4);
+function livingOpen(i, y) { const G = LIVING.groups[i]; return !!G && G.k > 0.3 && Math.abs(y - G.gy) < livingGap() * 0.95; }
+// where every course of one pylon stands this frame
+function livingPose(G, colour) {
+  const K = player.form === 'phoenix' ? birdK() : 0.4, gh = livingGap(), sep = 11 * K + 4, gc = _tcol2(G.col);
+  const put = (M, list, a, b, isStone) => {
+    for (let j = a; j < b; j++) { const S = list[j], f = G.k > 0.001 ? G.k * smoothstep(gh * 1.4, gh * 0.55, Math.abs(S.y - G.gy)) : 0, wob = f * Math.sin(S.j * 1.7 + time * 2.2), lift = f * 1.3 * Math.sin(S.j * 2.3 + time * 3.1);
+      for (let h = 0; h < 2; h++) { const sd = h ? 1 : -1;
+        let lx, lz, sx, sz;
+        if (G.ax === 0) { lx = sd * (S.w / 4 + sep * f); lz = S.lz; sx = S.w / 2; sz = S.d; }   // (parting side to side)
+        else { lx = 0; lz = S.lz + (isStone ? sd * (S.d / 4) : -S.d / 4) + (isStone ? sd : -1) * sep * f; sx = S.w; sz = isStone ? S.d / 2 : S.d; if (!isStone) { lx = sd * S.w / 4; sx = S.w / 2; } }   // (parting front from back; the lit face goes with the back)
+        _lq.setFromAxisAngle(_UPY, G.th + wob * 0.12 * sd);
+        _lm.compose(_lp.set(G.x + lx * G.c + lz * G.s, S.y + lift * sd, G.z - lx * G.s + lz * G.c), _lq, _ls.set(sx * (1 - 0.05 * f), S.h, sz * (1 - 0.05 * f)));
+        M.setMatrixAt(j * 2 + h, _lm);
+        if (colour) { if (isStone) _lc.setRGB(S.col[0], S.col[1], S.col[2]).lerp(gc, 0.45 * f).multiplyScalar(1 + 0.9 * f); else _lc.setRGB(S.col[0] * 0.55, S.col[1] * 0.55, S.col[2] * 0.55).multiplyScalar(1 + 2 * f); M.setColorAt(j * 2 + h, _lc); } } }
+    M.instanceMatrix.needsUpdate = true; if (colour && M.instanceColor) M.instanceColor.needsUpdate = true;
+  };
+  put(LIVING.stone, LIVING.slabs, G.s0, G.s1, true); put(LIVING.glow, LIVING.strips, G.t0, G.t1, false);
+}
+const _TC2 = {}, _tcol2 = c => _TC2[c] ||= new THREE.Color(c[0] / 2.4, c[1] / 2.4, c[2] / 2.4);
+function updateLiving(dt) {
+  if (!LIVING.built || realm !== 'over') return;
+  const p = player, P = p.pos, bird = p.form === 'phoenix' && !p.perch && !p.perchGo && !p.takeoff, glider = p.form === 'human' && p.wings && !p.grounded;
+  const flying = state === 'play' && (bird || glider) && (P.x - MOUNT.x) ** 2 + (P.z - MOUNT.z) ** 2 < 560 * 560;
+  const vx = bird ? dir3.x * p.speed : p.vel.x, vy = bird ? dir3.y * p.speed + p.vy : p.vel.y, vz = bird ? dir3.z * p.speed : p.vel.z, T = clamp(1.3, 0, 260 / Math.max(1, Math.hypot(vx, vy, vz)));
+  const K = bird ? birdK() : 0.4, m = 7.5 * K * (PHX_S / 1.55) + 3, c = camera.position;
+  for (const G of LIVING.groups) {
+    let hit = false;
+    if (flying) {   // the line he is on for the next moment, in the pylon's own frame: does it go into the stone?
+      const ex = P.x - G.x, ez = P.z - G.z, ax = ex * G.c - ez * G.s, az = ex * G.s + ez * G.c, dx = (vx * G.c - vz * G.s) * T, dz = (vx * G.s + vz * G.c) * T;
+      let t0 = 0, t1 = 1;
+      for (const [p0, d0, lim] of [[ax, dx, G.hw + m], [az, dz, G.hd + m]]) { if (Math.abs(d0) < 1e-6) { if (Math.abs(p0) > lim) { t0 = 2; break; } continue; } let a = (-lim - p0) / d0, b = (lim - p0) / d0; if (a > b) [a, b] = [b, a]; t0 = Math.max(t0, a); t1 = Math.min(t1, b); if (t0 > t1) break; }
+      if (t0 <= t1 && t0 <= 1) { const y = P.y + vy * T * t0; if (y > G.g && y < G.top + 2) { hit = true;
+        if (G.k < 0.05) { G.gy = y; G.ax = Math.abs(dz) >= Math.abs(dx) ? 0 : 1; } else G.gy = lerp(G.gy, y, damp(6, dt));
+        if (time - G.sndT > 2.5 && G.k < 0.2) { G.sndT = time; audio.at3?.(G.x, y, G.z, () => { audio.sfx.whoosh?.(false); audio.sfx.hiss?.(0.4); }, { vol: 1.2, ref: 30, max: 700 }); } } }
+    }
+    if (hit) G.hold = 0.75; else G.hold = Math.max(0, G.hold - dt);
+    const want = G.hold > 0 ? 1 : 0, was = G.k;
+    G.k = want ? Math.min(1, G.k + dt * 4.5) : Math.max(0, G.k - dt * 1.3);
+    if (G.k === 0 && was === 0) continue;
+    livingPose(G, true);
+    // the cut faces throw sparks of the god's colour as they part and as they meet
+    if (Math.abs(G.k - was) > 0.001 && (G.x - c.x) ** 2 + (G.z - c.z) ** 2 < 500 * 500) { const cc = [G.col[0] / 1.5, G.col[1] / 1.5, G.col[2] / 1.5];
+      for (let i = 0; i < (tierIdx === 0 ? 2 : 5); i++) { const a = rnd(1), y = G.gy + rnd(livingGap()), lx = G.ax === 0 ? rnd(2) : a * G.hw, lz = G.ax === 0 ? a * G.hd : rnd(2);
+        emit(G.x + lx * G.c + lz * G.s, y, G.z - lx * G.s + lz * G.c, rnd(6), rnd(6), rnd(6), 0.5 + Math.random() * 0.5, cc, 0.5, 0.8 + Math.random()); } }
+  }
+}
 function buildCrown(acc, grp, ids) {
   const cx = MOUNT.x, cz = MOUNT.z + 6, marble = MARBLEF, gold = GOLDLEAF, lit = c => { const k = new THREE.Color(c); return [k.r * 2.4, k.g * 2.4, k.b * 2.4]; }, sun = [2.4, 2.0, 1.2];
   const R = 170, TOP = SUMMIT + 250;
   ids.forEach((id, i) => {
     const th = i / ids.length * Math.PI * 2 + 0.26, x = cx + Math.sin(th) * R, z = cz + Math.cos(th) * R, g = terrainAt(x, z) - 30, H = TOP - g, c = lit(PATRONS[id][0]);
-    box(acc, 17, H * 0.55, 8, x, g + H * 0.275, z, marble, 0, th, 0);     // the foot
-    box(acc, 12, H * 0.45, 5.5, x, g + H * 0.775, z, marble, 0, th, 0);   // the shaft
+    livingPylon(i, x, z, th, g, H, TOP, marble, c);                         // the foot and the shaft: stone that lets a flier through
     box(acc, 15, 3, 9, x, TOP + 1.5, z, gold, 0, th, 0);                  // its cap: somewhere to stand
-    { const nm = `${godById[id]?.name || id}’s pylon`; CROWN.boxes.push(crownBox(x, z, th, 17, 8, g, g + H * 0.55, nm), crownBox(x, z, th, 12, 5.5, g + H * 0.55, TOP, nm), crownBox(x, z, th, 15, 9, TOP, TOP + 3, nm));
+    { const nm = `${godById[id]?.name || id}’s pylon`; CROWN.boxes.push(Object.assign(crownBox(x, z, th, 17, 8, g, g + H * 0.55, nm), { pyl: i }), Object.assign(crownBox(x, z, th, 12, 5.5, g + H * 0.55, TOP, nm), { pyl: i }), crownBox(x, z, th, 15, 9, TOP, TOP + 3, nm));
       CROWN.pylons.push({ id, i, x, z, th, g, top: TOP, H, hex: PATRONS[id][0], c: lit(PATRONS[id][0]).map(v => v / 2.4 * 1.9), k: 0, m: 0, t: Math.random() * 9, beat: 0 }); }
-    box(acc, 1.4, H * 0.86, 0.5, x - Math.sin(th) * 4.2, g + H * 0.55, z - Math.cos(th) * 4.2, c, 0, th, 0);   // the inner face, lit in their colour
     { const col = new THREE.Color(PATRONS[id][0]).multiplyScalar(2), gm = new THREE.MeshBasicMaterial({ color: col }), gem = new THREE.Mesh(G.oct, gm);
       gem.position.set(x, TOP + 12, z); gem.userData = { id, x, y: TOP + 12, z, th, ph: i * 1.7, sat: null };
       if (id === 'hera' || id === 'apollo') { gem.userData.sat = new THREE.Mesh(new THREE.TorusGeometry(id === 'hera' ? 4.6 : 6.2, id === 'hera' ? 0.28 : 0.16, 6, 28), gm); grp.add(gem.userData.sat); }   // her crown; his rays
@@ -12614,6 +12794,7 @@ function buildCrown(acc, grp, ids) {
   const a2 = newAcc(), R2 = 270, N2 = 60, seg2 = 2 * Math.PI * R2 / N2;
   for (let i = 0; i < N2; i++) { const th = i / N2 * 6.2832, x = Math.sin(th) * R2, z = Math.cos(th) * R2; box(a2, seg2 + 0.5, 3.2, 6, x, 0, z, i % 5 ? marble : gold, 0, th, 0); if (i % 5 === 0) part(a2, G.oct, x, 5.5, z, 1.6, 2.6, 1.6, sun, th); }
   const ring = new THREE.Mesh(accToGeo(a2), new THREE.MeshLambertMaterial({ vertexColors: true })); ring.position.set(cx, SUMMIT + 385, cz); ring.rotation.set(0.2, 0, 0.12); ring.frustumCulled = false; grp.add(ring); grp.userData.ring = ring;
+  livingBuild(grp);
   // five stones ride round each pylon, slowly, until something with fire in it comes near
   { const st = CROWN.stones = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial(), ids.length * 5); st.frustumCulled = false; st.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     for (let i = 0; i < st.count; i++) st.setColorAt(i, _c1.setRGB(0.85, 0.83, 0.78)); grp.add(st);
@@ -12810,79 +12991,168 @@ const col3 = hex => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
 // course counts the moment he takes it, and still counts if the world has not heard yet)
 const HELD = { t: -9, n: {} };
 const heldBy = id => { if (time - HELD.t > 1) { HELD.t = time; HELD.n = {}; for (const [k, c] of ARENA.claims) if (!k.startsWith('torch') && c.pats) for (const g of c.pats) HELD.n[g] = (HELD.n[g] || 0) + 1; } return Math.max(ARENA.held?.[id] || 0, HELD.n[id] || 0); };
-// ── The torches. Over the cairns that mark the way to the edge, and on out into the air past it along the line of the
-//    first flight, torches hang on nothing. Each new flier, the first time they fly, lights them one by one as they go
-//    past — in the colour of their god's fire — and that is the colour they burn in for everyone, until the next one who
-//    has never flown comes up the mountain and flies them in theirs. (Kept by the world as one entry: whose they are.)
-const TORCH = { list: [], built: false, lighting: false, t0: 0, lit: 0, posted: false, ripple: 0 };
+// ── The ring of fire, and the torches. Out on the line of the first flight a great ring of stone hangs in the air, and it
+//    burns: whoever flew through it last, their god's fire is what burns in it. Every torch on Olympus takes that fire from
+//    it — the torches over the cairns that lead to the edge, the ones that hang in the air on the way out, and the six on
+//    every one of the twelve pylons — and lightning walks from pylon to pylon round the crown in the same colour. Anyone
+//    can fly through it and change it; a new flier is sent through it on the first flight. (Kept by the world as one
+//    entry: whose the fire is.) The path torches still light one by one as a new flier passes them, on the way to it.
+const TORCH = { list: [], built: false, pylDone: false, lighting: false, t0: 0, lit: 0, ripple: 0, shown: '', ring: null, el: null, passT: -99, side: 0, prev: new THREE.Vector3(), has: false, arcT: 0, burstT: -99, burstK: 0, bolts: null, MAX: 100 };
 const torchHouse = () => { const cl = ARENA.claims.get('torches'), g = cl && cl.pats && cl.pats[0]; return PATRONS[g] ? g : ''; };
+const _TC = {}, _tcol = g => _TC[g] ||= new THREE.Color(PATRONS[g][0]);
+let RING_DONE = (() => { try { return localStorage.getItem('icarus.ring') === '1'; } catch { return false; } })();
+function torchAdd(x, y, z, k, kind, R) { const T = { i: TORCH.list.length, x, y, z, k, kind, col: '', ph: TORCH.list.length * 1.7, flare: 0, R, delay: 0, yy: y }; TORCH.list.push(T); return T; }
 function torchBuild() {
-  TORCH.built = true; const bowlM = new THREE.MeshLambertMaterial({ color: 0x3a2c22 }), cane = new THREE.MeshLambertMaterial({ color: 0x8a6a3c });
-  const nx = EDGE.x - START.x, nz = EDGE.z - START.z, L = Math.hypot(nx, nz), ux = nx / L, uz = nz / L, add = (x, y, z, big) => {
-    const g = new THREE.Group(), k = big ? 2.1 : 1;
-    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.12, 0.36, 9), bowlM); g.add(bowl);
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.02, 0.9, 6), cane); stem.position.y = -0.6; g.add(stem);
-    const fm = new THREE.MeshBasicMaterial({ color: 0x555555, toneMapped: false }), flame = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.85, 7), fm); flame.position.y = 0.6; g.add(flame);
-    const gm = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }), glow = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8), gm); glow.position.y = 0.62; g.add(glow);
-    g.scale.setScalar(k * 1.35); g.position.set(x, y, z); scene.add(g);
-    TORCH.list.push({ i: TORCH.list.length, x, y, z, g, flame, fm, gm, k, col: '', ph: TORCH.list.length * 1.7, flare: 0, R: big ? 26 : 4.5 });
-  };
+  TORCH.built = true;
+  // drawn all at once: a bowl on a cane, a flame, a glow — three draws for every torch on the mountain
+  const bowl = (() => { const a = new THREE.CylinderGeometry(0.34, 0.12, 0.36, 9).toNonIndexed(), b = new THREE.CylinderGeometry(0.05, 0.02, 0.9, 6).translate(0, -0.6, 0).toNonIndexed(), g = new THREE.BufferGeometry();
+    for (const k of ['position', 'normal']) { const A = a.attributes[k].array, B = b.attributes[k].array, C = new Float32Array(A.length + B.length); C.set(A); C.set(B, A.length); g.setAttribute(k, new THREE.BufferAttribute(C, 3)); } return g; })();
+  const M = TORCH.MAX, mk = (geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, M); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; };
+  TORCH.bowl = mk(bowl, new THREE.MeshLambertMaterial({ color: 0x4a3626 }));
+  TORCH.flame = mk(new THREE.ConeGeometry(0.26, 0.85, 7).translate(0, 0.6, 0), new THREE.MeshBasicMaterial({ toneMapped: false }));
+  TORCH.glow = mk(new THREE.SphereGeometry(0.42, 10, 7).translate(0, 0.62, 0), new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+  for (const m of [TORCH.flame, TORCH.glow]) { m.setColorAt(0, _c1.setRGB(1, 1, 1)); m.instanceColor.setUsage(THREE.DynamicDrawUsage); }
+  const nx = EDGE.x - START.x, nz = EDGE.z - START.z, L = Math.hypot(nx, nz), ux = nx / L, uz = nz / L;
   for (const i of [1, 3, 5]) for (const s of [-1, 1]) {   // over the cairns, either side of the way
     const t = (i + 0.5) / 6, d = 5 + t * (L - 6), w = 3.4 - t * 0.7, x = START.x + ux * d - uz * s * w, z = START.z + uz * d + ux * s * w, h = 0.45 + t * 0.8;
-    add(x, groundAt(x, z) + h * 1.25 + 2.2, z, false);
+    torchAdd(x, groundAt(x, z) + h * 1.25 + 2.2, z, 1.35, 'path', 4.5);
   }
   for (let i = 0; i < 10; i++) {   // and out over the drop, along the line he will fly, falling away with him
     const d = 34 + i * 46, sd = (i % 2 ? 1 : -1) * (13 + i * 0.6), x = EDGE.x + ux * d - uz * sd, z = EDGE.z + uz * d + ux * sd;
-    add(x, SUMMIT + 4 - i * 15 - i * i * 0.6, z, true);
+    torchAdd(x, SUMMIT + 4 - i * 15 - i * i * 0.6, z, 2.8, 'air', 26);
   }
-  const h0 = torchHouse(); for (const T of TORCH.list) T.col = h0;
+  // the ring: stone round a band of fire, as big as a temple, standing across the way
+  { const d = 34 + 4.5 * 46, cx = EDGE.x + ux * d, cz = EDGE.z + uz * d, cy = SUMMIT - 82, R = 56, acc = newAcc(), rk = new THREE.IcosahedronGeometry(1, 0).toNonIndexed(), g = new THREE.Group();
+    const RG = TORCH.ring = { x: cx, y: cy, z: cz, R, nx: ux, nz: uz, g, light: new THREE.PointLight(0xffb070, 0, 420, 1.6), k: 0 };
+    for (let k = 0; k < 44; k++) { const a = k / 44 * 6.283, lx = Math.cos(a) * R, ly = Math.sin(a) * R, wx = cx + lx * uz, wz = cz - lx * ux, wy = cy + ly, s = 4.2 + (k % 3) * 0.9;
+      const b = 0.38 + 0.06 * Math.sin(k * 1.7); part(acc, rk, wx, wy, wz, s * 1.15, s, s * 1.5, [b * 1.06, b * 0.96, b * 0.86], a, k * 0.7, k * 1.3);
+      ROCKS.cyls.push({ x: wx, z: wz, r: s * 0.9, y0: wy - s, y1: wy + s, what: 'the ring of fire', S: TORCH }); }
+    ROCKS.mat ||= new THREE.MeshLambertMaterial({ vertexColors: true });
+    const stone = new THREE.Mesh(accToGeo(acc), ROCKS.mat); g.add(stone);
+    const band = RG.band = new THREE.Mesh(new THREE.TorusGeometry(R - 3.5, 2.6, 8, 96), new THREE.MeshBasicMaterial({ color: 0x555555, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+    const halo = RG.halo = new THREE.Mesh(new THREE.TorusGeometry(R - 3.5, 7.5, 6, 64), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+    for (const m of [band, halo]) { m.position.set(cx, cy, cz); m.rotation.y = Math.atan2(ux, uz); g.add(m); }
+    RG.light.position.set(cx, cy, cz); g.add(RG.light); scene.add(g);
+  }
+  // lightning round the crown: a strand between each pylon and the next, in the ring's colour
+  TORCH.bolts = makeRibbons(14, 12);
+  const h0 = torchHouse(); for (const T of TORCH.list) T.col = h0; TORCH.shown = h0;
 }
-// his first flight: from the moment he is sent to the edge until he has flown on past the last of them
-function torchStart() { if (!TORCH.built || TORCH.spent) return; if (!TORCH.lighting) { TORCH.lighting = true; TORCH.lit = 0; TORCH.posted = false; } TORCH.t0 = time; }   // (again at the leap: the clock runs from there)
+function torchPylons() {   // six on each pylon: four on the ledge where the shaft stands on its foot, two on its crown
+  TORCH.pylDone = true;
+  for (const P of CROWN.pylons) { const c = Math.cos(P.th), sn = Math.sin(P.th), at = (lx, y, lz) => [P.x + lx * c + lz * sn, y, P.z - lx * sn + lz * c], ledge = P.g + P.H * 0.55;
+    for (const [lx, lz] of [[-7.4, -3.2], [7.4, -3.2], [-7.4, 3.2], [7.4, 3.2]]) { const [x, y, z] = at(lx, ledge + 1.4, lz); torchAdd(x, y, z, 2.2, 'pylon', 0).pyl = P; }
+    for (const lx of [-6.4, 6.4]) { const [x, y, z] = at(lx, P.top + 4.4, 3.4); torchAdd(x, y, z, 1.8, 'cap', 0).pyl = P; }
+  }
+  const h = torchHouse(); for (const T of TORCH.list) if (T.kind === 'pylon' || T.kind === 'cap') T.col = h;
+}
+// his first flight: from the moment he is sent to the edge until he has flown through the ring
+function torchStart() { if (!TORCH.built || TORCH.spent) return; if (!TORCH.lighting) { TORCH.lighting = true; TORCH.lit = 0; } TORCH.t0 = time; }
 function torchLight(T, house) {
   T.col = house; T.flare = 1;
   const c = pcol(house), hot = c.map(v => v * 2);
-  if ((T.x - camera.position.x) ** 2 + (T.z - camera.position.z) ** 2 < 900 * 900) {
-    for (let i = 0; i < 60; i++) emit(T.x + rnd(0.4 * T.k), T.y + 0.9 * T.k + Math.random(), T.z + rnd(0.4 * T.k), rnd(4 * T.k), 2 + Math.random() * 7, rnd(4 * T.k), 0.5 + Math.random() * 0.6, i % 3 ? hot : c, 2.5, 0.6 * T.k);
-    shock(T.x, T.y + 0.8 * T.k, T.z, new THREE.Color(PATRONS[house][0]).getHex(), 7 * T.k, 0.6, true);
-    audio.at3?.(T.x, T.y, T.z, () => { audio.sfx.whoomph?.(); }, { vol: 1.1, ref: 12 * T.k, max: 900 });
+  if ((T.x - camera.position.x) ** 2 + (T.z - camera.position.z) ** 2 < 700 * 700) {
+    for (let i = 0; i < 30; i++) emit(T.x + rnd(0.4 * T.k), T.yy + 0.9 * T.k + Math.random(), T.z + rnd(0.4 * T.k), rnd(4 * T.k), 2 + Math.random() * 7, rnd(4 * T.k), 0.5 + Math.random() * 0.6, i % 3 ? hot : c, 2.5, 0.6 * T.k);
+    if (T.kind === 'air' || T.kind === 'path') audio.at3?.(T.x, T.y, T.z, () => { audio.sfx.whoomph?.(); }, { vol: 0.9, ref: 12 * T.k, max: 700 });
   }
 }
+// through the ring: the fire is his god's now, and everything on the mountain takes it
+function ringPass() {
+  const house = PATRON.id, R = TORCH.ring, nm = g => (godById[g]?.name || g).toUpperCase();
+  if (!house) { if (time - TORCH.passT > 6) { TORCH.passT = time; toast('THE RING WANTS A GOD’S FIRE · PRAY AT A THRONE FIRST'); } return; }
+  const was = torchHouse(), first = !RING_DONE; TORCH.passT = time;
+  if (!RING_DONE) { RING_DONE = true; try { localStorage.setItem('icarus.ring', '1'); } catch {} }
+  if (was === house && !first) { torchBurst(house, true, true); toast(`THE RING ALREADY BURNS FOR ${nm(house)}`); return; }
+  const pats = [house], names = [heroName]; ARENA.claims.set('torches', { pats, names, at: Date.now() }); arenaSave(); TORCH.shown = house;
+  if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'arena', payload: { i: NET.id, k: 'claim', id: 'torches', pats, names } });
+  worldPost({ op: 'arena', id: 'torches', cx: Math.round(R.x), cz: Math.round(R.z), pats, names, len: 0 });
+  torchBurst(house, true);
+  questEvent.torch = true;
+  toast(was ? `${nm(was)}’S FIRE GOES OUT · EVERY TORCH ON OLYMPUS BURNS FOR ${nm(house)}` : `EVERY TORCH ON OLYMPUS BURNS FOR ${nm(house)}`);
+  witness(`flew through the ring of fire over Olympus, and every torch on the mountain burns in ${godById[house]?.name || house}'s colour now${was && was !== house ? ` instead of ${godById[was]?.name || was}'s` : ''}`, true);
+  if (first) titleCard('THE RING OF FIRE', `it burns for ${nm(house).toLowerCase()} · until someone else flies through it`, 2600, PATRONS[house][0]);
+}
+// the fire changing, seen from wherever you are: the ring flares, lightning goes round the crown, the light of the world turns
+function torchBurst(house, mine, small = false) {
+  const R = TORCH.ring; if (!R) return; TORCH.burstT = time; TORCH.burstK = small ? 0.4 : 1;
+  const c = camera.position, d = Math.hypot(c.x - R.x, c.z - R.z), col = _tcol(house).getHex();
+  if (d < 2200) { shock(R.x, R.y, R.z, col, R.R * 1.6, 0.8, false); if (!small) shock(R.x, R.y, R.z, 0xffffff, R.R * 2.4, 1.1, false);
+    const cc = pcol(house); for (let i = 0; i < (small ? 60 : 160); i++) { const a = Math.random() * 6.283, lx = Math.cos(a) * R.R, ly = Math.sin(a) * R.R; emit(R.x + lx * R.nz, R.y + ly, R.z - lx * R.nx, rnd(14), rnd(14), rnd(14), 0.8 + Math.random() * 0.8, i % 3 ? cc.map(v => v * 2.2) : [2.6, 2.4, 2], 0.5, 1.2 + Math.random() * 1.6); }
+    audio.at3?.(R.x, R.y, R.z, () => { audio.sfx.whoomph?.(); audio.sfx.thunder?.(); }, { vol: 1.4, ref: 60, max: 2400 }); }
+  if (!small && d < 3000) { const k = smoothstep(3000, 300, d); flash = Math.max(flash, 0.22 * k); postMat.uniforms.uFlashCol.value.copy(_tcol(house)).multiplyScalar(1.4); camShake = Math.max(camShake, (mine ? 0.35 : 0.15) * k); }
+  for (const T of TORCH.list) T.delay = Math.hypot(T.x - R.x, T.y - R.y, T.z - R.z) / (small ? 900 : 260);   // (from the ring outward, torch after torch)
+  TORCH.ripple = 0;
+}
+const _tm = new THREE.Matrix4(), _tq = new THREE.Quaternion(), _te = new THREE.Euler(), _tp = new THREE.Vector3(), _ts = new THREE.Vector3();
 function updateTorches(dt) {
-  if (!TORCH.built) { if (chunks.size) torchBuild(); return; }
-  const p = player, P = p.pos, c = camera.position, near = (c.x - EDGE.x) ** 2 + (c.z - EDGE.z) ** 2 < 900 * 900;
-  // the new flier lights them as he passes: from the cairns on the way to the edge, then out into the air
+  if (!TORCH.built) { if (chunks.size && realm === 'over') torchBuild(); return; }
+  if (!TORCH.pylDone && CROWN.pylons.length) torchPylons();
+  const over = realm === 'over', p = player, P = p.pos, c = camera.position, R = TORCH.ring, nearM = (c.x - MOUNT.x) ** 2 + (c.z - MOUNT.z) ** 2 < 3200 * 3200 && c.y > CLOUD_SEA - 400;
+  for (const m of [TORCH.bowl, TORCH.flame, TORCH.glow]) m.visible = over && nearM; R.g.visible = over;
+  if (!over) return;
+  const house = torchHouse(), flying = state === 'play' && (p.form === 'phoenix' && !p.perch || p.wings && !p.grounded);
+  // through the ring? (the plane it stands in, crossed inside the stone)
+  { const s = (P.x - R.x) * R.nx + (P.z - R.z) * R.nz;
+    if (TORCH.has && flying && TORCH.side && Math.sign(s) !== Math.sign(TORCH.side) && Math.abs(s - TORCH.side) < 400) {
+      const t = TORCH.side / (TORCH.side - s), qx = lerp(TORCH.prev.x, P.x, t) - R.x, qy = lerp(TORCH.prev.y, P.y, t) - R.y, qz = lerp(TORCH.prev.z, P.z, t) - R.z;
+      if (qx * qx + qy * qy + qz * qz < (R.R - 4) ** 2 && time - TORCH.passT > 2) ringPass(); }
+    TORCH.side = s || 0.001; TORCH.prev.copy(P); TORCH.has = state === 'play'; }
+  // the new flier lights the path torches as he passes, on his way to the ring
   if (!TORCH.lighting && !TORCH.spent && !flags.morphed && PATRON.id && state === 'play' && (P.x - EDGE.x) ** 2 + (P.z - EDGE.z) ** 2 < 60 * 60) torchStart();
   if (TORCH.lighting) {
-    const house = PATRON.id;
-    if (flags.morphed && (!house || time - TORCH.t0 > 150 || (p.grounded && p.form === 'human' && time - TORCH.t0 > 20))) { TORCH.lighting = false; TORCH.spent = true; }
-    else if (!house) {}
-    else for (const T of TORCH.list) { if (T.mine) continue; const r = T.R * (p.form === 'phoenix' ? 1 : 0.8);
-      if ((P.x - T.x) ** 2 + (P.z - T.z) ** 2 < r * r && Math.abs(P.y - T.y) < r * 1.2 + 6) { T.mine = true; torchLight(T, house); TORCH.lit++; questEvent.torch = true;
-        if (!TORCH.posted) { TORCH.posted = true; const pats = [house], names = [heroName]; ARENA.claims.set('torches', { pats, names, at: Date.now() }); arenaSave();
-          if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'arena', payload: { i: NET.id, k: 'claim', id: 'torches', pats, names } });
-          worldPost({ op: 'arena', id: 'torches', cx: Math.round(EDGE.x), cz: Math.round(EDGE.z), pats, names, len: 0 });
-          toast(`THE TORCHES TAKE ${(godById[house]?.name || house).toUpperCase()}'S FIRE FROM YOU`); witness(`lit the torches off the summit in ${godById[house]?.name || house}'s colour, on his first flight`, true); }
-        if (TORCH.lit === TORCH.list.length) { TORCH.lighting = false; TORCH.spent = true; toast('EVERY TORCH BURNS IN YOUR COLOUR · UNTIL THE NEXT ONE FLIES'); } } }
+    if (!PATRON.id || RING_DONE || (flags.morphed && p.grounded && p.form === 'human' && time - TORCH.t0 > 20)) { TORCH.lighting = false; TORCH.spent = true; }
+    else for (const T of TORCH.list) { if (T.mine || (T.kind !== 'air' && T.kind !== 'path')) continue; const r = T.R * (p.form === 'phoenix' ? 1 : 0.8);
+      if ((P.x - T.x) ** 2 + (P.z - T.z) ** 2 < r * r && Math.abs(P.y - T.y) < r * 1.2 + 6) { T.mine = true; torchLight(T, PATRON.id); TORCH.lit++; } }
   }
-  // on the first flight, the next of them out over the drop is marked: that is the way to fly
-  { const show = TORCH.lighting && flags.morphed && state === 'play' && p.form === 'phoenix', next = show && TORCH.list.find(T => !T.mine && T.R > 10);
-    if (next && !TORCH.el) { const el = TORCH.el = document.createElement('div'); el.className = 'mk wp'; el.innerHTML = '<b>✦</b><span></span>'; el.style.display = 'none'; $('markers').appendChild(el); }
-    if (TORCH.el) { if (next) { TORCH.el.style.color = PATRONS[PATRON.id]?.[0] || ''; placeMarker(TORCH.el, next.x, next.g.position.y + 3 * next.k, next.z, true, '✦', TORCH.lit < 6 ? 'FLY THROUGH THE TORCHES' : 'THE NEXT TORCH', true); } else if (TORCH.el.style.display !== 'none') TORCH.el.style.display = 'none'; } }
-  // someone else's colour, arriving: they take it one after another, down the line
-  { const h = torchHouse(); if (h && !TORCH.lighting && TORCH.list.some(T => T.col !== h)) { TORCH.ripple += dt; for (const T of TORCH.list) if (T.col !== h && TORCH.ripple > T.i * 0.22) { T.col = h; T.flare = 1; } } else TORCH.ripple = 0; }
-  for (const T of TORCH.list) {
-    T.g.position.y = T.y + Math.sin(time * 1.1 + T.ph) * 0.22 * T.k; T.g.rotation.z = Math.sin(time * 0.8 + T.ph * 2) * 0.06; T.g.rotation.x = Math.sin(time * 0.6 + T.ph) * 0.05;
-    T.flare = Math.max(0, T.flare - dt * 0.7);
-    const g = T.col, k = 0.85 + 0.25 * Math.sin(time * 11 + T.ph) * Math.sin(time * 7.3 + T.i) + T.flare * 1.6;
-    if (g) { T.fm.color.copy(_tcol(g)).multiplyScalar(1.5 * k); T.gm.color.copy(_tcol(g)).multiplyScalar(0.16 + 0.3 * T.flare); } else { T.fm.color.setRGB(0.22, 0.21, 0.23); T.gm.color.setRGB(0, 0, 0); }
-    T.flame.scale.set(0.9 + T.flare, (g ? 1 : 0.3) * (0.9 + 0.25 * Math.sin(time * 9 + T.ph)) + T.flare, 0.9 + T.flare);
-    if (!near) continue;
-    if (g && Math.random() < 0.5) { const cc = pcol(g); emit(T.x + rnd(0.15 * T.k), T.g.position.y + 1.15 * T.k, T.z + rnd(0.15 * T.k), rnd(0.35), 1.6 + Math.random() * 2.4, rnd(0.35), 0.5 + Math.random() * 0.5, Math.random() < 0.5 ? cc.map(v => v * 1.9) : cc, 3, 0.55 * T.k); }
-    else if (!g && Math.random() < 0.05) emit(T.x, T.g.position.y + 1.0 * T.k, T.z, rnd(0.1), 0.6, rnd(0.1), 1.2, [0.4, 0.4, 0.42], 1, 0.4);
+  // the way to the ring, marked, until he has been through it once
+  { const show = !RING_DONE && flags.morphed && flying && p.form === 'phoenix';
+    if (show && !TORCH.el) { const el = TORCH.el = document.createElement('div'); el.className = 'mk wp'; el.innerHTML = '<b>✦</b><span></span>'; el.style.display = 'none'; $('markers').appendChild(el); }
+    if (TORCH.el) { if (show) { TORCH.el.style.color = PATRONS[PATRON.id]?.[0] || '#ffb070'; placeMarker(TORCH.el, R.x, R.y + R.R + 8, R.z, true, '◎', 'FLY THROUGH THE RING OF FIRE', true); } else if (TORCH.el.style.display !== 'none') TORCH.el.style.display = 'none'; } }
+  // a new fire arriving (his, or someone else's from anywhere): torch after torch takes it, outward from the ring
+  if (house !== TORCH.shown) { if (house && TORCH.shown !== '') torchBurst(house, false, !nearM); else for (const T of TORCH.list) T.delay = T.i * 0.05; TORCH.shown = house; TORCH.ripple = 0; }
+  TORCH.ripple += dt;
+  const show = !TORCH.lighting;
+  for (const T of TORCH.list) if (T.col !== house && (show || T.kind === 'pylon' || T.kind === 'cap' || !T.mine) && TORCH.ripple > T.delay) { if (house) torchLight(T, house); else T.col = ''; }
+  // the ring: its band and its glow in the colour, its own light on everything round it
+  { const g = house, br = 0.8 + 0.2 * Math.sin(time * 7) * Math.sin(time * 4.3) + Math.max(0, 1 - (time - TORCH.burstT) / 1.6) * 1.6 * TORCH.burstK;
+    if (g) { R.band.material.color.copy(_tcol(g)).multiplyScalar(1.6 * br); R.halo.material.color.copy(_tcol(g)).multiplyScalar(0.14 * br); R.light.color.copy(_tcol(g)); R.light.intensity = (tierIdx === 0 ? 0 : 900) * br; }
+    else { R.band.material.color.setRGB(1.5 * br, 0.7 * br, 0.22 * br); R.halo.material.color.setRGB(0.12 * br, 0.05 * br, 0.01); R.light.color.setRGB(1, 0.55, 0.2); R.light.intensity = (tierIdx === 0 ? 0 : 600) * br; }   // (nobody's yet: plain fire, waiting)
+    R.band.rotation.z += dt * 0.15;
+    if (nearM && (c.x - R.x) ** 2 + (c.z - R.z) ** 2 < 1600 * 1600) { const cc = g ? pcol(g) : [1, 0.5, 0.15], n = tierIdx === 0 ? 2 : 5;   // flames licking up off the band all the way round
+      for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, lx = Math.cos(a) * (R.R - 3.5), ly = Math.sin(a) * (R.R - 3.5); emit(R.x + lx * R.nz + rnd(1.5), R.y + ly + rnd(1.5), R.z - lx * R.nx + rnd(1.5), rnd(1.5), 3 + Math.random() * 6, rnd(1.5), 0.7 + Math.random() * 0.6, Math.random() < 0.4 ? [2.6, 2.3, 1.6] : cc.map(v => v * 1.9), 3, 1.6 + Math.random() * 2.2); } }
+  }
+  // every torch: where it hangs, how it burns
+  if (nearM) {
+    let n = 0; const B = TORCH.bowl, F = TORCH.flame, Gl = TORCH.glow, near2 = 700 * 700;
+    for (const T of TORCH.list) {
+      const bob = T.kind === 'air' || T.kind === 'path' ? Math.sin(time * 1.1 + T.ph) * 0.22 * T.k : 0; T.yy = T.y + bob;
+      T.flare = Math.max(0, T.flare - dt * 0.7);
+      const g = T.col, k = 0.85 + 0.25 * Math.sin(time * 11 + T.ph) * Math.sin(time * 7.3 + T.i) + T.flare * 1.6;
+      _tq.setFromEuler(_te.set(Math.sin(time * 0.6 + T.ph) * 0.05 * (bob ? 1 : 0), 0, Math.sin(time * 0.8 + T.ph * 2) * 0.06 * (bob ? 1 : 0)));
+      _tm.compose(_tp.set(T.x, T.yy, T.z), _tq, _ts.setScalar(T.k)); B.setMatrixAt(n, _tm);
+      _tm.compose(_tp, _tq, _ts.set(T.k * (0.9 + T.flare), T.k * ((g ? 1 : 0.3) * (0.9 + 0.25 * Math.sin(time * 9 + T.ph)) + T.flare), T.k * (0.9 + T.flare))); F.setMatrixAt(n, _tm);
+      _tm.compose(_tp, _tq, _ts.setScalar(T.k * (1 + T.flare * 0.8))); Gl.setMatrixAt(n, _tm);
+      if (g) { F.setColorAt(n, _c1.copy(_tcol(g)).multiplyScalar(1.5 * k)); Gl.setColorAt(n, _c1.copy(_tcol(g)).multiplyScalar(0.16 + 0.3 * T.flare)); } else { F.setColorAt(n, _c1.setRGB(0.22, 0.21, 0.23)); Gl.setColorAt(n, _c1.setRGB(0, 0, 0)); }
+      n++;
+      if (g && (T.x - c.x) ** 2 + (T.z - c.z) ** 2 < near2 && Math.random() < (tierIdx === 0 ? 0.15 : 0.4)) { const cc = pcol(g); emit(T.x + rnd(0.15 * T.k), T.yy + 1.15 * T.k, T.z + rnd(0.15 * T.k), rnd(0.35), 1.6 + Math.random() * 2.4, rnd(0.35), 0.5 + Math.random() * 0.5, Math.random() < 0.5 ? cc.map(v => v * 1.9) : cc, 3, 0.55 * T.k); }
+    }
+    for (const m of [B, F, Gl]) { m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+  }
+  // lightning round the crown, from the torches on one pylon's crown to the next: now and then, and all of it when the fire changes
+  { const Bo = TORCH.bolts, caps = TORCH.pylDone ? CROWN.pylons : [], burst = Math.max(0, 1 - (time - TORCH.burstT) / 2.2) * TORCH.burstK, cc = house ? pcol(house) : null;
+    for (let k = 0; k < Math.min(12, caps.length); k++) {
+      const A = caps[k], Bp = caps[(k + 1) % caps.length]; let on = 0;
+      if (cc && nearM) { const due = burst > 0 ? (time - TORCH.burstT) * 6 - k : -1;   // (a burst runs round the crown, pylon to pylon)
+        on = due > 0 && due < 1.4 ? 1 : 0;
+        if (!on) { A.arcT = (A.arcT || 0) - dt; if (A.arcT <= 0) { A.arcT = 1.5 + Math.random() * 5; A.arcOn = 0.14; } A.arcOn = (A.arcOn || 0) - dt; on = A.arcOn > 0 ? 0.6 : 0; } }
+      if (on > 0 && (A.jitT = (A.jitT || 0) - dt) <= 0) { A.jitT = 0.05; Bo.clear(k);
+        const ya = A.top + 6, yb = Bp.top + 6;
+        for (let i = 0; i <= 11; i++) { const t = i / 11, w = Math.sin(Math.PI * t) * 9; Bo.lead(k, lerp(A.x, Bp.x, t) + rnd(w), lerp(ya, yb, t) + Math.sin(Math.PI * t) * 14 + rnd(w), lerp(A.z, Bp.z, t) + rnd(w), 0); } }
+      if (on > 0) Bo.write(k, 1.4 + on, cc[0] * 2.4 * on + 0.6, cc[1] * 2.4 * on + 0.6, cc[2] * 2.4 * on + 0.6, false); else Bo.write(k, 0, 0, 0, 0, false);
+    }
+    Bo.commit();
   }
 }
-const _TC = {}, _tcol = g => _TC[g] ||= new THREE.Color(PATRONS[g][0]);
 // ── Round Olympus, out of the sea of cloud below the summit, stand the spires: needles of rock a few hundred metres high,
 //    each with a name and a flat top to come down on, grass and a pine or two up there in the wind. Three are hollow near
 //    the top — a grotto you can walk or fly into, its walls grown with crystal that burns in a god's colour. Two pour a
@@ -12952,15 +13222,6 @@ function cragsBuild() {
     for (let r = 300; r <= 420; r += 20) { const x = MOUNT.x + Math.sin(f) * r, z = MOUNT.z + Math.cos(f) * r, g = terrainAt(x, z); if (g > CLOUD_SEA + 30 && (!best || r > best.r)) best = { x, z, g, r }; }
     if (best) { for (let k = 0; k < 7; k++) { const b = k / 7 * 6.283; part(acc, rk, best.x + Math.sin(b) * 3.2, best.g + 0.2, best.z + Math.cos(b) * 3.2, 1.6, 1.1, 1.6, [0.3, 0.27, 0.25], b); }
       CRAGS.vents.push({ x: best.x, y: best.g + 0.6, z: best.z, P: 19, ph: f * 7, on: 0, was: 0 }); } }
-  // the gate: a broken ring of stone hanging in the air across the way of the first flight, among the torches
-  { const nx = EDGE.x - START.x, nz = EDGE.z - START.z, L = Math.hypot(nx, nz), ux = nx / L, uz = nz / L, d = 34 + 4.5 * 46, gx = EDGE.x + ux * d, gz = EDGE.z + uz * d, gy = SUMMIT + 4 - 4.5 * 15 - 20 * 0.6 - 4, RR = 38;
-    const gate = CRAGS.gate = { x: gx, y: gy, z: gz, R: RR, th: Math.atan2(ux, uz) };
-    for (let k = 0; k < 30; k++) { const a = k / 30 * 6.283; if (k === 7 || k === 8 || k === 22) continue;   // (broken in places)
-      const lx = Math.cos(a) * RR, ly = Math.sin(a) * RR, wx = gx + lx * uz, wz = gz - lx * ux, wy = gy + ly;
-      part(acc, rk, wx, wy, wz, 5.2 + hsh(k, 1) * 2, 4.6 + hsh(1, k) * 2, 6 + hsh(k, 3) * 2, stone(wy, k), a, hsh(k, 4), hsh(4, k));
-      ROCKS.cyls.push({ x: wx, z: wz, r: 4.6, y0: wy - 4.5, y1: wy + 4.5, what: 'the gate in the air', S }); }
-    for (let k = 0; k < 5; k++) driftAdd(gx + rnd(30), gy + rnd(30), gz + rnd(30), 1.5 + Math.random() * 2, [0.5, 0.46, 0.4]);   // (and pieces of it, loose)
-  }
   ROCKS.mat ||= new THREE.MeshLambertMaterial({ vertexColors: true });
   const m = new THREE.Mesh(accToGeo(acc), ROCKS.mat); m.castShadow = m.receiveShadow = true; CRAGS.group.add(m);
   CRAGS.glowM = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
@@ -13076,7 +13337,7 @@ function updateShrineRings(dt) {
 function updatePantheon(dt) {
   const G = PANTHEON.group; if (!G) { if (realm === 'over' && state !== 'loading') buildPantheon(); return; }
   if (G.userData.ring) G.userData.ring.rotateY(dt * 0.03);
-  crownAnimate(G, dt); if (realm === 'over') { updateCrownLife(dt); updateShrineRings(dt); updateTorches(dt); } updateCrags(dt);
+  crownAnimate(G, dt); if (realm === 'over') { updateCrownLife(dt); updateShrineRings(dt); updateTorches(dt); updateLiving(dt); } updateCrags(dt);
   // above the clouds, round the mountain, nothing with wings runs out of fire: it is the one place a bird can always get back up from
   { const q = player; if (state === 'play' && realm === 'over' && (q.form === 'phoenix' || q.wings) && q.pos.y > CLOUD_SEA + 40 && (q.pos.x - MOUNT.x) ** 2 + (q.pos.z - MOUNT.z) ** 2 < 3300 * 3300) {
       if (q.flame < 0.55 && !CROWN.hiTold) { CROWN.hiTold = true; toast('ABOVE THE CLOUDS OF OLYMPUS · YOUR FIRE DOES NOT RUN DOWN HERE'); }
@@ -14034,7 +14295,7 @@ function footShotPos(sh, out) {
   return out;
 }
 function newShot() {
-  const p = player, foot = p.form === 'human', sc = cinema.sc = foot ? 0.085 : 1, fast = !foot && p.speed > 150;
+  const p = player, foot = p.form === 'human', sc = cinema.sc = foot ? 0.085 : 1 + (birdK() - 1) * 0.85, fast = !foot && p.speed > 150;   // (the big bird: every shot stands back for it, a little less than its size, so it still fills more of the frame)
   if (foot && !SH.def) return newFootShot();
   // what he is doing chooses the shot: low over water, the lens goes down to the water; in a dive, over his back; with
   // the sun low and clear, against it
@@ -14057,7 +14318,7 @@ function newShot() {
     const spd = foot ? Math.max(1.5, Math.hypot(p.vel.x, p.vel.z)) : p.speed;
     shot.anchor = new THREE.Vector3().copy(p.pos).addScaledVector(cineDir(_cd), spd * shot.dur * 0.42)
       .add(_v.set(Math.cos(hd) * 26 * sc * side, (4 + Math.random() * 10) * sc, -Math.sin(hd) * 26 * sc * side));
-    shot.anchor.y = Math.max(shot.anchor.y, groundAt(shot.anchor.x, shot.anchor.z, shot.anchor.y + 3) + (foot ? 1.2 : 5), WATER + 3 * sc);
+    shot.anchor.y = Math.max(shot.anchor.y, groundAt(shot.anchor.x, shot.anchor.z, shot.anchor.y + 3) + (foot ? 1.2 : 5 * sc), WATER + 3 * sc);
   }
   cinema.head = hd; cinema.blocked = 0;
   shotPos(shot, cinema.pos); cinema.posV.set(0, 0, 0);
@@ -14083,11 +14344,11 @@ function shotPos(sh, out) {
     case 'headon': out.set(p.pos.x + fx * d, p.pos.y + 1.5 * k, p.pos.z + fz * d); break;
     case 'belly': out.set(p.pos.x + fx * d * 0.5 + rx * 4 * k * s, p.pos.y - d * 0.8, p.pos.z + fz * d * 0.5 + rz * 4 * k * s); break;
     case 'wing': out.set(p.pos.x - fx * 5.5 * k + rx * 2.6 * k * s, p.pos.y + 2.9 * k, p.pos.z - fz * 5.5 * k + rz * 2.6 * k * s); break;
-    case 'skim': { const along = (0.5 - u) * d * 0.5; out.set(p.pos.x + rx * d * s + fx * along, WATER + 1.3, p.pos.z + rz * d * s + fz * along); return out; }   // (right down on the water)
+    case 'skim': { const along = (0.5 - u) * d * 0.5; out.set(p.pos.x + rx * d * s + fx * along, WATER + 1.3 * Math.max(1, k), p.pos.z + rz * d * s + fz * along); return out; }   // (right down on the water)
     case 'sun': out.set(p.pos.x - sunDir.x * d, p.pos.y - sunDir.y * d, p.pos.z - sunDir.z * d); break;   // the bird exactly between the lens and the sun
     case 'dive': out.set(p.pos.x - fx * d * 0.55 + rx * 5 * k * s, p.pos.y + d * 0.95, p.pos.z - fz * d * 0.55 + rz * 5 * k * s); break;
   }
-  out.y = Math.max(out.y, k < 1 ? groundAt(out.x, out.z, out.y + 3) + 0.9 : groundAt(out.x, out.z) + 4, WATER + 3 * k);
+  out.y = Math.max(out.y, k < 1 ? groundAt(out.x, out.z, out.y + 3) + 0.9 : groundAt(out.x, out.z) + 4 * k, WATER + 3 * k);
   return out;
 }
 function sightBlocked() {
@@ -14586,6 +14847,7 @@ function applyAct(g, j) {
   else if (j.act === 'quest' && !(story.saga && story.saga.god === g.id)) setQuest(g, j.kind, j.n, j.reward);
   else if (j.act === 'scare') scare(g);
   else if (j.act === 'gift') { talk.gift = [j.gift, g.name]; talk.after = giveGift; }
+  else if (j.act === 'item' && j.item) { const it = itemClean({ ...j.item, made: true }, g.id, g.name); if (it) talk.after = () => grantItem(it); }
   else if (j.act === 'leave') talk.after = () => { endTalk(); depart(g); };
   else if (j.act === 'smite') talk.after = () => { endTalk(); smite(g); };
   else if (j.act === 'weather') godWeather(g, j.sky);
@@ -14798,6 +15060,8 @@ $('talkInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') { const v = e.target.value.trim(); if (v && !talk.intro) { e.target.value = ''; if (/^\/?(leave|exit|quit|end)( (the )?(conversation|talk|chat))?$/i.test(v)) return leaveTalk(); if (talk.busy) talk.token++; talk.busy = false; godSay(v.slice(0, 300), { parting: v.split(/\s+/).length <= 8 && PARTING.test(v) }); } }
 });
 $('talkLeave').addEventListener('click', e => { e.stopPropagation(); leaveTalk(); });
+$('qtrack').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); qlShow(!QL.open); audio.sfx.ui?.(); });
+addEventListener('keydown', e => { if (QL.open && e.code === 'Escape') { qlShow(false); e.stopPropagation(); e.preventDefault(); } }, true);   // (Esc closes the log before anything else hears it)
 $('talk').addEventListener('pointerdown', e => {
   if (e.target.closest('button, input')) return;
   if (!live()) fallbackNext(); else staySilent();
@@ -15942,7 +16206,7 @@ function saveData() {
       order: GOD_ORDER, lit: BEACONS.filter(b => b.lit).map(b => b.id), pos: checkpoint.toArray(),
       gods: Object.fromEntries(gods.map(g => [g.id, { h: g.history.slice(-40), r: g.revealed, f: Math.max(g.formIdx, g.wantForm) }])),
       others: Object.fromEntries(others.filter(o => o.history.length).map(o => [o.id, { h: o.history.slice(-20), r: o.revealed }])),
-      great: { fire: GREAT.fire === 2 ? 1 : GREAT.fire, bolt: GREAT.bolt, race: GREAT.race, got: GREAT.got, best: GREAT.best }, self: (story.self || []).slice(-14) });
+      great: { fire: GREAT.fire === 2 ? 1 : GREAT.fire, bolt: GREAT.bolt, race: GREAT.race, got: GREAT.got, best: GREAT.best }, self: (story.self || []).slice(-14), items: (story.items || []).slice(-48), qlog: (story.qlog || []).slice(0, 40), track: story.track || '' });
   }
 }
 function loadGame() {
@@ -15955,6 +16219,7 @@ function loadGame() {
   flags.deaths = s.deaths || 0; flags.morphed = s.phase !== 'summit'; Object.assign(stats, s.stats || {});
   quests.length = 0; for (const q of s.quests || []) if (KINDS[q.kind] && PERKS[q.reward]) quests.push(q);
   for (const k in perks) perks[k] = Math.max(0, Math.min(3, (s.perks || {})[k] | 0));
+  story.items = (Array.isArray(s.items) ? s.items : []).map(o => o && itemClean(o, o.from, o.fromName) && Object.assign(itemClean(o, o.from, o.fromName), { at: +o.at || Date.now(), made: !!o.made })).filter(Boolean); story.qlog = Array.isArray(s.qlog) ? s.qlog.filter(d => d && typeof d === 'object').slice(0, 40) : []; story.track = typeof s.track === 'string' ? s.track : ''; itemStats();
   story.known = new Set(s.known || []);
   { const g = s.great || {}, ok = v => [0, 1, 2, 9].includes(v) ? v : 0; GREAT.fire = ok(g.fire); GREAT.bolt = ok(g.bolt); GREAT.race = ok(g.race) === 2 ? 1 : ok(g.race); GREAT.best = +g.best || 0; for (const k of ['iron', 'lava', 'storm']) GREAT.got[k] = g.got && g.got[k] ? 1 : 0;
     story.self = (Array.isArray(s.self) ? s.self : []).filter(x => typeof x === 'string').map(x => x.slice(0, 110)).slice(-14); }
@@ -16056,7 +16321,7 @@ function sagaAdvance(q) {
   const S = story.saga; if (!S || S.god !== q.id) return; player.flame = 1; S.i++;
   if (S.i < S.steps.length) { toast(`${S.title.toUpperCase()} · PART ${S.i} OF ${S.steps.length} DONE`); audio.sfx.fanfare?.(S.i); witness(`did the ${['first', 'second', 'third'][S.i - 1]} part of "${S.title}" for ${S.name}: he managed to ${goalOf(q)}`); setTimeout(() => sagaStep(true), 1800); saveSoon(); return; }
   toast(`${S.title.toUpperCase()} · IT IS DONE`); audio.sfx.fanfare?.(0); witness(`finished the story ${S.name} drew him into, "${S.title}"`, false); worldDeed('quest', S.god);
-  grantPerk(S.reward, S.name); (story.sagasDone ||= []).push({ god: S.god, title: S.title, at: Date.now() }); story.sagaOwed = { god: S.god, title: S.title }; story.saga = null;
+  grantPerk(S.reward, S.name); questFinished(S.god, S.name, `“${S.title}”`, 2.2); (story.sagasDone ||= []).push({ god: S.god, title: S.title, at: Date.now() }); story.sagaOwed = { god: S.god, title: S.title }; story.saga = null;
   say([{ text: `◆ “${S.title}” is finished. ${S.name} will want to hear how it went.`, title: S.name }]); saveSoon();
 }
 // set (or, if he has talked them round, change) the thing this one wants of him
@@ -16145,7 +16410,7 @@ function questDone(q) {
   toast(`${q.name.toUpperCase()} · DONE`);
   player.flame = 1;
   witness(`did what ${q.name} asked of him: he managed to ${goalOf(q)}`); worldDeed('quest', gods.find(g => g.name === q.name)?.id || '');
-  grantPerk(q.reward, q.name);
+  grantPerk(q.reward, q.name); questFinished(q.id, q.name, goalOf(q), RANGE[q.kind] ? 1 + q.n / (RANGE[q.kind][1] || 1) : 1);
   if (q.id === 'hermes' && q.kind === 'arena') setTimeout(hermesSendsOn, 2600);
 }
 // his rings flown: now Hermes passes him on, as the others do, with a river of air to ride
@@ -16155,6 +16420,110 @@ function hermesSendsOn() {
   if (!c || story.chain?.from !== 'hermes') return;
   setJet({ x: player.pos.x, y: Math.max(groundAt(player.pos.x, player.pos.z, player.pos.y), WATER), z: player.pos.z }, CHAIN_TO);
   say([{ text: `◇ Good — you can fly. Now find ${c.g.disguise}, ${fmtDist(c.d)} to the ${c.dir}. Whoever it is will send you on to the next. Ride the river of air.`, title: 'Hermes' }]);
+}
+// ── The quest log, and what he carries. One block at the top left says what he is doing — whose errand it is, how far
+//    along, how far away — and touching it (or J, or "quests" in the menu) opens the whole log: everything he could be
+//    doing (touch one to follow it: it is marked in the world), everything he carries, everything he has done and with
+//    whom. Every errand finished earns a thing made by the god who asked: a feather, a ring, a sandal, with a little power
+//    in it — faster flight, a slower burn, a surer grip, a higher leap, a longer glide — and the gods can make him others
+//    of their own when they feel like it. Do an errand with others near and it is done together: each of them is given
+//    the thing too, and it is in all their logs as done together.
+const ISTAT = { swift: ['faster flight', '>'], ember: ['your fire burns slower', '*'], grip: ['climbing tires you less', '#'], leap: ['higher wing leaps', '^'], glide: ['longer glides', '~'] };
+const IT_GOD = {
+  zeus: [['leap', 'swift'], ['Thunder Feather', 'Storm Torc', 'Oak Laurel', 'Eagle Talon', 'Bolt Shard']], hera: [['ember', 'grip'], ['Peacock Eye', 'Diadem', 'Pomegranate Seed', 'Wedding Veil']],
+  poseidon: [['glide', 'swift'], ['Trident Tine', 'Sea Glass', 'Conch', 'Kelp Cord']], demeter: [['ember', 'grip'], ['Wheat Sheaf', 'Red Poppy', 'Little Sickle', 'Seed Pouch']],
+  athena: [['grip', 'leap'], ['Owl Feather', 'Aegis Scale', 'Olive Sprig', 'Spearhead']], apollo: [['glide', 'ember'], ['Sun Disc', 'Lyre String', 'Laurel Crown', 'Golden Arrow']],
+  artemis: [['swift', 'glide'], ['Moon Bow', 'Stag Antler', 'Silver Arrow', 'Hunting Horn']], ares: [['leap', 'grip'], ['Bronze Greave', 'War Plume', 'Shield Boss', 'Boar Tusk']],
+  aphrodite: [['glide', 'ember'], ['Rose', 'Dove Feather', 'Gold Girdle', 'Shell Comb']], hephaestus: [['ember', 'grip'], ['Anvil Chip', 'Bellows Charm', 'Forge Tongs', 'Iron Ring']],
+  hermes: [['swift', 'leap'], ['Winged Sandal', 'Caduceus', 'Wide Hat', 'Lucky Coin']], dionysus: [['glide', 'ember'], ['Vine Crown', 'Thyrsus', 'Wine Cup', 'Panther Pelt']],
+};
+const IT_ADJ = ['Ember-Lit', 'Old', 'Burnished', 'Whispering', 'Sky-Worn', 'Cracked', 'Shining', 'Patient', 'Restless', 'Starlit', 'Salt-Bright', 'Ash-Grey', 'Singing', 'Heavy', 'Small'];
+const IS = { swift: 0, ember: 0, grip: 0, leap: 0, glide: 0 };   // what everything he carries adds up to (each capped)
+const QL = { open: false, el: null, track: null, mk: null, line: '', line2: '', god: '', t: 0, pick: 0 };
+const itemClean = (o, from, fromName) => { const stat = ISTAT[o?.stat] ? o.stat : null; if (!stat) return null;
+  const name = String(o.name || '').replace(/[^\w '’-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40); if (name.length < 3) return null;
+  return { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, stat, amt: clamp(Math.round(+o.amt || +o.amount || 6), 3, 18), from: PATRONS[from] ? from : '', fromName: String(fromName || '').slice(0, 20), with: Array.isArray(o.with) ? o.with.map(cleanName).filter(Boolean).slice(0, 6) : [], at: Date.now(), made: !!o.made }; };
+function itemMake(god, size = 1) {   // a thing of that god's, with a little power in it: the bigger the errand, the more
+  const G = IT_GOD[god] || IT_GOD.hermes, r = Math.random(), tier = r < 0.08 * size ? 2 : r < 0.32 * size ? 1 : 0, stat = G[0][Math.random() < 0.65 ? 0 : 1];
+  const amt = [4 + Math.random() * 4, 9 + Math.random() * 4, 14 + Math.random() * 4][tier] | 0, nm = godById[god]?.name || 'a god';
+  return itemClean({ name: `${tier === 2 ? 'Mythic ' : ''}${pick(IT_ADJ)} ${pick(G[1])} of ${nm}`, stat, amt }, god, nm);
+}
+function itemStats() { for (const k in IS) IS[k] = 0; for (const it of story.items || []) if (ISTAT[it.stat]) IS[it.stat] += it.amt; for (const k in IS) IS[k] = Math.min(60, IS[k]) / 100; }
+function grantItem(it, quiet = false) {
+  if (!it) return; (story.items ||= []).push(it);
+  if (story.items.length > 48) { story.items.sort((a, b) => b.amt - a.amt); story.items.length = 48; }   // (he carries the best of them)
+  itemStats(); saveSoon(); if (QL.open) qlRender();
+  if (quiet) return;
+  toast(`${ISTAT[it.stat][1]} ${it.name.toUpperCase()} · +${it.amt}% ${ISTAT[it.stat][0].toUpperCase()}`); audio.sting?.('godMet'); flash = Math.max(flash, 0.12);
+  witness(`was given ${it.name}${it.with.length ? ` (shared with ${it.with.join(', ')})` : ''}`, true);
+}
+// everyone near enough when it is done did it with him
+const questWith = () => { const me = realm === 'under' ? 1 : 0, out = []; for (const P of NET.peers.values()) if (P.s && P.realm === me && P.pos.distanceTo(player.pos) < 220 && performance.now() - P.s.t < 8000 && P.name) out.push(P.name); return [...new Set(out)].slice(0, 6); };
+function questFinished(god, name, goal, size = 1) {   // logged, rewarded, shared
+  const withN = questWith(), it = itemMake(god, size); if (!it) return; it.with = withN;
+  (story.qlog ||= []).unshift({ god, name, goal: String(goal).slice(0, 90), item: it.name, with: withN, at: Date.now() }); story.qlog.length = Math.min(story.qlog.length, 40);
+  grantItem(it);
+  if (withN.length && NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'qshare', payload: { i: NET.id, from: heroName, god, name, goal: String(goal).slice(0, 90), item: { name: it.name, stat: it.stat, amt: it.amt }, with: withN } });
+  if (withN.length) toast(`DONE TOGETHER WITH ${withN.join(', ')} · THEY GET IT TOO`);
+}
+function gotQshare(m) {   // someone near did an errand and we were with them: our share
+  if (!m || typeof m !== 'object' || !Array.isArray(m.with) || !m.with.map(cleanName).includes(cleanName(heroName))) return;
+  const from = cleanName(m.from), it = itemClean({ ...m.item, with: [from] }, m.god, godById[m.god]?.name || '');
+  if (!it || !from) return;
+  { const P = [...NET.peers.values()].find(P => P.name === from); if (!P || P.pos.distanceTo(player.pos) > 400) return;   // (only from someone who was really there with him)
+    const now = performance.now(); if (now - (P.qshT || -1e9) < 20000) return; P.qshT = now; }
+  (story.qlog ||= []).unshift({ god: PATRONS[m.god] ? m.god : '', name: String(m.name || '').slice(0, 20), goal: String(m.goal || '').slice(0, 90), item: it.name, with: [from], at: Date.now(), shared: true }); story.qlog.length = Math.min(story.qlog.length, 40);
+  grantItem(it); toast(`YOU HELPED ${from} · ${it.name.toUpperCase()} IS YOURS TOO`);
+}
+// where an errand takes him, if anywhere
+function questTarget(q) {
+  if (q.kind === 'go' && q.to) return { x: q.to.x, z: q.to.z };
+  if (q.kind === 'meet' && q.to) { const g = godById[q.to.id]; return g && g.active ? { x: g.x, z: g.z } : null; }
+  if (q.kind === 'visit' && q.a && q.a.id) return { x: q.a.x, z: q.a.z };
+  if (q.kind === 'arena' && q.id === 'hermes') { const c = ARENA.courses.get('hermes'); return c ? { x: c.rings[0].x, z: c.rings[0].z } : null; }
+  return null;
+}
+function qlActive() {
+  const L = [];
+  for (const q of quests) if (!q.done) { const sg = q.sg && story.saga && story.saga.god === q.id ? story.saga : null;
+    L.push({ key: 'q:' + q.id, god: q.id, name: q.name, goal: goalOf(q), title: sg ? sg.title : '', step: sg ? `${sg.i + 1} of ${sg.steps.length}` : '', v: RANGE[q.kind] ? clamp(q.v, 0, 1) : q.kind === 'climb' && q.v ? 0.5 : -1, n: RANGE[q.kind] ? q.n : 0, kind: q.kind, to: questTarget(q), reward: PERKS[q.reward]?.[0] || '' }); }
+  if (GREAT.line) L.push({ key: 'great', god: '', name: 'A LABOUR', goal: GREAT.line, v: -1, to: GREAT.T ? { x: GREAT.T.x, z: GREAT.T.z } : null });
+  { const c = chainInfo(); if (c) L.push({ key: 'chain', god: c.g.id, name: `${(godById[story.chain?.from]?.name || 'SOMEONE')} SENDS YOU`, goal: `find ${c.g.revealed ? c.g.name : c.g.disguise}`, v: -1, to: { x: c.g.x, z: c.g.z } }); }
+  return L;
+}
+const qlBar = (v, w = 10) => '[' + '#'.repeat(Math.round(clamp(v, 0, 1) * w)) + '-'.repeat(w - Math.round(clamp(v, 0, 1) * w)) + ']';
+const qlDist = to => { if (!to) return ''; const dx = to.x - player.pos.x, dz = to.z - player.pos.z, d = Math.hypot(dx, dz); return d < 60 ? 'HERE' : `${fmtDist(d)} ${compass(dx, dz).toUpperCase().replace('NORTH', 'N').replace('SOUTH', 'S').replace('EAST', 'E').replace('WEST', 'W').replace('-', '')}`; };
+function qlTracked() { const L = qlActive(); return L.find(e => e.key === story.track) || L[L.length - 1] || null; }
+// every quarter second: the two lines at the top left, the marker in the world
+function qlUpdate() {
+  const T = QL.track = state === 'talk' ? null : qlTracked(), el = $('qtrack');
+  if (!T) { QL.line = QL.line2 = ''; if (el && el.textContent) el.textContent = ''; } else {
+    const head = `${T.name.toUpperCase()}${T.step ? ' ' + T.step : ''}`;
+    QL.line = `${head} · ${T.goal}`; QL.god = T.god;
+    QL.line2 = [T.v >= 0 ? `${qlBar(T.v)} ${T.n >= 1 && T.n <= 30 ? `${Math.floor(T.v * T.n + 1e-6)}/${T.n}` : Math.round(T.v * 100) + '%'}` : '', qlDist(T.to)].filter(Boolean).join(' · ');
+    if (el) { const h = `<b style="color:${PATRONS[T.god]?.[0] || '#ffd9a8'}">◆ ${head}</b> · ${T.goal}${QL.line2 ? `<br><i>${QL.line2}</i>` : ''}`; if (el._h !== h) { el._h = h; el.innerHTML = h; } }
+  }
+  if (!QL.mk) { const m = QL.mk = document.createElement('div'); m.className = 'mk wp'; m.innerHTML = '<b>◆</b><span></span>'; m.style.display = 'none'; $('markers').appendChild(m); }
+  const show = !!(T && T.to && state === 'play'); if (show) QL.mk.style.color = PATRONS[T.god]?.[0] || '#ffd9a8';
+  QL.mkTo = show ? T.to : null; QL.mkLabel = show ? `${T.name.toUpperCase()} · ${qlDist(T.to)}` : '';
+  if (QL.open && (QL.t = (QL.t || 0) + 1) % 2 === 0) qlRender();
+}
+function qlMarker() { if (!QL.mk) return; if (QL.mkTo) placeMarker(QL.mk, QL.mkTo.x, Math.max(terrainAt(QL.mkTo.x, QL.mkTo.z), WATER) + 40, QL.mkTo.z, true, '◆', QL.mkLabel, true); else if (QL.mk.style.display !== 'none') QL.mk.style.display = 'none'; }
+const qlEsc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function qlRender() {
+  const el = QL.el; if (!el) return; const L = qlActive(), T = qlTracked(), items = story.items || [], log = story.qlog || [];
+  const col = g => PATRONS[g]?.[0] || '#ffd9a8';
+  const tot = Object.keys(IS).filter(k => IS[k] > 0).map(k => `${ISTAT[k][1]} +${Math.round(IS[k] * 100)}% ${ISTAT[k][0]}`).join('   ');
+  el.querySelector('.ql-body').innerHTML =
+    `<div class="ql-h">-- WHAT YOU ARE DOING --</div>` + (L.length ? L.map(e => `<button class="ql-q${T && e.key === T.key ? ' on' : ''}" data-k="${qlEsc(e.key)}"><b style="color:${col(e.god)}">${T && e.key === T.key ? '>' : ' '} ${qlEsc(e.name.toUpperCase())}${e.step ? ' · ' + qlEsc(e.step) : ''}</b>${e.title ? ` <u>${qlEsc(e.title)}</u>` : ''}<br><span>${qlEsc(e.goal)}</span><br><i>${e.v >= 0 ? qlBar(e.v, 16) + ' ' + (e.n >= 1 && e.n <= 30 ? `${Math.floor(e.v * e.n + 1e-6)}/${e.n}` : Math.round(e.v * 100) + '%') + ' · ' : ''}${e.to ? qlDist(e.to) + ' · ' : ''}${e.reward ? 'for ' + qlEsc(e.reward.toLowerCase()) + ' · ' : ''}${T && e.key === T.key ? 'FOLLOWING' : 'TOUCH TO FOLLOW'}</i></button>`).join('') : `<p class="ql-e">nobody has asked anything of you. kneel at a throne, or speak to a god.</p>`)
+    + `<div class="ql-h">-- WHAT YOU CARRY (${items.length}) --</div>` + (tot ? `<p class="ql-tot">${qlEsc(tot)}</p>` : '') + (items.length ? items.slice().reverse().map(it => `<p class="ql-i"><b style="color:${col(it.from)}">${ISTAT[it.stat][1]} ${qlEsc(it.name)}</b> <i>+${it.amt}% ${ISTAT[it.stat][0]}${it.made ? ' · made for you' : ''}${it.with.length ? ' · shared with ' + qlEsc(it.with.join(', ')) : ''}</i></p>`).join('') : `<p class="ql-e">nothing yet. every errand you finish earns you something.</p>`)
+    + `<div class="ql-h">-- DONE (${log.length}) --</div>` + (log.length ? log.map(d => `<p class="ql-d"><b style="color:${col(d.god)}">+ ${qlEsc(String(d.name).toUpperCase())}</b> ${qlEsc(d.goal)} <i>· ${ago(d.at)}${d.with?.length ? ` · with ${qlEsc(d.with.join(', '))}` : ''}${d.item ? ' · ' + qlEsc(d.item) : ''}</i></p>`).join('') : `<p class="ql-e">nothing finished yet.</p>`);
+}
+function qlShow(on) {
+  if (!QL.el) { const el = QL.el = document.createElement('div'); el.id = 'qlog'; el.innerHTML = '<div class="ql-top"><span>+-- QUESTS ------</span><button class="ql-x" type="button">[ X ]</button></div><div class="ql-body"></div>';
+    el.addEventListener('pointerdown', e => { e.stopPropagation(); const b = e.target.closest('.ql-q'); if (b) { story.track = b.dataset.k; QL.t = 0; qlUpdate(); qlRender(); audio.sfx.ui?.(); saveSoon(); } else if (e.target.closest('.ql-x')) qlShow(false); });
+    el.addEventListener('wheel', e => e.stopPropagation(), { passive: true }); document.body.appendChild(el); }
+  QL.open = on; QL.el.classList.toggle('on', on); if (on) { if (MENU.open) menuShow(false); qlRender(); }
 }
 let questT = 0;
 function updateQuests(dt) {
@@ -16199,10 +16568,12 @@ function updateQuests(dt) {
   }
   if (realm === 'under') ev.wasUnder = true; else if (ev.wasUnder && state === 'play') { ev.wasUnder = false; ev.home = true; }
   if (state === 'play') { ev.animal = false; ev.hoops = 0; ev.jet = false; ev.arena = ''; ev.tear = 0; ev.stones = 0; }
+  qlMarker();
   if ((questT -= dt) > 0) return;
   questT = 0.25;
   // one line on screen: the newest thing he has been asked and hasn't done
   const cur = [...quests].reverse().find(q => !q.done);
+  qlUpdate();
   $('quest').textContent = GREAT.line && state !== 'talk' ? `◆ ${GREAT.line}${GREAT.T && !GREAT.R ? ` · ${fmtDist(Math.hypot(GREAT.T.x - player.pos.x, GREAT.T.z - player.pos.z))}` : ''}` : !cur ? '' : `${cur.name.toUpperCase()} — ${goalOf(cur)}${cur.kind === 'climb' && cur.v ? ' · now land' : RANGE[cur.kind] && cur.v > 0.02 ? ` · ${Math.round(Math.min(1, cur.v) * 100)}%` : ''}`;
 }
 
@@ -18449,6 +18820,7 @@ addEventListener('keydown', e => {
     case 'BracketLeft': lettersSet(cellIdx - 1); break;
     case 'BracketRight': lettersSet(cellIdx + 1); break;
     case 'KeyM': openMap(); break;
+    case 'KeyJ': qlShow(!QL.open); break;
     case 'KeyF': openPhoto(); break;
     case 'KeyX': if (!e.repeat) throwBolt(); break;
     case 'KeyL': if (!e.repeat) { const P = TRACK.aim || NET.peers.get(TRACK.id); if (P) trackPeer(P, TRACK.aim ? TRACK.id !== P.id : false); else toast('LOOK AT ANOTHER FLIER, THEN L, TO TRACK THEM'); } break;   // look at someone and L: never lose them
@@ -18809,7 +19181,7 @@ function xrJoints(side) {
 function xrInput(dt) {
   _xe.setFromQuaternion(XR.cam.quaternion, 'YXZ');
   const hy = _xe.y, H = XR.cam.position, p = player;
-  const o = XR.out = XR.read.update(dt, { x: H.x, y: H.y, z: H.z, yaw: hy }, xrJoints('left'), xrJoints('right'), { form: p.form, grounded: p.grounded });
+  const o = XR.out = XR.read.update(dt, { x: H.x, y: H.y, z: H.z, yaw: hy }, xrJoints('left'), xrJoints('right'), { form: p.form, grounded: p.grounded, climb: !!p.climb });
   xrGestures(o.hands, dt);
   const fly = state === 'play' && !p.cine && (p.form === 'phoenix' && !p.perch || (p.wings && !p.grounded));
   const fall = state === 'play' && !p.cine && p.form === 'human' && p.tumble && !p.grounded;
@@ -18848,7 +19220,7 @@ function xrMove(ev) {
         if (XR.land) { XR.land = null; if (AP.kind === 'land') AP.kind = ''; toast('FLYING ON'); }
         const k = clamp((XR.flapV || 1.4) / 1.4, 0.7, 1.9), run = 1 + Math.min(4, XR.flapRate || 0) * 0.18;
         WR.beat = 1; p.speed = Math.min(p.speed + 16 * k * run, 190); p.vy = Math.min(p.vy + 9 * k, 17); netFx('beat');
-      } else if (p.grounded || p.climb) { const k = spaceAction()?.kind; if (k === 'jump' || k === 'ignite' || k === 'jumpoff') pressSpace(); }   // beat your wings on the ground and up he goes
+      } else if (p.grounded || p.climb) { const k = spaceAction()?.kind; if (k === 'jump' || k === 'ignite' || k === 'jumpoff' || k === 'wingleap') pressSpace(); }   // beat your wings on the ground and up he goes; on a wall, the wing leap
       else if (spaceAction()?.kind === 'rebirth') pressSpace();   // in the air, falling or gliding: catch fire and fly
     }
     return;
@@ -19128,6 +19500,7 @@ function xrHud(dt, sc) {
   if (state === 'talk') { const t = vis('talkText'); if (t) lines.push([vis('talkName'), t]); }
   else { const d = vis('dlgText'); if (d) lines.push([vis('dlgTitle'), d]); }
   const card = vis('card'); if (card) lines.push(['', card]);
+  if (QL.line && lines.length < 2 && state === 'play') lines.push([QL.line2 || '', QL.line]);
   const tst = vis('toast'); if (tst) lines.push(['', tst]);
   if (GUIDE.open) { const gs = vis('guideSay'); if (gs) lines.push(['HER', gs]); }
   if (XMAP.on && lines.length < 2) { const L = [...NET.peers.values()].filter(P => P.seen && !P.memory).sort((a, b) => a.pos.distanceTo(player.pos) - b.pos.distanceTo(player.pos)).slice(0, 4); if (L.length) lines.push(['ON THE MAP', L.map(P => `${P.name} ${fmtDist(P.pos.distanceTo(player.pos))}`).join(' · ') + ' — look at one and pinch']); }
@@ -19273,7 +19646,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, livingOpen, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);

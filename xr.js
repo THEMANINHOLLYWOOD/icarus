@@ -160,11 +160,13 @@ export function makeHands() {
     }
     // walk: the arms swung the way arms swing when you walk — one going forward as the other comes back, low at the sides.
     // (Each swing stops for an instant as it turns round: he keeps walking through that.)
-    if (!air && ctx.grounded && both && !out.pose) {
-      const zl = l.v[2], zr = r.v[2], amp = (Math.abs(zl) + Math.abs(zr)) / 2;
-      const sw = zl * zr < 0 && amp > 0.3 && l.palm.y < -0.15 && r.palm.y < -0.15 && Math.abs(l.palm.x) < 0.5 && Math.abs(r.palm.x) < 0.5;
+    // (and on a wall: hand over hand, one pulling down as the other reaches up, climbs it just the same)
+    if (!air && (ctx.grounded || ctx.climb) && both && !out.pose) {
+      const zl = l.v[2], zr = r.v[2], amp = (Math.abs(zl) + Math.abs(zr)) / 2, yl = l.v[1], yr = r.v[1], ampY = (Math.abs(yl) + Math.abs(yr)) / 2;
+      const swY = !!ctx.climb && yl * yr < 0 && ampY > 0.3 && Math.abs(l.palm.x) < 0.6 && Math.abs(r.palm.x) < 0.6;
+      const sw = swY || zl * zr < 0 && amp > 0.3 && (ctx.climb || l.palm.y < -0.15 && r.palm.y < -0.15) && Math.abs(l.palm.x) < 0.5 && Math.abs(r.palm.x) < 0.5;
       H.walk += ((sw ? 1 : 0) - H.walk) * Math.min(1, dt * (sw ? 7 : 1.8));
-      if (sw) H.walkV += (amp - H.walkV) * Math.min(1, dt * 4);
+      if (sw) H.walkV += (Math.max(amp, ampY) - H.walkV) * Math.min(1, dt * 4);
       if (H.walk > 0.4) { out.pose = 'walk'; out.axes = [0, 1]; out.run = H.walkV > 1.0; }
     } else H.walk = Math.max(0, H.walk - dt * 3);
     if ((H.boostT -= dt) > 0) out.boost = true;

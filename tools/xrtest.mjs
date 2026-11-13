@@ -77,5 +77,11 @@ head.yaw = 0;
 // no hands: nothing
 r = run(() => ({ L: null, R: null }), 0.3);
 check('no hands, no moves', !r.ev.length && r.last.axes[0] === 0 && r.last.axes[1] === 0);
+
+// climbing: hand over hand, one pulling down as the other reaches up
+r = run(t => { const ph = Math.sin(t * Math.PI * 2 * 1.1) * 0.22; return { L: fakeHand('L', at(-0.25, 0.05 + ph, -0.35), { toward: [0, 0, -1] }), R: fakeHand('R', at(0.25, 0.05 - ph, -0.35), { toward: [0, 0, -1] }) }; }, 2.0, { form: 'human', grounded: false, climb: true });
+check('hand over hand climbs', r.last.pose === 'walk' && r.last.axes[1] > 0.9, r.last.pose);
+r = run(t => { const ph = Math.sin(t * Math.PI * 2 * 1.1) * 0.22; return { L: fakeHand('L', at(-0.25, 0.05 + ph, -0.35), { toward: [0, 0, -1] }), R: fakeHand('R', at(0.25, 0.05 - ph, -0.35), { toward: [0, 0, -1] }) }; }, 2.0, { form: 'human', grounded: true });
+check('hand over hand on the ground is not walking', r.last.pose !== 'walk', r.last.pose);
 console.log(fails ? `${fails} failed` : 'all moves read');
 process.exit(fails ? 1 : 0);
