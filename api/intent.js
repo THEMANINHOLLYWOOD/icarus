@@ -5,7 +5,7 @@ import { json, clip, limited, refuse } from './_lib.js';
 const ACTIONS = ['fly', 'land', 'glide', 'bird', 'human', 'jump', 'dive', 'climb', 'faster', 'slower', 'left', 'right', 'around', 'walk', 'run', 'stop',
   'go_there', 'map', 'photo', 'snap', 'close', 'cinematic', 'normalcam', 'players', 'chat', 'mute', 'unmute', 'help',
   'objective', 'home', 'temple', 'nova', 'blow', 'perch', 'explain', 'closer', 'further', 'face', 'wide',
-  'menu', 'hands_on', 'hands_off', 'mic_off', 'tilt', 'thumb', 'quality_up', 'quality_down', 'letters_up', 'letters_down', 'album', 'hover'];
+  'menu', 'hands_on', 'hands_off', 'mic_off', 'tilt', 'thumb', 'quality_up', 'quality_down', 'letters_up', 'letters_down', 'album', 'hover', 'map3d', 'map2d', 'map_left', 'map_right', 'map_up', 'map_down', 'map_north', 'watch', 'bolt'];
 
 const SYSTEM = `You turn what a player says to their character in a flying game into actions. The player is Icarus: a man who can walk, jump, fall and glide on wax wings, and who turns into a phoenix to fly. They may also be shapeshifted into an animal.
 Actions you may use, in the order they should happen:
@@ -20,7 +20,11 @@ perch (land and stay a bird), explain (how to play), closer / further (move the 
 menu (open or close the menu), hands_on / hands_off (steer with hands seen by the camera, or stop), mic_off (stop listening), tilt / thumb (how a phone steers),
 quality_up / quality_down (sharper graphics, or smoother), letters_up / letters_down (bigger or smaller letters in the picture),
 album (open the photographs he has taken), hover (hold him in the air where he is and open the photo camera).
+map3d / map2d (the map as a model standing in three dimensions, or laid flat), map_left / map_right (turn the map), map_up / map_down (tip the map up or lay it further over), map_north (square the map north up).
+watch (be carried to Crete to watch a new player who is just beginning).
+bolt (throw his thunderbolt at whatever he is looking at, once Hephaestus has made him one).
 To stay with another player, use "follow:<their name>"; to go to a named place, god or player, use "goto:<name>".
+To be carried at once (teleported) to another player, use "warp:<their name>".
 To change shape, use "become:<animal>" (e.g. "become:whale").
 If what they said is not an instruction to the character or the game (it's chatter, or said to someone else), return no actions.
 Answer with one JSON object only: {"actions": ["..."]}`;
@@ -46,6 +50,6 @@ export async function POST(req) {
   } catch { return json({ actions: [] }); }
   // only the game's own words come back
   const actions = (Array.isArray(out.actions) ? out.actions : []).slice(0, 5).map(a => String(a || '').toLowerCase().trim())
-    .filter(a => ACTIONS.includes(a) || /^(become|goto|follow):[a-z][a-z0-9 \-']{1,30}$/.test(a));
+    .filter(a => ACTIONS.includes(a) || /^(become|goto|follow|warp):[a-z][a-z0-9 \-']{1,30}$/.test(a));
   return json({ actions });
 }

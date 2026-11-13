@@ -665,6 +665,37 @@ export function createAudio() {
     mapOpen() { if (!ctx) return; const t = T(); nz(pink, { t, dur: 0.32, f0: 900, f1: 3200, q: 0.6, a: 0.05, vol: 0.1 }); tn({ t: t + 0.24, dur: 0.09, f0: 660, f1: 990, a: 0.004, vol: 0.05 }); },
     mapClose() { if (!ctx) return; const t = T(); nz(pink, { t, dur: 0.26, f0: 3000, f1: 800, q: 0.6, a: 0.02, vol: 0.09 }); tn({ t: t + 0.12, dur: 0.08, f0: 880, f1: 520, a: 0.004, vol: 0.045 }); },
     mapFlip() { if (!ctx) return; const t = T(); tn({ t, dur: 0.06, f0: 740, a: 0.003, vol: 0.05 }); tn({ t: t + 0.07, dur: 0.1, f0: 1110, a: 0.003, vol: 0.05 }); },
+    // the map under the hand: a dial that clicks as it turns (brighter as north comes to the top), a note that rises as the
+    // view goes in, the table sliding, a bird noticed, a place chosen, a place that cannot be, and north found again
+    mapTurn(k = 0) { if (!ctx) return; const t = T(); tn({ t, dur: 0.045, f0: 560 + k * 300, a: 0.002, vol: 0.024 }); nz(pink, { t, dur: 0.06, f0: 2200, q: 2.5, a: 0.003, vol: 0.022 }); },
+    mapZoom(k = 0.5) { if (!ctx) return; const t = T(); tn({ t, dur: 0.08, f0: 280 + k * 620, f1: 320 + k * 760, a: 0.004, vol: 0.026 }); },
+    mapMove() { if (!ctx) return; const t = T(); nz(pink, { t, dur: 0.11, f0: 600, f1: 1400, q: 0.7, a: 0.02, vol: 0.03 }); },
+    mapHover() { if (!ctx) return; const t = T(); tn({ t, dur: 0.05, f0: 1320, a: 0.002, vol: 0.03 }); tn({ t: t + 0.05, dur: 0.08, f0: 1760, a: 0.002, vol: 0.026 }); },
+    mapPick() { if (!ctx) return; const t = T(); [76, 81, 88].forEach((m, i) => bell(mtof(m), t + i * 0.05, 0.05, sfxWet)); tn({ t, dur: 0.12, f0: 220, f1: 330, a: 0.004, vol: 0.05 }); },
+    mapNo() { if (!ctx) return; const t = T(); tn({ t, dur: 0.09, f0: 196, f1: 174, a: 0.004, vol: 0.04 }); },
+    mapNorth() { if (!ctx) return; const t = T(); bell(mtof(76), t, 0.045, sfxWet); bell(mtof(83), t + 0.09, 0.05, sfxWet); },
+    // the smith's hammer on something that is not quite metal: the blow, the ring of it, and the hiss
+    hammer() { if (!ctx) return; const t = T(); tn({ t, dur: 0.16, f0: 180, f1: 70, a: 0.002, vol: 0.7 }); nz(white, { t, dur: 0.05, type: 'highpass', f0: 2400, a: 0.001, vol: 0.4 }); bell(mtof(86 + Math.floor(Math.random() * 3)), t + 0.01, 0.09, sfxWet); bell(mtof(93), t + 0.02, 0.04, sfxWet); nz(pink, { t: t + 0.08, dur: 0.5, f0: 5000, f1: 2500, q: 0.8, a: 0.02, vol: 0.06, dest: sfxWet }); },
+    // someone new has begun: two soft notes, far off
+    newcomer() { if (!ctx) return; const t = T(); bell(mtof(69), t, 0.04, sfxWet); bell(mtof(76), t + 0.16, 0.045, sfxWet); bell(mtof(81), t + 0.34, 0.035, sfxWet); },
+    // carried by the gods. Going: the air drawn up the column, a chord that climbs an octave with him, a low note as the
+    // light takes hold, and a last bright thread as he is gone. Arriving: the column coming down, the weight of it
+    // landing, and the light ringing off him
+    beamUp() {
+      if (!ctx) return; const t = T();
+      nz(pink, { t, dur: 1.5, f0: 180, f1: 5200, q: 1.2, a: 0.9, vol: 0.34, dest: sfxWet });
+      nz(white, { t: t + 0.2, dur: 1.3, type: 'highpass', f0: 5000, f1: 9000, a: 0.8, vol: 0.05, dest: sfxWet });
+      [57, 64, 69, 73, 76].forEach((m, i) => tn({ t: t + i * 0.11, dur: 1.5 - i * 0.11, f0: mtof(m), f1: mtof(m + 12), a: 0.5, vol: 0.035, dest: sfxWet }));
+      tn({ t, dur: 0.5, f0: 110, f1: 55, a: 0.01, vol: 0.5 });
+      tn({ t: t + 1.45, dur: 0.5, f0: 1400, f1: 3200, a: 0.02, vol: 0.05, dest: sfxWet });
+    },
+    beamDown() {
+      if (!ctx) return; const t = T();
+      nz(pink, { t, dur: 0.9, f0: 5200, f1: 300, q: 1.2, a: 0.05, vol: 0.3, dest: sfxWet });
+      tn({ t: t + 0.8, dur: 0.9, f0: 82, f1: 36, a: 0.004, vol: 0.7 });
+      nz(brown, { t: t + 0.8, dur: 1.2, type: 'lowpass', f0: 1400, f1: 160, a: 0.005, vol: 0.45, dest: sfxWet });
+      [69, 76, 81, 85].forEach((m, i) => bell(mtof(m), t + 0.86 + i * 0.07, 0.05, sfxWet));
+    },
     // the photo camera: the two blades of a shutter
     shutter() { if (!ctx) return; const t = T(); nz(pink, { t, dur: 0.035, type: 'highpass', f0: 2600, a: 0.001, vol: 0.3 }); nz(pink, { t: t + 0.085, dur: 0.05, type: 'highpass', f0: 1800, a: 0.001, vol: 0.24 }); tn({ t, dur: 0.05, f0: 180, f1: 90, a: 0.002, vol: 0.12 }); },
     // a god chosen: the ring of light settling over his head
