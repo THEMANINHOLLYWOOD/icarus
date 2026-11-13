@@ -62,6 +62,7 @@ const DEEDS = {
   patron:  (n, g) => g && `${n} knelt at the thrones and chose ${g.name} as patron`,
   smitten: (n, g) => g && `${g.name} struck ${n} dead for insolence; ${n} woke on the summit again`,
   arena:   (n, g) => `${n} flew a whole course of rings${g ? ` and lit it in ${g.name}'s colour` : ''}`,
+  torch:   (n, g) => g && `${n} lit one of the torches on the summit of Olympus for ${g.name}; it burns in that colour for everyone now`,
   under:   n => `${n} went down under the sea, into the Underworld`,
   styx:    n => `${n} crossed the Styx in Charon's boat`,
   home:    n => `${n} came back up out of the Underworld alive`,

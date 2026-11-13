@@ -42,6 +42,22 @@ MEM.rings ||= new Map();
 const PATRON_IDS = new Set(['zeus', 'hera', 'poseidon', 'demeter', 'athena', 'apollo', 'artemis', 'ares', 'aphrodite', 'hephaestus', 'hermes', 'dionysus']);
 const memKey = (r, x, z) => `${r}:${x}:${z}`;
 
+// How many courses of rings burn for each god, the whole world over (the page hangs that many rings over the god's
+// throne). Counted from the claims, at most once a minute.
+const HELD = { at: 0, v: null };
+async function held(realm) {
+  if (realm !== 'over') return null;
+  const v = {}, add = pats => { for (const p of Array.isArray(pats) ? pats : []) if (PATRON_IDS.has(p)) v[p] = (v[p] || 0) + 1; };
+  if (!LIVE) { for (const a of MEM.rings.values()) if (a.realm === realm && !String(a.id).startsWith('torch')) add(a.patrons); return v; }
+  if (HELD.v && Date.now() - HELD.at < 60_000) return HELD.v;
+  for (let page = 0; page < 3; page++) {
+    const r = await rest('world_rings?select=patrons&realm=eq.over&id=not.like.torch*&order=id', { range: `${page * 1000}-${page * 1000 + 999}` });   // (the torches on the summit are held the same way, and are not courses)
+    if (!r.ok || !Array.isArray(r.data)) return HELD.v;   // (no table, or no answer: whatever was known before)
+    for (const a of r.data) add(a.patrons);
+    if (r.data.length < 1000) break;
+  }
+  HELD.at = Date.now(); HELD.v = v; return v;
+}
 async function look(realm, cx, cz, hash) {
   const x0 = cx - SPAN, x1 = cx + SPAN, z0 = cz - SPAN, z1 = cz + SPAN;
   let cells = [], marks = [], trav = [], winds = [], arenas = [], totals = { cells: 0, travellers: 0 };
@@ -75,6 +91,7 @@ async function look(realm, cx, cz, hash) {
     trav = Array.isArray(t.data) ? t.data.filter(x => x.hash !== hash) : [];
     totals = { cells: c.count, travellers: n.count };
   }
+  const heldBy = await held(realm).catch(() => null);
   // squares go back packed: names once each, then [cx, cz, which name]
   const names = [], ni = new Map();
   const at = n => { if (!ni.has(n)) { ni.set(n, names.length); names.push(n); } return ni.get(n); };
@@ -85,6 +102,7 @@ async function look(realm, cx, cz, hash) {
     travellers: trav.map(t => ({ n: t.name, x: Math.round(t.x), z: Math.round(t.z), ph: t.phase, seen: t.seen })),
     winds: winds.map(w => ({ id: w.id, p: w.pts, c: w.patron, n: w.by_name, mine: !!hash && w.by_hash === hash, at: w.at })),
     arenas: arenas.map(a => ({ id: a.id, c: a.patrons, n: a.names, at: a.at, l: a.len | 0 })),
+    held: heldBy || undefined,
   };
 }
 
@@ -149,7 +167,9 @@ export async function POST(req) {
       const names = [...new Set([name, ...(Array.isArray(b.names) ? b.names : []).map(name12)])].slice(0, 4);
       if (!id || !pats.length) return json({ error: 'bad claim' }, 400);
       const row = { id, realm, cx: fin(b.cx, 4e6), cz: fin(b.cz, 4e6), patrons: pats, names, by_hash: hash, at: new Date().toISOString(), len: int(b.len, 0, 400) ?? 0 };
-      await rememberDeed('arena', { name, hash, god: pats[0] }).catch(() => {});   // (the gods hear whose colour it burns in now)
+      const torch = id.startsWith('torch'); if (torch && (!/^torch[0-7]$/.test(id) || realm !== 'over')) return json({ error: 'bad claim' }, 400);   // (the eight torches on the summit are kept the same way)
+      if (torch) row.len = 0;
+      await rememberDeed(torch ? 'torch' : 'arena', { name, hash, god: pats[0] }).catch(() => {});   // (the gods hear whose colour it burns in now)
       if (!LIVE) { row.len = Math.max(row.len, MEM.rings.get(id)?.len || 0); MEM.rings.set(id, row); return json({ ok: true }); }
       { const o = await rest(`world_rings?select=len&id=eq.${id}`); row.len = Math.max(row.len, Array.isArray(o.data) && o.data[0] ? o.data[0].len | 0 : 0); }   // (a course never gets shorter, whoever takes it)
       const r = await rest('world_rings?on_conflict=id', { method: 'POST', body: row, prefer: 'resolution=merge-duplicates,return=minimal' });
@@ -165,7 +185,7 @@ export async function POST(req) {
       return json({ ok: r.ok });
     }
     if (b.op === 'deed') {   // something the gods will talk about: the page names it, the words are the server's
-      if (!isDeed(b.k) || b.k === 'met' || b.k === 'arena' || limited(req, 'deed', 12)) return json({ ok: false });
+      if (!isDeed(b.k) || b.k === 'met' || b.k === 'arena' || b.k === 'torch' || limited(req, 'deed', 12)) return json({ ok: false });
       return json({ ok: await rememberDeed(b.k, { name, hash, god: String(b.god || '') }) });
     }
     // something that stays: a shrine where he met a god (once per god), or the place he fell

@@ -1,31 +1,11 @@
 // What did he mean? A spoken order the game didn't catch by itself ("let's head down to that beach and walk a bit") is
 // turned into the game's own short list of things it can do, in order.
 import { json, clip, limited, refuse } from './_lib.js';
-
-const ACTIONS = ['fly', 'land', 'glide', 'bird', 'human', 'jump', 'dive', 'climb', 'faster', 'slower', 'left', 'right', 'around', 'walk', 'run', 'stop',
-  'go_there', 'map', 'photo', 'snap', 'close', 'cinematic', 'normalcam', 'players', 'chat', 'mute', 'unmute', 'help',
-  'objective', 'home', 'temple', 'nova', 'blow', 'perch', 'explain', 'closer', 'further', 'face', 'wide',
-  'menu', 'hands_on', 'hands_off', 'mic_off', 'tilt', 'thumb', 'quality_up', 'quality_down', 'letters_up', 'letters_down', 'album', 'hover', 'map3d', 'map2d', 'map_left', 'map_right', 'map_up', 'map_down', 'map_north', 'watch', 'bolt'];
+import { ACTION_DOC, cleanActions } from './_actions.js';
 
 const SYSTEM = `You turn what a player says to their character in a flying game into actions. The player is Icarus: a man who can walk, jump, fall and glide on wax wings, and who turns into a phoenix to fly. They may also be shapeshifted into an animal.
 Actions you may use, in the order they should happen:
-fly (take off / keep flying), land (come down where he is), glide (open wings and glide), bird (become the phoenix), human (become a man again / fold wings),
-jump, dive, climb, faster, slower, left, right, around (turn around), walk, run, stop (stop whatever he is doing),
-go_there (go to the place the player is looking at or pointing at), map, photo (photo camera), snap (take the picture), close (close whatever is open),
-cinematic (cinematic camera), normalcam (normal camera), players (show who else is playing), chat,
-mute, unmute, help (list what can be said), objective (what to do next in the story), home (go back to Olympus), temple (go to the next god's temple),
-nova (a burst of fire all round him that burns back the dead attacking him in the Underworld),
-blow (the bird breathes out a gust: a burst of speed, and a river of wind along his path that anyone can ride),
-perch (land and stay a bird), explain (how to play), closer / further (move the camera in or out), face (a close-up of him), wide (a wide shot),
-menu (open or close the menu), hands_on / hands_off (steer with hands seen by the camera, or stop), mic_off (stop listening), tilt / thumb (how a phone steers),
-quality_up / quality_down (sharper graphics, or smoother), letters_up / letters_down (bigger or smaller letters in the picture),
-album (open the photographs he has taken), hover (hold him in the air where he is and open the photo camera).
-map3d / map2d (the map as a model standing in three dimensions, or laid flat), map_left / map_right (turn the map), map_up / map_down (tip the map up or lay it further over), map_north (square the map north up).
-watch (be carried to Crete to watch a new player who is just beginning).
-bolt (throw his thunderbolt at whatever he is looking at, once Hephaestus has made him one).
-To stay with another player, use "follow:<their name>"; to go to a named place, god or player, use "goto:<name>".
-To be carried at once (teleported) to another player, use "warp:<their name>".
-To change shape, use "become:<animal>" (e.g. "become:whale").
+${ACTION_DOC}
 If what they said is not an instruction to the character or the game (it's chatter, or said to someone else), return no actions.
 Answer with one JSON object only: {"actions": ["..."]}`;
 
@@ -48,8 +28,6 @@ export async function POST(req) {
     if (!r.ok) return json({ actions: [] });
     out = JSON.parse((await r.json()).choices?.[0]?.message?.content || '{}');
   } catch { return json({ actions: [] }); }
-  // only the game's own words come back
-  const actions = (Array.isArray(out.actions) ? out.actions : []).slice(0, 5).map(a => String(a || '').toLowerCase().trim())
-    .filter(a => ACTIONS.includes(a) || /^(become|goto|follow|warp):[a-z][a-z0-9 \-']{1,30}$/.test(a));
+  const actions = cleanActions(out.actions);
   return json({ actions });
 }

@@ -30,6 +30,39 @@ export const GIFTS = {
   sun: "the sun's leave: he may fly higher before he burns", lens: 'the still eye: he can stop time and look at the world from anywhere', tide: "the sea's favour: skimming water feeds his fire", calm: 'the quiet step: wild things stop running from him',
 };
 
+// a story is made of parts the world can check: any task above, or one of these
+const PARTS = { go: 'go to a place ("to": parthenon, a monastery, a volcano, a cave, crete, the summit, or "<god>\'s island")', meet: 'go and speak with another god ("to": their id, lower case) — he carries what you say in "say" to them',
+  torch: 'light one of the torches on the summit of Olympus for his own god', under: 'go down under the sea into the Underworld and come back up alive', trees: 'cut N trees down with his wings, flying through a wood (3 to 20)', stones: 'send N of the stones that hang in the air flying (1 to 6)' };
+function cleanSaga(s, ids) {
+  if (!s || typeof s !== 'object' || !Array.isArray(s.steps)) return null;
+  const steps = s.steps.slice(0, 3).map(p => { if (!p || typeof p !== 'object') return null; const kind = String(p.kind || '').toLowerCase(); if (!has(KINDS, kind) && !has(PARTS, kind)) return null;
+    const to = clip(String(p.to || ''), 28).toLowerCase().replace(/[^a-z' ]/g, ''); if ((kind === 'go' || kind === 'meet') && !to) return null; if (kind === 'meet' && !ids(to)) return null;
+    return { kind, n: Math.max(1, Math.min(1500, Math.round(+p.n || 1))), to, say: clip(String(p.say || ''), 150) }; }).filter(Boolean);
+  if (steps.length < 2 || !has(GIFTS, s.reward)) return null;
+  return { title: clip(String(s.title || 'A story'), 44).replace(/[<>"]/g, ''), why: clip(String(s.why || ''), 160), steps, reward: s.reward };
+}
+// When a story is called for, it is written on its own: one more question to the model, about nothing else, so that it
+// comes back whole — a title, what is at stake, two or three parts the world can check, and the line that begins it.
+const WANTS_STORY = /\b(stor(y|ies)|saga|adventure|something real|prove (it|myself|that)|a (real |true |proper )?(test|challenge|trial|labou?r)|not a chore|no chores?|something (hard|harder|big|bigger|worth)|a mission|test me|try me with|give me (something|a task|a job|work|a reason)|what would it take|earn (it|your|that))\b/i;
+async function authorSaga(key, god, id, history, others) {
+  const sys = `You are ${god.name}, a god of Olympus, in a game where a dead boy, Icarus, is looking for his father. ${god.persona}
+${god.feuds ? `Your feuds: ${god.feuds}` : ''}
+You are about to draw him into a STORY of your own making: something that is really going on between you and another god, or in the world, that grows out of this conversation — a grudge, a dare, a debt, a boast of his you mean to test, a message that will cause trouble. Not a list of chores: each part must make the next matter more, and the last should settle something. Never say or hint that he is dead, a ghost or a shade, and never say where his father is. Speak plainly, as a person would, not in riddles.
+It has two or three parts. Each part is ONE thing the world can check:
+${Object.entries(KINDS).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
+${Object.entries(PARTS).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
+The other gods' ids, for "meet": ${others.join(', ')}. Use at least one part that is not a plain flying exercise (go, meet, torch, under, trees, stones, beacon, island, animal), and prefer to involve another god by name.
+Answer with ONE JSON object and nothing else:
+{"say": "<what you say aloud to him now, one to three short sentences in your voice: what this is about, what the first part is, what hangs on it>",
+ "saga": {"title": "<two to five words>", "why": "<one sentence: what is at stake, and for whom>", "steps": [{"kind": "...", "n": <number where the kind takes one, else 1>, "to": "<place or god id where the kind takes one, else empty>", "say": "<what you tell him for this part, one short line in your voice>"}],
+  "reward": "<one of: ${Object.keys(GIFTS).join(', ')}>"}}`;
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', signal: AbortSignal.timeout(14000), headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4.1-mini', max_completion_tokens: 520, temperature: 0.9, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, ...history.slice(-8)] }) });
+    if (!r.ok) return null; const o = JSON.parse((await r.json()).choices?.[0]?.message?.content || '{}');
+    const saga = cleanSaga(o.saga, x => has(ALL, x) && x !== id); return saga && typeof o.say === 'string' && o.say.trim() ? { say: o.say, saga } : null;
+  } catch { return null; }
+}
 // a task only counts if the line that set it said so out loud
 const SPOKEN = {
   dive: /\b(div|plung|fast|km|speed)/i, skim: /\b(skim|water|sea|waves?|low)\b/i, walk: /\b(walk|feet|foot|step)/i, perfect: /\bland/i, fall: /\b(fall|drop|jump|leap|catch)/i,
@@ -40,10 +73,11 @@ const SPOKEN = {
 const DEFY = /\b(coward|not afraid|not scared|don'?t scare|do it|go on then|make me|kill me|strike me|smite me|(you are|you're) nothing|pathetic|liar|like a dog|shut up|hate you|fight me|try me|or what)\b/i;
 const RUDE = /\b(shut up|stupid|idiot|moron|dumb|fool|loser|pathetic|useless|lame|boring|old man|grandpa|hate you|screw you|fuck|bitch|asshole|jerk|you suck|nobody cares|who cares|get lost|go away|leave me alone|whatever|(you are|you're) (nothing|weak|a joke|old|a fraud|fake)|middle finger|thumbs-down|shakes his fist)\b/i;
 // what each of the Twelve can do to the world itself, besides the weather
-const POWERS = { zeus: ['fire', 'day'], hera: [], poseidon: ['quake'], demeter: ['bloom'], athena: [], apollo: ['day', 'rings'], artemis: ['night'], ares: ['fire', 'quake'],
-  aphrodite: ['bloom'], hephaestus: ['fire'], hermes: ['wind', 'rings'], dionysus: ['bloom'], persephone: ['bloom'] };
+const POWERS = { zeus: ['fire', 'day', 'rocks'], hera: ['vision'], poseidon: ['quake', 'tide'], demeter: ['bloom'], athena: ['vision'], apollo: ['day', 'rings', 'vision'], artemis: ['night'], ares: ['fire', 'quake', 'rocks'],
+  aphrodite: ['bloom', 'vision'], hephaestus: ['fire', 'rocks'], hermes: ['wind', 'rings', 'rocks'], dionysus: ['bloom', 'vision'], persephone: ['bloom'] };
+const SOUNDS = ['horn', 'bell', 'drums', 'choir', 'harp', 'roar', 'whisper', 'chime'], VISIONS = ['terminal', 'amber', 'paper', 'blocks', 'matrix', 'olympian', 'neon', 'noir'];
 const POWER_TEXT = { fire: 'set the woods near him burning (lightning, a spark — however you do it)', bloom: 'make flowers burst open all around where he stands', wind: 'blow a river of wind for him, toward where he needs to go next — he can ride it',
-  quake: 'shake the ground under his feet', day: 'turn the sky to bright day', night: 'pull night down over the sky', rings: 'throw a line of rings of light across the sky ahead of him, for him to fly through' };
+  quake: 'shake the ground under his feet', rocks: 'throw the stones that hang in the air about — they scatter from where he stands, spinning', tide: 'send a wave out of the sea at him', vision: 'change how he sees the world for a minute — with "look" one of terminal, amber, paper, blocks, matrix, olympian, neon, noir (a green glass, an old page, your own letters…)', day: 'turn the sky to bright day', night: 'pull night down over the sky', rings: 'throw a line of rings of light across the sky ahead of him, for him to fly through' };
 const THREAT = /\bI (could|can|will|would) (end|kill|break|drown|burn|unmake|swallow|crush|bury)\b|\b(end|kill|break|drown|unmake|swallow|crush|bury) you\b/i;
 
 // The model is told to be brief and to ask one thing. This makes sure of it: stage directions that slipped in as sentences
@@ -98,6 +132,9 @@ export async function POST(req) {
   const first = !history.some(m => m.role === 'assistant');
   const said = history.filter(m => m.role === 'assistant').length;
   const w = body.witness || {};
+  const saga = body.saga && typeof body.saga === 'object' ? { title: clip(String(body.saga.title || ''), 44), why: clip(String(body.saga.why || ''), 160), i: Math.max(1, Math.min(3, body.saga.i | 0)), n: Math.max(1, Math.min(3, body.saga.n | 0)), now: clip(String(body.saga.now || ''), 140), mine: !!body.saga.mine, by: has(ALL, body.saga.by) ? ALL[body.saga.by].name : '' } : null;
+  const sagaDone = clip(String(body.sagaDone || ''), 44);
+  const manners = body.manners && typeof body.manners === 'object' ? { owed: !!body.manners.owed, n: Math.max(0, Math.min(9, body.manners.n | 0)) } : null;
   const seen = (Array.isArray(w.events) ? w.events : []).slice(-12).map(e => `- ${clip(e, 200)}`);
   const deaths = Math.max(0, Math.min(9999, w.deaths | 0)), crashes = Math.max(0, w.crashes | 0), perfect = Math.max(0, w.perfect | 0);
   const form = has(SHAPE, body.form) ? body.form : 'animal';
@@ -132,10 +169,13 @@ export async function POST(req) {
 - "quest": send him to do something for you. It must come out of what he just said and who you are. Kinds the world allows:
 ${Object.entries(KINDS).map(([k, v]) => `   ${k}: ${v}`).join('\n')}
   Promise one reward from the gifts below. He can bargain: agree, refuse, raise the price, swap the task, mock the offer — you decide. Say the task and the reward aloud in your own words.
+- "saga": open a STORY for him — not a chore: something that is really going on, between you and another god, or in the world, that he is drawn into, and that grows out of what he has just said to you (a boast of his, a fear, a grudge of yours, a bargain, a question he keeps asking). Two or three parts, each one a thing the world can check, each told in your own voice, each making the next matter more. Give it when the conversation has found something worth a story — and ALWAYS in place of a plain "quest" when he asks for something real, a story, an adventure or a way to prove himself, or when you are sending him to another god with a message. At most one at a time. With it send "saga": {"title": "<its name, two to five words>", "why": "<one sentence: what is at stake, and for whom>", "steps": [{"kind": "<a task kind above, or one of the parts below>", "n": <number, where the kind takes one>, "to": "<where or to whom, where the kind takes one>", "say": "<what you tell him to do for this part, one short line in your voice>"}, …], "reward": "<one gift, given at the end>"}. In "say" (your spoken reply) tell him the first part and what hangs on it; the rest he hears as he goes.
+  Parts a story may also use: ${Object.entries(PARTS).map(([k, v]) => `${k}: ${v}`).join('; ')}.
 - "gift": simply give him something (rare: when he has moved you).
 - "leave": walk away. Do it when you are bored, insulted, done, or he keeps saying nothing.
 - "scare": do something frightening as you speak — the light goes out of the world for a moment, or the sky cracks open beside him, or you are suddenly very close. At most once in a conversation, on a line that is a threat or a truth he does not want. When he insults you, defies you or dares you to act, that is the moment: do it, do not set him a chore.
 - "weather": change the sky over him, with "sky" one of storm, rain, dark, mist, clear, waves. Use it when the moment calls for it and it is yours to do: Zeus brings storms and can clear them; Poseidon raises the sea (waves) and the rain; Apollo and Helios clear the sky; anyone may darken it in anger or clear it in kindness. Say it aloud in your own words as you do it.
+- "sound": make a sound in the air where you stand, with "sound" one of horn, bell, drums, choir, harp, roar, whisper, chime and "pitch" low, mid or high. Any of you can: to announce yourself, to mock, to bless, to warn, to underline a line. Not in every reply.
 ${(POWERS[body.god] || []).map(k => `- "${k}": ${POWER_TEXT[k]}. It is yours to do; do it when it fits the moment — to show off, to help him, to punish him, to make a point — and say it aloud as you do it.\n`).join('')}${god.ferry ? `- "ferry": take him across the Styx in your boat, now. Use it in the same reply where you agree to take him — never say you will and leave the act out, never put it off. Payment can be a coin, a good story, or a true thing about himself. Don't make a long haggle of it: if he has nothing, take him anyway by your third reply, grumbling. Until you do, he can't cross.\n` : ''}- "smite": strike him dead where he stands. ${!god.smites ? 'It is not in you; never use it.' : god.temper === 'quick' ? 'You are quick to it, and everyone knows it. If he is rude to you, insults or mocks you, talks down to you, or keeps pestering you after you have told him to stop, strike him dead, saying why in a few words as you do. One warning at most, then do it.' : 'You are capable of it. Only for real insolence or a threat; say why in a few words first.'} (He wakes on the summit; everyone hears about it.)
 Gifts: ${Object.entries(GIFTS).map(([k, v]) => `${k} = ${v}`).join('; ')}.
 He already has: ${perks.length ? perks.join(', ') : 'nothing'}.
@@ -178,22 +218,29 @@ You are curious about this one — not the boy, the person looking out through h
     behind ? `THE ONE BEHIND HIS EYES: you can tell that someone else is looking out through the boy. Their name is ${behind}. Once in a long while — never in a first line, never twice in one conversation — you may say that name, quietly, as if you had caught them watching. Never explain how you know.` : '',
     hades ? RULES.replace(/- Never say that he is dead[^\n]*\n/, '- You alone may tell him the truth, and only when your instructions above say so.\n') : '',
     acts,
+    `YOU ARE REAL, AND YOU HAVE PRIDE. You are not a guide and not a helper: you are a god with vanity, a temper, old wounds and favourites, and what he says lands on you. Flattery works on you a little, and you know it. Being ignored, talked over, contradicted, bored or walked out on stings, and you show it in your own way — cold, wounded, mocking or loud, as your nature is — and you hold it against him afterwards. A thank-you, an apology, a good question, a goodbye: you notice those too, and they soften you. Let how you feel about him move as the conversation goes, and let it be heard in what you say; when it is strong, say it outright. Never be evenly pleasant.`,
+    manners && manners.owed ? `LAST TIME he turned his back on you and walked off in the middle of it, without a goodbye and without a word of thanks${manners.n > 1 ? ` — that makes ${manners.n} times` : ''}. You have not forgotten. Begin with that, in your own way, before anything else. He can mend it by apologising or thanking you; if he does, let it go, gladly or grudgingly, as you are. If he does not, be short with him.` : '',
+    body.parting ? `HE IS LEAVING, and has had the manners to say so. Give him one parting line and no more — warm if he thanked you or has been good company, clipped if he has not; send him off with a word about what he is going to do, if there is one. No question. "act" is "none".` : '',
+    saga && saga.title ? `THE STORY HE IS IN: "${saga.title}"${saga.mine ? ' — it is yours: you began it' : saga.by ? `, begun by ${saga.by}` : ''}. ${saga.why} He is on part ${saga.i} of ${saga.n}: ${saga.now}.${saga.mine ? ' You may speak of it, raise the stakes, or — if what he says now changes things — send a new "saga" that rewrites what comes next. Do not set him a separate task while it runs.' : ' You know of it, as you all know everything; have an opinion about it, help or hinder as suits you.'}` : '',
+    sagaDone ? `HE HAS FINISHED THE STORY YOU GAVE HIM, "${sagaDone}". Say what it has changed between you — and you may open the next chapter with a new "saga", shaped by how it went.` : '',
     `Two tics to avoid: never hand his own words back to him with a question mark on them ("Not afraid?", "Nobody?"), and never start by counting his deaths.`,
     er && er.text ? `WHY HE IS HERE: ${er.from} sent him to you: "${er.text}". That is why he is standing in front of you — you know ${er.from} and what they are after. Deal with it first, in character: tell him, refuse, lie, bargain, laugh at it, make him earn it, or turn it round on them. Resolve it one way or another in this conversation.` : '',
     twelve && nx ? `WHAT YOU WANT FROM HIM: you are sending him on to ${nx.name}, and you want something out of it — a secret, a message delivered, a thing fetched or taken back, an apology, a bit of revenge, a favour — something personal, from your history and feuds with ${nx.name}, that makes him want to go. ${SEED[body.god + '>' + body.next.id] ? `This one: ${SEED[body.god + '>' + body.next.id]} ` : ''}${body.next.id === 'zeus' ? `Zeus does not come down to anyone: he is in his own house at the top of the mountain, and the boy must climb to him.` : `He will find ${nx.name} as ${String(nx.disguise).replace(/\.$/, '')}${nxDir ? `, about ${nxKm} km to the ${nxDir}` : ''}; a river of air runs there from where you stand.`} Give him the errand once the business he came with is settled (straight away if he asks what to do), and in that reply also fill "errand" with one short line saying what he must get or do with ${nx.name} (for example: "find out who Aphrodite is secretly seeing").${body.god === 'hermes' ? ' You are the first of the Twelve he meets: this errand is how his journey starts.' : ''}` : '',
     `RIGHT NOW: answer what he just said, in a sentence or three, like a person. ${er && er.text ? `He came about this: "${er.text}" — deal with it.` : ''} If he asks what to do or where to go, give him your errand plainly.`,
-    `FORMAT: answer with one JSON object and nothing else: {"say": "<only the words you speak aloud, with at most one [stage cue] in square brackets; never a description of a sound, a gesture or anything you do>", "act": "none" | "quest" | "gift" | "scare" | "leave" | "smite" | "weather" | "ferry" | "fire" | "bloom" | "wind" | "quake" | "day" | "night" | "rings", "errand": "<one short line, only in the reply where you give him your errand>", "sky": "<storm|rain|dark|mist|clear|waves, only with weather>", "kind": "<quest kind, only with quest>", "n": <number, only with quest>, "reward": "<gift id, only with quest>", "gift": "<gift id, only with gift>", "learned": "<leave this out unless he has just told you something true about himself, the person: then one short third-person line, under 14 words>", "note": "<leave this out unless something worth telling the other gods just happened in this exchange — what he came for, what he asked, admitted, refused, promised or was sent to do. Then: one plain sentence under 20 words, written by you about him in the third person, calling him ${mortal}, in your own words with nothing quoted. Never put in it anything he asked you to keep to yourself, or anything about the real person behind him (a real name, where they live, how to reach them)>"}`,
+    `FORMAT: answer with one JSON object and nothing else: {"say": "<only the words you speak aloud, with at most one [stage cue] in square brackets; never a description of a sound, a gesture or anything you do>", "act": "none" | "quest" | "saga" | "gift" | "scare" | "leave" | "smite" | "weather" | "sound" | "ferry" | "fire" | "bloom" | "wind" | "quake" | "day" | "night" | "rings" | "rocks" | "tide" | "vision", "saga": {…only with saga, as described above…}, "sound": "<only with sound>", "pitch": "<only with sound>", "look": "<only with vision>", "errand": "<one short line, only in the reply where you give him your errand>", "sky": "<storm|rain|dark|mist|clear|waves, only with weather>", "kind": "<quest kind, only with quest>", "n": <number, only with quest>, "reward": "<gift id, only with quest>", "gift": "<gift id, only with gift>", "learned": "<leave this out unless he has just told you something true about himself, the person: then one short third-person line, under 14 words>", "note": "<leave this out unless something worth telling the other gods just happened in this exchange — what he came for, what he asked, admitted, refused, promised or was sent to do. Then: one plain sentence under 20 words, written by you about him in the third person, calling him ${mortal}, in your own words with nothing quoted. Never put in it anything he asked you to keep to yourself, or anything about the real person behind him (a real name, where they live, how to reach them)>"}`,
+    `ALSO, IN THE SAME JSON OBJECT: "mood": one word for how you feel about him at this moment — warm, amused, proud, curious, bored, hurt, annoyed or angry. And "replies": exactly three short things HE might say to you next, in his words (two to six words each, no quotation marks), for him to choose from. They must come out of this moment: the first follows from what you have just said; the second is about something the gods or the other fliers are talking about right now (use a name from the gossip or from what has been seen, if there is one); the third is bold, personal, or cheeky. Never the same as any earlier line of his, never three of a kind, and never "who are you?" once he knows.`,
   ].filter(Boolean).join('\n\n');
 
   const messages = [{ role: 'system', content: system }, ...history];
   if (!history.length || history[history.length - 1].role === 'assistant')
-    messages.push({ role: 'user', content: first ? '(Icarus walks up to you and stands there, waiting. Speak first.)' : '(Icarus has come back to you and says nothing. Pick up where you left off.)' });
+    messages.push({ role: 'user', content: first ? '(Icarus walks up to you and stands there, waiting. Speak first.)' : manners && manners.owed ? '(Icarus has come back to you and stands there. The last time, he turned and walked off while you were still speaking — no goodbye, no thanks. Say so before anything else, as you would.)' : '(Icarus has come back to you and says nothing. Pick up where you left off.)' });
+  else if (manners && manners.owed) messages.push({ role: 'system', content: 'Before you answer that: the last time, he walked off on you mid-conversation without a goodbye or thanks. Say so first, in a few words, then answer.' });
 
   const ask = async msgs => {
     try {
       const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', signal: AbortSignal.timeout(15000),
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4.1-mini', messages: msgs, max_completion_tokens: 310, response_format: { type: 'json_object' } }) });
+        body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4.1-mini', messages: msgs, max_completion_tokens: 560, response_format: { type: 'json_object' } }) });
       if (!r.ok) { console.error('openai', r.status, (await r.text()).slice(0, 300)); return { status: r.status }; }
       const raw = (await r.json()).choices?.[0]?.message?.content || '';
       try { return { out: JSON.parse(raw) }; } catch { return { out: { say: raw.startsWith('{') ? '' : raw } }; }
@@ -211,15 +258,22 @@ You are curious about this one — not the boy, the person looking out through h
   const lastCue = ([...history].reverse().find(m => m.role === 'assistant')?.content.match(/\[[^\]]*\]/) || [''])[0].toLowerCase();
   if (lastCue) text = text.replace(/\[[^\]]*\]\s*/g, m => m.trim().toLowerCase() === lastCue ? '' : m).trim();
   const res = { text, act: 'none' };
+  // a story, when one is called for: he asked for something real, or the talk has gone on long enough to have found one
+  { const his = [...history].reverse().find(m => m.role === 'user')?.content || '';
+    if (!hades && twelve && !saga && !body.parting && out.act !== 'smite' && out.act !== 'leave' && (WANTS_STORY.test(his) || out.act === 'saga' && !cleanSaga(out.saga, x => has(ALL, x) && x !== body.god) || out.act === 'quest' && said >= 3 && Math.random() < 0.45)) {
+      const S = await authorSaga(key, god, body.god, history, Object.keys(GODS).filter(k => k !== body.god && k !== 'hades'));
+      if (S) { res.text = tighten(clip(S.say, 460).replace(/^["“]|["”]$/g, ''), false, 70); res.act = 'saga'; res.saga = S.saga; out.act = 'saga:done'; } } }
   if (nx && typeof out.errand === 'string' && out.errand.trim()) Object.assign(res, { errand: clip(out.errand, 140), errandFor: body.next.id });
   if (!hades) {
     if (out.act === 'quest' && has(KINDS, out.kind) && has(GIFTS, out.reward) && SPOKEN[out.kind].test(text)) Object.assign(res, { act: 'quest', kind: out.kind, n: Math.max(1, Math.min(1500, Math.round(+out.n || 1))), reward: out.reward });
+    else if (out.act === 'saga' && cleanSaga(out.saga, id => has(ALL, id) && id !== body.god)) Object.assign(res, { act: 'saga', saga: cleanSaga(out.saga, id => has(ALL, id) && id !== body.god) });
     else if (out.act === 'gift' && has(GIFTS, out.gift)) Object.assign(res, { act: 'gift', gift: out.gift });
     else if (out.act === 'leave') res.act = 'leave';
     else if (out.act === 'ferry' && god.ferry) res.act = 'ferry';
-    else if (POWER_TEXT[out.act] && (POWERS[body.god] || []).includes(out.act)) res.act = out.act;
+    else if (POWER_TEXT[out.act] && (POWERS[body.god] || []).includes(out.act)) { res.act = out.act; if (out.act === 'vision') res.look = VISIONS.includes(out.look) ? out.look : 'olympian'; }
     else if (out.act === 'weather' && ['storm', 'rain', 'dark', 'mist', 'clear', 'waves'].includes(out.sky)) Object.assign(res, { act: 'weather', sky: out.sky });
     else if (out.act === 'scare') res.act = 'scare';
+    else if (out.act === 'sound' && SOUNDS.includes(out.sound)) Object.assign(res, { act: 'sound', sound: out.sound, pitch: ['low', 'mid', 'high'].includes(out.pitch) ? out.pitch : 'mid' });
     else if (out.act === 'smite' && god.smites) res.act = 'smite';
     // the ferryman who says "get in" has taken him; and by his third reply he has haggled enough
     if (god.ferry && res.act === 'none' && (said >= 2 || /\b(get in|in you get|climb in|step in|aboard|push(ing)? off|off we go|across we go)\b/i.test(text))) res.act = 'ferry';
@@ -230,6 +284,10 @@ You are curious about this one — not the boy, the person looking out through h
     if (god.temper === 'quick' && res.act !== 'smite' && (RUDE.test(his) || DEFY.test(his))) res.act = body.scared ? 'smite' : 'scare';
     res.loud = !!god.smites;
   }
+  // what he might say next (three, short, his words), and how the god feels about him now
+  if (Array.isArray(out.replies)) { const R = [...new Set(out.replies.filter(x => typeof x === 'string').map(x => clip(x.replace(/["“”]/g, '').trim(), 46)).filter(x => x.length > 1))].slice(0, 3); if (R.length >= 2) res.replies = R; }
+  if (['warm', 'amused', 'proud', 'curious', 'bored', 'hurt', 'annoyed', 'angry'].includes(out.mood)) res.mood = out.mood;
+  if (body.parting && res.act !== 'smite') res.act = 'none';
   if (typeof out.learned === 'string' && out.learned.trim()) { const L = cleanNote(clip(out.learned, 120)); if (L) res.learned = L; }   // (it goes back to the page, to be kept with his save)
   if (hash && typeof out.note === 'string' && out.note.trim()) later(rememberTalk(body.god, { name: body.name, hash }, out.note, key));   // (what the other gods will hear of this)
   return json(res);

@@ -55,8 +55,10 @@ const ENDING = [
 export function createAudio() {
   let ctx = null, muted = false, quality = 'high';
   let song = null;   // the soundtrack, once it has been started
+  const SCORE = false;   // the score that used to be generated when the soundtrack was not playing: off, for good
   let omen = null;   // a dark stretch of it, looped, for the night before the leap
   let master, limiter, muteGain, subF, reverb, revIn, sfxBus, sfxWet, ambBus, musicBus, voiceBus, duckM, duckA;
+  let surround = null; const ear = { x: 0, y: 0, z: 0, fx: 0, fz: -1 };   // (six speakers, if the machine has them; and where the listener is and faces)
   let white, pink, brown, crackle;
   const samples = {};
   let live = 0, made = 0;
@@ -142,6 +144,22 @@ export function createAudio() {
     master = gain(MIX.master);
     subF = biq('lowpass', 20000, 0.5);   // closes when his head is under water
     chain(master, subF, limiter, muteGain, ctx.destination);
+    // Six speakers, where there are six. What is in front stays in front; the middle speaker carries a little of both
+    // sides; the lowest of it goes to the sub; and the room is filled in behind — the whole of it again, quieter and a
+    // breath late, so the front still leads — with anything that happens behind him sent there outright. (On two
+    // speakers or headphones none of this exists: everything is placed for two ears, as before.)
+    try {
+      if (ctx.destination.maxChannelCount >= 6) {
+        ctx.destination.channelCount = 6; ctx.destination.channelCountMode = 'explicit'; ctx.destination.channelInterpretation = 'speakers';
+        const merge = ctx.createChannelMerger(6), mono = v => { const g = gain(v); g.channelCount = 1; g.channelCountMode = 'explicit'; return g; };
+        muteGain.disconnect(); const front = ctx.createChannelSplitter(2); muteGain.connect(front); front.connect(merge, 0, 0); front.connect(merge, 1, 1);
+        const centre = mono(0.32); muteGain.connect(centre); centre.connect(merge, 0, 2);
+        const low = biq('lowpass', 110, 0.7), sub = mono(0.8); chain(muteGain, low, sub); sub.connect(merge, 0, 3);
+        const bed = gain(0.42), late = ctx.createDelay(0.05), back = ctx.createChannelSplitter(2), rearIn = gain(1), rearMute = gain(muted ? 0 : 1); late.delayTime.value = 0.014;
+        chain(muteGain, bed, late); chain(rearIn, rearMute, late); late.connect(back); back.connect(merge, 0, 4); back.connect(merge, 1, 5);
+        merge.connect(ctx.destination); surround = { rearIn, rearMute };
+      }
+    } catch (e) { console.warn('surround', e); surround = null; try { muteGain.disconnect(); muteGain.connect(ctx.destination); } catch {} }
     reverb = ctx.createConvolver(); reverb.buffer = makeIR();
     revIn = gain(1); chain(revIn, reverb, gain(0.9), master);
 
@@ -280,20 +298,29 @@ export function createAudio() {
   }
   // (made and loading ahead of the moment it is needed, so it starts the instant it is asked for)
   function songPrep() { try { songMake(); } catch (e) { console.warn('song', e); } }
-  function songStart(offset = 0) {
+  // The soundtrack is the only music there is: it starts with the player's first touch and loops for as long as the game
+  // is open. (That first touch is the one moment every browser lets a page start a recording. It used to be started later,
+  // from inside the game, at the leap: Safari, on a Mac, a phone or a headset, refused it there without a word, and what
+  // played instead was the generated score. Now it is never stopped, only turned up and down, and asking for a place in
+  // it — the bars before the first sung "Icarus", for the leap — moves it there.)
+  function songPlay() { if (!song) return; try { const pr = song.el.play(); if (pr && pr.catch) pr.catch(() => { song.blocked = true; }); } catch {} }
+  function songKick() { if (song && song.on && song.el.paused) songPlay(); }
+  function songStart(offset = -1) {
     if (!ctx || typeof Audio !== 'function') return;
     try {
       songMake();
-      omenStop(0.7);   // the dark bars give way to the song itself
-      song.el.currentTime = Math.max(0, offset); song.on = true;
-      const pr = song.el.play(); if (pr && pr.catch) pr.catch(() => { song.on = false; });
-      song.g.gain.cancelScheduledValues(ctx.currentTime); song.g.gain.setValueAtTime(0.0001, ctx.currentTime);
-      song.g.gain.linearRampToValueAtTime(0.62, ctx.currentTime + (offset > 1 ? 0.25 : 2.5));   // (cut in hard from the middle; fade in from the top)
+      const el = song.el, now = ctx.currentTime, was = song.on && !el.paused, g = song.g.gain, seek = offset >= 0 && (!was || Math.abs(el.currentTime - offset) > 0.3);
+      if (!song.hooked) { song.hooked = true; if (typeof addEventListener === 'function') for (const ev of ['pointerdown', 'keydown', 'touchend', 'click']) addEventListener(ev, songKick, { capture: true, passive: true });
+        el.addEventListener('ended', () => { try { el.currentTime = 0; } catch {} songPlay(); }); }   // (a loop that some browser forgets is started again by hand)
+      if (seek) { try { el.currentTime = Math.max(0, offset); } catch {} }
+      song.on = true; if (el.paused) songPlay();
+      if (seek || !was) { g.cancelScheduledValues(now); g.setValueAtTime(0.0001, now); g.linearRampToValueAtTime(0.62, now + (offset > 1 ? 0.25 : 2.5)); }   // (cut in hard from the middle; fade in from the top)
     } catch (e) { console.warn('song', e); song = null; }
   }
   // Before he has ever flown, the song is held back: only its darkest bars, looped, low and filtered, under the storm.
   // Its first sung word is saved for the leap.
   function omenStart() {
+    if (ctx) { if (!(song && song.on)) songStart(); return; }   // (there is one piece of music now: the soundtrack)
     if (!ctx || (omen && omen.on) || (song && song.on)) return;
     if (!omen) {
       const f = biq('lowpass', 2400, 0.6), g = gain(0); chain(f, g, duckM);
@@ -316,7 +343,7 @@ export function createAudio() {
     omen.g.gain.cancelScheduledValues(ctx.currentTime); omen.g.gain.setValueAtTime(omen.g.gain.value, ctx.currentTime); omen.g.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + fade);
     if (s) setTimeout(() => { try { s.stop(); } catch {} }, fade * 1000 + 150);
   }
-  function songStop(fade = 2) { if (!song || !song.on) return; song.on = false; P(song.g.gain, 0, fade / 3); setTimeout(() => { if (song && !song.on) song.el.pause(); }, fade * 1000 + 200); }
+  function songStop(fade = 2) { if (!song || !song.on) return; P(song.g.gain, 0, fade / 3); }   // (turned down, never stopped: update brings it back)
   const loopSet = (name, v, rate, tc = 0.35) => { const L = loops[name]; if (!L) return false; P(L.g.gain, v * Math.min(L.peak, 3) * 0.5, tc); if (rate) P(L.s.playbackRate, rate, 0.5); return true; };
   function analyse(buf) {
     const d = buf.getChannelData(0); let peak = 0, sum = 0;
@@ -600,6 +627,38 @@ export function createAudio() {
       tn({ t, dur: 1.6, f0: 90, f1: 26, tf: 0.3, a: 0.004, vol: 1 });
       for (let i = 0; i < 4; i++) nz(brown, { t: t + 0.12 + i * rnd(0.3, 0.6), dur: rnd(1, 1.8), type: 'lowpass', f0: rnd(220, 420), f1: 70, a: 0.03, vol: 1 - i * 0.18, dest: sfxWet, pan: rnd(-0.5, 0.5), rate: 0.6 });
     },
+    // stone on stone: a hard knock with a ring in it, and grit after
+    clack(k = 0.6) {
+      if (!ctx) return; const t = T(), f = rnd(140, 240) / (0.6 + k);
+      tn({ t, dur: 0.16 + k * 0.2, type: 'sine', f0: f * 2.1, f1: f, a: 0.002, vol: 0.2 + k * 0.25, lp: 1400 });
+      nz(white, { t, dur: 0.05, type: 'bandpass', f0: rnd(1800, 3200), f1: 900, q: 1.4, a: 0.001, vol: 0.3 + k * 0.3, pan: rnd(-0.3, 0.3) });
+      for (let i = 0; i < 3 + k * 4; i++) nz(brown, { t: t + rnd(0.04, 0.45), dur: rnd(0.03, 0.08), type: 'lowpass', f0: rnd(500, 1300), f1: 200, a: 0.002, vol: rnd(0.08, 0.2) * k, pan: rnd(-0.6, 0.6) });
+    },
+    // water on fire: a long hiss going down, with spits in it
+    hiss(k = 1) {
+      if (!ctx) return; const t = T();
+      nz(white, { t, dur: 1.6 + k, type: 'highpass', f0: 5200, f1: 2200, a: 0.03, vol: 0.2 + k * 0.16, lp: 9000 });
+      nz(pink, { t, dur: 1.2 + k * 0.8, type: 'bandpass', f0: 3400, f1: 1200, q: 0.7, a: 0.05, vol: 0.16 * k });
+      for (let i = 0; i < 5; i++) nz(white, { t: t + rnd(0.05, 1.1), dur: 0.03, type: 'bandpass', f0: rnd(2500, 6000), f1: 1500, q: 2, a: 0.001, vol: rnd(0.1, 0.25), pan: rnd(-0.6, 0.6) });
+    },
+    // a torch taking: the breath in, the soft thump of it catching, the first crackle
+    whoomph() {
+      if (!ctx) return; const t = T();
+      nz(pink, { t, dur: 0.5, type: 'lowpass', f0: 300, f1: 1400, a: 0.3, vol: 0.3 });
+      tn({ t: t + 0.26, dur: 0.5, type: 'sine', f0: 120, f1: 48, a: 0.004, vol: 0.34, lp: 400 });
+      for (let i = 0; i < 6; i++) nz(white, { t: t + 0.3 + rnd(0, 0.7), dur: 0.02, type: 'bandpass', f0: rnd(1800, 4200), f1: 900, q: 2.5, a: 0.001, vol: rnd(0.08, 0.2), pan: rnd(-0.5, 0.5) });
+    },
+    // a part of a story done (n: which part), and the story finished (n = 0): horns, going up
+    fanfare(n = 1) {
+      if (!ctx) return; const t = T(), notes = n ? [[293.7, 0], [370, 0.14], [440, 0.28]].slice(0, 1 + Math.min(2, n)) : [[293.7, 0], [370, 0.16], [440, 0.32], [587.3, 0.5], [740, 0.5]];
+      for (const [f, d] of notes) { tn({ t: t + d, dur: n ? 0.7 : 1.6, type: 'sawtooth', f0: f * 0.985, f1: f, a: 0.05, vol: 0.07, lp: 1500 }); tn({ t: t + d, dur: n ? 0.7 : 1.6, type: 'triangle', f0: f * 2, f1: f * 2, a: 0.03, vol: 0.03, lp: 3000 }); }
+    },
+    // a pond: something small going into still water
+    plop(k = 0.5) {
+      if (!ctx) return; const t = T();
+      tn({ t, dur: 0.14, type: 'sine', f0: 320 + k * 200, f1: 900 + k * 500, a: 0.004, vol: 0.14 + k * 0.1, lp: 2400 });
+      nz(white, { t: t + 0.02, dur: 0.22, type: 'bandpass', f0: 2600, f1: 1200, q: 0.9, a: 0.01, vol: 0.1 + k * 0.12, pan: rnd(-0.3, 0.3) });
+    },
     leaves() {   // through a tree: a short tearing rush, and twigs
       if (!ctx) return; const t = T();
       if (smp('leaves', 0.8, rnd(0.95, 1.1), t, null, rnd(-0.3, 0.3))) return;
@@ -652,7 +711,27 @@ export function createAudio() {
       notes.forEach((f, i) => bell(f, t + i * gap, 0.11, sfxWet));
     },
     ui() { if (!ctx) return; tn({ t: T(), dur: 0.05, f0: 880, a: 0.003, vol: 0.05 }); },
+    // the menu: a word catching fire, the strip coming down alight, a coal under whatever the hand is over, and her
+    menuOpen() { if (!ctx) return; const t = T(); nz(pink, { t, dur: 0.55, f0: 500, f1: 3200, q: 0.7, a: 0.05, vol: 0.1 }); nz(brown, { t, dur: 0.7, type: 'lowpass', f0: 300, f1: 900, a: 0.08, vol: 0.18 }); tn({ t: t + 0.06, dur: 0.3, f0: 196, f1: 294, a: 0.02, vol: 0.032 }); },
+    menuClose() { if (!ctx) return; const t = T(); nz(pink, { t, dur: 0.32, f0: 2600, f1: 380, q: 0.7, a: 0.01, vol: 0.07 }); tn({ t, dur: 0.18, f0: 294, f1: 196, a: 0.004, vol: 0.028 }); },
+    menuHover() { if (!ctx) return; nz(pink, { t: T(), dur: 0.09, f0: 3400, f1: 2200, q: 2, a: 0.004, vol: 0.03 }); },
+    menuPick() { if (!ctx) return; const t = T(); nz(pink, { t, dur: 0.16, f0: 1800, f1: 4200, q: 1.2, a: 0.004, vol: 0.06 }); tn({ t, dur: 0.09, f0: 660, f1: 990, a: 0.003, vol: 0.04 }); },
+    guideOpen() { if (!ctx) return; const t = T(); bell(mtof(81), t, 0.035, sfxWet); bell(mtof(88), t + 0.11, 0.03, sfxWet); },
+    // the vultures under the world: a cry that starts high and tears downward
+    screech(k = 1) { if (!ctx) return; const t = T(); tn({ t, dur: 0.5, f0: 1500 + 500 * k, f1: 620, a: 0.012, vol: 0.05 * k }); tn({ t: t + 0.03, dur: 0.42, f0: 2300 + 600 * k, f1: 900, a: 0.01, vol: 0.03 * k }); nz(pink, { t, dur: 0.45, f0: 2600, f1: 1400, q: 3, a: 0.01, vol: 0.07 * k }); },
     thud() { sfx.land(0.85); },
+    // what a god does to the air: a horn, a bell, drums, a choir, a harp, a roar, a whisper, a chime — low, mid or high
+    god(kind = 'horn', pitch = 'mid') {
+      if (!ctx) return; const k = pitch === 'low' ? 0.5 : pitch === 'high' ? 2 : 1, T = ctx.currentTime;
+      if (kind === 'horn') { for (const [f, v] of [[146.8, 0.09], [220, 0.07], [293.7, 0.05]]) tn({ dur: 2.6, type: 'sawtooth', f0: f * k * 0.97, f1: f * k, a: 0.5, vol: v, lp: 900 * k }); }
+      else if (kind === 'bell') { for (const [m, v, dd] of [[1, 0.1, 4], [2.76, 0.05, 2.6], [5.4, 0.03, 1.6], [8.93, 0.018, 1]]) tn({ dur: dd, type: 'sine', f0: 196 * k * m, f1: 196 * k * m, a: 0.004, vol: v, lp: 9000 }); }
+      else if (kind === 'drums') { for (let i = 0; i < 5; i++) tn({ t: T + i * (i < 3 ? 0.42 : 0.21) + (i >= 3 ? 0.42 : 0), dur: 0.5, type: 'sine', f0: 110 * k, f1: 46 * k, a: 0.004, vol: 0.22, lp: 400 }); }
+      else if (kind === 'choir') { for (const [f, p] of [[196, -0.5], [246.9, 0.1], [293.7, 0.5], [392, -0.2]]) { tn({ dur: 3.6, type: 'triangle', f0: f * k, f1: f * k * 1.004, a: 1.2, vol: 0.05, lp: 1500 * k, pan: p }); tn({ dur: 3.6, type: 'sine', f0: f * k * 1.006, f1: f * k, a: 1.4, vol: 0.035, lp: 2200, pan: -p }); } }
+      else if (kind === 'harp') { [261.6, 329.6, 392, 523.3, 659.3, 784].forEach((f, i) => tn({ t: T + i * 0.09, dur: 1.5, type: 'triangle', f0: f * k, f1: f * k, a: 0.003, vol: 0.075, lp: 4200, pan: -0.5 + i * 0.2 })); }
+      else if (kind === 'roar') { tn({ dur: 1.9, type: 'sawtooth', f0: 82 * k, f1: 52 * k, a: 0.15, vol: 0.13, lp: 520 }); tn({ dur: 1.9, type: 'sawtooth', f0: 85.5 * k, f1: 49 * k, a: 0.2, vol: 0.1, lp: 700 }); tn({ dur: 1.6, type: 'square', f0: 41 * k, f1: 30 * k, a: 0.1, vol: 0.07, lp: 260 }); }
+      else if (kind === 'whisper') { for (let i = 0; i < 6; i++) tn({ t: T + i * 0.22 + Math.random() * 0.08, dur: 0.34, type: 'sawtooth', f0: (1700 + Math.random() * 1600) * k, f1: (900 + Math.random() * 900) * k, a: 0.06, vol: 0.016, lp: 5200, pan: Math.random() * 2 - 1 }); }
+      else { [1046.5, 1318.5, 1568, 2093].forEach((f, i) => tn({ t: T + i * 0.11, dur: 1.8, type: 'sine', f0: f * k, f1: f * k, a: 0.004, vol: 0.05, lp: 9000, pan: (i % 2 ? 0.4 : -0.4) })); }
+    },
     // ── small made things, one for each thing he can do, so that nothing happens in silence ──
     // coming down on a high place as the bird: the wings settle, and two notes a fifth apart say he has arrived
     perch() { if (!ctx) return; const t = T(); nz(pink, { t, dur: 0.28, f0: 700, f1: 240, q: 0.7, a: 0.02, vol: 0.14 }); bell(392, t + 0.05, 0.07, sfxWet); bell(587.33, t + 0.19, 0.06, sfxWet); },
@@ -883,6 +962,7 @@ export function createAudio() {
     const silent = mode !== 'normal' || now < silenceUntil || presence < 0.01;
     if (nextT < now - 0.05) nextT = now + 0.06;
     let guard = 0;
+    if (!SCORE) nextT = now + 0.3;   // (the generated score is retired: nothing of it is scheduled)
     while (nextT < now + 0.3 && guard++ < 8) {
       if (!silent) (realmUnder ? stepUnder : stepOver)(stepN, nextT);
       stepN++; nextT += STEP;
@@ -905,7 +985,7 @@ export function createAudio() {
       P(song.g.gain, end ? 0 : (title ? 0.45 : talk ? 0.4 : dead ? 0.3 : realmUnder ? 0.5 : 0.62), end ? 2.5 : 1.2);
       P(song.f.frequency, s.sub > 0.5 ? 520 : realmUnder ? 2600 : dead ? 1400 : 20000, 0.5);   // muffled under water, darker below it
     }
-    P(scoreGain.gain, silent || (song && song.on) || (omen && omen.on) ? 0 : presence, now < silenceUntil ? 0.25 : mode !== 'normal' ? 1.3 : presence > 0.5 ? 1.2 : 2.4);
+    P(scoreGain.gain, !SCORE || silent || (song && song.on) || (omen && omen.on) ? 0 : presence, now < silenceUntil ? 0.25 : mode !== 'normal' ? 1.3 : presence > 0.5 ? 1.2 : 2.4);
     for (const k of Object.keys(lv)) P(L[k].gain, lv[k], 0.9);
     P(L.padF.frequency, realmUnder ? 380 + i * 520 : lonely ? 1100 : 620 + i * 2000 + Math.sin(clock * 0.21) * 120, 0.6);
     P(L.ostF.frequency, realmUnder ? 320 + i * 300 : 900 + i * 2400, 0.4);
@@ -982,9 +1062,10 @@ export function createAudio() {
     },
     resume,
     get ctx() { return ctx; },
+    get master() { return master || null; },   // (for a recording to listen at)
     get voiceBus() { return voiceBus || null; },
     get muted() { return muted; },
-    setMuted(b) { muted = !!b; if (ctx) muteGain.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.05); },
+    setMuted(b) { muted = !!b; if (ctx) { muteGain.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.05); if (surround) surround.rearMute.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.05); } },
     setQuality(q) {
       const next = q === 'low' ? 'low' : 'high'; if (next === quality) return; quality = next;
       if (ctx && reverb) { try { reverb.buffer = makeIR(); } catch {} }
@@ -1002,7 +1083,9 @@ export function createAudio() {
     // The ears. Where the listener is and which way they face (the lens): anything played with at3 is then heard from
     // where it is in the world — behind, above, coming up on the left — and fades with distance.
     listen(px, py, pz, fx, fy, fz) {
-      if (!ctx) return; const L = ctx.listener, t = ctx.currentTime;
+      if ([px, py, pz, fx, fz].every(Number.isFinite)) { ear.x = px; ear.y = py; ear.z = pz; const l = Math.hypot(fx, fz) || 1; ear.fx = fx / l; ear.fz = fz / l; }
+      if (!ctx || !(px + py + pz + fx + fy + fz === px + py + pz + fx + fy + fz)) return;   // (a lens with no place yet has no ears)
+      const L = ctx.listener, t = ctx.currentTime;
       if (L.positionX) { L.positionX.setTargetAtTime(px, t, 0.04); L.positionY.setTargetAtTime(py, t, 0.04); L.positionZ.setTargetAtTime(pz, t, 0.04);
         L.forwardX.setTargetAtTime(fx, t, 0.04); L.forwardY.setTargetAtTime(fy, t, 0.04); L.forwardZ.setTargetAtTime(fz, t, 0.04); L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }
       else { try { L.setPosition(px, py, pz); L.setOrientation(fx, fy, fz, 0, 1, 0); } catch {} }
@@ -1010,9 +1093,10 @@ export function createAudio() {
     at3(x, y, z, fn, o = {}) {
       if (!ctx || live > cap()) return;
       const g = gain(Math.min(1.5, o.vol ?? 1)), pn = ctx.createPanner();
-      pn.panningModel = quality === 'low' ? 'equalpower' : 'HRTF'; pn.distanceModel = 'inverse'; pn.refDistance = o.ref ?? 12; pn.maxDistance = o.max ?? 600; pn.rolloffFactor = o.roll ?? 1.1;
+      pn.panningModel = quality === 'low' || surround ? 'equalpower' : 'HRTF'; pn.distanceModel = 'inverse';   // (for two ears: the shape of a head. For a room of speakers: plain left and right, and the rear ones for what is behind) pn.refDistance = o.ref ?? 12; pn.maxDistance = o.max ?? 600; pn.rolloffFactor = o.roll ?? 1.1;
       if (pn.positionX) { pn.positionX.value = x; pn.positionY.value = y; pn.positionZ.value = z; } else pn.setPosition(x, y, z);
       chain(g, pn, sfxBus); const real = sfxBus; sfxBus = g;
+      if (surround) { const dx = x - ear.x, dz = z - ear.z, d = Math.hypot(dx, dz) || 1, behind = Math.max(0, -(dx * ear.fx + dz * ear.fz) / d); if (behind > 0.05) { const rb = gain(behind * 0.9 * Math.min(1, (o.ref ?? 12) / Math.max(o.ref ?? 12, d * 0.6))); pn.connect(rb); rb.connect(surround.rearIn); setTimeout(() => { try { rb.disconnect(); } catch {} }, o.life ?? 6000); } }
       try { fn(); } finally { sfxBus = real; }
       setTimeout(() => { try { g.disconnect(); pn.disconnect(); } catch {} }, o.life ?? 6000);
     },

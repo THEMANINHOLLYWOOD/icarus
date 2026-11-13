@@ -15,6 +15,10 @@
 //   offer   one open palm turned up, held still — speak to a god, kindle a fire, greet an animal.
 //   push    both palms shoved out in front — stop: leave a conversation, or come in to land.
 //   pinch   (look at something and pinch: the headset's own tap) — the same as clap.
+//   walk    on the ground, swing your arms the way arms swing when you walk — he walks where you are looking; swing
+//           them hard and he runs.
+//   join    in the air, bring your hands together and hold them: the wings meet, and he glides down to land.
+//   (and a flap is a flap whatever the hands are doing: both arms swept down hard at your sides. Keep flapping to go faster.)
 
 const FINGERS = ['index', 'middle', 'ring', 'pinky'];
 
@@ -30,7 +34,7 @@ const frame = (h, yaw) => ({ ...h, yaw, rx: Math.cos(yaw), rz: -Math.sin(yaw), f
 export function makeHands() {
   const H = {
     L: { prev: null, v: [0, 0, 0], hist: [], hold: {} }, R: { prev: null, v: [0, 0, 0], hist: [], hold: {} },
-    cool: {}, sepPrev: null, sepV: 0, boostT: 0, foldHeld: 0, folded: false, spreadHeld: 0, spreadFired: false, offerHeld: 0, t: 0, bodyYaw: null,
+    cool: {}, sepPrev: null, sepV: 0, boostT: 0, foldHeld: 0, folded: false, spreadHeld: 0, spreadFired: false, offerHeld: 0, t: 0, bodyYaw: null, walk: 0, walkV: 0, joinHeld: 0, joined: false, flaps: [],
   };
   // one hand, in the BODY's frame: x to the right, y up, z straight ahead (metres, from between the eyes). The body, not
   // the head: you look at your own wing without the wing turning into a hand held out in front of you. (Where a finger
@@ -71,7 +75,10 @@ export function makeHands() {
     // the thumb, for a thumbs-up or a thumbs-down: out from the fist and pointing up or down
     const tt = joints['thumb-tip'], tpx = joints['thumb-phalanx-proximal'];
     const thumb = tt && tpx ? { up: tt.y - w.y > 0.05 && tt.y - tpx.y > 0.02, down: w.y - tt.y > 0.05 && tpx.y - tt.y > 0.02 } : null;
-    return { palm, palmW, n, straight, open, fist, point, aim, pinch, thumb, v: S.v, rise: dy, drop: dropY };
+    // which way the fingers run and which way the knuckles lie (for the hand he is given, when it is his own to move)
+    const fv = sub(k, w), fl = len(fv) || 1, av = sub(joints['index-finger-phalanx-proximal'], joints['pinky-finger-phalanx-proximal']), al = len(av) || 1;
+    return { palm, palmW, wrist: toLocal(w), wristW: { x: w.x, y: w.y, z: w.z }, tipW: joints['index-finger-tip'] || null, n, fd: dirLocal([fv[0] / fl, fv[1] / fl, fv[2] / fl]), ac: dirLocal([av[0] / al, av[1] / al, av[2] / al]),
+      straight, open, fist, point, aim, pinch, thumb, v: S.v, rise: dy, drop: dropY };
   }
   const ready = (name, t) => (H.cool[name] || 0) <= H.t ? ((H.cool[name] = H.t + t), true) : false;
 
@@ -94,7 +101,7 @@ export function makeHands() {
     H.bodyYaw = wrapA(H.bodyYaw + wrapA(tgt - H.bodyYaw) * Math.min(1, dt * k));
     const hd = frame(head, head.yaw), bd = frame(head, H.bodyYaw);
     const l = readHand('L', L, bd, dt, hd), r = readHand('R', R, bd, dt, hd);
-    const out = { axes: [0, 0], boost: false, run: false, pose: '', events: [], hands: { l, r } };
+    const out = { axes: [0, 0], boost: false, run: false, pose: '', events: [], hands: { l, r }, bodyYaw: H.bodyYaw, flapV: 0, flapRate: 0 };
     const both = l && r;
     const air = ctx.form === 'phoenix';
     // the distance between the palms, and how fast it is closing
@@ -106,14 +113,19 @@ export function makeHands() {
       const wide = Math.abs(r.palm.x - l.palm.x) > 0.72 && l.palm.x < -0.25 && r.palm.x > 0.25;
       // clap: palms meeting, fast
       if (sep < 0.11 && H.sepV < -1.1 && ready('clap', 0.9)) out.events.push('clap');
+      // flap: both arms swept down, hard, together, out at the sides — whatever the hands are doing. The harder, the more.
+      if (l.palm.x < -0.16 && r.palm.x > 0.16 && l.v[1] < -0.9 && r.v[1] < -0.9 && l.drop > 0.1 && r.drop > 0.1 && ready('flap', 0.26)) {
+        out.events.push('flap'); out.flapV = Math.min(3, -(l.v[1] + r.v[1]) / 2); H.boostT = 1.1; H.flaps.push(H.t);
+      }
+      // join: the hands together and held there, close in (reaching forward with them is the stoop)
+      if (sep < 0.1 && (l.palm.z + r.palm.z) / 2 < 0.36) { if ((H.joinHeld += dt) > 0.3 && !H.joined) { H.joined = true; out.events.push('join'); } }
+      else { H.joinHeld = 0; H.joined = false; }
       // wings: arms out wide, hands open
       if (wide && l.open && r.open) {
         out.pose = 'wings';
         const bank = Math.atan2(l.palm.y - r.palm.y, r.palm.x - l.palm.x);   // left hand high → positive → bank right
         const h = (l.palm.y + r.palm.y) / 2 + 0.24;                            // against the shoulders, about a hand below the eyes
         out.axes = [dz(bank, 0.07, 0.42), h > 0 ? -dz(h, 0.05, 0.22) : dz(-h, 0.06, 0.3)];
-        // flap: both swept down, hard, together
-        if (l.v[1] < -1.0 && r.v[1] < -1.0 && l.drop > 0.12 && r.drop > 0.12 && ready('flap', 0.28)) { out.events.push('flap'); H.boostT = 0.9; }
         // falling as a man and throwing the arms out: catch fire
         if (!air && !ctx.grounded) { if ((H.spreadHeld += dt) > 0.25 && !H.spreadFired) { H.spreadFired = true; out.events.push('spread'); } }
       } else { H.spreadHeld = 0; H.spreadFired = false; }
@@ -128,7 +140,8 @@ export function makeHands() {
       if (l.v[1] > 1.3 && r.v[1] > 1.3 && l.rise > 0.15 && r.rise > 0.15 && ready('leap', 1)) out.events.push('leap');
       // push: both palms facing ahead, shoved out
       if (l.n.z > 0.6 && r.n.z > 0.6 && l.v[2] > 1.1 && r.v[2] > 1.1 && ready('push', 1)) out.events.push('push');
-    } else { H.spreadHeld = 0; H.spreadFired = false; H.foldHeld = 0; H.folded = false; }
+    } else { H.spreadHeld = 0; H.spreadFired = false; H.foldHeld = 0; H.folded = false; H.joinHeld = 0; H.joined = false; }
+    H.flaps = H.flaps.filter(x => H.t - x < 2.5); out.flapRate = H.flaps.length;
 
     // offer: one palm up, open, still, in front
     const up = [l, r].find(h => h && h.open && h.n.y > 0.72 && h.palm.z > 0.15 && Math.hypot(...h.v) < 0.35);
@@ -143,6 +156,15 @@ export function makeHands() {
         if (hl > 0.35) { out.axes = [a.x / hl, a.z / hl]; out.pose = 'point'; out.run = pts.length > 1; }
       }
     }
+    // walk: the arms swung the way arms swing when you walk — one going forward as the other comes back, low at the sides.
+    // (Each swing stops for an instant as it turns round: he keeps walking through that.)
+    if (!air && ctx.grounded && both && !out.pose) {
+      const zl = l.v[2], zr = r.v[2], amp = (Math.abs(zl) + Math.abs(zr)) / 2;
+      const sw = zl * zr < 0 && amp > 0.3 && l.palm.y < -0.15 && r.palm.y < -0.15 && Math.abs(l.palm.x) < 0.5 && Math.abs(r.palm.x) < 0.5;
+      H.walk += ((sw ? 1 : 0) - H.walk) * Math.min(1, dt * (sw ? 7 : 1.8));
+      if (sw) H.walkV += (amp - H.walkV) * Math.min(1, dt * 4);
+      if (H.walk > 0.4) { out.pose = 'walk'; out.axes = [0, 1]; out.run = H.walkV > 1.0; }
+    } else H.walk = Math.max(0, H.walk - dt * 3);
     if ((H.boostT -= dt) > 0) out.boost = true;
     return out;
   }
