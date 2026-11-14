@@ -2140,7 +2140,8 @@ function pushOut(pos, vel, m) {
     hit = { x: b.x, z: b.z, r: b.hw, t: 0, soft: false, y0: b.y0, yb: b.y0, y1: b.y1, what: b.what, ref: b, type: 'box', list: CROWN.boxes };
   }
   if (realm === 'over') {   // (and the stone out in the country: its rocks and its walls)
-    for (const c of ROCKS.cyls) { if (pos.y > c.y1 - 0.4 || pos.y + 1.8 < c.y0) continue; const ex = pos.x - c.x, ez = pos.z - c.z, rr = c.r + m, d2 = ex * ex + ez * ez; if (d2 >= rr * rr || d2 < 1e-4) continue;
+    for (const c of ROCKS.cyls) { if (pos.y > c.y1 - 0.4 || pos.y + 1.8 < c.y0) continue; const ex = pos.x - c.x, ez = pos.z - c.z, d2 = ex * ex + ez * ez; if (c.rad && d2 > c.r * c.r * 6) continue;
+      const rr = (c.rad ? c.rad(Math.atan2(ez, ex), pos.y + 0.9) : c.r) + m; if (d2 >= rr * rr || d2 < 1e-4) continue;
       const d = Math.sqrt(d2), nx = ex / d, nz = ez / d, vn = vel.x * nx + vel.z * nz; pos.x = c.x + nx * rr; pos.z = c.z + nz * rr; if (vn < 0) { vel.x -= nx * vn; vel.z -= nz * vn; } hit = { x: c.x, z: c.z, r: c.r, t: 0, soft: false, y0: c.y0, yb: c.y0, y1: c.y1, what: c.what, ref: c, type: 'cyl', list: ROCKS.cyls }; }
     for (const b of ROCKS.boxes) { if (pos.y > b.y1 - 0.4 || pos.y + 1.8 < b.y0) continue; const ex = pos.x - b.x, ez = pos.z - b.z, lx = ex * b.c - ez * b.s, lz = ex * b.s + ez * b.c, ox = Math.abs(lx) - b.hw - m, oz = Math.abs(lz) - b.hd - m; if (ox > 0 || oz > 0) continue;
       let nx, nz; if (ox > oz) { const sg = Math.sign(lx) || 1; nx = sg * b.c; nz = -sg * b.s; pos.x -= nx * ox; pos.z -= nz * ox; } else { const sg = Math.sign(lz) || 1; nx = sg * b.s; nz = sg * b.c; pos.x -= nx * oz; pos.z -= nz * oz; }
@@ -2892,12 +2893,12 @@ function updateClouds(dt) {
 
 // ───────────────────────── time of day ─────────────────────────
 const PALETTES = [
-  { zen: '#1d4fb9', hor: '#a8cbe8', fog: '#a3c3df', sun: '#fff0d8', sunI: 2.3, el: 38, az: 1.0, hemiS: '#cfe3ff', hemiG: '#6a8a4a', hemiI: 1.45, cloud: '#8a98a8', stars: 0, water: '#2f72b8' },
-  { zen: '#2354ae', hor: '#cdd9dc', fog: '#bccbd2', sun: '#ffe4b8', sunI: 2.2, el: 23, az: 1.25, hemiS: '#e2e6ee', hemiG: '#6a8445', hemiI: 1.35, cloud: '#9a9a98', stars: 0, water: '#3a72aa' },
-  { zen: '#33498f', hor: '#f2bb7d', fog: '#d9b08c', sun: '#ffb46b', sunI: 2.0, el: 10, az: 1.5, hemiS: '#ffd9b0', hemiG: '#6a5a3a', hemiI: 1.15, cloud: '#a8785a', stars: 0, water: '#4a6a9a' },
-  { zen: '#1a1e52', hor: '#d06c55', fog: '#7b5468', sun: '#ff7a48', sunI: 1.3, el: 3, az: 1.75, hemiS: '#a87aa0', hemiG: '#3a3440', hemiI: 0.8, cloud: '#6a4058', stars: 0.25, water: '#3a3a6a' },
-  { zen: '#040919', hor: '#16204a', fog: '#111a38', sun: '#9eb2ff', sunI: 1.3, el: 42, az: -1.0, hemiS: '#5a6eb0', hemiG: '#2a3450', hemiI: 1.25, cloud: '#1a2238', stars: 1, water: '#14204a' },
-  { zen: '#2f62c4', hor: '#ffc99c', fog: '#efc7a6', sun: '#ffdba6', sunI: 2.2, el: 9, az: 1.2, hemiS: '#ffe6cc', hemiG: '#6a7a45', hemiI: 1.35, cloud: '#c09a8a', stars: 0, water: '#3c6ab0' },
+  { zen: '#1657d8', hor: '#9fd3f6', fog: '#9dcbf0', sun: '#fff2d6', sunI: 2.3, el: 38, az: 1.0, hemiS: '#cfe6ff', hemiG: '#70a046', hemiI: 1.45, cloud: '#8a9cb2', stars: 0, water: '#1f82d2' },
+  { zen: '#1e5cc8', hor: '#cfe4ee', fog: '#b9d5e6', sun: '#ffe2ac', sunI: 2.2, el: 23, az: 1.25, hemiS: '#e2e9f2', hemiG: '#749844', hemiI: 1.35, cloud: '#9a9ea2', stars: 0, water: '#2b80c6' },
+  { zen: '#3352ac', hor: '#ffb869', fog: '#e8ae80', sun: '#ffae5c', sunI: 2.0, el: 10, az: 1.5, hemiS: '#ffd6a6', hemiG: '#78663a', hemiI: 1.15, cloud: '#c27a52', stars: 0, water: '#4a74b8' },
+  { zen: '#1c1f68', hor: '#ea644a', fog: '#8c5272', sun: '#ff7040', sunI: 1.3, el: 3, az: 1.75, hemiS: '#ba7aaa', hemiG: '#3c3444', hemiI: 0.8, cloud: '#74405e', stars: 0.25, water: '#403c84' },
+  { zen: '#040a20', hor: '#17245c', fog: '#111c44', sun: '#a2b6ff', sunI: 1.3, el: 42, az: -1.0, hemiS: '#5d74c2', hemiG: '#2a3654', hemiI: 1.25, cloud: '#1a2440', stars: 1, water: '#14245c' },
+  { zen: '#2c66d8', hor: '#ffc48e', fog: '#f3c29e', sun: '#ffd89a', sunI: 2.2, el: 9, az: 1.2, hemiS: '#ffe4c4', hemiG: '#708444', hemiI: 1.35, cloud: '#d29c88', stars: 0, water: '#3572c6' },
 ];
 const COLOR_KEYS = ['zen', 'hor', 'fog', 'sun', 'hemiS', 'hemiG', 'cloud', 'water'];
 const NUM_KEYS = ['sunI', 'el', 'az', 'hemiI', 'stars'];
@@ -3344,6 +3345,20 @@ function makeHuman(mask = true, who = WHO_ME) {
   // (and the fine work — fingers, the small pieces of the face, the drawn outline — for when he is close enough to see it)
   out.fine = []; out.fineOn = true; rig.updateMatrixWorld(true);
   rig.traverse(o => { if (!o.isMesh || o === cape || o === scarf) return; if (o.userData.ink) return out.fine.push(o); o.geometry.computeBoundingSphere(); const s = o.getWorldScale(_s).x; if (o.geometry.boundingSphere.radius * s < 0.065) out.fine.push(o); });
+  // ── the tail he has in the sea: the bird's own, from the hips down. A spine of joints that a wave runs along, one
+  //    tapering body of ember, a fin of flame down its back, and at its end the three long feathers of a phoenix's tail.
+  { const emb = L(0xe8551a, { emissive: 0xff3a08, emissiveIntensity: 1.25 }), gold = L(0xffb04a, { emissive: 0xff8a1e, emissiveIntensity: 1.7, side: THREE.DoubleSide });
+    const root = new THREE.Group(); root.position.set(0, -0.04, 0); root.visible = false; rig.add(root);
+    const rr = [0.2, 0.185, 0.16, 0.13, 0.1, 0.072, 0.048], segs = []; let par = root;
+    for (let i = 0; i < 6; i++) { const sg = new THREE.Group(); sg.position.y = i ? -0.27 : 0; par.add(sg); par = sg; segs.push(sg);
+      M(new THREE.CylinderGeometry(rr[i], rr[i + 1], 0.29, 14, 1, true).translate(0, -0.135, 0), emb, 0, 0, 0, sg).scale.z = 0.78;
+      if (i > 0 && i < 5) { const fin = M(new THREE.ConeGeometry(0.05, 0.3 - i * 0.03, 4).translate(0, 0.1, 0), gold, 0, -0.12, 0.6 * rr[i] + 0.05, sg); fin.rotation.x = 2.2; fin.scale.x = 0.25; } }
+    const fluke = new THREE.Group(); fluke.position.y = -0.27; par.add(fluke);
+    for (const sd of [-1, 0, 1]) { const len = sd ? 0.78 : 1.05, g2 = new THREE.PlaneGeometry(sd ? 0.34 : 0.2, len, 1, 6).translate(0, -len / 2, 0), q = g2.attributes.position;
+      for (let v = 0; v < q.count; v++) { const tt = -q.getY(v) / len; q.setX(v, q.getX(v) * (1 - 0.92 * Math.pow(tt, 1.6)) * (1 + 0.5 * Math.sin(tt * 3.1)) + sd * 0.34 * tt * tt); q.setZ(v, 0.02 * Math.sin(tt * 9 + sd)); }
+      g2.computeVertexNormals(); M(g2, gold, sd * 0.03, 0, 0, fluke).rotation.z = sd * 0.3; }
+    root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+    out.tail = { root, segs, fluke }; }
   return out;
 }
 // near enough to see it, all of him; further off, the fine work is not drawn (it would be smaller than a letter on the screen)
@@ -3750,11 +3765,12 @@ function makePhoenix() {
   return { group: g, wings, tails, light, body, head };
 }
 // the tail is a set of chains: each link eases toward its place behind the one before, so turns and dives whip through it
-const _tinv = new THREE.Matrix4();
+const _tinv = new THREE.Matrix4(), _tz = new THREE.Vector3();
 function updateTails(dt, snap, P = phoenix) {
   const G = P.group; G.updateMatrixWorld();
   const sc = G.scale.x, up = _n.set(0, 1, 0).transformDirection(G.matrixWorld), inv = _tinv.copy(G.matrixWorld).invert();
   const own = P === phoenix, fan = own ? 1 - 0.78 * STOOP.tuck : 1, fast = own ? STOOP.fast : 0;   // (stooping, the tail closes to a blade and shivers)
+  const down = own && player.form === 'phoenix' && (player.perch || !!player.takeoff);
   for (const t of P.tails) {
     const seg = t.len / (t.N - 1) * sc, n = t.nodes, a = t.geo.attributes.position.array, ang = t.ang * fan;
     if (t.root) _p.copy(t.root); else _p.set(Math.sin(ang) * 0.25, 0.08, 1.6);
@@ -3767,6 +3783,8 @@ function updateTails(dt, snap, P = phoenix) {
       _s.copy(n[i - 1]).addScaledVector(_v, seg).addScaledVector(up, wv);
       if (fresh) n[i].copy(_s); else n[i].lerp(_s, damp(lerp(26, 9, i / t.N), dt));
       _s.subVectors(n[i], n[i - 1]).setLength(seg); n[i].copy(n[i - 1]).add(_s);
+      if (down) { const q = n[i], gy = groundAt(q.x, q.z, q.y + 3) + 0.06; if (q.y < gy) q.y = gy;   // (down: it lies along the ground, and gives way to what stands there)
+        if (i % 3 === 0) { _tz.set(0, 0, 0); pushOut(q, _tz, 0.2); } }
     }
     const px = Math.cos(t.ang), pz = -Math.sin(t.ang);
     for (let i = 0; i < t.N; i++) {
@@ -3919,14 +3937,14 @@ const postMat = new THREE.ShaderMaterial({
     tPrev: { value: null }, uPersist: { value: 0 }, tTitle: { value: null }, uTitleT: { value: -1 }, uSunUV: { value: new THREE.Vector2(0.5, 0.8) }, uRays: { value: 0 },
     tName: { value: null }, uNameNs: { value: new Float32Array(9).fill(7) }, uNameW: { value: 2 },
     uNear: { value: 0.3 }, uFar: { value: 14000 }, uEdge: { value: 1 }, uFlash: { value: 0 }, uFlashCol: { value: new THREE.Color(1, 0.75, 0.45) }, uHeat: { value: 0 }, uGlow: { value: 0 },
-    uTint: { value: new THREE.Color(1, 1, 1) }, uFade: { value: 1 }, uWarp: { value: 0 }, uLight: { value: 0 }, uSpeed: { value: 0 }, uDanger: { value: 0 }, uDof: { value: 0 }, tBlur: { value: null }, uTime: worldFx.uTime,
+    uTint: { value: new THREE.Color(1, 1, 1) }, uFade: { value: 1 }, uWarp: { value: 0 }, uLight: { value: 0 }, uSpeed: { value: 0 }, uDanger: { value: 0 }, uDof: { value: 0 }, uSea: { value: 0 }, uVib: { value: 1 }, tBlur: { value: null }, uTime: worldFx.uTime,
     tCells: { value: null }, tCells2: { value: null }, uCells: { value: new THREE.Vector2(1, 1) }, uRelief: { value: 6 },
     uGlitch: { value: 0 }, uStTint: { value: new THREE.Color(1, 1, 1) }, uStA: { value: new THREE.Vector4(0, 1, 1, 1) }, uStB: { value: new THREE.Vector4(1, 1, 0, 0) }, tUI: { value: null }, tChars: { value: null }, uUiOn: { value: 0 }, uUiK: { value: 1 }, uUiN: { value: new THREE.Vector2(1, 1) }, tUI2: { value: null }, uUi2On: { value: 0 }, uUi2N: { value: new THREE.Vector2(1, 1) }, uWt: { value: [new THREE.Color(1, 0.9, 0.7), new THREE.Color(1, 0.7, 0.35), new THREE.Color(0.4, 0.2, 0.08)] }, uSayCol: { value: new THREE.Color(1, 0.7, 0.35) }, uUiCol: { value: [new THREE.Color(1, 0.54, 0.23), new THREE.Color(1, 0.85, 0.66), new THREE.Color(0.42, 0.15, 0.03)] } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tScene, tDepth, tGlyph, tName, tPrev; uniform vec2 uRes, uCell; uniform vec3 uTint, uFlashCol; uniform float uNameNs[9]; uniform float uNameW;
     uniform float uAscii, uTotal, uNear, uFar, uEdge, uFlash, uHeat, uGlow, uFade, uWarp, uLight, uSpeed, uDanger, uTime, uPersist, uTitleT, uRays; uniform vec2 uSunUV; uniform sampler2D tTitle;
-    uniform sampler2D tCells, tCells2, tBlur; uniform vec2 uCells; uniform float uDof;
+    uniform sampler2D tCells, tCells2, tBlur; uniform vec2 uCells; uniform float uDof, uSea, uVib;
     uniform vec3 uStTint; uniform vec4 uStA, uStB; uniform sampler2D tUI, tUI2, tChars; uniform float uUiOn, uUi2On, uGlitch, uUiK; uniform vec2 uUi2N; uniform vec3 uWt[3], uSayCol; uniform vec2 uUiN; uniform vec3 uUiCol[3];
     // ── the name, on fire. A texture of the word stretched to fill the screen; flames are the word's own shape pulled upward
     //    by moving noise; then a ragged front burns through it, leaving a glowing edge, char, and then nothing but sparks.
@@ -4036,6 +4054,22 @@ const postMat = new THREE.ShaderMaterial({
       }
       if (uGlitch > 0.002) { float gs = step(0.86, fract(sin(floor(gl_FragCoord.y / (uCell.y * 2.0)) * 3.31 + floor(uTime * 30.0) * 5.7) * 77.7)) * uGlitch; col = mix(col, col.brg * 1.25 + vec3(0.05, 0.0, 0.08), gs); col += vec3(0.1, 0.16, 0.22) * gband * uGlitch * 0.5; }
       col = mix(col, col * vec3(1.6, 0.8, 0.45) + vec3(0.12, 0.03, 0.0), uHeat);
+      if (uVib > 0.0) {   // colour: what is dull gains most, what is already strong is left; a little more depth between light and dark; warm light, cool shade
+        float l = dot(col, vec3(0.299, 0.587, 0.114)), sat = max(col.r, max(col.g, col.b)) - min(col.r, min(col.g, col.b));
+        col = max(mix(vec3(l), col, 1.0 + uVib * (0.62 - 0.42 * sat)), 0.0);
+        col = mix(col, col * col * (3.0 - 2.0 * col), 0.2 * uVib);
+        col *= mix(vec3(1.0), vec3(1.045, 1.0, 0.94), smoothstep(0.45, 1.0, l) * uVib); col += vec3(-0.008, 0.004, 0.03) * (1.0 - smoothstep(0.0, 0.35, l)) * uVib;
+      }
+      if (uSea > 0.0) {   // under the sea
+        float l = dot(col, vec3(0.3, 0.55, 0.15));
+        vec3 w = mix(col * vec3(0.4, 0.86, 1.22), mix(vec3(0.02, 0.17, 0.4), vec3(0.22, 0.8, 0.98), smoothstep(0.0, 0.85, l)), 0.42);
+        float ca = sin(vUv.x * 34.0 + uTime * 1.3 + sin(vUv.y * 9.0 + uTime * 0.7) * 2.0) * sin(vUv.x * 13.0 - uTime * 0.9 + vUv.y * 21.0);
+        w += vec3(0.1, 0.36, 0.5) * smoothstep(0.5, 1.0, ca) * (0.2 + 0.8 * vUv.y) * 0.55;                                      // the light the waves let through, moving
+        w += vec3(0.12, 0.32, 0.4) * pow(max(0.0, sin(vUv.x * 7.0 + vUv.y * 2.4 + uTime * 0.25)), 6.0) * smoothstep(0.15, 1.0, vUv.y) * 0.4;   // and coming down in bars
+        vec2 vq = vUv - 0.5; w *= 1.0 - dot(vq, vq) * 0.85;
+        w = mix(w, col * vec3(1.05, 0.82, 0.7), smoothstep(0.18, 0.5, col.r - max(col.g, col.b)) * 0.85);   // (fire is still fire down here: his tail, a bird's wake)
+        col = mix(col, w, uSea);
+      }
       col *= uTint;
       col += uFlash * uFlashCol;
       if (uSpeed > 0.02) {
@@ -4824,6 +4858,7 @@ function setWings(f, fold, sweep, stretch) {
 // for a man hanging under its wings (to land) — and the winged man back for the bird.
 const COST = { ignite: 0.05, wings: 0.04, rebirth: 0.1 };
 const stats = { crashes: 0, perfect: 0, toldWings: false, toldCrash: false, dove: false };
+try { if (localStorage.getItem('icarus.vivid') === '0') postMat.uniforms.uVib.value = 0; } catch {}   // (/vivid: the fuller colours are how the world comes; this is who turned them down)
 const ROLL_ALT = 30, ROLL_T = 1.15;   // press SPACE this close to anything and he swoops in, rolls, and stands
 function spaceAction() {
   if (player.sub) return null;   // in the water there is nothing to do but keep going
@@ -5350,6 +5385,38 @@ function becomeHuman() {
   }
 }
 
+// ── In the sea his legs take fire and are gone: from the hips down he is the bird's own tail, and he swims as a thing of
+//    the sea swims: a long reach, one sweep of the arms, and a glide, the tail beating behind. Out of the water they are
+//    legs again. And the sea gives the fire back: to the swimmer, to the bird under it, to the bird tearing along its top.
+const TAILS = { ph: 0, hot: false, sprayT: 0 };
+function tailPose(H, k, ph, amp) {   // k: how much of it there is (0 legs, 1 tail); ph: where in its beat; amp: how hard it beats
+  const T = H.tail; if (!T) return; const on = k > 0.02;
+  T.root.visible = on; H.legL.visible = H.legR.visible = k < 0.55; if (!on) return;
+  const w = k > 0.55 ? 1 : 0.35 + k * 1.1; T.root.scale.set(w, 0.2 + 0.8 * k, w);   // (it grows down out of his hips as the legs burn away)
+  for (let i = 0; i < T.segs.length; i++) T.segs[i].rotation.x = Math.sin(ph - i * 0.62) * amp * (0.09 + i * 0.07);
+  T.fluke.rotation.x = Math.sin(ph - T.segs.length * 0.62 - 0.5) * amp * 0.8;
+}
+function updateTail(dt) {
+  const p = player, wet = p.form === 'human' && (p.swim || !!p.dive) && (state === 'play' || state === 'talk') && !p.cine && realm === 'over';
+  p.wetT = wet ? (p.wetT || 0) + dt : 0;
+  const want = wet && p.wetT > 0.4 ? 1 : 0, k0 = p.tailK || 0, k = p.tailK = want > k0 ? Math.min(1, k0 + dt / 0.9) : Math.max(0, k0 - dt / 0.35);
+  if (want && !TAILS.hot) { TAILS.hot = true; audio.sfx.sizzle?.(); audio.sfx.morph?.();
+    if (!stats.toldTail) { stats.toldTail = true; toast(TOUCH ? 'YOUR LEGS TAKE FIRE: A TAIL · THE SEA GIVES YOUR FIRE BACK' : 'YOUR LEGS TAKE FIRE: A TAIL · SHIFT SURGES · THE SEA GIVES YOUR FIRE BACK'); } }
+  if (!want && k === 0) TAILS.hot = false;
+  const sp = p.form === 'human' ? Math.hypot(p.vel.x, p.vel.y, p.vel.z) : 0;
+  if (k > 0 || human.tail.root.visible) { TAILS.ph += dt * (2.2 + sp * 0.75); tailPose(human, k, TAILS.ph, 0.35 + Math.min(1, sp / 9) * 0.75); }
+  if (k > 0 && k < 1) for (let i = 0; i < 4; i++) emit(p.pos.x + rnd(0.3), p.pos.y + 0.1 + Math.random() * 0.8, p.pos.z + rnd(0.3), rnd(1.4), 0.8 + Math.random() * 2, rnd(1.4), 0.4 + Math.random() * 0.5, want ? [1.6, 0.6 + Math.random() * 0.5, 0.12] : [0.7, 0.85, 0.95], 3);   // (the burning of it; and the steam of its going out)
+  if (wet && k > 0.6) {
+    const fy = human.group.rotation.y, bx = p.pos.x + Math.sin(fy) * 1.3, bz = p.pos.z + Math.cos(fy) * 1.3;   // (where the tail is: behind him)
+    if (p.swim && sp > 2.2 && (TAILS.sprayT -= dt) < 0) { TAILS.sprayT = 0.16; ripple(bx, bz, 0.5 + Math.min(0.6, sp / 14));   // on top: the tail throws water
+      for (let i = 0; i < 3; i++) emit(bx + rnd(0.4), WATER + 0.15, bz + rnd(0.4), rnd(1.6) + Math.sin(fy) * 1.5, 2.2 + Math.random() * 2.6, rnd(1.6) + Math.cos(fy) * 1.5, 0.5 + Math.random() * 0.4, [0.78, 0.9, 1.0], -9); }
+    if (p.dive && Math.random() < 0.5 + sp * 0.05) emit(bx + rnd(0.3), p.pos.y + 0.6 + rnd(0.4), bz + rnd(0.3), rnd(0.4), 1 + Math.random() * 1.6, rnd(0.4), 0.8 + Math.random() * 0.9, Math.random() < 0.3 ? [1.5, 0.7, 0.2] : [0.6, 0.85, 1.0], 4);   // under: a string of light and air behind it
+  }
+  if (realm === 'over' && state === 'play') {   // the sea gives the fire back
+    if (wet && k > 0.5) p.flame = Math.min(1, p.flame + dt * 0.06);
+    else if (p.form === 'phoenix' && !p.perch && (p.sub || p.pos.y - WATER < 2.6 && overHeight(p.pos.x, p.pos.z) < WATER - 1)) p.flame = Math.min(1, p.flame + dt * 0.05);
+  }
+}
 // Under the water, as a man. From the surface he can duck under and swim down: he steers, forward takes him deeper and
 // back brings him up again, and the sea closes over him. Deep enough, and it is the roof of the other world he comes out
 // through — as a man, with nothing under him: he falls, and has the whole height of the Underworld to catch fire in.
@@ -5359,7 +5426,7 @@ function humanDive() {
   const bed = overHeight(p.pos.x, p.pos.z);
   if (bed > WATER - 14) { toast('TOO SHALLOW TO DIVE HERE · SWIM OUT'); return false; }
   p.dive = { t: 0, bed, deep: Math.min(30, WATER - bed - 3), told: false }; p.grounded = false; p.swim = false; p.vel.set(0, 0, 0); SEA.trans = true;   // (the sea closes over the lens too)
-  ripple(p.pos.x, p.pos.z, 1); audio.sfx.plunge?.(); toast(TOUCH ? 'UNDER · PUSH FORWARD TO GO DEEPER' : 'UNDER · W DEEPER · S BACK UP');
+  ripple(p.pos.x, p.pos.z, 1); audio.sfx.plunge?.(); toast(TOUCH ? 'UNDER · PUSH FORWARD TO SWIM · HOLD THE SURGE TO GO DOWN THROUGH THE SEA BED' : 'UNDER · W SWIMS · S BACK UP · SHIFT + W: DOWN THROUGH THE SEA BED');
   return true;
 }
 function updateHumanDive(dt) {
@@ -5374,7 +5441,10 @@ function updateHumanDive(dt) {
       emit(p.pos.x - M.x * q * b + rnd(0.35), p.pos.y + 1 - M.y * q * b, p.pos.z - M.z * q * b + rnd(0.35), rnd(0.5), 1.5 + Math.random() * 2.5, rnd(0.5), 0.6 + Math.random() * 0.7, [0.34, 0.45, 0.56], 4, 0.22 + Math.random() * 0.3); }
   }
   const fy = H.group.rotation.y, vy = iz < -0.25 ? 5.5 : idle ? (D.mom ? 0 : Math.min(5.2, 1.2 + (D.upT = (D.upT || 0) + dt) * 3.2)) : -(6.5 + Math.max(0, iz) * 4.5 + (boosting() ? 3 : 0)), fwd = idle ? 0.7 : 2.6 + Math.abs(iz) * 2;   // (left alone after a plunge, he floats up)
-  p.vel.set(-Math.sin(fy) * fwd, vy, -Math.cos(fy) * fwd); p.pos.addScaledVector(p.vel, dt); p.fallTop = p.pos.y;
+  { const tk = p.tailK || 0, kf = 1 + 1.7 * tk + (boosting() ? 0.8 * tk : 0); let vv = vy;
+    // with the tail he keeps to the lit water, a few fathoms down, and goes where he likes there; only driving down (the surge held) takes him on through the bed of the sea
+    if (tk > 0.5 && vy < 0 && !D.mom && !boosting()) { const cruise = Math.max(3, Math.min(D.deep - 7, 16)); vv *= 1 - smoothstep(cruise - 3, cruise, WATER - p.pos.y); }
+    p.vel.set(-Math.sin(fy) * fwd * kf, vv, -Math.cos(fy) * fwd * kf); } p.pos.addScaledVector(p.vel, dt); p.fallTop = p.pos.y;
   const bed = overHeight(p.pos.x, p.pos.z); if (p.pos.y < bed + 1.2) { p.pos.y = bed + 1.2; if (D.mom && !D.through) { D.mom = null; for (let i = 0; i < 24; i++) emit(p.pos.x + rnd(1.5), bed + 0.4, p.pos.z + rnd(1.5), rnd(2), 0.5 + Math.random() * 1.5, rnd(2), 1.2 + Math.random(), [0.5, 0.46, 0.38], 0.4, 1.4); } }   // (the bed: a cloud of it goes up)
   // the stroke: arms sweep from stretched ahead out and back to his sides, and glide; the legs beat
   const glide = clamp(ms / 18, 0, 1);   // (still carried by the plunge: one line, arms ahead, no stroke yet)
@@ -5383,9 +5453,10 @@ function updateHumanDive(dt) {
   H.armL.rotation.set(lerp(-2.95, -0.5, pull), 0, -0.12 - Math.sin(pull * Math.PI) * 0.95); H.armR.rotation.set(lerp(-2.95, -0.5, pull), 0, 0.12 + Math.sin(pull * Math.PI) * 0.95);
   if (H.foreL) H.foreL.rotation.x = H.foreR.rotation.x = -pull * 0.5;
   H.legL.rotation.x = kick * 0.36; H.legR.rotation.x = -kick * 0.36; if (H.head) H.head.rotation.x = -0.45;
+  if (p.tailK > 0) R.rotation.x += Math.sin(TAILS.ph) * 0.07 * p.tailK;   // (the whole of him goes with the tail)
   if (Math.random() < 0.5) emit(p.pos.x + rnd(0.5), p.pos.y + 1 + rnd(0.5), p.pos.z + rnd(0.5), rnd(0.6), 1.5 + Math.random() * 2.5, rnd(0.6), 0.9 + Math.random() * 0.8, [0.7, 0.85, 0.95], 5);   // his breath, going up
   if ((D.bT = (D.bT || 0) - dt) < 0) { D.bT = 0.45 + Math.random() * 0.5; audio.sfx.bubble?.(); }
-  p.flame = Math.max(0.12, p.flame - dt * 0.03);   // (water is no friend of his fire)
+  if (!(p.tailK > 0.5)) p.flame = Math.max(0.12, p.flame - dt * 0.03);   // (water is no friend of his fire, until his legs have taken it: see updateTail)
   if (vy > 0 && p.pos.y > WATER - 0.9) { p.pos.y = WATER; p.dive = null; p.grounded = true; resetPose(); ripple(p.pos.x, p.pos.z, 0.8); audio.sfx.splash?.(false); return; }   // back up into the air
   if (p.pos.y < WATER - D.deep) {   // through: out of the roof of the Underworld, falling
     const x = p.pos.x, z = p.pos.z, oy = p.pos.y;
@@ -5459,7 +5530,7 @@ function updateHuman(dt) {
     mx = fwdX * iz + rX * ix; mz = fwdZ * iz + rZ * ix;
     ml = Math.hypot(mx, mz);
     if (ml > 1) { mx /= ml; mz /= ml; }  // analog stick keeps partial tilt as a slower walk
-    const speed = (boosting() ? 16 : 7) * (swimming ? 0.5 : 1) * MOD.speed;
+    const speed = (boosting() ? 16 : 7) * (swimming ? lerp(0.5, 1.5, p.tailK || 0) : 1) * MOD.speed;   // (with the tail he is quicker in the sea than on his feet)
     if (p.grounded) {
       const [sx, sz] = slopeAt(p.pos.x, p.pos.z, p.pos.y + 0.5), sl = Math.hypot(sx, sz);
       p.sliding = !swimming && sl > STEEP;
@@ -6050,6 +6121,12 @@ function bodyLanguage(dt, hs, swimming) {
           T.cx = lerp(T.cx, 0.1, k); T.nx = lerp(T.nx, 0.75, k); T.ny = (T.ny || 0) + Math.max(0, Math.sin(st - 0.6)) * 0.6 * k;
         }
       }
+      { const tk = p.tailK || 0; if (tk > 0.02) {   // with the tail: he lies along the water; a long reach, one sweep, a glide
+          const pull = smoothstep(0.35, 1, Math.sin(TAILS.ph * 0.5)), mk = tk * go, idle = tk * (1 - go);
+          T.rx = lerp(T.rx || 0, -1.3 + Math.sin(TAILS.ph) * 0.09, mk); T.rz = lerp(T.rz || 0, 0, mk); T.py -= (0.3 - Math.sin(TAILS.ph - 0.8) * 0.045) * mk;
+          T.alx = lerp(T.alx, lerp(3.0, 0.5, pull), mk); T.arx = lerp(T.arx, lerp(3.0, 0.5, pull), mk); T.alz = lerp(T.alz, -0.1 - Math.sin(pull * Math.PI) * 0.9, mk); T.arz = lerp(T.arz, 0.1 + Math.sin(pull * Math.PI) * 0.9, mk);
+          T.flx = lerp(T.flx, 0.1, mk); T.frx = lerp(T.frx, 0.1, mk); T.cx = lerp(T.cx, 0.12, mk); T.nx = lerp(T.nx, 0.7, mk); T.ny = lerp(T.ny || 0, 0, mk);
+          T.py -= 0.12 * idle; } }   // (and at rest he hangs a little deeper, held up by the tail turning under him)
     }
     // a landing goes down through the knees and back up
     if (p.land) {
@@ -6205,7 +6282,8 @@ function updateClimbStone(dt) {
   // along the face (and round the corner when he comes to it)
   const along = Math.abs(side) > 0.3 ? side * 1.7 * slow * dt : 0;
   if (S.type === 'cyl') {
-    const c = S.ref, R = c.r + 0.45; let a = Math.atan2(p.pos.z - c.z, p.pos.x - c.x); a -= along / R;
+    const c = S.ref; let a = Math.atan2(p.pos.z - c.z, p.pos.x - c.x); a -= along / (c.r + 0.45);
+    const R = (c.rad ? c.rad(a, p.pos.y + 0.9) : c.r) + 0.45;   // (a rock of the monasteries: the face as it is drawn there)
     p.pos.x = c.x + Math.cos(a) * R; p.pos.z = c.z + Math.sin(a) * R; C.dx = -Math.cos(a); C.dz = -Math.sin(a);
   } else {
     const b = S.ref; p.pos.x += -C.dz * along; p.pos.z += C.dx * along;
@@ -6619,12 +6697,40 @@ function newcomerSeen(P) {
   if (NEWC.told.has(P.id) || aloneNow() || !flags.morphed || state === 'title' || state === 'loading' || realm !== 'over' || SHUN.block.has(P.name)) return;
   NEWC.told.add(P.id); NEWC.P = P; NEWC.until = time + 45; audio.sfx.newcomer?.();
 }
+// Over Crete, a watcher can give the bird the air: it goes round and round whoever is there to be watched (or the tower,
+// when nobody is), a wing down toward them, and the lens looks in past the bird at them. Any hand on the controls takes
+// it back. Whoever is in the opening is drawn larger the further off the watcher is, and marked, so he can be found from
+// the air; and what he does there is heard: the jump, each beat of the wings, the wax giving way.
+const CIRC = { on: false, pending: false, r: 300, h: 70, dist0: 0 };
+const cretePeer = () => { let best = null; for (const Q of NET.peers.values()) if (Q.crete && Q.s && performance.now() - Q.s.t < 8000 && (!best || Q.s.t > best.s.t)) best = Q; return best; };
+const _ca = { x: 0, y: 0, z: 0 };
+function circleAim() { const Q = cretePeer(); if (Q) { _ca.x = Q.pos.x; _ca.y = Q.pos.y; _ca.z = Q.pos.z; } else { _ca.x = CRETE.x; _ca.y = WATER + PRO_C.y + 50; _ca.z = CRETE.z; } return _ca; }
+const nearCrete = () => (player.pos.x - CRETE.x) ** 2 + (player.pos.z - CRETE.z) ** 2 < 2600 * 2600;
+function circleStart() {
+  const p = player;
+  if (BIRD.auto === 'circle') { birdAuto(''); return true; }
+  if (!nearCrete()) { if (!watchCrete()) return false; CIRC.pending = true; return true; }   // (not there yet: go, and begin on arriving)
+  if (p.form !== 'phoenix' || p.perch) { toast('YOU HAVE TO BE FLYING'); return false; }
+  if (!birdAuto('circle', 'THE BIRD CIRCLES · YOU WATCH · STEER TO TAKE IT BACK')) return false;
+  LIVE.q.length = 0; LIVE.mv = null; if (!CIRC.on) CIRC.dist0 = phxDist; CIRC.on = true; return true;
+}
 function updateNewcomer() {
-  const el = $('newcomer'), P = NEWC.P;
+  const el = $('newcomer'), P = NEWC.P, p = player;
   if (P && (time > NEWC.until || !P.crete || !P.s || performance.now() - P.s.t > 8000)) NEWC.P = null;
-  const on = !!NEWC.P && state === 'play' && !player.cine && !aloneNow();
-  if (on) { const t = `${NEWC.P.name} IS WAKING ON CRETE · ${TOUCH ? 'TAP' : 'CLICK'} TO WATCH`; if (el.textContent !== t) el.textContent = t; }
-  el.classList.toggle('on', on);
+  if (CIRC.on && BIRD.auto !== 'circle') { CIRC.on = false; if (CIRC.dist0) phxDist = CIRC.dist0; }
+  if (CIRC.on) phxDist = lerp(phxDist, TOUCH ? 84 : 76, 0.03);
+  if (CIRC.pending && state === 'play') { if (nearCrete() && p.form === 'phoenix') { CIRC.pending = false; circleStart(); } else if (!nearCrete() && state !== 'warp') CIRC.pending = false; }
+  const free = state === 'play' && !p.cine && !aloneNow(), over = free && realm === 'over' && flags.morphed && p.form === 'phoenix' && !p.perch && nearCrete() && !MATCH.phase;
+  const t = !free ? '' : NEWC.P ? `${NEWC.P.name} IS WAKING ON CRETE · ${TOUCH ? 'TAP' : 'CLICK'} TO WATCH` : CIRC.on ? `CIRCLING${cretePeer() ? ' · WATCHING ' + cretePeer().name : ''} · STEER TO TAKE IT BACK` : over ? `CIRCLE ${cretePeer() ? cretePeer().name : 'THE ISLAND'} AND WATCH · ${TOUCH ? 'TAP' : 'CLICK'} · OR /circle` : '';
+  if (t && el.textContent !== t) el.textContent = t;
+  el.classList.toggle('on', !!t);
+  // whoever is in the opening, seen from the air
+  if (realm === 'over') for (const Q of NET.peers.values()) { const show = Q.crete && Q.s && performance.now() - Q.s.t < 8000 && flags.morphed && state !== 'title' && !aloneNow();
+    if (show) { const d = Q.pos.distanceTo(camera.position);
+      if (!Q.cmk) { const m = Q.cmk = document.createElement('div'); m.className = 'mk wp'; m.innerHTML = '<b>✦</b><span></span>'; m.style.display = 'none'; m.style.color = '#ffe2a8'; $('markers').appendChild(m); }
+      placeMarker(Q.cmk, Q.pos.x, Q.pos.y + 4 + d * 0.012, Q.pos.z, d < 3400, '◎', `${Q.name} · ${Q.form === 't' ? 'FALLING' : Q.form === 'w' ? 'FLYING' : 'ON THE TOWER'}`, true);
+      if (Q.av) { Q.av.man.group.scale.setScalar(MAN_SCALE * clamp(d / 110, 1, 6)); Q.cbig = true; } }
+    else { if (Q.cmk && Q.cmk.style.display !== 'none') Q.cmk.style.display = 'none'; if (Q.cbig) { Q.cbig = false; if (Q.av) Q.av.man.group.scale.setScalar(MAN_SCALE); } } }
 }
 function watchCrete() {
   if (!flags.morphed) { toast('YOU HAVE NO WINGS YET'); return false; }
@@ -6635,7 +6741,7 @@ function watchCrete() {
   if (state === 'warp') toast('TO CRETE');
   return state === 'warp';
 }
-$('newcomer').addEventListener('click', e => { e.stopPropagation(); $('newcomer').blur(); watchCrete(); });
+$('newcomer').addEventListener('click', e => { e.stopPropagation(); $('newcomer').blur(); if (NEWC.P) { if (watchCrete()) CIRC.pending = false; } else if (CIRC.on) birdAuto(''); else circleStart(); });
 for (const ev of ['pointerdown', 'pointerup', 'touchstart']) $('newcomer').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 // what this player is doing, a few times a second
 function netSend(dt) {
@@ -6847,6 +6953,11 @@ function animPeer(P, H, dt, sp) {
   H.group.position.copy(P.pos); H.group.rotation.y = P.yaw;
   faceApply(H, P.face, damp(12, dt));
   const R = H.rig, t = P.form, run = smoothstep(7.5, 14, sp), mv = smoothstep(0.3, 3, sp);
+  { const wetP = t === 'h' && realm === 'over' && P.pos.y < WATER + 0.3 && overHeight(P.pos.x, P.pos.z) < WATER - 1.1;   // in the sea: the tail
+    P.tk = wetP ? Math.min(1, (P.tk || 0) + dt / 0.9) : Math.max(0, (P.tk || 0) - dt / 0.35);
+    if (P.tk > 0 || H.tail.root.visible) { P.tph = (P.tph || 0) + dt * (2.2 + sp * 0.75); tailPose(H, P.tk, P.tph, 0.35 + Math.min(1, sp / 9) * 0.75); }
+    if (P.tk > 0.5) { const pull = smoothstep(0.35, 1, Math.sin(P.tph * 0.5)), mk = smoothstep(0.35, 1.6, sp), ax = lerp(0.6, lerp(3.0, 0.5, pull), mk), az = 0.2 + Math.sin(pull * Math.PI) * 0.8 * mk;
+      R.rotation.set(lerp(-0.2, -1.3 + Math.sin(P.tph) * 0.09, mk), 0, 0); H.armL.rotation.set(ax, 0, -az); H.armR.rotation.set(ax, 0, az); return; } }
   P.ph += sp / lerp(4.6, 8.4, run) * 6.2832 * dt;
   const s1 = Math.sin(P.ph), air = !P.gr && t === 'h';
   if (t === 't') {   // falling: belly to the earth, arms out
@@ -7618,10 +7729,11 @@ function gotFx(m) {
   if (!m || !ok(m.i) || !FX_KINDS[m.k] || !AC) return;
   const P = NET.peers.get(m.i); if (!P || flood(P) || P.realm !== (realm === 'under' ? 1 : 0) || state === 'title') return;
   const x = num(m.x, -1e6, 1e6), y = num(m.y, -2000, 20000), z = num(m.z, -1e6, 1e6), d = Math.hypot(x - player.pos.x, y - player.pos.y, z - player.pos.z);
-  if (d > 170) return;
+  const far = m.c === 1 && P.crete;   // (someone in the opening, watched from the air: heard from much further off)
+  if (d > (far ? 1700 : 170)) return;
   const dx = x - camera.position.x, dz = z - camera.position.z, l = Math.hypot(dx, dz) || 1;
   camera.getWorldDirection(_n); const rx = -_n.z, rz = _n.x, rl = Math.hypot(rx, rz) || 1;
-  audio.at3(x, y, z, FX_KINDS[m.k], { ref: 16, max: 220 });   // (heard from where it happened)
+  audio.at3(x, y, z, FX_KINDS[m.k], far ? { vol: 1.3, ref: 150, max: 2200 } : { ref: 16, max: 220 });   // (heard from where it happened)
 }
 
 // ── speech, carried to whoever is near enough to hear it
@@ -7706,6 +7818,9 @@ const CMD_HELP = [
   ['PEOPLE', '/players · /follow @NAME · /track @NAME · /untrack · /friend @NAME · /mute @NAME · /block @NAME · @NAME calls them'],
   ['SEE', '/map · /map3d · /camera · /snap · /record · /album · /film · /face · /wide'],
   ['YOU', '/name NEW · /become ANIMAL · /god (god mode) · /mortal · /bolt · /burn · /blow'],
+  ['CRETE', '/watch (go and see who is waking on Crete) · /circle (the bird goes round the island by itself and the lens stays on them; steer to take it back)'],
+  ['THE FIGHT', '/warzone end · /challenge end (stop it: for everyone if you called it, for yourself if not) · /again (the same fight once more) · /warzone settings · /warzone set close 120 · speed 1.5 · ring 1800 · floor 300 · /warzone reset'],
+  ['COLOUR', '/vivid (the world in full colour, which is how it comes, or in its plainer colours)'],
   ['HAMLET', '/hamlet (your own AI agents: who lives there, what they are building, the way to it) · /hamlet connect (bring your Claude, Codex and other agents in) · /hamlet key (the key, by hand)'],
   ['FIGHT', '/challenge NAME (or cpu) · /accept · /decline · /warzone · /cpu N (birds that fly themselves) · /warsim N (watch N of them) · /forfeit'],
   ['SET', '/sound on|off · /mic on|off · /hands on|off · /quality up|down · /letters up|down · /clear'],
@@ -7765,16 +7880,19 @@ function chatCommand(text) {
     case 'help': case 'h': case 'commands': case '?': for (const [k, v] of CMD_HELP) sys(`${k} · ${v}`); if (MOD.admin) sys('KEEPER · /agent ANYTHING · /noclip · /speed N · /spawn GOD · /kick NAME · /ban NAME · /ipban NAME · /unban NAME'); return true;
     case 'agent': agentAsk(arg); return true;
     case 'god': case 'godmode': godMode(arg ? !off : !GODM.on); return true; case 'mortal': godMode(false); return true;
-    case 'challenge': case 'duel': matchChallenge(arg); return true;
+    case 'challenge': case 'duel': if (/^(end|stop|quit|leave|off)$/i.test((arg || '').trim())) matchStop(); else if (/^again$/i.test((arg || '').trim())) matchAgain(); else matchChallenge(arg); return true;
+    case 'again': case 'rematch': matchAgain(); return true;
     case 'bird': if (!arg) birdSay(); else if (!birdHear(String(arg).toLowerCase(), String(arg).trim().split(/\s+/).length)) chatLine('', 'IT DOES NOT KNOW THAT ONE · /bird ALONE SAYS WHAT IT DOES', 'sys'); return true;
     case 'pet': if (player.form === 'phoenix') birdPet(1); else chatLine('', 'THERE IS NO BIRD TO STROKE', 'sys'); return true;
     case 'dp': case 'shot': case 'director': if (state === 'play' || state === 'photo') dpHear(arg || 'wide shot', true); return true;
     case 'tour': case 'hermes': if (GFLY.on) gflyEnd(); else if (!tourStart()) chatLine('', player.form === 'phoenix' ? 'NOT NOW' : 'TAKE OFF FIRST · HERMES MEETS YOU IN THE AIR', 'sys'); return true;
     case 'accept': if (MATCH.inv && !MATCH.inv.mine) matchAnswer(true); else sys('NOBODY HAS CHALLENGED YOU'); return true;
     case 'decline': if (MATCH.inv && !MATCH.inv.mine) matchAnswer(false); return true;
-    case 'warzone': case 'war': matchWar(parseInt(arg) || 0); return true;
+    case 'warzone': case 'war': matchCmd(arg); return true;
     case 'cpu': case 'npc': case 'bots': if (MATCH.phase === 'count' && MATCH.host) matchCpu(parseInt(arg) || 3); else if (!MATCH.phase) matchWar(clamp(parseInt(arg) || 3, 1, 12)); else sys('ONLY BEFORE IT STARTS'); return true;
     case 'hamlet': case 'cabin': case 'cabins': agCommand(arg); return true;
+    case 'circle': case 'orbit': circleStart(); return true;
+    case 'vivid': case 'color': case 'colour': case 'colors': case 'colours': { const U = postMat.uniforms.uVib, on = /^(off|0|no|plain)$/i.test(arg || '') ? 0 : /^(on|1|yes)$/i.test(arg || '') ? 1 : U.value > 0.5 ? 0 : 1; U.value = on; try { localStorage.setItem('icarus.vivid', String(on)); } catch {} chatLine('', on ? 'THE WORLD IN FULL COLOUR' : 'THE WORLD IN ITS PLAINER COLOURS · /vivid BRINGS THEM BACK', 'sys'); return true; }
     case 'warsim': matchWar(clamp(parseInt(arg) || 6, 2, 12), true); return true;
     case 'forfeit': case 'yield': if (MATCH.phase === 'live' && MATCH.me.alive) matchOut('gave it up'); else sys('YOU ARE NOT IN A FIGHT'); return true;
     case 'kick': case 'ban': case 'ipban': case 'unban': modOrder(c, arg); return true;
@@ -7883,10 +8001,18 @@ function updateNet(dt) {
 const dir3 = new THREE.Vector3();
 // The bird can come down and stay a bird: it stands on the ground with its wings folded, walks (a run of hops, really),
 // and can do everything he could do on his feet — talk to a god, kindle a fire, go up to an animal — before it goes up again.
+// A bird on the ground is a body, not a point: this much of it, measured from its middle, must be clear of walls, trunks
+// and rock (its breast, its folded wings); and its tail is kept out of them a feather at a time (see updateTails).
+const perchR = () => 1.55 * birdK(), _pz = new THREE.Vector3(), _pq = new THREE.Vector3();
+function perchClear(pos) {   // moved out of whatever it is in, a few times over (a corner takes more than one push)
+  for (let k = 0; k < 5; k++) { _pz.set(0, 0, 0); if (!pushOut(pos, _pz, perchR())) break; }
+}
 function perchLand() {
   const p = player;
-  p.perch = true; p.takeoff = null; p.perchT = 0; p.grounded = true; p.speed = 0; p.vy = 0; p.pitch = 0; p.bank = 0; p.turn = 0;
-  p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * birdK(); p.fallTop = p.pos.y;
+  p.perch = true; p.takeoff = null; p.perchT = 0; p.grounded = true; p.speed = 0; p.vy = 0; p.pitch = 0; p.bank = 0; p.turn = 0; p.perchRoom = 1; p.perchRoomT = 0;
+  p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * birdK(); perchClear(p.pos);
+  p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * birdK(); p.fallTop = p.pos.y; camShake = Math.max(camShake, 0.12 * birdK());
+  if (overHeight(p.pos.x, p.pos.z) < WATER + 1.5) ripple(p.pos.x, p.pos.z, 0.9);
   for (let i = 0; i < 30; i++) emit(p.pos.x + rnd(2), p.pos.y - 0.6, p.pos.z + rnd(2), rnd(4), Math.random() * 3, rnd(4), 0.8, pick(EMBER));
   audio.sfx.land?.(0.4); audio.sfx.perch?.(); toast('ON THE GROUND · AS THE BIRD');
   if (!p.look) scorch(p.pos.x, p.pos.z, 2.4, p.pos.y);   // (where a bird of fire sets down, the grass knows it)
@@ -8034,6 +8160,13 @@ function perchGo(S) {
   const p = player, ty = groundAt(S.x, S.z, S.y + 3) + 0.9 * birdK(), L = Math.hypot(S.x - p.pos.x, ty - p.pos.y, S.z - p.pos.z), hx = S.x - p.pos.x, hz = S.z - p.pos.z, hl = Math.hypot(hx, hz) || 1, in_ = Math.min(L * 0.25, 18);
   p.perchGo = { x: S.x, y: S.y, z: S.z, r: S.r, ty, name: S.name, t: 0, T: clamp(L / Math.max(38, p.speed * 0.6), 1.1, 5), beatT: 0,
     a: p.pos.clone(), b: p.pos.clone().addScaledVector(dir3, L * 0.38), c: new THREE.Vector3(S.x - hx / hl * in_, ty + clamp(L * 0.12, 3, 16), S.z - hz / hl * in_), d: new THREE.Vector3(S.x, ty, S.z) };
+  { const G = p.perchGo, m = 2.2 * birdK();   // if the curve would take him through rock, a wall or the ground, it is lifted until it does not: he comes in over the top
+    const wasOpen = PART.fly; PART.fly = false;   // (the rocks that open for a bird in flight do not open for one coming in to land: they are looked at as stone)
+    for (let lift = 0; lift < 6; lift++) { let hit = false;
+      for (let q = 1; q < 9 && !hit; q++) { const e = q / 10, k = 1 - e; _pq.copy(G.a).multiplyScalar(k * k * k).addScaledVector(G.b, 3 * k * k * e).addScaledVector(G.c, 3 * k * e * e).addScaledVector(G.d, e * e * e);
+        hit = _pq.y < groundAt(_pq.x, _pq.z, _pq.y + 30) + m || realm === 'over' && (ROCKS.cyls.length || ROCKS.boxes.length) && !!stoneHit(_pq.x, _pq.y, _pq.z, m) || !!crownHit?.(_pq.x, _pq.y, _pq.z, m); }
+      if (!hit) break; G.b.y += 14; G.c.y += 14; G.T = Math.min(5.5, G.T + 0.25); }
+    PART.fly = wasOpen; }
   audio.sfx.whoosh?.(false);
 }
 function updatePerchGo(dt) {
@@ -8072,11 +8205,17 @@ function updatePerch(dt) {
   let mx = fx * iz + rx * ix, mz = fz * iz + rz * ix; const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
   const sp = boosting() ? 13 : 6, nx = p.pos.x + mx * sp * dt, nz = p.pos.z + mz * sp * dt, g = groundAt(nx, nz, p.pos.y + 2);
   if (g > WATER + 0.3) { p.pos.x = nx; p.pos.z = nz; }   // (it will not walk into the sea)
-  p.vel.set(mx * sp, 0, mz * sp); pushOut(p.pos, p.vel, 0.9);
+  p.vel.set(mx * sp, 0, mz * sp); pushOut(p.pos, p.vel, perchR());   // (the whole of him stops at a wall, not the middle of him)
   const hop = ml > 0.1 ? Math.abs(Math.sin(time * 9)) * 0.35 : 0;
-  p.pos.y = lerp(p.pos.y, groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + (0.9 + hop) * birdK(), damp(14, dt));   // (a bigger bird stands taller: its feet on the ground, not its belly)
+  // he stands on the ground as it lies: on what is highest under the length of him, tipped the way it slopes
+  const K = birdK(), bx = -Math.sin(p.yaw), bz = -Math.cos(p.yaw), gc = groundAt(p.pos.x, p.pos.z, p.pos.y + 2);
+  const gf = clamp(groundAt(p.pos.x + bx * 1.5 * K, p.pos.z + bz * 1.5 * K, p.pos.y + 2), gc - 1.6 * K, gc + 1.6 * K), gb = clamp(groundAt(p.pos.x - bx * 1.7 * K, p.pos.z - bz * 1.7 * K, p.pos.y + 2), gc - 1.6 * K, gc + 1.6 * K);
+  p.pos.y = lerp(p.pos.y, Math.max(gc, (gf + gb) / 2) + (0.9 + hop) * K, damp(14, dt));   // (a bigger bird stands taller: its feet on the ground, not its belly)
   if (ml > 0.1) p.yaw += wrapAngle(Math.atan2(-mx, -mz) - p.yaw) * damp(9, dt);
-  p.pitch = lerp(p.pitch, 0, damp(6, dt)); p.bank = lerp(p.bank, 0, damp(6, dt)); p.speed = 0; p.vy = 0;
+  p.pitch = lerp(p.pitch, clamp(Math.atan2(gf - gb, 3.2 * K), -0.42, 0.42), damp(6, dt)); p.bank = lerp(p.bank, 0, damp(6, dt)); p.speed = 0; p.vy = 0;
+  if ((p.perchRoomT = (p.perchRoomT || 0) - dt) <= 0) { p.perchRoomT = 0.3;   // is there room to open his wings here? (a wall or a trunk within a wing's length on either side: no)
+    let room = 1; for (const sd of [-1, 1]) { _pq.set(p.pos.x + bz * sd * 4.2 * K, p.pos.y, p.pos.z - bx * sd * 4.2 * K); _pz.set(0, 0, 0); if (pushOut(_pq, _pz, 1.2 * K)) room = 0; }
+    p.perchRoom = room; }
   p.flame = Math.min(1, p.flame + dt / (realm === 'under' ? (UNDER.warm ? 3 : 26) : 14)); p.fallTop = p.pos.y;
   dir3.set(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
   // standing still on a high place he opens his wings to the wind; on a place with a name, the lens draws back and goes slowly round him and the view
@@ -8085,7 +8224,7 @@ function updatePerch(dt) {
     p.perchIdle = ml < 0.1 ? (p.perchIdle || 0) + dt : 0;
     if (L) p.flame = Math.min(1, p.flame + dt / 5); }
   p.perchT = (p.perchT || 0) + dt;
-  const open = Math.max(p.look ? smoothstep(0.5, 1.6, p.perchIdle) : 0, BIRDI.stretch);
+  const open = Math.max(p.look ? smoothstep(0.5, 1.6, p.perchIdle) : 0, BIRDI.stretch) * (p.perchRoom === 0 ? 0.12 : 1);   // (no room: they stay folded)
   flyWings(dt, { boost: false, dive: 0, climb: 0, fold: 1 - open });   // wings folded while he walks or stands; out to the wind on a perch with a name, or stretched now and then
   if (!dragging) camYaw += p.look && p.perchIdle > 1.8 ? dt * 0.09 : p.perchIdle > 7 ? dt * 0.035 * smoothstep(7, 11, p.perchIdle) : wrapAngle(p.yaw - camYaw) * damp(ml > 0.1 ? 1.2 : 0, dt);   // (left alone a while, the lens goes slowly round him)
 }
@@ -10780,7 +10919,7 @@ function setRealm(to, x = player.pos.x, z = player.pos.z, yaw = player.yaw) {
 // Through the sea, either way. It is one country: the Underworld lies under the water, and the way between them is a
 // column of sea he flies through, burning, without ever letting go of the bird. The two halves are kept in different
 // places, and he is carried from one to the other in the dark of the water, where nothing can be seen to move.
-const SEA = { col: 720, up: 55, murk: 0, trans: false, hid: false, fog: new THREE.Color(), top: new THREE.Color('#2f72b8'), deep: new THREE.Color('#07102a') };
+const SEA = { col: 720, up: 55, murk: 0, trans: false, hid: false, fog: new THREE.Color(), top: new THREE.Color('#2f72b8'), deep: new THREE.Color('#061c4c'), bright: new THREE.Color('#2aa6dc') };
 const tintWant = new THREE.Color(1, 1, 1);
 // the nearest water deep enough to come up through, looking outward in rings from straight overhead
 function seaAbove(x, z) {
@@ -10869,7 +11008,7 @@ function updateSub(dt) {
 // what the lens sees of it: under either surface the world closes to a hundred metres of blue, brighter toward the day
 function updateSea(dt) {
   const c = camera.position, under = realm === 'under';
-  if (!under) SEA.top.copy(pal.water).lerp(WHITE_C, 0.12);
+  if (!under) SEA.top.copy(pal.water).lerp(SEA.bright, 0.4 * clamp(pal.sunI / 2.2, 0, 1)).lerp(WHITE_C, 0.1);   // (by day the top of the sea is bright and blue-green from below)
   const camWet = SEA.trans && (under ? c.y > UNDER.ceil : c.y < WATER + 0.2);
   if (SEA.trans && !player.sub && !player.dive && !camWet) SEA.trans = false;
   SEA.murk = camWet ? 1 : lerp(SEA.murk, 0, damp(under ? 2.4 : 10, dt));
@@ -10886,6 +11025,7 @@ function updateSea(dt) {
     if (camWet) for (let i = 0; i < 3; i++) emit(c.x + rnd(34), c.y + rnd(22), c.z + rnd(34), rnd(0.6), 1 + Math.random() * 3, rnd(0.6), 1 + Math.random() * 1.2, [0.22, 0.36, 0.5], 7);
   }
   postMat.uniforms.uTint.value.lerp(tintWant, damp(2.5, dt));
+  postMat.uniforms.uSea.value = SEA.murk;
 }
 
 // Low and fast over water, he tears it open. The wake is the line he flew; the steam is because he is on fire; and past
@@ -12998,16 +13138,73 @@ function paintSandstone(x, y, z, ny, m) {
   if (ny < 0.5 && noise2(x / 19 + z / 23, y / 120) > 0.42) k *= 0.76;   // (where the rain runs down)
   return [r * k, g * k, b * k];
 }
+// ── A rock of the monasteries, drawn finely. Its face is one rule, `towerShape`: how far out the stone stands at each
+//    bearing and height. The plan of it is not round (two or three great buttresses, turning a little as they rise); it
+//    swells or draws in at the waist; water has cut flutes down it from top to bottom; the beds of the stone show as
+//    grooves, each a little crooked; the wind has made hollows in it; and at the top it comes round again, to a worn lip,
+//    because what is built up there stands on a round floor. The same rule draws it, stops a walker at its foot and
+//    holds a climber on its face, so what is seen is what is touched.
+const TOWER = [col('#c7a67a'), col('#ab907a'), col('#d8c19b'), col('#98816c'), col('#bd9668')];   // honey, grey rose, pale, umber, ochre
+function towerShape(R, y0, y1, seed) {
+  const H = y1 - y0, ph = seed * 1.37 % 100, r = mulberry32(seed * 7919 + 13);
+  const a2 = r() * 6.283, a3 = r() * 6.283, a5 = r() * 6.283, k2 = 0.05 + r() * 0.09, k3 = 0.03 + r() * 0.06, belly = (r() - 0.35) * 0.1, tw = (r() - 0.5) * 0.012;
+  const beds = []; for (let y = y0 + 22 + r() * 8; y < y1 - 8; y += 8 + r() * 13) beds.push([y, 0.6 + r() * 0.9, 0.012 + r() * 0.02]);
+  const dents = []; for (let k = 0, n = 3 + Math.floor(r() * 4); k < n; k++) dents.push([r() * 6.283, y0 + H * (0.24 + r() * 0.6), 0.16 + r() * 0.22, 5 + r() * 9, 0.05 + r() * 0.09]);
+  const f = (a, y, out) => {
+    const t = clamp((y - y0) / H, 0, 1), keep = 1 - smoothstep(0.9, 1, t);
+    const s = lerp(1.07, 0.92, Math.pow(t, 0.8)) * (1 + 0.85 * Math.pow(1 - t, 6)) * (1 + belly * Math.sin(Math.PI * t)) * (1 - 0.035 * smoothstep(0.972, 1, t));
+    const lobe = k2 * Math.cos(2 * (a - a2) + tw * (y - y0)) + k3 * Math.cos(3 * (a - a3)) + 0.03 * Math.cos(5 * (a - a5) - tw * 2 * (y - y0)) + 0.07 * noise2(Math.cos(a) * 1.4 + ph, Math.sin(a) * 1.4 + y / 110);
+    const flute = 0.04 * (Math.abs(Math.sin(a * 4.5 + ph + 1.4 * noise2(ph + 9, y / 95))) - 0.62);
+    let bed = 0; for (const b of beds) { const d = Math.abs(y - b[0] - 1.6 * noise2(Math.cos(a) * 1.3 + ph, Math.sin(a) * 1.3 + b[0])) / b[1]; if (d < 1) bed -= b[2] * (1 - d * d); }
+    let dent = 0; for (const D of dents) { const da = wrapAngle(a - D[0]) / D[2], dy = (y - D[1]) / D[3], q = da * da + dy * dy; if (q < 4) dent -= D[4] * Math.exp(-q * 1.6); }
+    const fine = 0.012 * noise2(Math.cos(a) * 13 + ph, Math.sin(a) * 13 + y / 6.5) + 0.008 * noise2(Math.cos(a) * 29 - ph, Math.sin(a) * 29 + y / 2.7);
+    if (out) { out.ao = flute + bed * 1.6 + dent * 1.3 + fine * 1.5; out.t = t; }
+    return R * s * (1 + lobe * keep + (flute + bed + dent) * (0.35 + 0.65 * keep) + fine);
+  };
+  f.ph = ph; return f;
+}
+function paintTower(x, y, z, ny, ao, a, t, ph) {
+  const st = y / 9 + noise2(x / 55, z / 55) * 1.6 + noise2(Math.cos(a) * 2 + ph, Math.sin(a) * 2 + y / 40) * 0.5, i0 = Math.floor(st), e = smoothstep(0.72, 1, st - i0), A = TOWER[((i0 % 5) + 5) % 5], B = TOWER[(((i0 + 1) % 5) + 5) % 5];
+  let r = lerp(A[0], B[0], e), g = lerp(A[1], B[1], e), b = lerp(A[2], B[2], e);
+  const wet = smoothstep(0.36, 0.6, noise2(Math.cos(a) * 6.5 + ph * 3, Math.sin(a) * 6.5 + y / 210)) * smoothstep(0.12, 0.55, t) * 0.72;   // where the rain runs down it, dark, from the top
+  r *= 1 - wet * 0.46; g *= 1 - wet * 0.43; b *= 1 - wet * 0.32;
+  const li = smoothstep(0.5, 0.76, noise2(x / 13 + 40, y / 11 + z / 13)) * 0.3;   // lichen, rust and gold, in patches
+  r = lerp(r, 0.8, li); g = lerp(g, 0.52, li); b = lerp(b, 0.2, li);
+  const gr = Math.max(smoothstep(0.42, 0.8, ny), smoothstep(0.1, 0, t) * 0.55) * 0.78;   // green wherever anything can hold: a ledge, the foot
+  r = lerp(r, 0.29, gr); g = lerp(g, 0.47, gr); b = lerp(b, 0.19, gr);
+  let k = clamp(1 + ao * 4.4, 0.48, 1.16); if (ny < -0.15) k *= 0.6;   // what sits back is in shade; what stands out catches the light
+  return [r * k, g * k, b * k];
+}
+function rockTower(acc, x, z, y0, y1, f) {
+  const SEG = TOUCH ? 30 : 56, STEP = TOUCH ? 6 : 3.2, ys = [], info = {};
+  for (let y = y0; y < y1 - 2; y += STEP) ys.push(y); ys.push(y1 - 1.1, y1 - 0.4, y1);
+  const G = ys.map(y => { const row = []; for (let i = 0; i < SEG; i++) { const a = i / SEG * 6.283, r = f(a, y, info); row.push([x + Math.cos(a) * r, y, z + Math.sin(a) * r, info.ao, a, info.t]); } return row; });
+  const P = acc.pos, N = acc.nor, C = acc.col, J = G.length;
+  // every point takes its facing from how its neighbours lie, and its colour from where it is: no flat faces
+  const V = G.map((row, j) => row.map((q, i) => { const L = row[(i + SEG - 1) % SEG], Rr = row[(i + 1) % SEG], D = G[Math.max(0, j - 1)][i], U = G[Math.min(J - 1, j + 1)][i];
+    const ax = Rr[0] - L[0], az = Rr[2] - L[2], bx = U[0] - D[0], by = U[1] - D[1], bz = U[2] - D[2]; let nx = by * az, ny = bz * ax - bx * az, nz = -by * ax; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    return [nx, ny, nz, paintTower(q[0], q[1], q[2], ny, q[3], q[4], q[5], f.ph)]; }));
+  const put = (j, i) => { const q = G[j][i], v = V[j][i], c = v[3]; P.push(q[0], q[1], q[2]); N.push(v[0], v[1], v[2]); C.push(c[0], c[1], c[2]); if (acc.sway) acc.sway.push(0); if (acc.leg) acc.leg.push(0, 0, 0); };
+  for (let j = 0; j < J - 1; j++) for (let i = 0; i < SEG; i++) { const i1 = (i + 1) % SEG; put(j, i); put(j + 1, i1); put(j, i1); put(j, i); put(j + 1, i); put(j + 1, i1); }
+  // the floor of its top: turf, worn to the stone toward the lip
+  const top = G[J - 1], flat = (px, py, pz, k) => { const m = 0.5 + 0.5 * noise2(px / 6 + 3, pz / 6), c = [lerp(0.33, TOWER[2][0], k) * (0.82 + 0.3 * m), lerp(0.5, TOWER[2][1], k) * (0.82 + 0.3 * m), lerp(0.2, TOWER[2][2], k) * (0.82 + 0.3 * m)]; P.push(px, py, pz); N.push(0, 1, 0); C.push(c[0], c[1], c[2]); if (acc.sway) acc.sway.push(0); if (acc.leg) acc.leg.push(0, 0, 0); };
+  for (let i = 0; i < SEG; i++) { const a = top[i], b = top[(i + 1) % SEG], mx = (q, k) => x + (q[0] - x) * k, mz = (q, k) => z + (q[2] - z) * k;
+    flat(x, y1, z, 0); flat(mx(b, 0.62), y1, mz(b, 0.62), 0.15); flat(mx(a, 0.62), y1, mz(a, 0.62), 0.15);
+    flat(mx(a, 0.62), y1, mz(a, 0.62), 0.15); flat(mx(b, 0.62), y1, mz(b, 0.62), 0.15); flat(b[0], y1, b[2], 0.85); flat(mx(a, 0.62), y1, mz(a, 0.62), 0.15); flat(b[0], y1, b[2], 0.85); flat(a[0], y1, a[2], 0.85); }
+}
 function buildMeteora(S, acc) {
   const r = mulberry32(S.seed), n = 3 + Math.floor(r() * 3), tops = [];
   for (let i = 0; i < n; i++) {
     const a = r() * 6.283, d = i ? 55 + r() * 120 : 0, px = S.x + Math.cos(a) * d, pz = S.z + Math.sin(a) * d, g = overHeight(px, pz); if (g < WATER + 2) continue;
     if (tops.some(t => Math.hypot(t.x - px, t.z - pz) < t.R + 34)) continue;
     const H = 105 + r() * 135 - i * 9, R = 20 + r() * 17 - i * 1.5, top = g + H, N = 8;
-    rockPillar(acc, { x: px, z: pz, y0: g - 12, y1: top - 0.6, R0: R * 1.04, Rt: R * 0.86, seed: S.seed % 997 + i * 13, lean: 0.035 + r() * 0.04, flare: 0.9, crown: 0, paint: paintSandstone });   // the rock: one stone, rooted
-    part(acc, G.islandTop, px, top - 0.9, pz, R * 0.86, 1.4, R * 0.86, SANDST[2]);
+    const face = towerShape(R, g - 12, top, S.seed % 997 + i * 13); r(); r();   // (two numbers the old drawing took: what follows stays where it was)
+    rockTower(acc, px, pz, g - 12, top, face);   // the rock: one stone, rooted
+    { const q = mulberry32(S.seed * 31 + i * 7 + 5);   // what grows in its cracks, hanging out over the drop
+      for (let k = 0, m = TOUCH ? 5 : 11; k < m; k++) { const a = q() * 6.283, y = g + 14 + q() * (H - 24), rr = face(a, y), sz = 1.1 + q() * 1.9; SWAY = [y - sz, 0.2];
+        blob(acc, sz, sz * 0.72, sz, px + Math.cos(a) * (rr + sz * 0.25), y, pz + Math.sin(a) * (rr + sz * 0.25), [0.2 + q() * 0.1, 0.36 + q() * 0.14, 0.14 + q() * 0.06]); } SWAY = null; }
     for (let k = 0; k < 9; k++) { const b = r() * 6.283, d2 = R * (1.15 + r() * 0.9), bx = px + Math.cos(b) * d2, bz = pz + Math.sin(b) * d2, s = 2 + r() * 5; part(acc, G.rock, bx, overHeight(bx, bz) + s * 0.25, bz, s, s * 0.7, s * 1.1, SANDST[k % 4], r() * 6.28, r(), r()); }   // (what has come down off it, half in the grass)
-    ROCKS.cyls.push({ x: px, z: pz, r: R * 0.96, y0: g - 6, y1: top - 0.6, what: 'a rock of the monasteries', S });
+    ROCKS.cyls.push({ x: px, z: pz, r: R * 0.96, y0: g - 6, y1: top - 0.6, what: 'a rock of the monasteries', S, rad: face });
     S.looks.push(lookout(i < 2 ? `THE ${['GREAT', 'UPPER', 'HANGING', 'FAR', 'LEAST'][i]} MONASTERY` : 'A ROCK OF THE MONASTERIES', px, top, pz, R * 0.86, 'over'));
     tops.push({ x: px, z: pz, R, top, i });
     SWAY = [top, 0.045]; if (i < 2 || r() < 0.45) monastery(acc, S, px, top, pz, R * 0.8, r);
@@ -13089,8 +13286,41 @@ function updatePart() {
   PART.fly = realm === 'over' && state === 'play' && p.form === 'phoenix' && !p.perch && !p.perchGo && !p.takeoff && !p.cine;
   if (realm === 'over') { for (const F of BIRDS.L) { if (F.id === 'me' && !PART.fly || F.sp < 9) continue; L.push({ x: F.x, y: F.y, z: F.z, vx: F.vx, vy: F.vy, vz: F.vz, sp: F.sp, hs: F.hs, d: (F.x - c.x) ** 2 + (F.z - c.z) ** 2 }); }
     if (GFLY.on && GFLY.B.sp > 9) { const B = GFLY.B; L.push({ x: B.pos.x, y: B.pos.y, z: B.pos.z, vx: B.vel.x, vy: B.vel.y, vz: B.vel.z, sp: B.sp, hs: 23 * GOD_PHX, d: B.pos.distanceToSquared(c) * 0 + (B.pos.x - c.x) ** 2 + (B.pos.z - c.z) ** 2 }); } }
+  if (PART.test) L.push(PART.test);   // (a bird that is not there, for tests)
   L.sort((a, b) => a.d - b.d);
   for (let i = 0; i < 3; i++) { const F = L[i]; if (!F) { U.uPartV.value[i].w = 0; continue; } U.uPart.value[i].set(F.x, F.y, F.z, F.hs + 5); U.uPartV.value[i].set(F.vx / F.sp, F.vy / F.sp, F.vz / F.sp, clamp(F.sp * 1.2, 190, 1100)); }
+}
+// The same sum on this side of the glass: how far the stone at a point has stood off, for whoever is passing. One who has
+// hold of that stone (climbing it, standing or perched on its top) is carried with the half he is on, and brought back
+// when it closes. He is moved after he has done his own moving and put back before he does it again, so the stone he
+// feels under him is always the stone where it was built.
+const CARRY = { x: 0, z: 0, k: 0, side: [0, 0, 0], told: false }, _cs = { x: 0, z: 0, k: 0 };
+function partShift(x, y, z, o, stick) {
+  o.x = 0; o.z = 0; o.k = 0; const U = PART.u;
+  for (let i = 0; i < 3; i++) { const F = U.uPart.value[i], V = U.uPartV.value[i]; if (V.w <= 0) { if (stick) stick[i] = 0; continue; }
+    let sx = -V.z, sz = V.x; const sl = Math.hypot(sx, sz); if (sl < 0.05) continue; sx /= sl; sz /= sl;
+    const dx = x - F.x, dy = y - F.y, dz = z - F.z, along = dx * V.x + dy * V.y + dz * V.z, lat = dx * sx + dz * sz, up = dy - V.y * along, R = F.w;
+    const open = smoothstep(V.w, V.w * 0.3, along) * smoothstep(-R * 2.4, -R * 0.7, along) * smoothstep(R * 1.75, R * 0.5, Math.abs(up));
+    if (open <= 0.001) { if (stick) stick[i] = 0; continue; }
+    let sd = lat >= 0 ? 1 : -1; if (stick) { if (stick[i]) sd = stick[i]; else stick[i] = sd; }   // (the half he was on when it opened is the half he stays on)
+    const push = R * 1.07 * (1 - smoothstep(R * 1.7, R * 3.6, Math.abs(lat))) * open;
+    o.x += sx * sd * push; o.z += sz * sd * push; o.k = Math.max(o.k, open); }
+  return o;
+}
+function carryOff() { if (CARRY.x || CARRY.z) { player.pos.x -= CARRY.x; player.pos.z -= CARRY.z; CARRY.x = CARRY.z = 0; } }
+function carryOn() {
+  const p = player; CARRY.k = 0;
+  if (realm !== 'over' || PART.fly || (state !== 'play' && state !== 'talk') || p.cine || p.sub || p.dive) return;
+  let on = false; const parts = S => S && (S.kind === 'meteora' || S.kind === 'parthenon');
+  if (p.climb && p.climb.kind === 'stone' && parts(p.climb.surf.ref && p.climb.surf.ref.S)) on = true;
+  else if (p.grounded || p.perch) {
+    for (const c of ROCKS.cyls) { if (!parts(c.S) || p.pos.y < c.y1 - 2.5 || p.pos.y > c.y1 + 18) continue; if ((p.pos.x - c.x) ** 2 + (p.pos.z - c.z) ** 2 < (c.r + 2) ** 2) { on = true; break; } }
+    if (!on) for (const f of ROCKS.floors) { if (!parts(f.S) || p.pos.y < f.top - 1 || p.pos.y > f.top + 22) continue; const ex = p.pos.x - f.x, ez = p.pos.z - f.z; if (Math.abs(ex * f.c - ez * f.s) < f.hw + 1 && Math.abs(ex * f.s + ez * f.c) < f.hd + 1) { on = true; break; } }
+  }
+  if (!on) { CARRY.side[0] = CARRY.side[1] = CARRY.side[2] = 0; return; }
+  partShift(p.pos.x, p.pos.y + 1, p.pos.z, _cs, CARRY.side); if (!_cs.k) return;
+  p.pos.x += _cs.x; p.pos.z += _cs.z; CARRY.x = _cs.x; CARRY.z = _cs.z; CARRY.k = _cs.k;
+  if (_cs.k > 0.25 && !CARRY.told) { CARRY.told = true; audio.sfx.grab?.(false); toast(p.climb ? 'THE ROCK OPENS FOR A BIRD · YOU GO WITH YOUR HALF OF IT' : 'THE ROCK OPENS FOR A BIRD · IT CARRIES YOU'); }
 }
 function rocksMat(part = false) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true });
@@ -13927,11 +14157,15 @@ function torchBuild() {
     torchAdd(x, SUMMIT + 4 - i * 15 - i * i * 0.6, z, 2.8, 'air', 26);
   }
   // the ring: stone round a band of fire, as big as a temple, standing across the way
-  { const d = 34 + 4.5 * 46, cx = EDGE.x + ux * d, cz = EDGE.z + uz * d, cy = SUMMIT - 82, R = 56, acc = Object.assign(newAcc(), { sway: [] }), rk = new THREE.IcosahedronGeometry(1, 0).toNonIndexed(), g = new THREE.Group();   // (every geometry the rocks' material draws carries its 'sway', even when it is all 0)
-    const RG = TORCH.ring = { x: cx, y: cy, z: cz, R, nx: ux, nz: uz, g, light: new THREE.PointLight(0xffb070, 0, 420, 1.6), k: 0 };
+  { const d = 34 + 6.5 * 46, cx = EDGE.x + ux * d, cz = EDGE.z + uz * d, cy = SUMMIT - 126, R = 56, acc = Object.assign(newAcc(), { sway: [] }), rk = new THREE.IcosahedronGeometry(1, 0).toNonIndexed(), g = new THREE.Group();   // (every geometry the rocks' material draws carries its 'sway', even when it is all 0)
+    const RG = TORCH.ring = { x: cx, y: cy, z: cz, R, nx: ux, nz: uz, g, light: new THREE.PointLight(0xffb070, 0, 420, 1.6), k: 0, rocks: [], blazeT: -99, blazeA: 0, blazeK: 0, blazeC: '' };
     for (let k = 0; k < 44; k++) { const a = k / 44 * 6.283, lx = Math.cos(a) * R, ly = Math.sin(a) * R, wx = cx + lx * uz, wz = cz - lx * ux, wy = cy + ly, s = 4.2 + (k % 3) * 0.9;
       const b = 0.38 + 0.06 * Math.sin(k * 1.7); part(acc, rk, wx, wy, wz, s * 1.15, s, s * 1.5, [b * 1.06, b * 0.96, b * 0.86], a, k * 0.7, k * 1.3);
-      ROCKS.cyls.push({ x: wx, z: wz, r: s * 0.9, y0: wy - s, y1: wy + s, what: 'the ring of fire', S: TORCH }); }
+      ROCKS.cyls.push({ x: wx, z: wz, r: s * 0.9, y0: wy - s, y1: wy + s, what: 'the ring of fire', S: TORCH }); RG.rocks.push({ x: wx, y: wy, z: wz, s, a }); }
+    // the fire on its stones: a flame standing on each and one thrown outward from each, and the stone itself lit from inside
+    { const fm = () => new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+      RG.fire = new THREE.InstancedMesh(new THREE.ConeGeometry(0.5, 1, 6).translate(0, 0.5, 0), fm(), 88); RG.ember = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), fm(), 44);
+      for (const m of [RG.fire, RG.ember]) { m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.setColorAt(0, _c1.setRGB(1, 1, 1)); m.instanceColor.setUsage(THREE.DynamicDrawUsage); g.add(m); } }
     ROCKS.mat ||= rocksMat();
     const stone = new THREE.Mesh(accToGeo(acc), ROCKS.mat); g.add(stone);
     const band = RG.band = new THREE.Mesh(new THREE.TorusGeometry(R - 3.5, 2.6, 8, 96), new THREE.MeshBasicMaterial({ color: 0x555555, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
@@ -13961,9 +14195,17 @@ function torchLight(T, house) {
     if (T.kind === 'air' || T.kind === 'path') audio.at3?.(T.x, T.y, T.z, () => { audio.sfx.whoomph?.(); }, { vol: 0.9, ref: 12 * T.k, max: 700 });
   }
 }
+// Someone through the ring (anyone: him, another flier, a god): every stone of it takes fire, from where he passed, round
+// both ways, and burns high for a few breaths. It always burns a little.
+function ringBlaze(house, x, y, z, k = 1) {
+  const R = TORCH.ring; if (!R || !R.rocks) return;
+  R.blazeT = time; R.blazeA = Math.atan2(y - R.y, (x - R.x) * R.nz - (z - R.z) * R.nx); R.blazeK = k; R.blazeC = house || '';
+  if ((camera.position.x - R.x) ** 2 + (camera.position.z - R.z) ** 2 < 2200 * 2200) audio.at3?.(R.x, R.y, R.z, () => { audio.sfx.whoomph?.(); audio.sfx.kindle?.(); }, { vol: 1.2, ref: 60, max: 2200 });
+}
 // through the ring: the fire is his god's now, and everything on the mountain takes it
 function ringPass() {
   const house = PATRON.id, R = TORCH.ring, nm = g => (godById[g]?.name || g).toUpperCase();
+  ringBlaze(house, player.pos.x, player.pos.y, player.pos.z, 1);
   if (!house) { if (time - TORCH.passT > 6) { TORCH.passT = time; toast('THE RING WANTS A GOD’S FIRE · PRAY AT A THRONE FIRST'); } return; }
   const was = torchHouse(), first = !RING_DONE; TORCH.passT = time;
   if (!RING_DONE) { RING_DONE = true; try { localStorage.setItem('icarus.ring', '1'); } catch {} }
@@ -14002,6 +14244,11 @@ function updateTorches(dt) {
       const t = TORCH.side / (TORCH.side - s), qx = lerp(TORCH.prev.x, P.x, t) - R.x, qy = lerp(TORCH.prev.y, P.y, t) - R.y, qz = lerp(TORCH.prev.z, P.z, t) - R.z;
       if (qx * qx + qy * qy + qz * qz < (R.R - 4) ** 2 && time - TORCH.passT > 2) ringPass(); }
     TORCH.side = s || 0.001; TORCH.prev.copy(P); TORCH.has = state === 'play'; }
+  // anyone else through it (another flier, a bird that flies itself): the ring knows
+  { const M = TORCH.sides ||= new Map(); if (M.size > 80) M.clear();
+    for (const F of BIRDS.L) { if (F.id === 'me' || F.id === undefined) continue; const s = (F.x - R.x) * R.nx + (F.z - R.z) * R.nz, was = M.get(F.id);
+      if (was !== undefined && Math.sign(s) !== Math.sign(was) && Math.abs(s - was) < 300 && (F.x - R.x) ** 2 + (F.y - R.y) ** 2 + (F.z - R.z) ** 2 < (R.R + 6) ** 2 && time - R.blazeT > 1) ringBlaze('', F.x, F.y, F.z, 0.85);
+      M.set(F.id, s || 0.001); } }
   // the new flier lights the path torches as he passes, on his way to the ring
   if (!TORCH.lighting && !TORCH.spent && !flags.morphed && PATRON.id && state === 'play' && (P.x - EDGE.x) ** 2 + (P.z - EDGE.z) ** 2 < 60 * 60) torchStart();
   if (TORCH.lighting) {
@@ -14023,6 +14270,18 @@ function updateTorches(dt) {
     if (g) { R.band.material.color.copy(_tcol(g)).multiplyScalar(1.6 * br); R.halo.material.color.copy(_tcol(g)).multiplyScalar(0.14 * br); R.light.color.copy(_tcol(g)); R.light.intensity = (tierIdx === 0 ? 0 : 900) * br; }
     else { R.band.material.color.setRGB(1.5 * br, 0.7 * br, 0.22 * br); R.halo.material.color.setRGB(0.12 * br, 0.05 * br, 0.01); R.light.color.setRGB(1, 0.55, 0.2); R.light.intensity = (tierIdx === 0 ? 0 : 600) * br; }   // (nobody's yet: plain fire, waiting)
     R.band.rotation.z += dt * 0.15;
+    // its stones on fire: always a little, and high for a while after anyone has been through
+    if (R.fire) { const seen = nearM && (c.x - R.x) ** 2 + (c.z - R.z) ** 2 < 2600 * 2600; R.fire.visible = R.ember.visible = seen;
+      if (seen) { const bc = R.blazeC && PATRONS[R.blazeC] ? pcol(R.blazeC) : g ? pcol(g) : [1, 0.5, 0.15], bt = time - R.blazeT; let hot = 0;
+        for (let k = 0; k < R.rocks.length; k++) { const Q = R.rocks[k], u = bt - Math.abs(wrapAngle(Q.a - R.blazeA)) / Math.PI * 0.7, bz = u > 0 ? Math.max(0, 1 - u / 5.5) * Math.min(1, u * 6) * R.blazeK : 0; hot = Math.max(hot, bz);
+          const fl = 0.75 + 0.25 * Math.sin(time * 13 + k * 2.1) * Math.sin(time * 7.7 + k), lv = (0.32 + 0.9 * bz) * fl, ox = Math.cos(Q.a) * R.nz, oy = Math.sin(Q.a), oz = -Math.cos(Q.a) * R.nx;   // (outward from the middle of the ring)
+          _tm.compose(_tp.set(Q.x, Q.y + Q.s * 0.55, Q.z), _tq.identity(), _ts.set(Q.s * (0.75 + 0.6 * bz), Q.s * (1.3 + 5.2 * bz) * fl, Q.s * (0.75 + 0.6 * bz))); R.fire.setMatrixAt(k * 2, _tm);
+          _tq.setFromUnitVectors(UP, _tp.set(ox, oy, oz).normalize()); _tm.compose(_tp.set(Q.x + ox * Q.s * 0.6, Q.y + oy * Q.s * 0.6, Q.z + oz * Q.s * 0.6), _tq, _ts.set(Q.s * (0.6 + 0.5 * bz), Q.s * (0.8 + 4.4 * bz) * fl, Q.s * (0.6 + 0.5 * bz))); R.fire.setMatrixAt(k * 2 + 1, _tm);
+          _c1.setRGB(bc[0] * (0.9 + 2.2 * lv), bc[1] * (0.9 + 2.2 * lv), bc[2] * (0.9 + 2.2 * lv)); R.fire.setColorAt(k * 2, _c1); R.fire.setColorAt(k * 2 + 1, _c1);
+          _tm.compose(_tp.set(Q.x, Q.y, Q.z), _tq.identity(), _ts.setScalar(Q.s * (1.25 + 0.5 * bz))); R.ember.setMatrixAt(k, _tm); R.ember.setColorAt(k, _c1.setRGB(bc[0] * (0.1 + 0.9 * bz), bc[1] * (0.1 + 0.9 * bz), bc[2] * (0.1 + 0.9 * bz)));
+          if (bz > 0.2 && Math.random() < bz * 0.5) emit(Q.x + rnd(Q.s), Q.y + rnd(Q.s), Q.z + rnd(Q.s), ox * 14 + rnd(6), oy * 14 + 4 + rnd(6), oz * 14 + rnd(6), 0.6 + Math.random() * 0.9, Math.random() < 0.35 ? [2.6, 2.3, 1.6] : bc.map(v => v * 2.1), 1.5, 1.4 + Math.random() * 2); }
+        R.fire.instanceMatrix.needsUpdate = R.ember.instanceMatrix.needsUpdate = true; R.fire.instanceColor.needsUpdate = R.ember.instanceColor.needsUpdate = true;
+        R.light.intensity *= 1 + 2.2 * hot; } }
     if (nearM && (c.x - R.x) ** 2 + (c.z - R.z) ** 2 < 1600 * 1600) { const cc = g ? pcol(g) : [1, 0.5, 0.15], n = tierIdx === 0 ? 2 : 5;   // flames licking up off the band all the way round
       for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, lx = Math.cos(a) * (R.R - 3.5), ly = Math.sin(a) * (R.R - 3.5); emit(R.x + lx * R.nz + rnd(1.5), R.y + ly + rnd(1.5), R.z - lx * R.nx + rnd(1.5), rnd(1.5), 3 + Math.random() * 6, rnd(1.5), 0.7 + Math.random() * 0.6, Math.random() < 0.4 ? [2.6, 2.3, 1.6] : cc.map(v => v * 1.9), 3, 1.6 + Math.random() * 2.2); } }
   }
@@ -19084,7 +19343,8 @@ function updateCamera(dt) {
     lookAt.copy(camTarget); camera.lookAt(camTarget);
     camera.fov = lerp(camera.fov, (62 + (p.perch ? 8 * smoothstep(0, 1.6, p.perchT || 0) : 0)) * fovK(), damp(2.2, dt));
   } else {
-    if (!dragging) camYawOff = lerp(camYawOff, 0, damp(1.5, dt));
+    if (!dragging) { let want = 0; if (CIRC.on && BIRD.auto === 'circle') { const T = circleAim(); want = wrapAngle(Math.atan2(-(T.x - p.pos.x), -(T.z - p.pos.z)) - p.yaw); }   // (circling: the lens looks in past the bird at whoever is being watched)
+      camYawOff = lerp(camYawOff, want, damp(1.5, dt)); }
     const y = p.yaw + camYawOff;
     // The faster he goes, the more the camera gets down behind his tail and opens the lens: the bird stays the same size
     // while the world stretches past it. It leans with him, and at full speed it shakes.
@@ -19396,6 +19656,28 @@ function buildCrete() {
   _mat.makeScale(0, 0, 0); for (let i = 0; i < FN; i++) feathers.setMatrixAt(i, _mat);
   return { sc, sky, halo, disc, seaU, feathers, fp, fi: 0 };
 }
+// What the island has in the world that the opening has no time for: olive groves and cypresses between the labyrinth and
+// the cliffs; a village on the rim, white walls and red roofs, looking out to sea; low walls along the edge; and under
+// the cliff a harbour: a mole of stone, boats on their moorings, a light at the end of it.
+function creteDress(g) {
+  const acc = newAcc(), r = mulberry32(4107), C = PRO_C, top = C.y, CZ = 215, R = 430;
+  const rad = a => R * (1 + 0.08 * Math.sin(3 * a + 1) + 0.05 * Math.sin(7 * a) + 0.03 * Math.sin(13 * a + 2));
+  const white = [0.95, 0.92, 0.85], roof = [0.74, 0.3, 0.2], olive = [0.38, 0.47, 0.27], cyp = [0.15, 0.28, 0.17], trunk = [0.3, 0.24, 0.18], stone = [0.72, 0.68, 0.58], wood = [0.42, 0.3, 0.2], clear = (x, z) => Math.hypot(x - C.x, z - C.z) > 222;
+  for (let i = 0, n = TOUCH ? 70 : 170; i < n; i++) { const a = r() * 6.283, d = (0.5 + r() * 0.44) * rad(a), x = Math.cos(a) * d, z = CZ + Math.sin(a) * d; if (!clear(x, z)) continue;
+    if (r() < 0.72) { const sz = 2.2 + r() * 1.9; box(acc, 0.35, sz * 0.9, 0.35, x, top + sz * 0.45, z, trunk); blob(acc, sz * 1.15, sz * 0.8, sz * 1.15, x, top + sz * 1.15, z, [olive[0] * (0.85 + r() * 0.3), olive[1] * (0.85 + r() * 0.3), olive[2]]); }
+    else part(acc, G.shard, x, top, z, 1.1, 8 + r() * 6, 1.1, cyp); }
+  for (let i = 0; i < 18; i++) { const a = 2.1 + i * 0.15 + r() * 0.05, d = (0.76 + (i % 3) * 0.07) * rad(a), x = Math.cos(a) * d, z = CZ + Math.sin(a) * d, w = 6 + r() * 4, h = 3.2 + r() * 2.4, yw = -a + (r() - 0.5) * 0.5; if (!clear(x, z)) continue;
+    box(acc, w, h, w * 0.8, x, top + h / 2, z, white, 0, yw, 0); for (const sd of [-1, 1]) box(acc, w * 1.08, 0.3, w * 0.5, x, top + h + 0.55, z, roof, sd * 0.4, yw, 0);
+    box(acc, 0.9, 1.7, 0.14, x + Math.sin(yw) * w * 0.41, top + 0.85, z + Math.cos(yw) * w * 0.41, [0.2, 0.32, 0.55], 0, yw, 0); }
+  for (let i = 0; i < 64; i++) { if (i % 8 === 3) continue; const a = i / 64 * 6.283, d = rad(a) * 0.975, x = Math.cos(a) * d, z = CZ + Math.sin(a) * d; box(acc, 2 * 3.1416 * d / 64 * 1.04, 1.1, 0.7, x, top + 0.55, z, i % 2 ? stone : [0.78, 0.74, 0.64], 0, -a + Math.PI / 2, 0); }   // the wall along the edge, with gaps to look out through
+  { const a = 4.25, cs = Math.cos(a), sn = Math.sin(a), d0 = rad(a) * 1.22, at = (d, o) => [cs * d - sn * o, CZ + sn * d + cs * o];
+    { const [x, z] = at(d0 + 46, 0); box(acc, 96, 3, 8, x, 0.7, z, stone, 0, -a, 0); } { const [x, z] = at(d0 + 92, 14); box(acc, 8, 3, 36, x, 0.7, z, stone, 0, -a, 0); }   // the mole, and its elbow
+    { const [x, z] = at(d0 + 92, 30); box(acc, 5, 15, 5, x, 9.5, z, white, 0, -a, 0); box(acc, 6, 1, 6, x, 17.5, z, roof, 0, -a, 0); box(acc, 2.6, 2.6, 2.6, x, 19.2, z, [1, 0.86, 0.5], 0, -a, 0); part(acc, G.shard, x, 20.4, z, 2.4, 2.6, 2.4, roof); CRETE.lamp = { x, y: 19.2, z }; }   // the light
+    for (let i = 0; i < 7; i++) { const [x, z] = at(d0 + 16 + i * 11 + r() * 4, (i % 2 ? 1 : -1) * (9 + r() * 5) + 14), yw = -a + (r() - 0.5) * 0.8;
+      box(acc, 7.5, 1.3, 2.5, x, 0.5, z, wood, 0, yw, 0); box(acc, 0.2, 6.4, 0.2, x, 3.8, z, wood); if (i % 3) box(acc, 0.12, 4.2, 2.8, x, 4.4, z, [0.95, 0.93, 0.88], 0, yw + 0.3, 0); } }
+  const m = new THREE.Mesh(accToGeo(acc), new THREE.MeshLambertMaterial({ vertexColors: true })); m.castShadow = m.receiveShadow = true; g.add(m);
+  if (CRETE.lamp) { const L = new THREE.PointLight(0xffd890, 0, 260, 1.6); L.position.set(CRETE.lamp.x, CRETE.lamp.y, CRETE.lamp.z); g.add(L); CRETE.light = L; }
+}
 // the same island, stood in the world: everything of it but its own sky, sun and sea
 function creteWorld() {
   if (CRETE.group) return;
@@ -19403,6 +19685,7 @@ function creteWorld() {
   for (const o of [...B.sc.children]) { if (o.isLight || o === B.sky || o === B.halo || o === B.disc || o === B.feathers || o.material?.isShaderMaterial) { o.geometry?.dispose(); o.material?.dispose?.(); continue; } g.add(o); }
   g.position.set(CRETE.x - PRO_C.x, WATER, CRETE.z - PRO_C.z); g.updateMatrixWorld(true);
   const b = new THREE.Box3().setFromObject(g); CRETE.R = Math.max(b.max.x - CRETE.x, CRETE.x - b.min.x, b.max.z - CRETE.z, CRETE.z - b.min.z);
+  creteDress(g);
   g.visible = realm === 'over'; scene.add(g);
   lookout('THE TOWER OF DAEDALUS', CRETE.x, WATER + PRO_C.y + 50.6, CRETE.z, 8.6, 'over');
   lookout('CRETE · THE LABYRINTH', CRETE.x, WATER + PRO_C.y + 0.4, CRETE.z, 190, 'over');
@@ -19450,11 +19733,15 @@ function proSkip() {
 // The player's one input over Crete: Space (or a finger on the glass). On the tower it is the jump. Over the sea it is
 // up — held, or beaten again and again like a wing — and the story only goes on while he is going up: nobody makes him
 // fly too high but the person holding it.
+function proFx(k) {   // (to anyone watching from the air: where he is on Crete, and what was just heard there)
+  if (!NET.on || !NET.ch || !pro.netL) return; const now = performance.now(); if (now - (pro.fxT || 0) < 220) return; pro.fxT = now;
+  NET.ch.send({ type: 'broadcast', event: 'fx', payload: { i: NET.id, k, x: Math.round(pro.netL.x), y: Math.round(pro.netL.y), z: Math.round(pro.netL.z), c: 1 } });
+}
 function proPress(down) {
   if (!pro.on) return;
   if (down) pro.sayPress = true;
   if (down) {
-    if (!pro.jumped && pro.t >= 2.0) { pro.jumped = true; audio.sfx.jump(); }
+    if (!pro.jumped && pro.t >= 2.0) { pro.jumped = true; audio.sfx.jump(); proFx('jump'); }
     else if (pro.pov && !pro.falling) proBeat(true);
   }
   pro.held = !!down;
@@ -19463,6 +19750,7 @@ function proPress(down) {
 // keeps beating, but slower than a hand that keeps at it). Each beat lifts him and gives him a little way; without them he
 // sinks toward the sea and the story waits for him.
 function proBeat(hand) {
+  proFx('flap');
   if (pro.rt - (pro.lastBeat ?? -9) < (hand ? 0.2 : 0.5)) return;
   if (pro.dead > 0) return;
   pro.lastBeat = pro.rt; pro.e = Math.min(1, (pro.e || 0) + (hand ? 0.36 : 0.3)); pro.lift = (pro.lift || 0) + (hand ? 5.4 : 4.6); pro.speed = Math.min(95, pro.speed + (hand ? 7 : 6)); pro.imp = 1; pro.stroke = 1; pro.told |= 1;
@@ -19670,7 +19958,7 @@ function updatePrologue(dt) {
       // the places he can be put back to, as he gets further
       { const marks = [12.2, 16.8]; if (pro.ckI < marks.length && t >= marks[pro.ckI] && alt > 50) { pro.ckI++; pro.ck = { x: pro.pos.x, y: Math.max(alt, pro.dY - 8), z: pro.pos.z, yaw: pro.yaw, t, base: null }; } }
     } else {
-      if (!pro.falling) { pro.falling = true; pro.vy = Math.min(pro.vy, 14); audio.sfx.wingsFail(); }
+      if (!pro.falling) { pro.falling = true; pro.vy = Math.min(pro.vy, 14); audio.sfx.wingsFail(); proFx('swoop'); }
       pro.vy = Math.max(pro.vy - 46 * dt, -150); pro.speed = lerp(pro.speed, 5, damp(0.9, dt));
       pro.pitch = lerp(pro.pitch, -1.2, damp(1.5, dt)); pro.roll += dt * 0.55;
       _v.set(-Math.sin(pro.yaw) * pro.speed, pro.vy, -Math.cos(pro.yaw) * pro.speed);
@@ -20364,7 +20652,7 @@ $('title').addEventListener('pointerdown', e => { if (e.target.closest('#nameRow
 for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) $('title').addEventListener(ev, () => titlePress(false));
 $('goBtn').addEventListener('click', e => { e.stopPropagation(); nameAsked = true; begin(); });
 $('flyBtn').addEventListener('click', e => { e.stopPropagation(); nameAsked = true; begin(); });
-$('matchAsk').addEventListener('click', e => { e.stopPropagation(); matchAnswer(true); });
+$('matchAsk').addEventListener('click', e => { e.stopPropagation(); if (MATCH.inv && !MATCH.inv.mine) matchAnswer(true); else if (MATCH.againUntil) matchAgain(); });
 for (const ev of ['pointerdown', 'pointerup', 'touchstart']) $('matchAsk').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 $('signRow').addEventListener('click', e => { e.stopPropagation(); authShow(true); });
 $('authBox').addEventListener('click', e => { e.stopPropagation(); if (e.target === $('authBox')) authShow(false); });
@@ -21304,6 +21592,7 @@ function frame() {
 }
 function tick(dt) {
   time += dt;
+  carryOff();   // (back to where the stone he is on was built: he does his own moving from there)
   if (state === 'prologue') return updatePrologue(dt);
   if (pro.waitMic) { pro.waitMic = false; $('primer').classList.remove('on'); }   // (the voice is only ever asked for over the black before the story)
   if (flags.flapHintT > 0) flags.flapHintT -= dt;
@@ -21326,6 +21615,8 @@ function tick(dt) {
   else if (state === 'photo') { if (photo.live && player.form === 'phoenix' && !player.perch && !player.sub) flyWings(dt, { boost: false, dive: 0, climb: 0.7 }); }   // (held in the air where he was, wings beating)
   else if (state === 'end') updateEnding(dt);
   else if (state === 'warp') updateWarp(dt);
+  carryOn();    // (and then to where it has stood off to, if a bird is passing through it)
+  updateTail(dt);
   updateGodDirector(dt);
   updateCinemaState(dt);
   if (state === 'title') updateTitle(dt);
@@ -21574,7 +21865,7 @@ function birdStep(dt) {
   M.t += dt; M.clear = 5 * K;
   if (!M.mv || M.mv.done) {
     if (M.mv && TRICK_K.has(M.mv.k)) { M.pitch = wrapAngle(M.pitch); M.roll = wrapAngle(M.roll); }
-    if (!M.q.length) { if (BIRD.auto === 'tour') menuPlan(); else if (BIRD.auto === 'cruise') M.q.push({ k: 'cruise', t: 0 }); else { birdAuto('', 'YOURS AGAIN'); return false; } }
+    if (!M.q.length) { if (BIRD.auto === 'tour') menuPlan(); else if (BIRD.auto === 'cruise') M.q.push({ k: 'cruise', t: 0 }); else if (BIRD.auto === 'circle') M.q.push({ k: 'circle', t: 0 }); else { birdAuto('', 'YOURS AGAIN'); return false; } }
     M.mv = M.q.shift(); M.mv.t = 0; M.mv.done = false; if (M.mv.what) toast(M.mv.what);
     if (M.mv.k === 'cruise') { BIRD.hd = M.yaw; if (!BIRD.alt) BIRD.alt = P.y; }
   }
@@ -21584,6 +21875,10 @@ function birdStep(dt) {
     BIRD.alt = clamp(BIRD.alt, floor, roof);
     const turn = clamp(wrapAngle(BIRD.hd - M.yaw) * 1.4, -0.8, 0.8); M.yaw += turn * dt; M.roll = lerp(M.roll, clamp(turn * 1.5, -1.0, 1.0), damp(2.6, dt));
     M.pitch = lerp(M.pitch, clamp((BIRD.alt - P.y) / 160, -0.55, 0.5), damp(1.8, dt)); M.speed = lerp(M.speed, BIRD.v, damp(0.9, dt));
+  } else if (M.mv.k === 'circle') {   // round and round what there is to see, a wing down toward it
+    const T = circleAim(), a = Math.atan2(P.x - T.x, P.z - T.z) + 0.34, tx = T.x + Math.sin(a) * CIRC.r, tz = T.z + Math.cos(a) * CIRC.r;
+    const turn = clamp(wrapAngle(Math.atan2(-(tx - P.x), -(tz - P.z)) - M.yaw) * 1.6, -0.9, 0.9); M.yaw += turn * dt; M.roll = lerp(M.roll, clamp(turn * 1.4 + 0.22, -1.0, 1.0), damp(2.6, dt));
+    const alt = clamp(T.y + CIRC.h, menuSafe(P) + 40 * K, menuRoof(P.x, P.z) - 30); M.pitch = lerp(M.pitch, clamp((alt - P.y) / 160, -0.5, 0.45), damp(1.8, dt)); M.speed = lerp(M.speed, 50, damp(0.9, dt));
   } else menuMove(M.mv, dt);
   const cp = Math.cos(M.pitch);
   dir3.set(-Math.sin(M.yaw) * cp, Math.sin(M.pitch), -Math.cos(M.yaw) * cp);
@@ -21964,7 +22259,7 @@ function updateTron(dt) {
   // everyone's: what is too old goes out from the far end (in a duel, nothing does until it is over)
   const now = performance.now();
   for (const T of TRON.trails.values()) {
-    if (!T.match) { while (T.start < T.n - 1 && time - T.at[T.start] > TRON.life) T.start++; }
+    if (!T.match) { const life = T.sign ? 150 : TRON.life; while (T.start < T.n - 1 && time - T.at[T.start] > life) T.start++; }
     const left = T.n - 1 - T.start; T.geo.setDrawRange(T.start * 6, Math.max(0, left * 6)); T.mesh.visible = left > 0 && realm === 'over';
     if (T.id !== NET.id) { const P = NET.peers.get(T.id); if (P && P.gm && !P.tpSeen && P.form === 'p' && P.s && now - P.s.t < 4000) tronLay(T, P.pos.x, P.pos.y, P.pos.z);   // (one who does not tell us theirs: laid where we see them)
       if (left <= 0 && (!P || !P.gm)) { tronDrop(T.id); continue; } }
@@ -22265,6 +22560,49 @@ async function agCommand(arg) {
 //    birds that fly themselves, and /warsim N sets N of them at each other to be watched.
 const MATCH = { id: '', kind: '', phase: '', t0: 0, lock: 0, over: 0, roster: new Map(), me: { alive: false, in: false }, cx: MOUNT.x, cz: MOUNT.z + 6, R: 1200, R0: 1200, R1: 300, shrink: 240, outT: 0,
   ring: null, inv: null, watch: '', cpus: [], host: false, big: '', bigT: 0, placed: false, slot: null, prev: new THREE.Vector3(), has: false, back: null, win: '', sim: false, endSent: false, cool: 0 };
+// How a fight is set, by whoever calls it (and sent with the call, so it is the same fight for everyone in it): how long the
+// ring takes to close, how fast everything flies, how wide the ring is when it starts and when it has closed.
+const WAR_DEF = { close: 240, speed: 1, ring: 1500, floor: 320 }, WAR_LIM = { close: [40, 900], speed: [0.6, 2], ring: [600, 3200], floor: [150, 1200] };
+const warCfg = c => { const o = {}; for (const k in WAR_DEF) { const v = c && c[k] != null ? +c[k] : NaN; o[k] = Number.isFinite(v) ? clamp(v, WAR_LIM[k][0], WAR_LIM[k][1]) : WAR_DEF[k]; } o.floor = Math.min(o.floor, o.ring * 0.8); return o; };
+MATCH.cfg = warCfg((() => { try { return JSON.parse(localStorage.getItem('icarus.warcfg') || 'null'); } catch { return null; } })());
+Object.assign(MATCH, { spd: 1, hostId: '', lastOut: null, fin: null, overFor: 6500, againUntil: 0, last: null, kills: 0, liveAt: 0 });
+const warSay = c => `THE RING CLOSES IN ${Math.round(c.close)} S · SPEED ×${(+c.speed).toFixed(2).replace(/0$/, '')} · RING ${Math.round(c.ring)} M DOWN TO ${Math.round(c.floor)} M`;
+function matchCmd(arg) {
+  const sys = t => chatLine('', t, 'sys'), w = String(arg || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!w.length || /^\d+$/.test(w[0])) return matchWar(parseInt(w[0]) || 0);
+  if (/^(end|stop|quit|leave|off)$/.test(w[0])) return matchStop();
+  if (w[0] === 'again') return matchAgain();
+  if (w[0] === 'settings' || w[0] === 'set' && w.length === 1) return sys(warSay(MATCH.cfg) + ' · /warzone set close 120 · speed 1.5 · ring 1800 · floor 300 · /warzone reset');
+  if (w[0] === 'reset' || w[0] === 'default') { MATCH.cfg = warCfg(null); try { localStorage.removeItem('icarus.warcfg'); } catch {} return sys('AS IT WAS · ' + warSay(MATCH.cfg)); }
+  const words = w[0] === 'set' ? w.slice(1) : w, c = { ...MATCH.cfg }; let any = false;
+  const named = { fast: { close: 110 }, slow: { close: 420 }, quick: { close: 110 }, long: { close: 420 }, wide: { ring: 2400 }, tight: { ring: 900, floor: 220 } };
+  for (let i = 0; i < words.length; i++) { const k = { close: 'close', closes: 'close', shrink: 'close', time: 'close', speed: 'speed', fast: null, ring: 'ring', size: 'ring', radius: 'ring', floor: 'floor', end: 'floor', min: 'floor' }[words[i]], v = parseFloat(words[i + 1]);
+    if (k && Number.isFinite(v)) { c[k] = v; any = true; i++; } else if (named[words[i]]) { Object.assign(c, named[words[i]]); any = true; } }
+  if (!any) return sys('/warzone set close 120 · speed 1.5 · ring 1800 · floor 300 (any of them) · /warzone settings · /warzone reset');
+  MATCH.cfg = warCfg(c); try { localStorage.setItem('icarus.warcfg', JSON.stringify(MATCH.cfg)); } catch {}
+  sys('THE NEXT FIGHT YOU CALL · ' + warSay(MATCH.cfg));
+}
+// stop it: whoever called it stops it for everyone; anyone else walks out of it
+function matchStop() {
+  const sys = t => chatLine('', t, 'sys'), M = MATCH;
+  if (!M.phase) { if (M.inv && M.inv.mine) { M.inv = null; return sys('THE CHALLENGE IS WITHDRAWN'); } return sys('NOTHING IS BEING FOUGHT'); }
+  if (M.host) { matchSend({ k: 'stop', id: M.id }); return matchStopped(heroName); }
+  if (M.me.alive && M.phase === 'live') { M.me.alive = false; matchSend({ k: 'out', id: M.id, by: 'gave it up' }); matchSetOut(NET.id, 'gave it up', true); }
+  sys(`YOU HAVE LEFT THE ${M.kind === 'duel' ? 'DUEL' : 'WARZONE'}`); matchLeave(); MATCH.againUntil = 0; $('matchAsk').classList.remove('on');
+}
+function matchStopped(by) {
+  const line = `${by} HAS ENDED THE ${MATCH.kind === 'duel' ? 'DUEL' : 'WARZONE'}`; chatLine('', line, 'sys'); toast(line);
+  matchLeave(); MATCH.cool = performance.now() + 3000;
+}
+// the same fight once more
+function matchAgain() {
+  const sys = t => chatLine('', t, 'sys'), L = MATCH.last; MATCH.againUntil = 0; if (!MATCH.inv) $('matchAsk').classList.remove('on');
+  if (MATCH.phase) return sys('IT IS STILL GOING · /warzone end STOPS IT');
+  if (!L) return sys('NOTHING TO FIGHT AGAIN YET · /warzone OR /challenge NAME');
+  MATCH.cool = 0;
+  if (L.kind === 'duel') return matchChallenge(L.vs || 'cpu');
+  matchWar(L.cpus || 0, L.sim);
+}
 const CPU_NAMES = ['THESEUS', 'ATALANTA', 'PERSEUS', 'MEDEA', 'AJAX', 'CIRCE', 'ORPHEUS', 'HECTOR', 'ARIADNE', 'JASON', 'ELECTRA', 'NIOBE', 'DIOMEDES', 'CASSANDRA', 'ACHILLES', 'PENELOPE'];
 const matchSend = m => { if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'match', payload: { i: NET.id, n: heroName, ...m } }); };
 const matchAlive = () => { let n = 0; for (const r of MATCH.roster.values()) if (r.alive) n++; return n; };
@@ -22278,7 +22616,7 @@ function matchChallenge(arg) {
   if (MATCH.phase) return sys('ONE FIGHT AT A TIME');
   if (!matchFree()) return sys(flags.morphed ? 'NOT NOW' : 'YOU HAVE TO HAVE FLOWN FIRST');
   if (!arg || n === 'SOMEONE') return sys('/challenge NAME · or /challenge cpu');
-  if (n === 'CPU' || n === 'NPC') { const id = 'd' + Math.random().toString(36).slice(2, 8); matchGo({ id, kind: 'duel', t0: Date.now() + 4600 + miLen('duel'), ids: [NET.id], names: [heroName], host: NET.id }, true); matchCpu(1); return; }
+  if (n === 'CPU' || n === 'NPC') { const id = 'd' + Math.random().toString(36).slice(2, 8); matchGo({ id, kind: 'duel', t0: Date.now() + 4600 + miLen('duel'), ids: [NET.id], names: [heroName], host: NET.id, cfg: MATCH.cfg }, true); matchCpu(1); MATCH.last = { kind: 'duel', vs: 'cpu' }; return; }
   const P = peerNamed(n.toLowerCase()); if (!P || !P.s) return sys(`NOBODY CALLED ${n} IS FLYING`);
   if (P.ma) return sys(`${P.name} IS ALREADY FIGHTING`);
   MATCH.inv = { id: 'd' + Math.random().toString(36).slice(2, 8), to: P.id, name: P.name, until: performance.now() + 22000, mine: true };
@@ -22296,8 +22634,8 @@ function matchWar(cpus = 0, sim = false) {
   if (!sim && !matchFree()) return sys(flags.morphed ? 'NOT NOW' : 'YOU HAVE TO HAVE FLOWN FIRST');
   if (sim && (state !== 'play' || realm !== 'over')) return sys('NOT NOW');
   if (performance.now() < MATCH.cool) return sys(`THE WARZONE IS RESTING · ${Math.ceil((MATCH.cool - performance.now()) / 1000)} S`);
-  const m = { k: 'go', id: 'w' + Math.random().toString(36).slice(2, 8), kind: 'war', t0: Date.now() + (sim || cpus && !NET.count ? 5000 : 10000) + miLen('war'), ids: [], names: [], host: NET.id };
-  matchSend(m); matchGo({ ...m, i: NET.id, n: heroName }, true, sim); if (cpus > 0) matchCpu(cpus);
+  const m = { k: 'go', id: 'w' + Math.random().toString(36).slice(2, 8), kind: 'war', t0: Date.now() + (sim || cpus && !NET.count ? 5000 : 10000) + miLen('war'), ids: [], names: [], host: NET.id, cfg: MATCH.cfg };
+  matchSend(m); matchGo({ ...m, i: NET.id, n: heroName }, true, sim); if (cpus > 0) matchCpu(cpus); MATCH.last = { kind: 'war', cpus, sim };
 }
 // it is on: the count begins
 function matchGo(m, mine = false, sim = false) {
@@ -22307,7 +22645,11 @@ function matchGo(m, mine = false, sim = false) {
   const t0 = clamp(+m.t0 || 0, Date.now() + 1500, Date.now() + 32000);
   Object.assign(MATCH, { id: m.id, kind, phase: 'count', t0, lock: Math.max(Date.now() + 600, t0 - 3000 - miLen(kind)), intro: false, order: null, over: 0, host: m.host === NET.id, placed: false, win: '', sim, endSent: false, outT: 0, has: false, watch: '', back: null, cpus: [] });
   MATCH.roster.clear(); MATCH.me.alive = false; MATCH.me.in = false;
-  MATCH.R0 = kind === 'duel' ? 1000 : 1500; MATCH.R1 = kind === 'duel' ? 260 : 320; MATCH.shrink = kind === 'duel' ? 150 : 240; MATCH.R = MATCH.R0;
+  { const c = warCfg(m.cfg), dk = kind === 'duel';   // (a duel is the same fight in a smaller ring, closing sooner)
+    MATCH.R0 = dk ? c.ring * 2 / 3 : c.ring; MATCH.R1 = dk ? Math.min(c.floor * 0.8, MATCH.R0 * 0.8) : c.floor; MATCH.shrink = dk ? c.close * 0.625 : c.close; MATCH.spd = c.speed; MATCH.R = MATCH.R0;
+    MATCH.hostId = typeof m.host === 'string' ? m.host : ''; MATCH.lastOut = null; MATCH.fin = null; MATCH.overFor = 6500; MATCH.kills = 0; MATCH.againUntil = 0; if (!MATCH.inv) $('matchAsk').classList.remove('on');
+    if (!mine && (kind === 'war' || ids.includes(NET.id))) MATCH.last = kind === 'war' ? { kind: 'war', cpus: 0 } : { kind: 'duel', vs: cleanName(m.n) };
+    if (JSON.stringify(c) !== JSON.stringify(WAR_DEF)) chatLine('', warSay(c), 'sys'); }
   if (kind === 'duel') { ids.forEach((id, k) => MATCH.roster.set(id, { id, name: cleanName((m.names || [])[k]) || matchName(id), alive: true })); MATCH.me.in = MATCH.roster.has(NET.id); }
   else if (!sim && matchFreeNow()) { MATCH.roster.set(NET.id, { id: NET.id, name: heroName, alive: true }); MATCH.me.in = true; if (!mine) matchSend({ k: 'join', id: m.id }); else setTimeout(() => MATCH.id === m.id && matchSend({ k: 'join', id: m.id }), 300); }
   if (kind === 'war') { toast(mine ? 'THE WARZONE IS CALLED' : `${cleanName(m.n)} CALLS THE WARZONE`); audio.sfx.thunder?.(); }
@@ -22321,12 +22663,13 @@ function gotMatch(m) {
     MATCH.inv = { id: m.id, from: m.i, name: nm, until: performance.now() + 20000 }; const el = $('matchAsk'); el.textContent = `${nm} CHALLENGES YOU · ${TOUCH ? 'TAP' : 'CLICK'} TO FIGHT`; el.classList.add('on'); audio.sfx.newcomer?.(); chatLine('', `${nm} CHALLENGES YOU · /accept OR /decline`, 'sys'); return; }
   if (m.k === 'acc' || m.k === 'dec') { const I = MATCH.inv; if (!I || !I.mine || I.id !== m.id || m.i !== I.to) return; MATCH.inv = null;
     if (m.k === 'dec') { toast(`${I.name} WILL NOT FIGHT`); return; }
-    const g = { k: 'go', id: I.id, kind: 'duel', t0: Date.now() + 5000 + miLen('duel'), ids: [NET.id, I.to], names: [heroName, I.name], host: NET.id }; matchSend(g); matchGo(g, true); return; }
+    const g = { k: 'go', id: I.id, kind: 'duel', t0: Date.now() + 5000 + miLen('duel'), ids: [NET.id, I.to], names: [heroName, I.name], host: NET.id, cfg: MATCH.cfg }; matchSend(g); matchGo(g, true); MATCH.last = { kind: 'duel', vs: I.name }; return; }
   if (m.k === 'go') return matchGo(m);
   if (m.id !== MATCH.id) return;
   if (m.k === 'join' && MATCH.kind === 'war' && MATCH.phase === 'count' && Date.now() < MATCH.lock) { const list = m.cpu && Array.isArray(m.cpu) ? m.cpu.slice(0, 16) : [[m.i, nm]];
     for (const [id, name] of list) if (typeof id === 'string' && id.length < 40 && MATCH.roster.size < 24 && !MATCH.roster.has(id)) MATCH.roster.set(id, { id, name: cleanName(name), alive: true, cpu: !!m.cpu }); return; }
   if (m.k === 'out') return matchSetOut(typeof m.who === 'string' && MATCH.roster.get(m.who)?.cpu ? m.who : m.i, String(m.by || '').slice(0, 24), false);   // (a bird that flies itself is told out by whoever is flying it)
+  if (m.k === 'stop' && m.i === MATCH.hostId) return matchStopped(nm);
   if (m.k === 'end' && MATCH.phase === 'live') matchEnd(typeof m.win === 'string' ? m.win : '');
 }
 // birds that fly themselves (kept and flown by whoever asked for them, and told to everyone)
@@ -22475,6 +22818,8 @@ function matchSetOut(id, by, mine) {
   const r = MATCH.roster.get(id); if (!r || !r.alive || MATCH.phase !== 'live') return; r.alive = false;
   const me = id === NET.id, P = me ? null : NET.peers.get(id), at = me ? player.pos : P?.pos;
   if (at) matchBoom(at.x, at.y, at.z, matchCol(id), bigName(r.name));
+  MATCH.lastOut = { x: at ? at.x : MATCH.cx, y: at ? at.y : SUMMIT + 200, z: at ? at.z : MATCH.cz, name: r.name, by, col: matchCol(id), K: bigName(r.name) };
+  if (!me && MATCH.me.in && by === `${heroName}’s fire`) { MATCH.kills++; warStat().kills++; toast(`${r.name} FLEW INTO YOUR FIRE`); }
   const line = `${r.name} IS OUT${by ? ' · ' + by.toUpperCase() : ''} · ${matchAlive()} LEFT`; chatLine('', line, 'sys'); if (!me) toast(line);
   if (MATCH.watch === id) MATCH.watch = '';
   const C = MATCH.cpus.find(c => c.id === id); if (C) { C.alive = false; cpuShow(C, false); }
@@ -22485,6 +22830,8 @@ function matchOut(by = '') {
   matchSend({ k: 'out', id: MATCH.id, by }); matchSetOut(NET.id, by, true);
   MATCH.deadAt = performance.now(); MATCH.deadPos = (MATCH.deadPos || new THREE.Vector3()).copy(player.pos); MATCH.deadYaw = player.yaw;
   matchBig('OUT', 1900); STATS.d.deaths++;
+  { const W = warStat(), secs = (performance.now() - MATCH.liveAt) / 1000, place = matchAlive() + 1; W.outs++; W.secs += secs; if (MATCH.kind === 'war') W.top = Math.min(W.top || 99, place);
+    W.last = { at: statsIso(), kind: MATCH.kind, won: false, place, of: MATCH.roster.size, secs: Math.round(secs), kills: MATCH.kills, by }; }
   matchWatch(false);
 }
 function matchWatch(bring) {   // out, or never in: he watches
@@ -22495,8 +22842,10 @@ function matchWatch(bring) {   // out, or never in: he watches
 }
 function matchWatchNext() { const ids = [...MATCH.roster.values()].filter(r => r.alive && r.id !== NET.id).map(r => r.id); if (!ids.length) { MATCH.watch = ''; return; } MATCH.watch = ids[(ids.indexOf(MATCH.watch) + 1) % ids.length]; audio.sfx.ui?.(); modeBarSet(); }
 function camWatch(dt) {
-  const P = MATCH.watch && NET.peers.get(MATCH.watch), dead = MATCH.deadAt ? (performance.now() - MATCH.deadAt) / 1000 : 9;
-  if (dead < 3.3 && MATCH.deadPos) {   // (first the fire he became: pulling back from it, a little to one side)
+  const P = MATCH.watch && NET.peers.get(MATCH.watch), dead = MATCH.deadAt ? (performance.now() - MATCH.deadAt) / 1000 : 9, F = MATCH.phase === 'over' ? MATCH.fin : null, fa = F ? (performance.now() - F.t) / 1000 : 9;
+  if (F && F.L && fa < 3.4) { const L = F.L, a = 0.6 + fa * 0.32, cd = (120 + fa * 22) * (L.K || 1);   // (the last one out: round the fire it became, drawing back)
+    camWant.set(L.x + Math.sin(a) * cd, L.y + 30 + fa * 12, L.z + Math.cos(a) * cd); camera.position.lerp(camWant, damp(3, dt)); lookAt.lerp(_p.set(L.x, L.y, L.z), damp(8, dt)); }
+  else if (dead < 3.3 && MATCH.deadPos) {   // (first the fire he became: pulling back from it, a little to one side)
     const D = MATCH.deadPos, y = MATCH.deadYaw || 0, cd = (96 + dead * 26) * birdK();
     camWant.set(D.x + Math.sin(y + 0.5) * cd, D.y + 12 + dead * 16, D.z + Math.cos(y + 0.5) * cd); camera.position.lerp(camWant, damp(2.6, dt)); lookAt.lerp(D, damp(8, dt)); }
   else if (P && P.s) { const y = (P.yaw || 0) + 0.42, cd = 58 * (1 + (bigName(P.name) - 1) * 0.6);   // (off to one side and above, so the wall behind them is seen and not flown through)
@@ -22505,22 +22854,61 @@ function camWatch(dt) {
   { const g = Math.max(groundAt(camera.position.x, camera.position.z, camera.position.y + 40), WATER) + 4; if (camera.position.y < g) camera.position.y = g; }
   camera.up.set(0, 1, 0); camera.lookAt(lookAt); camera.fov = lerp(camera.fov, 70 * fovK(), damp(2, dt)); camera.updateProjectionMatrix();
 }
+// His record of fights (kept with the rest of his record: see STATS)
+function warStat() { return STATS.d.war ||= { n: 0, wins: 0, duels: 0, dwins: 0, kills: 0, outs: 0, secs: 0, best: 0, top: 0, last: null }; }
+// The end. The last one out is shown again to everyone, bigger and in slow time; every wall of fire goes out; the winner is
+// named; the pillar of the winner's house on Olympus takes fire; and for a little while the sky is the winner's to write on:
+// what is written stays when the fight is over, and goes out slowly from the end it was begun at.
 function matchEnd(win) {
-  if (MATCH.phase !== 'live') return; MATCH.phase = 'over'; MATCH.over = performance.now(); MATCH.win = win;
-  if (!MATCH.endSent && (MATCH.host || MATCH.me.in)) { MATCH.endSent = true; matchSend({ k: 'end', id: MATCH.id, win }); }
-  const nm = win ? matchName(win) : '';
-  matchBig(nm ? `${nm} WINS` : 'NOBODY WINS', 4200); chatLine('', nm ? `${nm} WINS THE ${MATCH.kind === 'duel' ? 'DUEL' : 'WARZONE'}` : 'NOBODY IS LEFT', 'sys');
-  if (win === NET.id) { audio.sting?.('firstFlight'); witness(MATCH.kind === 'duel' ? 'won a duel of fire over Olympus' : `won the warzone over Olympus, last of ${MATCH.roster.size}`, false); flash = Math.max(flash, 0.5); }
+  const M = MATCH; if (M.phase !== 'live') return; M.phase = 'over'; M.over = performance.now(); M.win = win;
+  if (!M.endSent && (M.host || M.me.in)) { M.endSent = true; matchSend({ k: 'end', id: M.id, win }); }
+  const nm = win ? matchName(win) : '', L = M.lastOut, secs = (performance.now() - M.liveAt) / 1000, duel = M.kind === 'duel', mine = win === NET.id;
+  M.fin = { t: performance.now(), L, win }; M.overFor = win ? 15500 : 6500; if (win && !mine) M.watch = win;
+  for (const id of M.roster.keys()) { const T = TRON.trails.get(id); if (T) { tronClear(T); T.sign = id === win; } }   // (every wall goes out; the winner's sky is clean)
+  if (L) { matchBoom(L.x, L.y, L.z, L.col, 1.6 * (L.K || 1)); chatLine('', `THE LAST ONE OUT · ${L.name}${L.by ? ' · ' + L.by.toUpperCase() : ''}`, 'sys'); }
+  timeK = 0.3; { const t0 = performance.now(), id = M.id, back = () => { const u = (performance.now() - t0) / 2300; if (u >= 1 || MATCH.id !== id) { timeK = 1; return; } timeK = 0.3 + 0.7 * u * u; requestAnimationFrame(back); }; requestAnimationFrame(back); }
+  matchBig(L ? 'THE LAST FIRE' : nm ? `${nm} WINS` : 'NOBODY WINS', L ? 1700 : 4200);
+  if (L) setTimeout(() => { if (MATCH.id === M.id && MATCH.phase === 'over') { matchBig(nm ? `${nm} WINS` : 'NOBODY WINS', 4200); audio.sfx.halo?.(); } }, 1800);
+  chatLine('', nm ? `${nm} WINS THE ${duel ? 'DUEL' : 'WARZONE'} · ${Math.round(secs)} S` : 'NOBODY IS LEFT', 'sys');
+  const house = !win ? '' : mine ? PATRON.id : M.cpus.find(c => c.id === win)?.pat || NET.peers.get(win)?.patron || '';
+  if (house) setTimeout(() => pylonBlaze(house, nm), 2600);
+  if (mine) { audio.sting?.('firstFlight'); witness(duel ? 'won a duel of fire over Olympus' : `won the warzone over Olympus, last of ${M.roster.size}`, false); flash = Math.max(flash, 0.5);
+    const W = warStat(); if (duel) W.dwins++; else W.wins++; W.secs += secs; W.best = W.best ? Math.min(W.best, secs) : secs; if (!duel) W.top = 1;
+    W.last = { at: statsIso(), kind: M.kind, won: true, place: 1, of: M.roster.size, secs: Math.round(secs), kills: M.kills };
+    setTimeout(() => { if (MATCH.id === M.id && MATCH.phase === 'over') toast('THE SKY IS YOURS · WRITE YOUR NAME ON IT · IT STAYS'); }, 4300); }
+  try { localStorage.setItem('icarus.stats', JSON.stringify(STATS.d)); } catch {}
   audio.sfx.halo?.(); modeBarSet();
+}
+// A house has won: its pillar on Olympus burns from its foot to its crown, and goes on burning a while.
+function pylonBlaze(house, who) {
+  const P = CROWN.pylons.find(q => q.id === house); if (!P || realm !== 'over') return; P.win = time; P.shockT = 0;
+  const g = (godById[house]?.name || house).toUpperCase(), line = `THE PILLAR OF ${g} TAKES FIRE · ${who} WON FOR THAT HOUSE`; chatLine('', line, 'sys'); toast(line);
+  if (camera.position.distanceToSquared(_v.set(P.x, P.top, P.z)) < 4000 * 4000) { shock(P.x, P.top, P.z, new THREE.Color(P.hex).getHex(), 190, 1.5, true); shock(P.x, P.g + 6, P.z, 0xffffff, 120, 1.1);
+    audio.at3 ? audio.at3(P.x, P.top, P.z, () => { audio.sfx.thunder?.(); audio.sfx.whoomph?.(); }, { vol: 1.4, ref: 80, max: 3600 }) : audio.sfx.thunder?.(); }
+}
+function updatePylonBlaze(dt) {
+  if (realm !== 'over') return;
+  for (const P of CROWN.pylons) { if (P.win === undefined) continue; const t = time - P.win; if (t > 30) { P.win = undefined; continue; }
+    const k = Math.min(1, t * 1.5) * smoothstep(30, 22, t); for (const T of TORCH.list) if (T.pyl === P) T.flare = Math.max(T.flare, 0.9 * k);
+    if (camera.position.distanceToSquared(_v.set(P.x, P.top, P.z)) > 3600 * 3600) continue;
+    const c = pcol(P.id), hot = c.map(v => v * 2.3), n = Math.round((TOUCH ? 5 : 12) * k), cs = Math.cos(P.th), sn = Math.sin(P.th), rise = Math.min(1, t / 1.6);   // (it climbs the pillar first)
+    for (let i = 0; i < n; i++) { const lx = (Math.random() < 0.5 ? -1 : 1) * (7.6 + Math.random() * 1.2), lz = rnd(4.2), u = Math.random() * rise, y = P.g + u * (P.top - P.g + 6), sw = Math.random() < 0.5;
+      const ax = sw ? lx : rnd(8), az = sw ? lz : (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random());
+      emit(P.x + ax * cs + az * sn, y, P.z - ax * sn + az * cs, rnd(2.5), 9 + Math.random() * 15, rnd(2.5), 0.7 + Math.random() * 0.9, i % 4 === 0 ? [2.8, 2.5, 1.8] : i % 2 ? hot : c, 3.5, 2 + Math.random() * 3.5); }
+    for (let i = 0; i < Math.round(n * 0.6 * rise); i++) emit(P.x + rnd(9), P.top + 2 + Math.random() * 6, P.z + rnd(9), rnd(7), 14 + Math.random() * 22, rnd(7), 0.9 + Math.random() * 1.2, i % 3 ? hot : [3, 2.7, 2], 2, 3 + Math.random() * 4);   // and stands on its crown
+    if ((P.shockT -= dt) <= 0 && k > 0.3) { P.shockT = 2.4; shock(P.x, P.top + 4, P.z, new THREE.Color(P.hex).getHex(), 110, 1.3, false); } }
 }
 function matchLeave() {
   const p = player, B = MATCH.back, wasIn = MATCH.me.in;
-  for (const id of MATCH.roster.keys()) { const T = TRON.trails.get(id); if (T) { tronClear(T); T.match = ''; } }
+  for (const id of MATCH.roster.keys()) { const T = TRON.trails.get(id); if (!T) continue; if (T.sign && MATCH.win === id) { T.match = ''; T.signAt = time; continue; } tronClear(T); T.match = ''; T.sign = false; }   // (what the winner wrote on the sky is left there)
   for (const C of MATCH.cpus) { cpuShow(C, false); const P = NET.peers.get(C.id); if (P) { P.seen = false; dropPeer(C.id, P); NET.peers.delete(C.id); } tronDrop(C.id); }
   if (MATCH.ring) MATCH.ring.visible = false;
-  if (MATCH.kind === 'war') MATCH.cool = performance.now() + 45000;
+  if (MATCH.kind === 'war') MATCH.cool = performance.now() + 6000;
+  if (timeK < 1) timeK = 1;
+  if (MATCH.last && (wasIn || MATCH.host) && MATCH.phase === 'over') { MATCH.againUntil = performance.now() + 25000; const el = $('matchAsk'); el.textContent = `${MATCH.last.kind === 'duel' ? 'THE DUEL' : 'THE WARZONE'} AGAIN · ${TOUCH ? 'TAP' : 'CLICK'} · OR /again`; el.classList.add('on'); }
   Object.assign(MATCH, { id: '', kind: '', phase: '', placed: false, slot: null, watch: '', back: null, cpus: [], sim: false, host: false }); MATCH.roster.clear(); MATCH.me.alive = false; MATCH.me.in = false;
   GODM.forced = false; GODM.charge = Math.max(GODM.charge, 0.5);
+  if (wasIn && GODM.on && state !== 'watch') godMode(false, true);   // (the fight is over: nobody goes on trailing fire behind him)
   if (state === 'watch') { p.gone = false; state = 'play';
     if (B && !B.in) { p.pos.copy(B.pos); p.fallTop = p.pos.y; if (B.form === 'phoenix') p.form = 'phoenix'; streamChunks(Math.floor(p.pos.x / CHUNK), Math.floor(p.pos.z / CHUNK), 40); }   // (only ever watching: put back where he was)
     else { godMode(false, true); const gy = groundAt(START.x, START.z, SUMMIT + 40); p.form = 'human'; p.cine = null; p.wings = false; p.perch = false; p.tumble = false; resetPose(); setBurn(0);
@@ -22575,7 +22963,8 @@ function cpuFly(C, dt) {
     NET.ch.send({ type: 'broadcast', event: 's', payload: { i: C.id, n: C.name, p: [r1(P.x), r1(P.y), r1(P.z)], v: [r1(P.vx), r1(P.vy), r1(P.vz)], y: Math.round(C.yaw * 100) / 100, pi: Math.round(C.pitch * 100) / 100, b: Math.round(C.bank * 100) / 100, f: 'p', r: 0, g: 0, w: 0, gm: 1, ma: M.id, pt: C.pat, ts: g0, tp } }); }
 }
 function updateMatch(dt) {
-  const M = MATCH, p = player, now = Date.now(); updateBooms(dt);
+  const M = MATCH, p = player, now = Date.now(); updateBooms(dt); updatePylonBlaze(dt);
+  if (M.againUntil && performance.now() > M.againUntil) { M.againUntil = 0; if (!M.inv) $('matchAsk').classList.remove('on'); }
   if (M.inv && performance.now() > M.inv.until) { if (!M.inv.mine) matchAnswer(false); else { toast(`${M.inv.name} DID NOT ANSWER`); M.inv = null; } }
   if (!M.phase) return;
   if (M.phase === 'count') {
@@ -22586,11 +22975,16 @@ function updateMatch(dt) {
     else if (M.placed) { miEnd(); const s = Math.ceil((M.t0 - now) / 1000); if (s !== M.lastS && s > 0 && s <= 3) { M.lastS = s; matchBig(String(s)); audio.sfx.ui?.(); }
       if (M.me.alive && M.slot) { p.pos.set(M.slot.x, M.slot.y, M.slot.z); p.yaw = M.slot.yaw; p.pitch = 0; p.bank = 0; p.speed = 30; p.vy = 0; p.fallTop = p.pos.y; p.flame = 1; }
       for (const C of M.cpus) cpuShow(C, true); }
-    if (now >= M.t0 && M.placed) { miEnd(); for (const id of M.roster.keys()) { const T = TRON.trails.get(id); if (T) tronClear(T); } trailRib.key = null; M.phase = 'live'; M.lastS = 0; M.liveAt = performance.now(); matchBig('FLY', 1100); audio.sfx.rebirth?.(); if (M.me.alive) { p.speed = 70; M.prev.copy(p.pos); M.has = true; } }
+    if (now >= M.t0 && M.placed) { miEnd(); for (const id of M.roster.keys()) { const T = TRON.trails.get(id); if (T) tronClear(T); } trailRib.key = null; M.phase = 'live'; M.lastS = 0; M.liveAt = performance.now(); matchBig('FLY', 1100); audio.sfx.rebirth?.(); if (M.me.alive) { p.speed = 70 * M.spd; M.prev.copy(p.pos); M.has = true; const W = warStat(); if (M.kind === 'duel') W.duels++; else W.n++; }
+      if (M.host) for (const C of M.cpus) C.speed *= M.spd; }
     if (M.ring && M.placed) { M.ring.visible = realm === 'over'; M.ring.position.set(M.cx, SUMMIT - 300, M.cz); M.ring.scale.set(M.R, 3200, M.R); }
     return;
   }
-  if (M.phase === 'over') { if (performance.now() - M.over > 6500) matchLeave(); else if (M.host) for (const C of M.cpus) if (C.alive) cpuFly(C, Math.min(dt, 0.05)); return; }   // (a bird that flies itself and has won goes on flying while it is said)
+  if (M.phase === 'over') { const ago = performance.now() - M.over;
+    if (ago > M.overFor) matchLeave(); else { if (M.host) for (const C of M.cpus) if (C.alive) cpuFly(C, Math.min(dt, 0.05));   // (a bird that flies itself and has won goes on flying while it is said)
+      if (M.win && ago > 1800 && ago < 9000 && (M.fwT = (M.fwT || 0) - dt) <= 0) { M.fwT = 0.55;   // fire in the winner's colour, going up round the mountain
+        const a = Math.random() * 6.283, r = 200 + Math.random() * 500, c = new THREE.Color(matchCol(M.win)); boomBall(M.cx + Math.cos(a) * r, SUMMIT + 120 + Math.random() * 260, M.cz + Math.sin(a) * r, '#' + c.getHexString(), 0.5 + Math.random() * 0.5); } }
+    return; }
   // live
   const el = (performance.now() - M.liveAt) / 1000; M.R = lerp(M.R0, M.R1, smoothstep(M.shrink * 0.25, M.shrink, el));
   if (M.ring) { M.ring.visible = realm === 'over'; M.ring.position.set(M.cx, SUMMIT - 300, M.cz); M.ring.scale.set(M.R, 3200, M.R); }
@@ -22598,7 +22992,7 @@ function updateMatch(dt) {
   if (M.me.alive) {
     GODM.forced = true; if (!GODM.on) godMode(true, true);
     if (state === 'play') {
-      if (p.form === 'phoenix' && !p.perch) p.speed = Math.max(p.speed, 46);
+      if (p.form === 'phoenix' && !p.perch) p.speed = Math.max(p.speed, 46 * M.spd);
       if (el > 1.5 && (p.form !== 'phoenix' || p.perch || p.grounded)) return matchOut('the ground');
       if (M.has) { const hit = tronHit(M.prev.x, M.prev.y, M.prev.z, p.pos.x, p.pos.y, p.pos.z, NET.id, M.id); if (hit) return matchOut(hit.id === NET.id ? 'your own fire' : `${hit.name}’s fire`); }
       M.prev.copy(p.pos); M.has = true;
@@ -22851,7 +23245,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);
