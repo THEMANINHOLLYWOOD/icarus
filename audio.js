@@ -808,6 +808,15 @@ export function createAudio() {
       tn({ t, dur: 0.17, type: 'sine', f0: 64, f1: 38, a: 0.006, vol: v });
       tn({ t: t + 0.23, dur: 0.14, type: 'sine', f0: 58, f1: 36, a: 0.006, vol: v * 0.72 });
     },
+    // the bird has no words: this is what it has instead. Glad: two bright notes going up, the second held. Curious: one
+    // short note with a question in it. Cross: a rasp, falling. Under a hand: a long soft purr.
+    cry(mood = 'glad', k = 1) {
+      if (!ctx) return; const t = T(), v = 0.3 * Math.max(0.3, Math.min(1.4, k));
+      if (mood === 'cross') { tn({ t, dur: 0.42, type: 'sawtooth', f0: 620, f1: 240, a: 0.01, vol: v * 0.7 }); nz(pink, { t, dur: 0.4, f0: 2400, f1: 900, q: 2.5, a: 0.02, vol: v * 0.7 }); tn({ t: t + 0.12, dur: 0.3, type: 'square', f0: 310, f1: 150, a: 0.01, vol: v * 0.2 }); }
+      else if (mood === 'purr') { for (let i = 0; i < 10; i++) tn({ t: t + i * 0.085, dur: 0.07, type: 'triangle', f0: 150 + (i % 2) * 14, f1: 132, a: 0.01, vol: v * 0.5 }); tn({ t, dur: 0.85, type: 'sine', f0: 520, f1: 560, a: 0.2, vol: v * 0.16 }); }
+      else if (mood === 'curious') { tn({ t, dur: 0.16, type: 'triangle', f0: 1250, f1: 1820, a: 0.008, vol: v * 0.7 }); tn({ t: t + 0.015, dur: 0.14, type: 'sine', f0: 2500, f1: 3600, a: 0.008, vol: v * 0.2 }); }
+      else { tn({ t, dur: 0.13, type: 'triangle', f0: 1050, f1: 1500, a: 0.006, vol: v * 0.75 }); tn({ t: t + 0.15, dur: 0.34, type: 'triangle', f0: 1400, f1: 2050, a: 0.01, vol: v * 0.8 }); tn({ t: t + 0.15, dur: 0.3, type: 'sine', f0: 2800, f1: 4100, a: 0.01, vol: v * 0.2 }); }
+    },
     jump() { if (!ctx) return; if (!smp('jump', 0.55, rnd(0.95, 1.08), T())) sfx.step(); },
     grab(tree) { if (!ctx) return; smp('grab', tree ? 0.22 : 0.3, tree ? rnd(0.8, 0.9) : rnd(0.93, 1.07), T(), null, rnd(-0.3, 0.3)); },   // (no good bark takes came back: a rock grip, lower and softer, stands in)
     flyby(pan = 0) { if (!ctx) return; smp('whoosh', 0.9, rnd(0.9, 1.1), T(), null, pan); },

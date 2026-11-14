@@ -92,3 +92,99 @@ grant select, insert, delete on public.god_notes to service_role;
 
 -- A course of rings goes on past its first length for whoever keeps flying it: how far it has been opened (it only grows).
 alter table public.world_rings add column if not exists len integer not null default 0 check (len between 0 and 400);
+
+-- Who may not play (api/_bans.js, api/admin.js): a traveller (c: + the hash of their travel code), an address (i: + a
+-- salted hash of the IP, or of the IPv6 /64), or a name (n: + the name). Written and read only by the server.
+create table if not exists public.world_bans (
+  key text primary key check (key ~ '^[cin]:[A-Za-z0-9 ]{1,64}$'),
+  kind text not null check (kind in ('code','ip','name')),
+  name text not null default '',
+  by_name text not null default '',
+  at timestamptz not null default now()
+);
+alter table public.world_bans enable row level security;
+revoke all on public.world_bans from anon, authenticated;
+grant select, insert, update, delete on public.world_bans to service_role;
+
+-- ── Accounts. Signing in (email, or Google) ties a Supabase user to a traveller: the travel code is kept here so that
+-- signing in on another device brings the same traveller back. Written and read only by the server (api/account.js).
+create table if not exists public.accounts (
+  user_id uuid primary key,
+  email text not null default '',
+  code text not null check (code ~ '^[A-Z0-9]{12}$'),
+  name text not null default '',
+  created_at timestamptz not null default now(),
+  seen_at timestamptz not null default now()
+);
+create unique index if not exists accounts_code on public.accounts (code);
+alter table public.accounts enable row level security;
+revoke all on public.accounts from anon, authenticated;
+grant select, insert, update, delete on public.accounts to service_role;
+
+-- ── Stats (api/stats.js): what each traveller has done, kept as one record they add to (distance, the fastest they
+-- have been, their fastest mile, the water they have thrown, crashes, words said ...).
+create table if not exists public.player_stats (
+  key text primary key check (key ~ '^[0-9a-f]{64}$'),   -- sha-256 of the travel code
+  name text not null default '',
+  data jsonb not null default '{}'::jsonb check (pg_column_size(data) < 32768),
+  updated_at timestamptz not null default now()
+);
+alter table public.player_stats enable row level security;
+revoke all on public.player_stats from anon, authenticated;
+grant select, insert, update, delete on public.player_stats to service_role;
+
+-- Where they flew: a point every couple of seconds, so the stats page can play their flights back.
+create table if not exists public.flight_points (
+  id bigserial primary key,
+  key text not null check (key ~ '^[0-9a-f]{64}$'),
+  t timestamptz not null,
+  x real not null, y real not null, z real not null,
+  r smallint not null default 0,          -- realm: 0 the world, 1 the Underworld
+  v real not null default 0,              -- speed, m/s
+  f char(1) not null default 'h'          -- form: p bird, h on foot, w wings, ...
+);
+create index if not exists flight_points_key_t on public.flight_points (key, t);
+alter table public.flight_points enable row level security;
+revoke all on public.flight_points from anon, authenticated;
+grant select, insert, update, delete on public.flight_points to service_role;
+grant usage, select on sequence public.flight_points_id_seq to service_role;
+
+-- Everything said with the gods, both ways. "Deleted" by the player only hides a line from them: it is kept.
+create table if not exists public.talk_log (
+  id bigserial primary key,
+  key text not null check (key ~ '^[0-9a-f]{64}$'),
+  god text not null default '' check (length(god) <= 24),
+  who text not null check (who in ('me','god')),
+  text text not null check (length(text) <= 1200),
+  at timestamptz not null default now(),
+  hidden boolean not null default false
+);
+create index if not exists talk_log_key_at on public.talk_log (key, at);
+alter table public.talk_log enable row level security;
+revoke all on public.talk_log from anon, authenticated;
+grant select, insert, update, delete on public.talk_log to service_role;
+grant usage, select on sequence public.talk_log_id_seq to service_role;
+
+-- ── Areas (api/areas.js): the world cut into squares three kilometres across, each named (by the gods' voice, the
+-- first time anyone flies into it) and the name kept for everyone.
+create table if not exists public.world_areas (
+  key text primary key check (key ~ '^(over|under):-?\d{1,5}:-?\d{1,5}$'),
+  name text not null check (length(name) between 2 and 40),
+  style smallint not null default 0,
+  by_name text not null default '',
+  at timestamptz not null default now()
+);
+alter table public.world_areas enable row level security;
+revoke all on public.world_areas from anon, authenticated;
+grant select, insert, update, delete on public.world_areas to service_role;
+
+-- ── The keeper's agent (api/agent.js): skills it has been taught, kept between conversations.
+create table if not exists public.agent_skills (
+  name text primary key check (name ~ '^[a-z0-9_]{2,40}$'),
+  body text not null check (length(body) <= 4000),
+  by_email text not null default '',
+  at timestamptz not null default now()
+);
+alter table public.agent_skills enable row level security;
+revoke all on public.agent_skills from anon, authenticated;
+grant select, insert, update, delete on public.agent_skills to service_role;

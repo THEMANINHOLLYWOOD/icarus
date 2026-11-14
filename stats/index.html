@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ICARUS · Your Record</title>
+<meta name="theme-color" content="#07080d">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#07080d; --ink:#f2e9d8; --dim:#8a8276; --ember:#ff9a4a; --gold:#ffc46a; --line:rgba(255,170,110,.16); --card:rgba(255,255,255,.025); }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--ink); font-family:"IBM Plex Mono", Menlo, Consolas, monospace; font-size:13px; line-height:1.55; }
+  body { padding:max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 60px max(16px, env(safe-area-inset-left)); }
+  main { max-width:1080px; margin:0 auto; }
+  a { color:var(--gold); }
+  header { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:10px 24px; padding:8px 0 22px; border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-weight:600; font-size:clamp(22px, 5vw, 34px); letter-spacing:.32em; color:var(--gold); text-shadow:0 0 22px rgba(255,110,40,.35); }
+  header .who { color:var(--dim); letter-spacing:.14em; font-size:11px; }
+  header nav { display:flex; gap:16px; font-size:11px; letter-spacing:.2em; }
+  h2 { margin:38px 0 14px; font-weight:500; font-size:11px; letter-spacing:.42em; color:var(--dim); }
+  .rec { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); border-top:1px solid var(--line); border-left:1px solid var(--line); }
+  .rec div { padding:16px 14px 14px; min-height:92px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .rec b { display:block; font-weight:500; font-size:clamp(20px, 3.6vw, 26px); color:var(--ink); letter-spacing:.02em; font-variant-numeric:tabular-nums; }
+  .rec span { display:block; margin-top:2px; color:var(--dim); font-size:10px; letter-spacing:.2em; text-transform:uppercase; }
+  .rec small { display:block; margin-top:6px; color:#a79f92; font-size:10px; }
+  .rec .hot b { color:var(--ember); }
+  #replay { position:relative; border:1px solid var(--line); background:#05060a; }
+  #view { display:block; width:100%; height:min(62vh, 560px); touch-action:none; }
+  #hud { position:absolute; left:12px; top:10px; font-size:11px; letter-spacing:.12em; color:var(--ink); text-shadow:0 0 6px #000; pointer-events:none; }
+  #hud i { font-style:normal; color:var(--dim); }
+  .bar { display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; padding:12px; border-top:1px solid var(--line); }
+  .bar button, .bar select { background:rgba(255,110,40,.12); color:var(--ink); border:1px solid rgba(255,170,110,.35); border-radius:2px; font:inherit; font-size:11px; letter-spacing:.14em; padding:7px 12px; cursor:pointer; }
+  .bar button:focus-visible, .bar select:focus-visible, .bar input:focus-visible { outline:1px solid var(--gold); }
+  .bar input[type=range] { flex:1 1 260px; accent-color:var(--ember); }
+  .bar label { color:var(--dim); font-size:11px; display:flex; align-items:center; gap:6px; }
+  #flights { display:flex; gap:8px; overflow-x:auto; padding:12px; border-top:1px solid var(--line); scrollbar-width:thin; }
+  #flights button { flex:none; text-align:left; background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:2px; font:inherit; font-size:11px; padding:8px 10px; cursor:pointer; }
+  #flights button.on { border-color:var(--ember); background:rgba(255,110,40,.12); }
+  #flights button i { display:block; font-style:normal; color:var(--dim); font-size:10px; }
+  .gods { display:grid; grid-template-columns:220px 1fr; gap:0; border:1px solid var(--line); min-height:380px; }
+  @media (max-width:720px) { .gods { grid-template-columns:1fr; } #godList { display:flex; overflow-x:auto; border-right:0 !important; border-bottom:1px solid var(--line); } #godList button { flex:none; } }
+  #godList { border-right:1px solid var(--line); }
+  #godList button { display:block; width:100%; text-align:left; background:none; color:var(--ink); border:0; border-bottom:1px solid var(--line); font:inherit; padding:12px 14px; cursor:pointer; }
+  #godList button.on { background:rgba(255,110,40,.1); color:var(--gold); }
+  #godList button i { display:block; font-style:normal; color:var(--dim); font-size:10px; letter-spacing:.08em; }
+  #talk { display:flex; flex-direction:column; min-width:0; }
+  #lines { flex:1; overflow-y:auto; max-height:520px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; }
+  .ln { position:relative; max-width:82%; padding:9px 34px 9px 12px; border-radius:2px; font-size:12.5px; line-height:1.6; }
+  .ln.god { align-self:flex-start; background:rgba(255,196,106,.07); border-left:2px solid var(--gold); }
+  .ln.me { align-self:flex-end; background:rgba(255,255,255,.04); border-right:2px solid var(--dim); }
+  .ln time { display:block; color:var(--dim); font-size:9.5px; letter-spacing:.1em; margin-top:3px; }
+  .ln button { position:absolute; right:4px; top:4px; background:none; border:0; color:var(--dim); cursor:pointer; font:inherit; font-size:12px; padding:4px 6px; opacity:.55; }
+  .ln button:hover, .ln button:focus-visible { opacity:1; color:var(--ember); }
+  #say { display:flex; gap:8px; padding:12px; border-top:1px solid var(--line); }
+  #say input { flex:1; min-width:0; background:rgba(255,255,255,.04); border:1px solid rgba(244,234,210,.16); color:var(--ink); font:inherit; font-size:13px; padding:9px 11px; border-radius:2px; }
+  #say input:focus { outline:none; border-color:var(--ember); }
+  #say button { background:rgba(255,110,40,.16); border:1px solid rgba(255,170,110,.45); color:var(--gold); font:inherit; font-size:11px; letter-spacing:.24em; padding:0 16px; cursor:pointer; border-radius:2px; }
+  .empty { color:var(--dim); padding:20px 16px; }
+  .quests { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px; }
+  .q { border:1px solid var(--line); padding:14px; background:var(--card); }
+  .q h3 { margin:0 0 10px; font-weight:500; font-size:10.5px; letter-spacing:.3em; color:var(--dim); }
+  .q ul { list-style:none; margin:0; padding:0; }
+  .q li { padding:7px 0; border-top:1px solid rgba(255,255,255,.05); }
+  .q li:first-child { border-top:0; }
+  .q li b { font-weight:500; color:var(--ink); } .q li i { font-style:normal; color:var(--dim); font-size:11px; display:block; }
+  .meter { height:3px; background:rgba(255,255,255,.08); margin-top:6px; } .meter i { display:block; height:100%; background:var(--ember); }
+  #msg { margin-top:30px; color:var(--dim); }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior:auto !important; } }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>ICARUS</h1><div class="who" id="who">your record</div></div>
+    <nav><a href="/">back to the sky</a></nav>
+  </header>
+
+  <h2>WHAT YOU HAVE DONE</h2>
+  <section class="rec" id="rec" aria-label="Records"></section>
+
+  <h2>YOUR FLIGHTS</h2>
+  <section id="replay" aria-label="Flight replay">
+    <canvas id="view"></canvas>
+    <div id="hud"></div>
+    <div class="bar">
+      <button id="play" type="button" aria-label="Play">PLAY</button>
+      <input id="time" type="range" min="0" max="1000" value="0" step="1" aria-label="Time">
+      <select id="rate" aria-label="Playback speed"><option value="1">1×</option><option value="4" selected>4×</option><option value="16">16×</option><option value="64">64×</option></select>
+      <label><input id="follow" type="checkbox" checked> follow</label>
+    </div>
+    <div id="flights" aria-label="Flights"></div>
+  </section>
+
+  <h2>THE GODS</h2>
+  <section class="gods" aria-label="Conversations">
+    <div id="godList"></div>
+    <div id="talk"><div id="lines"><div class="empty">Every word between you and the gods is kept here.</div></div>
+      <form id="say" autocomplete="off"><input id="sayIn" placeholder="say something" maxlength="300" aria-label="Your message"><button type="submit">SAY</button></form></div>
+  </section>
+
+  <h2>QUESTS</h2>
+  <section class="quests" id="quests"></section>
+  <p id="msg"></p>
+</main>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const $ = id => document.getElementById(id);
+const code = (() => { try { return localStorage.getItem('icarus.code') || ''; } catch { return ''; } })();
+let token = '';
+try { const a = JSON.parse(localStorage.getItem('icarus.auth') || 'null'); token = a?.access_token || a?.currentSession?.access_token || ''; } catch {}
+const post = (body) => fetch('/api/hub?fn=stats', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ code, ...body }) }).then(r => r.ok ? r.json() : Promise.reject(r.status));
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const cap = s => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1);
+const when = t => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+const dur = s => { if (s < 10) return `${s.toFixed(2)}s`; s = Math.round(s); return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${Math.floor(s / 3600)}h ${Math.floor(s % 3600 / 60)}m`; };
+const kmh = v => Math.round(v * 3.6).toLocaleString();
+let REC = null, NAME = '';
+
+async function load() {
+  if (!code && !token) { $('msg').textContent = 'No traveller on this device yet. Fly first, then come back.'; return; }
+  try { REC = await post({ op: 'get' }); } catch (e) { $('msg').textContent = e === 401 ? 'This device has no traveller yet.' : 'The record is not answering right now.'; return; }
+  NAME = REC.name || 'TRAVELLER';
+  $('who').textContent = `${NAME}${REC.since ? ` · since ${new Date(REC.since).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}` : ''}`;
+  records(REC.data || {}); gods(REC.talk || []); quests(REC.save); flights(REC.span);
+}
+function records(d) {
+  const tile = (v, label, sub = '', hot = false) => `<div class="${hot ? 'hot' : ''}"><b>${v}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  const at = o => o ? `${when(o.at)}${o.r ? ' · the Underworld' : ''}` : '';
+  $('rec').innerHTML = [
+    tile(`${(d.km || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} km`, 'flown'),
+    tile(d.top ? `${kmh(d.top.v)} km/h` : '—', 'fastest moment', d.top ? `${Math.round(d.top.v)} m/s · ${at(d.top)}` : '', true),
+    tile(d.mile ? dur(d.mile.v) : '—', 'fastest mile', d.mile ? at(d.mile) : ''),
+    tile(d.km1 ? dur(d.km1.v) : '—', 'fastest kilometre', d.km1 ? at(d.km1) : ''),
+    tile(`${Math.round(d.water || 0).toLocaleString()} m³`, 'water thrown', d.wave ? `biggest wave ${Math.round(d.wave.v).toLocaleString()} m³` : '', true),
+    tile(dur(d.air || 0), 'in the air'),
+    tile((d.crashes || 0).toLocaleString(), 'crashes'),
+    tile((d.deaths || 0).toLocaleString(), 'deaths'),
+    tile((d.words || 0).toLocaleString(), 'words spoken', d.typed ? `${d.typed.toLocaleString()} typed` : ''),
+    tile((d.talks || 0).toLocaleString(), 'conversations'),
+    tile((d.quests || 0).toLocaleString(), 'quests done'),
+    tile((d.areas || 0).toLocaleString(), 'countries found'),
+    tile((d.flights || 0).toLocaleString(), 'times you took fire'),
+    tile((d.tsunamis || 0).toLocaleString(), 'waves raised'),
+  ].join('');
+}
+
+// ── the gods: every word, by god; a line can be taken off the page (it is kept all the same); and you can still talk to them here
+let TALK = [], GOD = '';
+function gods(talk) {
+  TALK = talk; const by = new Map();
+  for (const l of talk) { const g = by.get(l.god) || { n: 0, last: '' }; g.n++; g.last = l.at; by.set(l.god, g); }
+  const ids = [...by.keys()].sort((a, b) => (by.get(b).last > by.get(a).last ? 1 : -1));
+  if (!ids.length) { $('godList').innerHTML = '<div class="empty">No god has spoken with you yet.</div>'; $('say').style.display = 'none'; return; }
+  GOD = GOD && by.has(GOD) ? GOD : ids[0];
+  $('godList').innerHTML = ids.map(id => `<button type="button" data-g="${esc(id)}" class="${id === GOD ? 'on' : ''}">${esc(cap(id))}<i>${by.get(id).n} lines · ${esc(when(by.get(id).last))}</i></button>`).join('');
+  lines();
+}
+function lines() {
+  const L = TALK.filter(l => l.god === GOD);
+  $('lines').innerHTML = L.length ? L.map(l => `<div class="ln ${l.who === 'me' ? 'me' : 'god'}" data-id="${l.id ?? ''}">${esc(l.text)}<time>${l.who === 'me' ? 'you' : esc(cap(l.god))} · ${esc(when(l.at))}</time>${l.id ? `<button type="button" aria-label="Delete this line" title="delete">✕</button>` : ''}</div>`).join('') : '<div class="empty">Nothing yet.</div>';
+  $('sayIn').placeholder = `say something to ${cap(GOD)}`;
+  $('lines').scrollTop = 1e9;
+}
+$('godList').addEventListener('click', e => { const b = e.target.closest('button[data-g]'); if (!b) return; GOD = b.dataset.g; for (const x of $('godList').children) x.classList.toggle('on', x === b); lines(); });
+$('lines').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return; const row = b.closest('.ln'), id = +row.dataset.id; if (!id) return;
+  row.style.opacity = .35; try { await post({ op: 'hide', id }); TALK = TALK.filter(l => l.id !== id); row.remove(); } catch { row.style.opacity = 1; }
+});
+$('say').addEventListener('submit', async e => {
+  e.preventDefault(); const text = $('sayIn').value.trim(); if (!text || !GOD) return; $('sayIn').value = '';
+  const mine = { god: GOD, who: 'me', text, at: new Date().toISOString() }; TALK.push(mine); lines();
+  const hist = TALK.filter(l => l.god === GOD).slice(-40).map(l => ({ role: l.who === 'me' ? 'mortal' : 'god', text: l.text }));
+  try {
+    const r = await fetch('/api/god', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ god: GOD, code, name: NAME, messages: hist, time: 'day', stage: hist.filter(m => m.role === 'god').length }) });
+    const j = await r.json(); const reply = String(j.text || j.error || '…');
+    TALK.push({ god: GOD, who: 'god', text: reply, at: new Date().toISOString() }); lines();
+    post({ op: 'push', talk: [[GOD, 'me', text, Date.now() - 1], [GOD, 'god', reply, Date.now()]] }).catch(() => {});
+  } catch { TALK.push({ god: GOD, who: 'god', text: '(no answer)', at: new Date().toISOString() }); lines(); }
+});
+
+// ── quests: what is done, what is under way, and what comes next
+function quests(sv) {
+  if (!sv) { $('quests').innerHTML = '<div class="q"><h3>QUESTS</h3><div class="empty" style="padding:0">Your quests show here once your journey has been kept by the server (it is, every minute or so, while you fly).</div></div>'; return; }
+  const li = (b, i, m) => `<li><b>${esc(b)}</b>${i ? `<i>${esc(i)}</i>` : ''}${m != null ? `<div class="meter"><i style="width:${Math.round(m * 100)}%"></i></div>` : ''}</li>`;
+  const act = (sv.quests || []).map(q => li(`${cap(q.from || q.god || '')}${q.from || q.god ? ' · ' : ''}${q.title || q.text || q.goal || q.kind || 'an errand'}`, q.reward ? `for ${q.reward}` : '', q.n ? Math.min(1, (q.done || q.got || 0) / q.n) : null));
+  const done = (sv.qlog || []).map(q => li(`${q.title || q.text || q.kind || 'an errand'}`, [q.from || q.god ? `for ${cap(q.from || q.god)}` : '', q.with && q.with.length ? `with ${[].concat(q.with).join(', ')}` : '', q.at ? when(q.at) : ''].filter(Boolean).join(' · ')));
+  const next = sv.chain ? li(`${cap(sv.chain.id || sv.chain.god || 'the next god')}`, sv.chain.text || sv.chain.goal || 'go and find them') : '';
+  const met = (sv.met || []).map(cap).join(', ');
+  $('quests').innerHTML = `<div class="q"><h3>UNDER WAY</h3><ul>${act.join('') || '<li><i>nothing under way</i></li>'}</ul></div>
+    <div class="q"><h3>WHAT COMES NEXT</h3><ul>${next || '<li><i>ask a god what they need</i></li>'}${met ? `<li><i>gods you have met · ${esc(met)}</i></li>` : ''}</ul></div>
+    <div class="q"><h3>DONE</h3><ul>${done.reverse().join('') || '<li><i>none yet</i></li>'}</ul></div>`;
+}
+
+// ── the replay: where you flew, in three dimensions, played back on a time bar
+const view = $('view'), R = new THREE.WebGLRenderer({ canvas: view, antialias: true }); R.setPixelRatio(Math.min(2, devicePixelRatio));
+const S = new THREE.Scene(); S.background = new THREE.Color(0x05060a); S.fog = new THREE.Fog(0x05060a, 4000, 60000);
+const C = new THREE.PerspectiveCamera(55, 1, 1, 200000); const O = new OrbitControls(C, view); O.enableDamping = true;
+S.add(new THREE.HemisphereLight(0xffe8c8, 0x1a1420, 1.2));
+let LINE = null, PTS = [], T0 = 0, T1 = 0, NOW = 0, PLAY = false, GRID = null;
+const bird = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffb060 })); S.add(bird);
+const glow = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff6a20, transparent: true, opacity: 0.25, depthWrite: false })); S.add(glow);
+{ const cone = new THREE.Mesh(new THREE.ConeGeometry(1750, 2040, 48, 1, true), new THREE.MeshBasicMaterial({ color: 0x8a8276, wireframe: true, transparent: true, opacity: 0.18 })); cone.position.set(0, 1020, 2400); S.add(cone); }   // Olympus
+function size() { const w = view.clientWidth, h = view.clientHeight; R.setSize(w, h, false); C.aspect = w / h; C.updateProjectionMatrix(); }
+addEventListener('resize', size); size();
+function flights(span) {
+  if (!span) { $('flights').innerHTML = '<div class="empty" style="padding:4px">Your flights show here after your next time in the air.</div>'; return; }
+  post({ op: 'track', from: Date.parse(span[0]), to: Date.parse(span[1]) + 1 }).then(j => {
+    const pts = j.points || []; const S2 = []; let cur = null;
+    for (const p of pts) { if (!cur || p[0] - cur.b > 10 * 60_000) S2.push(cur = { a: p[0], b: p[0], n: 0, km: 0, top: 0, last: p }); const L = cur.last; cur.km += Math.hypot(p[1] - L[1], p[2] - L[2], p[3] - L[3]) / 1000; cur.b = p[0]; cur.n++; cur.top = Math.max(cur.top, p[5]); cur.last = p; }
+    const list = S2.filter(s => s.n > 3).reverse().slice(0, 40);
+    if (!list.length) { $('flights').innerHTML = '<div class="empty" style="padding:4px">Nothing to play back yet.</div>'; return; }
+    $('flights').innerHTML = list.map((s, i) => `<button type="button" data-a="${s.a}" data-b="${s.b}" class="${i ? '' : 'on'}">${esc(when(s.a))}<i>${dur((s.b - s.a) / 1000)} · ${s.km.toFixed(1)} km · ${kmh(s.top)} km/h</i></button>`).join('');
+    show(list[0].a, list[0].b);
+  }).catch(() => { $('flights').innerHTML = '<div class="empty" style="padding:4px">The flights are not answering.</div>'; });
+}
+$('flights').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if (!b) return; for (const x of $('flights').children) x.classList.toggle('on', x === b); show(+b.dataset.a, +b.dataset.b); });
+async function show(a, b) {
+  let j; try { j = await post({ op: 'track', from: a, to: b + 1 }); } catch { return; }
+  PTS = j.points || []; if (!PTS.length) return;
+  T0 = PTS[0][0]; T1 = PTS[PTS.length - 1][0]; NOW = T0; $('time').value = 0;
+  if (LINE) { S.remove(LINE); LINE.geometry.dispose(); }
+  const pos = new Float32Array(PTS.length * 3), col = new Float32Array(PTS.length * 3), top = Math.max(1, ...PTS.map(p => p[5])), c = new THREE.Color();
+  let lo = 1e9; PTS.forEach((p, i) => { pos.set([p[1], p[2], p[3]], i * 3); c.setHSL(0.6 - 0.6 * Math.min(1, p[5] / top), 0.9, 0.55); col.set([c.r, c.g, c.b], i * 3); lo = Math.min(lo, p[2]); });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  LINE = new THREE.Line(g, new THREE.LineBasicMaterial({ vertexColors: true })); S.add(LINE);
+  g.computeBoundingSphere(); const bs = g.boundingSphere;
+  if (GRID) S.remove(GRID); GRID = new THREE.GridHelper(Math.max(4000, bs.radius * 4), 40, 0x3a2a20, 0x1a1418); GRID.position.set(bs.center.x, Math.min(lo, 0) - 20, bs.center.z); S.add(GRID);
+  O.target.copy(bs.center); C.position.copy(bs.center).add(new THREE.Vector3(bs.radius * 1.2, bs.radius * 0.8, bs.radius * 1.2)); O.update();
+  const r = Math.max(6, bs.radius * 0.012); bird.scale.setScalar(r); glow.scale.setScalar(r * 2.6);
+  place();
+}
+function at(t) {   // where he was at a moment (between two points)
+  let i = 0, j = PTS.length - 1; while (j - i > 1) { const m = (i + j) >> 1; if (PTS[m][0] <= t) i = m; else j = m; }
+  const A = PTS[i], B = PTS[j], k = B[0] > A[0] ? Math.min(1, Math.max(0, (t - A[0]) / (B[0] - A[0]))) : 0;
+  return { x: A[1] + (B[1] - A[1]) * k, y: A[2] + (B[2] - A[2]) * k, z: A[3] + (B[3] - A[3]) * k, v: A[5] + (B[5] - A[5]) * k, f: A[6], r: A[4], dx: B[1] - A[1], dz: B[3] - A[3] };
+}
+const _w = new THREE.Vector3();
+function place() {
+  if (!PTS.length) return; const p = at(NOW); bird.position.set(p.x, p.y, p.z); glow.position.copy(bird.position);
+  $('hud').innerHTML = `${esc(new Date(NOW).toLocaleTimeString())} &nbsp; ${kmh(p.v)} km/h &nbsp; <i>${Math.round(p.y)} m up${p.r ? ' · the Underworld' : ''} · ${{ p: 'the bird', h: 'on foot', w: 'wings', s: 'swimming', r: 'perched', f: 'falling' }[p.f] || ''}</i>`;
+  if ($('follow').checked) { const L = Math.hypot(p.dx, p.dz) || 1, d = Math.max(60, bird.scale.x * 14); _w.set(p.x - p.dx / L * d, p.y + d * 0.35, p.z - p.dz / L * d); C.position.lerp(_w, 0.12); O.target.lerp(bird.position, 0.25); }
+}
+$('time').addEventListener('input', () => { NOW = T0 + (T1 - T0) * $('time').value / 1000; place(); });
+$('play').addEventListener('click', () => { PLAY = !PLAY; $('play').textContent = PLAY ? 'PAUSE' : 'PLAY'; if (PLAY && NOW >= T1) NOW = T0; });
+let last = performance.now();
+(function frame(now) {
+  requestAnimationFrame(frame); const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (PLAY && PTS.length) { NOW = Math.min(T1, NOW + dt * 1000 * +$('rate').value); $('time').value = Math.round((NOW - T0) / Math.max(1, T1 - T0) * 1000); place(); if (NOW >= T1) { PLAY = false; $('play').textContent = 'PLAY'; } }
+  glow.material.opacity = 0.18 + 0.1 * Math.sin(now / 160);
+  O.update(); R.render(S, C);
+})(performance.now());
+load();
+</script>
+</body>
+</html>

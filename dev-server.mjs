@@ -21,6 +21,7 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
+  if (url.pathname === '/mcp') { url.pathname = '/api/hub'; url.searchParams.set('fn', 'mcp'); }   // (as vercel.json rewrites it)
   try {
     const api = url.pathname.match(/^\/api\/([a-z]+)$/);
     if (api) {
@@ -36,7 +37,8 @@ http.createServer(async (req, res) => {
       if (out.body) for await (const c of out.body) res.write(c);
       return res.end();
     }
-    const fp = path.join(root, url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname));
+    let fp = path.join(root, url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname));
+    try { if (fs.statSync(fp).isDirectory()) fp = path.join(fp, 'index.html'); } catch {}   // (a folder: its index, the way Vercel serves one)
     if (!(fp === root || fp.startsWith(root + path.sep)) || fp.includes(`${path.sep}.`)) return res.writeHead(403).end();
     fs.readFile(fp, (e, d) => {
       if (e) return res.writeHead(404).end();

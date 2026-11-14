@@ -9,6 +9,8 @@ import { json, refuse, limited, clip } from './_lib.js';
 import { createHash } from 'node:crypto';
 import { rememberDeed, isDeed } from './_pantheon.js';
 import { ALL } from './_gods.js';
+import { bannedFor, ipOf } from './_bans.js';
+import { agentsPublic } from './_mcp.js';
 // deeds the server itself sees happen, which a page cannot claim: meeting a god, a course of rings, the torches, a god's strike
 const SERVER_DEEDS = new Set(['met', 'arena', 'torch', 'smitten']);
 
@@ -84,7 +86,7 @@ async function look(realm, cx, cz, hash) {
     const mx0 = (cx - SPAN * 2) * 200, mx1 = (cx + SPAN * 2) * 200, mz0 = (cz - SPAN * 2) * 200, mz1 = (cz + SPAN * 2) * 200;
     const [m, t, c, n, w, a] = await Promise.all([
       rest(`world_marks?select=kind,x,y,z,god,seed,by_name,by_hash,at&realm=eq.${realm}&x=gte.${mx0}&x=lte.${mx1}&z=gte.${mz0}&z=lte.${mz1}&order=at.desc&limit=300`),
-      rest(`travellers?select=hash,name,x,z,phase,seen&realm=eq.${realm}&seen=gte.${new Date(Date.now() - 14 * 864e5).toISOString()}&order=seen.desc&limit=60`),
+      rest(`travellers?select=hash,name,x,z,phase,seen&realm=eq.${realm}&phase=neq.agent&seen=gte.${new Date(Date.now() - 14 * 864e5).toISOString()}&order=seen.desc&limit=60`),
       rest('world_cells?select=cx&limit=1', { prefer: 'count=estimated' }),
       rest('travellers?select=hash&limit=1', { prefer: 'count=estimated' }),
       rest(`world_winds?select=id,pts,patron,by_name,by_hash,at&realm=eq.${realm}&cx=gte.${mx0}&cx=lte.${mx1}&cz=gte.${mz0}&cz=lte.${mz1}&order=at.desc&limit=40`),
@@ -97,6 +99,7 @@ async function look(realm, cx, cz, hash) {
     totals = { cells: c.count, travellers: n.count };
   }
   const heldBy = await held(realm).catch(() => null);
+  const agents = realm === 'over' ? await agentsPublic().catch(() => []) : [];   // (travellers' own agents, and what they are building: see _mcp.js)
   // squares go back packed: names once each, then [cx, cz, which name]
   const names = [], ni = new Map();
   const at = n => { if (!ni.has(n)) { ni.set(n, names.length); names.push(n); } return ni.get(n); };
@@ -108,6 +111,7 @@ async function look(realm, cx, cz, hash) {
     winds: winds.map(w => ({ id: w.id, p: w.pts, c: w.patron, n: w.by_name, mine: !!hash && w.by_hash === hash, at: w.at })),
     arenas: arenas.map(a => ({ id: a.id, c: a.patrons, n: a.names, at: a.at, l: a.len | 0 })),
     held: heldBy ? heldBy.v : undefined, heldWith: heldBy ? heldBy.w : undefined,
+    agents: agents.length ? agents : undefined,
   };
 }
 
@@ -127,6 +131,7 @@ export async function POST(req) {
   const code = codeOf(b.code);
   if (!code) return json({ error: 'no travel code' }, 400);
   const hash = hashOf(code), name = name12(b.name), realm = realmOf(b.realm);
+  if (await bannedFor({ hash, ip: ipOf(req), name })) return json({ error: 'banned' }, 403);
   try {
     // squares he has just seen. The first to see a square keeps it: later sightings change nothing.
     if (b.op === 'chart') {

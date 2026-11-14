@@ -1,11 +1,11 @@
 // The game's own short list of things it can be told to do, and what each one means: shared by the two routes that turn
 // a person's words into orders (api/intent.js for a spoken order, api/guide.js for the voice that helps).
-export const ACTIONS = ['fly', 'land', 'glide', 'bird', 'human', 'jump', 'dive', 'climb', 'faster', 'slower', 'left', 'right', 'around', 'walk', 'run', 'stop',
+export const ACTIONS = ['godmode', 'godmode_off', 'fly', 'land', 'glide', 'bird', 'human', 'jump', 'dive', 'climb', 'faster', 'slower', 'left', 'right', 'around', 'walk', 'run', 'stop',
   'go_there', 'map', 'photo', 'snap', 'close', 'cinematic', 'normalcam', 'players', 'chat', 'mute', 'unmute', 'help',
   'objective', 'home', 'temple', 'nova', 'blow', 'perch', 'explain', 'closer', 'further', 'face', 'wide',
   'menu', 'hands_on', 'hands_off', 'mic_off', 'tilt', 'thumb', 'quality_up', 'quality_down', 'letters_up', 'letters_down', 'letters_fit', 'visuals', 'look_share', 'look_wear', 'look_keep', 'map_bigger', 'map_smaller', 'xr_leave', 'act', 'album', 'hover', 'map3d', 'map2d', 'map_left', 'map_right', 'map_up', 'map_down', 'map_north', 'watch', 'bolt', 'record', 'record_stop', 'mark_here', 'mark_next', 'mark_home', 'wind_share', 'wind_hide'];
 
-export const ACTION_DOC = `fly (take off / keep flying), land (come down where he is), glide (open wings and glide), bird (become the phoenix), human (become a man again / fold wings),
+export const ACTION_DOC = `godmode (wake the god in him: a greater bird, flown by voice, with a wall of fire left behind it) / godmode_off (be mortal again), fly (take off / keep flying), land (come down where he is), glide (open wings and glide), bird (become the phoenix), human (become a man again / fold wings),
 jump, dive, climb, faster, slower, left, right, around (turn around), walk, run, stop (stop whatever he is doing),
 go_there (go to the place the player is looking at or pointing at), map, photo (photo camera), snap (take the picture), close (close whatever is open),
 cinematic (cinematic camera), normalcam (normal camera), players (show who else is playing), chat,

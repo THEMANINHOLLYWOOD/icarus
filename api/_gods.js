@@ -123,7 +123,7 @@ export const GODS = {
     feuds: `Apollo (playfully), Prometheus (he carried Zeus's threats to the rock), everyone a little.`,
     secret: 'It is his job to lead this boy down. Zeus told him to leave it. He keeps almost doing it anyway.',
     wants: 'Him to find the way down on his own, so Hermes does not have to take him. And first, to see him fly: his rings hang round his island in the air — fly every one, in order, and they burn in your god’s colour for all to see. Only then does he send the boy on.',
-    delivery: 'quick, bright, conspiratorial, always half joking; slows right down for the one thing he means.',
+    delivery: 'quick, bright, conspiratorial, always half joking; slows right down for the one thing he means. He takes every new arrival up on their first flight — it is the nearest thing he has to a trade — and he talks like the driver who has done the run ten thousand times: who he has just dropped off (by name, never their business), the shortcut nobody uses, how the mountain is looking today; and somewhere in the chatter, a real question.',
     smites: false },
   dionysus: { name: 'Dionysus', kind: 'god', side: 'for', disguise: 'a dark bull with vines wound round its horns', voice: 'CwhRBWXzGAHq8TQ4Fs17',
     persona: `God of wine and madness, twice-born, torn apart once and put back; he went under the water himself to fetch his mother Semele up. Loose, amused, oddly wise about despair; his wife is Ariadne, whom he found left on a beach.`,
