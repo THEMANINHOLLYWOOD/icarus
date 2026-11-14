@@ -96,6 +96,32 @@
     font-size:12px; letter-spacing:.5em; padding-left:.5em; color:var(--ember); text-shadow:0 0 14px rgba(255,120,40,.6), 0 0 3px #000; opacity:0; transition:opacity .5s; }
   #proAct.show { opacity:1; animation:proPulse 1.6s ease-in-out infinite; }
   @keyframes proPulse { 0%,100% { opacity:.55; } 50% { opacity:1; } }
+  /* a conversation, on the tower: one line of his father's at a time, large enough to read at a glance; then what the boy can say back */
+  #proTalk { position:fixed; left:50%; bottom:calc(var(--sb) + max(6vh, 22px)); width:min(580px, calc(100vw - 28px)); box-sizing:border-box; z-index:7; padding:16px 18px 12px; border-radius:14px;
+    background:rgba(6,7,12,.86); box-shadow:0 0 0 1px rgba(244,234,210,.09), 0 18px 50px rgba(0,0,0,.45); text-align:left; opacity:0; pointer-events:none; transform:translate(-50%, 10px);
+    transition:opacity .4s, transform .55s cubic-bezier(.16,1,.3,1); }
+  #proTalk.on { opacity:1; pointer-events:auto; transform:translate(-50%, 0); }
+  #ptWho { display:block; font-weight:400; font-size:10px; letter-spacing:.3em; text-transform:uppercase; color:var(--ember); margin-bottom:6px; }
+  #ptSay { margin:0; min-height:2.9em; font-size:clamp(16px, 2.2vw, 19px); line-height:1.45; color:#f6eedb; cursor:default; }
+  #ptSay.me { color:#ffd8a8; }
+  #ptOpts { display:none; gap:8px; margin-top:12px; } #proTalk.ask #ptOpts { display:grid; }
+  #ptOpts button { display:flex; align-items:center; gap:12px; min-height:44px; padding:9px 14px; border-radius:10px; border:1px solid rgba(244,234,210,.17); background:rgba(244,234,210,.05); color:#f6eedb;
+    font:inherit; font-size:15px; line-height:1.3; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; animation:ptIn .45s cubic-bezier(.16,1,.3,1) both; animation-delay:calc(var(--i) * 90ms + 60ms);
+    transition:background .2s, border-color .2s, transform .15s; }
+  #ptOpts button kbd { flex:none; font:inherit; font-size:11px; line-height:18px; min-width:18px; text-align:center; color:var(--ember); border:1px solid rgba(255,138,58,.45); border-radius:5px; }
+  #ptOpts button:hover, #ptOpts button:focus-visible { background:rgba(255,138,58,.15); border-color:var(--ember); outline:none; } #ptOpts button:active { transform:scale(.985); }
+  @keyframes ptIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+  #ptOwn { display:none; gap:8px; margin-top:8px; } #proTalk.ask #ptOwn { display:flex; animation:ptIn .45s cubic-bezier(.16,1,.3,1) both .36s; }
+  #ptIn { flex:1; min-width:0; height:42px; box-sizing:border-box; padding:0 12px; border-radius:10px; border:1px solid rgba(244,234,210,.17); background:rgba(0,0,0,.4); color:#f6eedb; font:inherit; font-size:15px; }
+  #ptIn::placeholder { color:rgba(244,234,210,.45); } #ptIn:focus { outline:none; border-color:var(--ember); }
+  #ptOwn button { flex:none; height:42px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,138,58,.5); background:rgba(255,138,58,.14); color:#ffd8a8; font:inherit; font-size:13px; cursor:pointer; }
+  #ptJump { display:none; margin:6px 0 0; padding:8px 0 2px; border:0; background:none; color:rgba(244,234,210,.5); font:inherit; font-size:11px; letter-spacing:.14em; cursor:pointer; } #proTalk.ask #ptJump { display:block; }
+  #ptJump:hover, #ptJump:focus-visible { color:var(--ember); outline:none; }
+  body:has(#proTalk.on) #proAct, body:has(#proTalk.on) #proSub { opacity:0 !important; }
+  .touch #ptOpts button kbd { display:none; }
+  @media (max-height: 460px) { #proTalk { bottom:calc(var(--sb) + 8px); width:min(720px, calc(100vw - 20px)); padding:10px 14px 8px; } #ptSay { min-height:1.45em; font-size:15px; } #proTalk.ask #ptOpts { grid-template-columns:repeat(3, 1fr); margin-top:8px; }
+    #ptOpts button { min-height:40px; padding:6px 10px; font-size:13px; } #ptOwn { margin-top:6px; } #ptIn, #ptOwn button { height:36px; } #ptJump { position:absolute; right:14px; top:6px; margin:0; padding:4px 0; } }
+  @media (prefers-reduced-motion: reduce) { #ptOpts button, #proTalk.ask #ptOwn { animation:none; } }
   #hud > * { transition:opacity .8s; }
   .cinema #hud > *:not(#dialog):not(#warn):not(#talk):not(#talkLeave) { opacity:0; }
   /* a conversation is subtitles too: their name, their words, his words small above; the place to type is one faint line */
@@ -720,6 +746,7 @@
 <div id="explain"></div>
 <div id="card"><b></b><i></i></div>
 <div id="proSub"><b></b><span></span></div><div id="proSkip"></div><div id="proAct"></div>
+<div id="proTalk" aria-live="polite"><b id="ptWho"></b><p id="ptSay"></p><div id="ptOpts" role="group" aria-label="What you say"></div><form id="ptOwn" autocomplete="off"><input id="ptIn" maxlength="90" autocomplete="off" autocapitalize="sentences" spellcheck="false" enterkeyhint="send" aria-label="Say it your own way"><button type="submit">say it</button></form><button id="ptJump" type="button">say nothing · jump</button></div>
 <div id="fsHint"><b>↑</b><span>SWIPE UP · OR TAP · FULL SCREEN</span><i>for no browser at all: Share → Add to Home Screen</i><u id="fsKeep">keep the bar</u></div>
 <div id="primer"><b>YOU WILL SPEAK FOR HIM</b><span id="primerSay">his father, the gods and the world can hear you</span><div id="primerRow"><button id="primerVoice" type="button">USE MY VOICE</button><button id="primerQuiet" type="button">PLAY WITHOUT VOICE</button></div><i id="primerNote"></i></div><div id="tut"><kbd></kbd><span></span></div>
 <div id="chat" class="hidden"><div id="chatLog"></div><div id="chatRow"><span>›</span><input id="chatInput" maxlength="200" autocomplete="off" spellcheck="false" enterkeyhint="send" placeholder="say something to everyone"></div></div>
@@ -3847,7 +3874,13 @@ const MAN_SCALE = 1.88 / 2.09;
 const WING_S = 0.6, PHX_S = 1.55, bigName = n => n === 'ANDRES' ? 2 : 1;
 // (his own bird: how many times the usual size, and how many times the usual force — twice as big is four times the wave)
 const BIG = { k: 0 };   // (the size of his bird while it is growing or shrinking into a new name; 0: whatever his name says)
-const birdK = () => BIG.k || bigName(heroName), birdPow = () => birdK() ** 2;   // (whoever flies under that name flies a bird twice the size)
+// ── And a bird can make itself small. Crete is a small place: a man on a tower, a labyrinth a few hundred paces across. A phoenix
+//    the size of a house cannot come near it, and goes past it in a breath. So over Crete (or anywhere, if asked) the bird folds down
+//    to the size of a hawk: a sixth of itself, a third of its speed, the lens in close behind it, and the tower as big as a tower.
+//    Everything that depends on how big the bird is asks the one number (birdK), so it shrinks and grows without a step in it.
+const SMALL = { k: 1, want: 1, free: false, MIN: 0.16 };
+const smallT = () => clamp((SMALL.k - SMALL.MIN) / (1 - SMALL.MIN), 0, 1), smallV = () => lerp(0.3, 1, smallT());   // (how far along from small to whole; and what that does to how fast he goes)
+const birdK = () => (BIG.k || bigName(heroName)) * SMALL.k, birdPow = () => birdK() ** 2;   // (whoever flies under that name flies a bird twice the size)
 human.wings = new THREE.Group(); human.wings.position.set(0, 0.6, 0.07); human.wings.visible = false;   // (on his shoulders, over the arms that are strapped to them)
 human.wingParts = [-1, 1].map(side => { const w = makeWing(); w.root.scale.x = side < 0 ? 1 : -1; human.wings.add(w.root); return w; });
 human.rig.add(human.wings);
@@ -4642,7 +4675,22 @@ function applyTier(i, announce, persist = true) {
   if (announce) toast(`GRAPHICS · ${tier.name}`);
 }
 let toastT = 0;
-function toast(msg) { TOAST.msg = String(msg || ''); TOAST.t0 = performance.now(); TOAST.until = TOAST.t0 + 1900 + Math.min(1600, TOAST.msg.length * 22); const t = $('toast'); t.textContent = msg; t.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => t.style.opacity = 0, 1800); }
+// What the game has to say, it says one thing at a time. A line with several things in it ("IN THE SEA · S: ON DOWN, FAST ·
+// SPACE: UP AND OUT · LET GO: SWIM") used to arrive all at once, three rows of capitals across the picture, and was gone before
+// it could be read. Now each part comes by itself, in turn, for as long as it takes to read, with a count beside it (2/4).
+// A short line, or one of two parts, comes whole as it always did. A new line puts an end to whatever was still being said.
+const TOASTQ = { parts: [], i: 0, timer: 0 };
+function toast(msg) {
+  msg = String(msg || ''); clearTimeout(TOASTQ.timer); TOASTQ.parts = [];
+  const parts = msg.split(' · ');
+  if (parts.length >= 3 && msg.length > 46) { TOASTQ.parts = parts; TOASTQ.i = 0; return void toastPart(); }
+  toastShow(msg, '');
+}
+function toastPart() { const Q = TOASTQ, n = Q.parts.length, t = Q.parts[Q.i]; if (t == null) return; const ms = toastShow(t, `${Q.i + 1}/${n}`); if (++Q.i < n) Q.timer = setTimeout(toastPart, ms - 260); }
+function toastShow(msg, tag) {
+  TOAST.msg = msg; TOAST.tag = tag; TOAST.t0 = performance.now(); const ms = (tag ? 1500 : 1900) + Math.min(1600, msg.length * (tag ? 40 : 22)); TOAST.until = TOAST.t0 + ms;
+  const t = $('toast'); t.textContent = msg; t.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => t.style.opacity = 0, ms - 100); return ms;
+}
 addEventListener('orientationchange', () => setTimeout(resize, 250));
 applyTier(tierIdx, false, false);   // (what the machine was measured at is not a choice the player made: it isn't saved)
 try { LOOK.mine = (JSON.parse(localStorage.getItem('icarus.looks') || '[]') || []).map(cleanLook).filter(Boolean).slice(0, 10); } catch {}
@@ -5150,9 +5198,25 @@ function ashReset() { DIS.boy.value.w = 0; DIS.bird.value.w = 0; MORPH.kind = ''
 //    it from the heart. Under the one name that makes the bird twice the size, the ash stands at the size of the greater bird and the
 //    bird grows into it, with no step in it anywhere: its reach, its lens and its clearance all follow the one number (birdK).
 const REBORN = { burn: 0.8, fire: 1.05, bird: 2.6, man: 2.0 };
+function small(on, free) {   // make the bird small, or whole again
+  const S = SMALL, p = player;
+  if (on && (p.form !== 'phoenix' || state !== 'play' || p.sub || p.cine || MATCH.phase)) { toast('ONLY A BIRD IN FLIGHT CAN MAKE ITSELF SMALL'); return false; }
+  if ((S.want < 1) === !!on) return true;
+  S.want = on ? S.MIN : 1; S.free = !!on && !!free; audio.sfx.morph?.(); audio.sfx.whoosh?.(!on);
+  toast(on ? 'SMALL AS A HAWK · EVERYTHING ELSE IS BIG' : 'YOUR OWN SIZE AGAIN'); return true;
+}
+function updateSmall(dt) {
+  const S = SMALL, p = player;
+  if (S.want < 1 && (p.form !== 'phoenix' || state === 'dead' || p.sub || MATCH.phase || !S.free && !nearCrete())) { S.want = 1; S.free = false; }   // (only a bird in flight is small; and one made small to watch Crete is whole again when it leaves)
+  if (S.k === S.want) return;
+  const d = S.want - S.k; S.k = Math.abs(d) < 0.004 ? S.want : lerp(S.k, S.want, damp(2.4, dt));
+  // the change itself: the fire he is made of drawn in tight, or let out again
+  if (p.form === 'phoenix' && state === 'play') for (let i = 0; i < 3; i++) { const a = Math.random() * 6.283, R = (d < 0 ? 9 : 2.5) * birdK() + 1, u = d < 0 ? -1 : 1;
+    emit(p.pos.x + Math.cos(a) * R, p.pos.y + rnd(1.2) * birdK(), p.pos.z + Math.sin(a) * R, Math.cos(a) * 9 * u, 1 + Math.random() * 2, Math.sin(a) * 9 * u, 0.35 + Math.random() * 0.3, pick(EMBER), 0, 0.5 + birdK()); }
+}
 function rebirthStart(clean) {
   const p = player, Mo = MORPH;
-  if (state !== 'play' || p.cine || p.gone || p.sub || p.ghost || Mo.kind || SH.def) return false;
+  if (state !== 'play' || p.cine || p.gone || p.sub || p.ghost || Mo.kind || SH.def || SMALL.k < 0.98) return false;
   const bird = p.form === 'phoenix';
   if (!bird && (p.swim || p.dive || p.riding || p.climb)) return false;
   const k0 = birdK(), src = bird ? birdPts(Math.round(ASH_N() * 0.5), k0) : boyPts(Math.round(ASH_N() * 0.8));
@@ -6831,7 +6895,7 @@ function gotState(m) {
   const x = num(m.p[0], -1e6, 1e6), y = num(m.p[1], -2000, 20000), z = num(m.p[2], -1e6, 1e6);
   const first = !P.s;
   P.s = { x, y, z, vx: num(m.v[0], -400, 400), vy: num(m.v[1], -400, 400), vz: num(m.v[2], -400, 400), t: performance.now() };
-  P.yawT = num(m.y, -10, 10); P.pitchT = num(m.pi, -3.2, 3.2); P.bankT = num(m.b, -3.2, 3.2); P.gm = m.gm === 1; P.rider = m.rd === 1; P.gf = Array.isArray(m.gf) && m.gf.length === 4 && typeof m.gf[0] === 'string' && Object.prototype.hasOwnProperty.call(PATRONS, m.gf[0]) ? { id: m.gf[0], x: num(m.gf[1], -1e6, 1e6), y: num(m.gf[2], -1e4, 1e5), z: num(m.gf[3], -1e6, 1e6), t: performance.now() } : null; P.ma = typeof m.ma === 'string' && m.ma.length < 12 ? m.ma : ''; if (Array.isArray(m.tp) && m.tp.length <= 180) { P.tpSeen = true; tronTake(P, m.ts | 0, m.tp); } P.menu = m.m === 1; if (typeof m.tk === 'string' && /^[a-z0-9]{2,10}:\d{1,7}$/.test(m.tk)) P.tk = m.tk;
+  P.yawT = num(m.y, -10, 10); P.pitchT = num(m.pi, -3.2, 3.2); P.bankT = num(m.b, -3.2, 3.2); P.gm = m.gm === 1; P.sm = m.sm === 1; P.rider = m.rd === 1; P.gf = Array.isArray(m.gf) && m.gf.length === 4 && typeof m.gf[0] === 'string' && Object.prototype.hasOwnProperty.call(PATRONS, m.gf[0]) ? { id: m.gf[0], x: num(m.gf[1], -1e6, 1e6), y: num(m.gf[2], -1e4, 1e5), z: num(m.gf[3], -1e6, 1e6), t: performance.now() } : null; P.ma = typeof m.ma === 'string' && m.ma.length < 12 ? m.ma : ''; if (Array.isArray(m.tp) && m.tp.length <= 180) { P.tpSeen = true; tronTake(P, m.ts | 0, m.tp); } P.menu = m.m === 1; if (typeof m.tk === 'string' && /^[a-z0-9]{2,10}:\d{1,7}$/.test(m.tk)) P.tk = m.tk;
   P.face = typeof m.fc === 'string' && /^\d{6}$/.test(m.fc) ? faceDecode(m.fc) : null;
   P.form = ['h', 'w', 'p', 't', 'c'].includes(m.f) ? m.f : 'h'; P.realm = m.r ? 1 : 0; P.gr = m.g ? 1 : 0; P.wing = num(m.w, -1, 2);
   if (m.n) { const was = P.name; P.name = cleanName(m.n);
@@ -6866,7 +6930,9 @@ function circleStart() {
   if (!nearCrete()) { if (!watchCrete()) return false; CIRC.pending = true; return true; }   // (not there yet: go, and begin on arriving)
   if (p.form !== 'phoenix' || p.perch) { toast('YOU HAVE TO BE FLYING'); return false; }
   if (!birdAuto('circle', 'THE BIRD CIRCLES · YOU WATCH · STEER TO TAKE IT BACK')) return false;
-  LIVE.q.length = 0; LIVE.mv = null; if (!CIRC.on) CIRC.dist0 = phxDist; CIRC.on = true; return true;
+  LIVE.q.length = 0; LIVE.mv = null; if (!CIRC.on) CIRC.dist0 = phxDist; CIRC.on = true;
+  CIRC.close = true;   // (he goes in whole, at a bird's pace, and makes himself small as he gets there: see the circle itself, and SMALL)
+  return true;
 }
 function updateNewcomer() {
   const el = $('newcomer'), P = NEWC.P, p = player;
@@ -6875,7 +6941,7 @@ function updateNewcomer() {
   if (CIRC.on) phxDist = lerp(phxDist, TOUCH ? 84 : 76, 0.03);
   if (CIRC.pending && state === 'play') { if (nearCrete() && p.form === 'phoenix') { CIRC.pending = false; circleStart(); } else if (!nearCrete() && state !== 'warp') CIRC.pending = false; }
   const free = state === 'play' && !p.cine && !aloneNow(), over = free && realm === 'over' && flags.morphed && p.form === 'phoenix' && !p.perch && nearCrete() && !MATCH.phase;
-  const t = !free ? '' : NEWC.P ? `${NEWC.P.name} IS WAKING ON CRETE · ${TOUCH ? 'TAP' : 'CLICK'} TO WATCH` : CIRC.on ? `CIRCLING${cretePeer() ? ' · WATCHING ' + cretePeer().name : ''} · STEER TO TAKE IT BACK` : over ? `CIRCLE ${cretePeer() ? cretePeer().name : 'THE ISLAND'} AND WATCH · ${TOUCH ? 'TAP' : 'CLICK'} · OR /circle` : '';
+  const t = !free ? '' : NEWC.P ? `${NEWC.P.name} IS WAKING ON CRETE · ${TOUCH ? 'TAP' : 'CLICK'} TO WATCH` : CIRC.on ? `CIRCLING${cretePeer() ? ' · WATCHING ' + cretePeer().name : ''} · STEER TO TAKE IT BACK` : SMALL.want < 1 && p.form === 'phoenix' ? `SMALL AS A HAWK · ${TOUCH ? 'TAP' : 'CLICK'} TO BE YOUR OWN SIZE` : over ? `CIRCLE ${cretePeer() ? cretePeer().name : 'THE ISLAND'} AND WATCH · ${TOUCH ? 'TAP' : 'CLICK'} · OR /circle` : '';
   if (t && el.textContent !== t) el.textContent = t;
   el.classList.toggle('on', !!t);
   // whoever is in the opening, seen from the air
@@ -6895,7 +6961,7 @@ function watchCrete() {
   if (state === 'warp') toast('TO CRETE');
   return state === 'warp';
 }
-$('newcomer').addEventListener('click', e => { e.stopPropagation(); $('newcomer').blur(); if (NEWC.P) { if (watchCrete()) CIRC.pending = false; } else if (CIRC.on) birdAuto(''); else circleStart(); });
+$('newcomer').addEventListener('click', e => { e.stopPropagation(); $('newcomer').blur(); if (NEWC.P) { if (watchCrete()) CIRC.pending = false; } else if (CIRC.on) birdAuto(''); else if (SMALL.want < 1) small(false); else circleStart(); });
 for (const ev of ['pointerdown', 'pointerup', 'touchstart']) $('newcomer').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 // what this player is doing, a few times a second
 function netSend(dt) {
@@ -6914,7 +6980,7 @@ function netSend(dt) {
   NET.lastSent = { x: p.pos.x, y: p.pos.y, z: p.pos.z, f, yaw, fc, t: performance.now() };
   let tp, ts; { const T = TRON.trails.get(NET.id); if (T && T.n > T.start) { const end = T.base + T.n, g0 = Math.max(TRON.sent, T.base + T.start, end - 40); if (g0 < end) { ts = g0; tp = []; for (let gi = g0; gi < end; gi++) { const i = (gi - T.base) * 3; tp.push(r1(T.pts[i]), r1(T.pts[i + 1]), r1(T.pts[i + 2])); } TRON.sent = end; } } }   // (the wall behind him: the pieces laid since he last said)
   NET.ch.send({ type: 'broadcast', event: 's', payload: { i: NET.id, n: heroName, p: [r1(p.pos.x), r1(p.pos.y), r1(p.pos.z)], v: [r1(v.x), r1(v.y), r1(v.z)],
-    y: r2(yaw), pi: r2(p.pitch || 0), b: r2(p.bank || 0), f, r: realm === 'under' ? 1 : 0, gm: GODM.on ? 1 : undefined, rd: XR.on && XR.mode === 'rider' && p.form === 'phoenix' ? 1 : undefined, gf: GFLY.on ? [GFLY.g.id, Math.round(GFLY.B.pos.x), Math.round(GFLY.B.pos.y), Math.round(GFLY.B.pos.z)] : undefined, ma: MATCH.phase === 'live' && MATCH.me.alive ? MATCH.id : undefined, ts, tp, m: LIVE.on ? 1 : undefined, tk: LIVE.on && LIVE.tk ? LIVE.tk : undefined, g: p.grounded ? 1 : 0, w: r2(p.wingF || 0), pt: PATRON.id || undefined, fc: fc || undefined,
+    y: r2(yaw), pi: r2(p.pitch || 0), b: r2(p.bank || 0), f, r: realm === 'under' ? 1 : 0, gm: GODM.on ? 1 : undefined, sm: SMALL.want < 1 ? 1 : undefined, rd: XR.on && XR.mode === 'rider' && p.form === 'phoenix' ? 1 : undefined, gf: GFLY.on ? [GFLY.g.id, Math.round(GFLY.B.pos.x), Math.round(GFLY.B.pos.y), Math.round(GFLY.B.pos.z)] : undefined, ma: MATCH.phase === 'live' && MATCH.me.alive ? MATCH.id : undefined, ts, tp, m: LIVE.on ? 1 : undefined, tk: LIVE.on && LIVE.tk ? LIVE.tk : undefined, g: p.grounded ? 1 : 0, w: r2(p.wingF || 0), pt: PATRON.id || undefined, fc: fc || undefined,
     vk: VK.pub && (performance.now() - (NET.vkT || -1e9) > 4000) ? (NET.vkT = performance.now(), VK.pub) : undefined } });
 }
 // ── what other people look like: a man, or a burning bird, with their name over them
@@ -7023,7 +7089,7 @@ function updatePeers(dt) {
       A.bird.wings.forEach((w, i) => { w.shoulder.rotation.z = -f; w.elbow.rotation.z = -lerp(-0.34, 0.75, dive); w.wrist.rotation.z = w.elbow.rotation.z * 0.6; w.root.rotation.y = dive * 0.9 * (i === 0 ? 1 : -1); w.shoulder.scale.x = 1.12 - dive * 0.35; });
       updateTails(dt, false, A.bird);
       if (P.rider) { P.reins ||= reinPair(); riderOn(G, A.man.group, G.scale.x / PHX_S, P.reins, null, true); P.rode = true; }   // (someone riding theirs: there they are, up on its back, reins in hand)
-      { const want = PHX_S * bigName(P.name) * (P.gm ? 1.12 : 1), sc = G.scale.x; if (Math.abs(sc - want) > 0.003) G.scale.setScalar(Math.abs(sc - want) < 0.01 ? want : lerp(sc, want, damp(2.2, dt))); }   // (their bird's size is come to, not jumped to: a new name, the god waking)
+      { const want = PHX_S * bigName(P.name) * (P.gm ? 1.12 : 1) * (P.sm ? SMALL.MIN : 1), sc = G.scale.x; if (Math.abs(sc - want) > 0.003) G.scale.setScalar(Math.abs(sc - want) < 0.01 ? want : lerp(sc, want, damp(2.2, dt))); }   // (their bird's size is come to, not jumped to: a new name, the god waking)
       if (P.gm !== P.gmWas) { P.gmWas = P.gm; A.halo.color.copy(A.fire.userData.tint.value).multiplyScalar(P.gm ? 9 : 3); }   // (the god awake in them: a greater bird, its halo blazing)
       if (P.gm && Math.random() < 0.7) { const c = A.fire.userData.tint.value; emit(P.pos.x + rnd(7), P.pos.y + 3 + rnd(4), P.pos.z + rnd(7), rnd(6), 3 + Math.random() * 6, rnd(6), 0.6 + Math.random() * 0.7, [c.r * 2.6 + 0.3, c.g * 2.6 + 0.3, c.b * 2.6 + 0.3], 2, 1.2 + Math.random() * 1.4); }
       if (Math.random() < 0.5) emit(P.pos.x + rnd(1), P.pos.y + rnd(0.5), P.pos.z + rnd(1), rnd(3) - P.s.vx * 0.3, rnd(2), rnd(3) - P.s.vz * 0.3, 0.4, pick(EMBER));
@@ -7573,7 +7639,8 @@ function auiToast() {
   const nx = UIL.nx, k = Math.min(1, (now - TOAST.t0) / 160, (TOAST.until - now) / 320), max = nx - 6, words = TOAST.msg.split(' '), lines = [''];
   for (const w of words) { const L = lines.length - 1, t = lines[L] ? lines[L] + ' ' + w : w; if (lines[L] && t.length > max) lines.push(w); else lines[L] = t; }
   const mr = Math.max(MENU.open ? rectOf($('menu'), 250).bottom : 0, document.body.classList.contains('moding') ? rectOf($('modeBar'), 250).bottom + 4 : 0), top = Math.min(UIL.ny - 2 - (QL.rows && !MENU.open ? QL.rows + 1 : 0), uilRow(Math.max(mr + UIL.ch * 1.2, UIL.ch * 1.6)));   // (under the quest at the top left, not across it)
-  lines.slice(0, 3).forEach((ln, i) => { const shown = ln.slice(0, Math.ceil(ln.length * Math.min(1, (now - TOAST.t0) / 220 + 0.25))), c0 = (nx - ln.length) >> 1; uilPlate(c0 - 2, top - i, c0 + ln.length + 1, top - i, 190 * k | 0); uilText(c0, top - i, shown, 0, 235 * k | 0); uilPut(c0 - 2, top - i, 42, 1, 220 * k | 0); });
+  lines.slice(0, 3).forEach((ln, i) => { const shown = ln.slice(0, Math.ceil(ln.length * Math.min(1, (now - TOAST.t0) / 220 + 0.25))), c0 = (nx - ln.length) >> 1, tag = i === 0 && TOAST.tag ? TOAST.tag : ''; uilPlate(c0 - 2, top - i, c0 + ln.length + 1 + (tag ? tag.length + 2 : 0), top - i, 205 * k | 0); uilText(c0, top - i, shown, 0, 245 * k | 0); uilPut(c0 - 2, top - i, 42, 1, 220 * k | 0);
+    if (tag) uilText(c0 + ln.length + 2, top - i, tag, 1, 150 * k | 0); });   // (which of how many: there is more coming, or this is the last of it)
 }
 
 // ── The names of places, and of gods, are not laid over the picture: they stand in the world. Tall block letters — each
@@ -7666,7 +7733,7 @@ function auiTalk() {
   if (full) show.forEach((ln, i) => { const row = base + (show.length - 1 - i), c0 = (bx - ln.length) >> 1, n = clamp(left, 0, ln.length); left -= ln.length + 1; if (n <= 0) return; uibPlate(c0 - 1, row, c0 + n, row, 205); uibText(c0, row, ln.slice(0, n), 0, 245); });
   let top = base + Math.max(1, show.length);
   if (name) { const g = talk.god, fv = g && live() ? Math.round(((g.favor | 0) + 6) / 2) : -1, t = (name.toUpperCase().slice(0, max - 9) + (fv >= 0 ? ` [${'#'.repeat(fv)}${'-'.repeat(6 - fv)}]` : '')), c0 = (bx - t.length) >> 1, ink = g && godInk(g); /* (and how he stands with them: six marks) */ if (ink) postMat.uniforms.uSayCol.value.set(ink).lerp(_wtW, 0.4); uibPlate(c0 - 1, top, c0 + t.length, top, 150); uibText(c0, top, t, ink ? 3 : 1, 230); top++; }
-  if (you && you !== '…') { const t = you.slice(0, max), c0 = (bx - t.length) >> 1; uibPlate(c0 - 1, top, c0 + t.length, top, 120); uibText(c0, top, t, 0, 150); }
+  if (you && you !== '…') { const t = you.slice(0, max), c0 = (bx - t.length) >> 1; uibPlate(c0 - 1, top, c0 + t.length, top, 150); uibText(c0, top, t, 0, 200); }
   auiTalkKeys();
 }
 // the things to press in a conversation, typed in the grid where the buttons are: [ a reply ]  [ thank you - goodbye ]  [ >_ ];
@@ -7692,7 +7759,7 @@ function auiTalkKeys() {
       uilPut(c0, row, 62, focus ? 2 : 1, focus ? 255 : 150); uilText(c0 + 2, row, t, shown ? 0 : 0, shown ? 240 : 95);
       if (focus && blink) uilPut(c0 + 2 + shown.length, row, 95, 2, 255);
       for (let c = c0; c <= c0 + Math.max(t.length + 2, 8); c++) uilPut(c, row - 1, 45, 0, focus ? 90 : 45, 60); } }   // (and a faint rule under it)
-  const hn = $('talkHint'); if (hn && !TOUCH) { const r = rectOf(hn, 400), t = asciiOf(hn.textContent).toUpperCase(); if (r.width > 2 && t) { const row = uilRow(r.top + r.height / 2), c0 = uilCol(r.left + r.width / 2) - (t.length >> 1); uilText(c0, row, t, 0, 85); } }
+  const hn = $('talkHint'); if (hn && !TOUCH) { const r = rectOf(hn, 400), t = asciiOf(hn.textContent).toUpperCase(); if (r.width > 2 && t) { const row = uilRow(r.top + r.height / 2), c0 = uilCol(r.left + r.width / 2) - (t.length >> 1); uilText(c0, row, t, 0, 155); } }
 }
 function auiSay() {
   const nx = UIL.nx, ny = UIL.ny;
@@ -8108,6 +8175,8 @@ function chatCommand(text) {
     case 'cpu': case 'npc': case 'bots': if (MATCH.phase === 'count' && MATCH.host) matchCpu(parseInt(arg) || 3); else if (!MATCH.phase) matchWar(clamp(parseInt(arg) || 3, 1, 12)); else sys('ONLY BEFORE IT STARTS'); return true;
     case 'hamlet': case 'cabin': case 'cabins': agCommand(arg); return true;
     case 'circle': case 'orbit': circleStart(); return true;
+    case 'small': case 'shrink': case 'tiny': case 'hawk': small(SMALL.want >= 1 || /^(on|yes)$/i.test(arg || ''), true); return true;
+    case 'big': case 'grow': case 'whole': small(false); return true;
     case 'vivid': case 'color': case 'colour': case 'colors': case 'colours': { const U = postMat.uniforms.uVib, on = /^(off|0|no|plain)$/i.test(arg || '') ? 0 : /^(on|1|yes)$/i.test(arg || '') ? 1 : U.value > 0.5 ? 0 : 1; U.value = on; try { localStorage.setItem('icarus.vivid', String(on)); } catch {} chatLine('', on ? 'THE WORLD IN FULL COLOUR' : 'THE WORLD IN ITS PLAINER COLOURS · /vivid BRINGS THEM BACK', 'sys'); return true; }
     case 'warsim': matchWar(clamp(parseInt(arg) || 6, 2, 12), true); return true;
     case 'forfeit': case 'yield': if (MATCH.phase === 'live' && MATCH.me.alive) matchOut('gave it up'); else sys('YOU ARE NOT IN A FIGHT'); return true;
@@ -8524,9 +8593,9 @@ function updatePhoenix(dt) {
   const tHit = diving && !plunge && state === 'play' && dir3.y < -0.2 ? (p.pos.y - ahead) / Math.max(1, -dir3.y * p.speed) : 99, dWant = clamp((1.8 - tHit) / 1.3, 0, 1);
   p.danger = lerp(p.danger || 0, dWant, damp(dWant > (p.danger || 0) ? 7 : 2.5, dt));
   if (p.danger > 0.3 && time > (p.beatT || 0)) { p.beatT = time + lerp(0.95, 0.42, p.danger); audio.sfx.heart?.(p.danger); }
-  const p0x = p.pos.x, p0y = p.pos.y, p0z = p.pos.z;
-  p.pos.addScaledVector(dir3, p.speed * dt);
-  p.pos.y += p.vy * dt;
+  const p0x = p.pos.x, p0y = p.pos.y, p0z = p.pos.z, sv = SMALL.k < 1 ? smallV() : 1;   // (a small bird covers less ground: its own lengths a second are what they were)
+  p.pos.addScaledVector(dir3, p.speed * sv * dt);
+  p.pos.y += p.vy * sv * dt;
   const gHere = groundAt(p.pos.x, p.pos.z, p.pos.y);
   if (plunge && gHere < WATER - 3 && p.pos.y < WATER + 5.1 * birdK() && state === 'play') { enterSea(-1); return; }
   // the sea overhead is the way back: climb into it and he goes through; graze it and it holds him under
@@ -16695,6 +16764,7 @@ function heard(text, recorded = false) {
   ear.wordsAt = performance.now(); statsWords(text, false);
   const low = text.toLowerCase(), words = low.split(/\s+/).length;
   if (MATCH.inv && !MATCH.inv.mine && words <= 5) { if (/\b(accept|yes|fight|bring it|let'?s go|i'?m in)\b/.test(low)) return matchAnswer(true); if (/\b(no|decline|not now|pass)\b/.test(low)) return matchAnswer(false); }   // (challenged: a word answers it)
+  if (state === 'prologue' && pro.talk && pro.talk.wait) { proAnswer(text); return; }   // (his father has asked him something: what the player says aloud is his answer)
   if (state === 'prologue') { if (words <= 4 && /\b(skip|move on|get on with it)\b/.test(low)) { if (!(time - pro.skipT < 3)) pro.skipT = time; proSkip(); } return; }   // (said once: it is not a slip of the thumb)
   if (state === 'end') { if (words <= 4 && /\b(continue|close|keep (going|flying))\b/.test(low)) closeEnd(); return; }
   if (PATRON.picking && !PATRON.id && /\b(any( of them| one)?|anyone|surprise me|you (choose|decide|pick)|(let )?the gods (can )?decide|whoever|i don'?t (mind|care))\b/.test(low)) { choosePatron(pick(Object.keys(PATRONS))); return; }
@@ -19585,7 +19655,7 @@ function updateCamera(dt) {
     // while the world stretches past it. It leans with him, and at full speed it shakes.
     if (flags.wideT > 0) flags.wideT -= dt;
     const wide = smoothstep(0, 4, flags.wideT || 0);   // (the first flight: pulled right back, the whole sky around him, then easing in)
-    const camK = 1 + (birdK() - 1) * 0.6, rush = smoothstep(95, 290, p.speed), cd = phxDist * (1 - 0.34 * rush) * (camK + 2.6 * wide);   // (a bigger bird: the lens stands further back, but not so far that it is no bigger in the frame)
+    const camK = birdK() >= 1 ? 1 + (birdK() - 1) * 0.6 : lerp(0.2, 1, clamp((birdK() - SMALL.MIN) / (1 - SMALL.MIN), 0, 1)), rush = smoothstep(95, 290, p.speed), cd = phxDist * (1 - 0.34 * rush) * (camK + 2.6 * wide);   // (a bigger bird: the lens stands further back, but not so far that it is no bigger in the frame)
     camWant.set(p.pos.x + Math.sin(y) * cd, p.pos.y + cd * lerp(0.42, 0.16, rush) - p.pitch * lerp(12, 5, rush) * camK, p.pos.z + Math.cos(y) * cd);
     if (!p.sub) {
       camClear(camWant, p.pos, dt, 3, true);
@@ -19952,8 +20022,8 @@ function startPrologue() {
   pro.me = makeFlier({ ...hero, mat: plumeMat(fx, true), wing: 0.34 }); pro.me.body.visible = false; pro.me.group.visible = false;
   pro.sc.add(pro.dad.group, pro.son.group, pro.me.group);
   Object.assign(pro, { on: true, t: 0, skipT: -9, pov: false, falling: false, hitT: 0, li: 0, subT: 0, yaw: 0, pitch: 0, roll: 0, speed: 38, vy: 0, flap: 0, dPass: 0, speedNow: 0, vyNow: 0, slow: 1, dd: 999,
-    rt: 0, jumped: false, held: false, imp: 0, c: 0, waitT: 0, nagT: 0, act: '', e: 0, lift: 0, stroke: 0, lastBeat: -9, steer: 0, kl: false, kr: false, ku: false, kd: false, tx: 0, ty: 0, vyP: 0, dY: 0, lowT: 0, povT: 0,
-    dead: 0, tries: 0, ez: 1, ck: null, ckI: 0, base: null, nag2: -99, told: 0 });
+    rt: 0, talkK: 0, jumped: false, held: false, imp: 0, c: 0, waitT: 0, nagT: 0, act: '', e: 0, lift: 0, stroke: 0, lastBeat: -9, steer: 0, kl: false, kr: false, ku: false, kd: false, tx: 0, ty: 0, vyP: 0, dY: 0, lowT: 0, povT: 0,
+    dead: 0, tries: 0, ez: 1, ck: null, ckI: 0, base: null, nag2: -99, told: 0, talk: { on: false, done: false, wait: false, t: 0, q: [], cur: null } });
   pro.lines = PRO_LINES.map(l => ({ ...l, buf: null, ready: false })); pro.lines.forEach(l => proClip(l.clip).then(b => { l.buf = b; l.ready = true; }));
   state = 'prologue'; document.body.classList.add('pro'); document.body.classList.remove('cinema');
   $('proSkip').textContent = TOUCH ? 'tap here to skip' : 'esc — skip';
@@ -20010,6 +20080,95 @@ function proRetry() {
   if (L && L.buf && pro.rt - pro.nag2 > 12) { pro.nag2 = pro.rt; const d = proSay(L.buf, 'dad'); $('proSub').firstChild.textContent = L.who; $('proSub').lastChild.textContent = L.text; $('proSub').classList.add('show'); pro.subT = d + 0.5; }
   else { $('proSub').firstChild.textContent = 'Daedalus'; $('proSub').lastChild.textContent = 'Beat your wings, boy! Beat them!'; $('proSub').classList.add('show'); pro.subT = 2.4; }
 }
+// ── On the tower, before anything else: a father and a son, talking. He has fastened the last strap; he asks the boy what
+//    he will do first when they are home. The boy answers: one of three things, or whatever the player types or says. His
+//    father answers THAT (at once, for the three; for the player's own words, from the server, with a plain line ready if
+//    it is slow or away), and then says what has to be said before a jump like this one, in its own lines whatever came
+//    before: not too low, not too high. He asks if he is heard; the boy answers again; stay close to me. Then the line that
+//    was always there: "Now, Icarus. Jump!" One line on the screen at a time, and nothing to read while there is something to do.
+//    (Each line has the name of a recording it will be spoken from once one is made: voice/<clip>.mp3. Until then it is read.)
+const PRO_TALK_AT = 1.9;
+const DAD = { recorded: false,
+  open: [{ clip: 'pq0', text: 'Hold still. There. The wax has taken.' }, { clip: 'pq1', text: 'Well. What are you going to do first, when we get home?' }],
+  q0: [
+    { say: 'Sleep. Somewhere with no walls.', re: { clip: 'pa0', text: 'No walls. Then I\'ll build you a bed on the roof.' } },
+    { say: 'Eat. Everything.', re: { clip: 'pa1', text: 'Everything. Then we eat until the table gives way.' } },
+    { say: 'Fly again.', re: { clip: 'pa2', text: 'Ha! Fly once first, boy. Then we\'ll see about again.' } }],
+  own0: { clip: 'pa3', text: 'Then that is the first thing we do. I promise you.' },
+  none0: { clip: 'pa4', text: 'No? Think about it on the way. It is a long way.' },
+  warn: [{ clip: 'pq2', text: 'Now listen. Not too low: the sea gets into the feathers.' }, { clip: 'pq3', text: 'Not too high: the sun gets into the wax. Do you hear me?' }],
+  q1: [
+    { say: 'I hear you.', re: { clip: 'pb0', text: 'Good. Stay close to me, and we are home by dark.' } },
+    { say: 'What if I fall?', re: { clip: 'pb1', text: 'Then I catch you. Stay close to me, and I can.' } },
+    { say: 'I\'m not afraid.', re: { clip: 'pb2', text: 'I am. So stay close to me.' } }],
+  own1: { clip: 'pb3', text: 'Stay close to me. Whatever happens.' },
+  none1: { clip: 'pb4', text: 'Stay close to me. That is all I ask.' },
+};
+function dadReply(q, said) {   // what he says back to the player's own words: '' if there is nothing to be had in time
+  return fetch('/api/hub?fn=dad', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q, said, name: heroName }), signal: AbortSignal.timeout(5200) })
+    .then(r => r.ok ? r.json() : null).then(o => o && typeof o.say === 'string' ? o.say.replace(/\s+/g, ' ').trim().slice(0, 170) : '').catch(() => '');
+}
+function proTalkShow(C) {
+  const say = $('ptSay'), T = $('proTalk');
+  if (C.ask != null) {   // (his father's question stays where it is: what can be said back comes in under it)
+    const L = C.ask === 0 ? DAD.q0 : DAD.q1, box = $('ptOpts'); box.innerHTML = '';
+    L.forEach((o, i) => { const b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--i', i); b.innerHTML = '<kbd></kbd><span></span>'; b.firstChild.textContent = i + 1; b.lastChild.textContent = o.say; b.addEventListener('click', e => { e.stopPropagation(); proAnswer(i); }); box.appendChild(b); });
+    $('ptIn').value = ''; $('ptIn').placeholder = mic.stream && !VC.muted ? 'or say it aloud, your own way' : TOUCH ? 'or say it your own way' : 'or type it your own way';
+    T.classList.add('ask'); pro.talk.wait = true; return;
+  }
+  T.classList.remove('ask'); pro.talk.wait = false; say.classList.toggle('me', !!C.me);
+  $('ptWho').textContent = C.me ? heroName : 'Daedalus'; C.n = -1;
+  if (C.think) { say.textContent = '.'; return; }
+  C.text = C.me ? '“' + C.me + '”' : C.dad.text; C.cps = C.me ? 70 : 36; C.dur = C.text.length / C.cps + (C.me ? 0.85 : 1.15 + C.text.length * 0.012);
+  if (C.dad && DAD.recorded && C.dad.clip) proClip(C.dad.clip).then(b => { if (b && pro.on && pro.talk && pro.talk.cur === C) { const d = proSay(b, 'dad'); C.dur = Math.max(C.dur, d + 0.35); } });
+}
+function proTalkStep(dt) {
+  const K = pro.talk; K.t += dt;
+  if (!K.on) { if (pro.t < PRO_TALK_AT - 0.01 || K.t < 2.6) return; K.on = true; K.q = [{ dad: DAD.open[0] }, { dad: DAD.open[1] }, { ask: 0 }]; $('proTalk').classList.add('on'); }
+  let C = K.cur;
+  if (!C) { C = K.cur = K.q.shift(); if (!C) return proTalkEnd(); C.t = 0; proTalkShow(C); }
+  C.t += dt;
+  if (C.ask != null) { if (C.t > 20 && !C.done && !(document.activeElement === $('ptIn') && $('ptIn').value)) proAnswer(-1); }   // (he says nothing: his father goes on)
+  else if (C.think) {
+    $('ptSay').textContent = '.'.repeat(1 + Math.floor(C.t * 3) % 3);
+    if (C.t > 0.55 && (C.got !== undefined || C.t > 5.4)) {
+      let text = C.got || (C.q === 0 ? DAD.own0.text : DAD.own1.text);
+      if (C.q === 1 && !/stay close/i.test(text)) text = text.replace(/\s+$/, '') + ' Stay close to me.';   // (whatever else he says to that, he says this)
+      K.q.unshift({ dad: { text, clip: C.got ? '' : (C.q === 0 ? DAD.own0 : DAD.own1).clip } }); K.cur = null; }
+  } else {
+    const n = Math.min(C.text.length, Math.floor(C.t * C.cps)); if (n !== C.n) { C.n = n; $('ptSay').textContent = C.text.slice(0, n); }
+    if (C.t > C.dur) { K.cur = null; if (K.q[0] && K.q[0].ask != null) { C = K.cur = K.q.shift(); C.t = 0; proTalkShow(C); } }   // (the question stays up while he chooses)
+  }
+}
+// what the boy says: one of the three (0..2), nothing (-1), or his own words
+function proAnswer(x) {
+  const K = pro.talk, C = K && K.cur; if (!C || C.ask == null || C.done) return;
+  const q = C.ask, L = q === 0 ? DAD.q0 : DAD.q1, own = typeof x === 'string', said = own ? x.replace(/\s+/g, ' ').trim().slice(0, 90) : x >= 0 && L[x] ? L[x].say : '';
+  if (own && !said) return;
+  C.done = true; $('proTalk').classList.remove('ask'); K.wait = false; $('ptIn').blur(); audio.sfx.menuPick?.();
+  let re;
+  if (own) { re = { think: true, q }; dadReply(q, said).then(s => { re.got = s || ''; }); }
+  else re = { dad: x >= 0 ? L[x].re : q === 0 ? DAD.none0 : DAD.none1 };
+  K.q = [...(said ? [{ me: said }] : []), re, ...(q === 0 ? [{ dad: DAD.warn[0] }, { dad: DAD.warn[1] }, { ask: 1 }] : [])]; K.cur = null;
+  if (said && q === 0) { flags.homeWish = said; try { saveSoon(); } catch {} }   // (what he meant to do first, when he got home: kept)
+}
+function proTalkEnd() { const K = pro.talk; if (!K) return; K.done = true; K.on = false; K.wait = false; K.cur = null; K.q = []; $('proTalk').classList.remove('on', 'ask'); try { $('ptIn').blur(); } catch {} }
+function proTalkKey(e) {   // the keys, while they are talking: 1 2 3 answer, a letter begins his own words, Space or Enter hurries a line
+  const K = pro.talk, C = K.cur; if (e.repeat) return;
+  if (e.code === 'Escape') return proSkip();
+  if (C && C.ask != null && !C.done) {
+    const d = /^(?:Digit|Numpad)([1-3])$/.exec(e.code); if (d) { e.preventDefault(); return proAnswer(+d[1] - 1); }
+    if (e.code === 'Enter' || /^Key[A-Z]$/.test(e.code) && !e.metaKey && !e.ctrlKey && !e.altKey) { if (e.code === 'Enter') e.preventDefault(); $('ptIn').focus({ preventScroll: true }); }
+    return;
+  }
+  if (C && C.text && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); proTalkHurry(); }
+}
+function proTalkHurry() { const C = pro.talk && pro.talk.cur; if (!C || !C.text) return; const full = C.text.length / C.cps; C.t = C.t < full ? full : C.dur; }   // (the first press finishes the line; the second goes on)
+$('ptSay').addEventListener('click', e => { e.stopPropagation(); proTalkHurry(); });
+$('ptOwn').addEventListener('submit', e => { e.preventDefault(); e.stopPropagation(); proAnswer($('ptIn').value); });
+$('ptIn').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); $('ptIn').blur(); } });
+$('ptJump').addEventListener('click', e => { e.stopPropagation(); proTalkEnd(); });
+for (const ev of ['pointerdown', 'pointerup', 'touchstart', 'click']) $('proTalk').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 function proAct(text) {
   if (pro.act === text) return;
   pro.act = text; const el = $('proAct');
@@ -20057,6 +20216,7 @@ function proPlace(v, dt) {
 }
 function proHush() { stopVoice(); for (const s of pro.srcs || []) try { s.stop(); } catch {} pro.srcs = []; pro.vox = []; }
 function endPrologue(skipped) {
+  proTalkEnd();
   WT.on = false;   // (whatever was still written over Crete is not carried to the mountain)
   if (!pro.on) return;
   pro.on = false; proHush(); proAct('');
@@ -20112,7 +20272,9 @@ function updatePrologue(dt) {
     $('proSub').firstChild.textContent = heroName; $('proSub').lastChild.textContent = '“' + LS.text + '”'; $('proSub').classList.add('show'); pro.subT = 0.6;
   }
   pro.sayPress = false;
-  const t = pro.t = !pro.jumped ? Math.min(PRO_JUMP, pro.t + dt) : pro.t + dt * rate, C = PRO_C, dad = pro.dad, son = pro.son, me = pro.me;
+  const talking = !!pro.talk && !pro.talk.done && !pro.jumped;   // (on the tower, the two of them: nothing else happens until that is over)
+  const t = pro.t = !pro.jumped ? Math.min(talking ? PRO_TALK_AT : PRO_JUMP, pro.t + dt) : pro.t + dt * rate, C = PRO_C, dad = pro.dad, son = pro.son, me = pro.me;
+  if (talking) proTalkStep(dt);
   pro.fx.uTime.value = pro.rt; pro.seaU.uTime.value = pro.rt;
   // what he is being asked to do, and his father asking again if he stands there
   const waiting = !pro.jumped && t >= PRO_JUMP - 0.4;
@@ -20139,10 +20301,11 @@ function updatePrologue(dt) {
   for (const v of pro.vox || []) proPlace(v, dt);
 
   if (!pro.pov) {
+    const tk0 = pro.talkK = lerp(pro.talkK || 0, talking && pro.talk.on ? 1 : 0, damp(talking && pro.talk.on ? 1.5 : 2.4, dt)), tkE = tk0 * tk0 * (3 - 2 * tk0);
     // the tower: two figures on the parapet with their wings spread, then gone
     const leap = (F, x, t0, ph) => {
       const tau = t - t0, g = F.group;
-      if (tau < 0) { g.position.set(C.x + x, C.y + 52.5, C.z - 8.2); g.rotation.set(1.22, 0, 0); flierFlap(F, pro.rt * 1.6 + ph, 0.1, 0.5); return; }
+      if (tau < 0) { g.position.set(C.x + x, C.y + 52.5, C.z - 8.2); g.rotation.set(1.22, 0, (x < 0 ? 1 : -1) * 0.5 * tkE); flierFlap(F, pro.rt * 1.6 + ph, 0.1, 0.5); return; }   // (while they talk, each is turned a little to the other)
       const s = 38 * (tau - (1 - Math.exp(-1.4 * tau)) / 1.4);
       g.position.set(C.x + x * (1 + tau * 0.35), C.y + 52.5 - 15 * (1 - Math.exp(-1.2 * tau)) + 2.4 * tau + Math.sin(tau * 5.2 + ph) * 0.35, C.z - 8.2 - s);
       g.rotation.set(lerp(1.22, 0.06, smoothstep(0, 0.9, tau)), 0, Math.sin(tau * 1.3 + ph) * 0.08);
@@ -20150,13 +20313,18 @@ function updatePrologue(dt) {
     };
     leap(dad, -2.6, 3.3, 0); leap(son, 2.6, 3.95, 1.7);
     const k = smoothstep(0, 3.7, t);
-    if (t < 3.9) { camera.position.set(lerp(70, 22, k), lerp(430, 132, k), lerp(C.z + 150, C.z + 46, k)); _p.set(C.x, C.y + lerp(0, 50, k), C.z - lerp(0, 8, k)); }
+    if (t < 3.9) { camera.position.set(lerp(70, 22, k), lerp(430, 132, k), lerp(C.z + 150, C.z + 46, k)); _p.set(C.x, C.y + lerp(0, 50, k), C.z - lerp(0, 8, k));
+      // while they talk the lens comes down off the height to the two of them on the parapet, out over the drop and looking back at
+      // their faces; when it is said, it goes back up to where it was, and from there they are two small things that jump
+      if (tkE > 0.001) { const A = pro.tcA ||= new THREE.Vector3(), B = pro.tcB ||= new THREE.Vector3();
+        A.set(C.x + 1.3 + Math.sin(pro.rt * 0.23) * 0.6, C.y + 54.1 + Math.sin(pro.rt * 0.31) * 0.15, C.z - 8.2 - 10.6); B.set(C.x, C.y + 51.6, C.z - 8.2);   // (aimed below their feet: they stand in the top of the picture, clear of what is written under them)
+        camera.position.lerp(A, tkE); _p.lerp(B, tkE); } }
     else {   // cut: riding just behind and above the two of them as the walls go by underneath
       const u = smoothstep(3.9, PRO_TA, t);
       camera.position.set(son.group.position.x + lerp(5.5, 2.2, u), son.group.position.y + lerp(3.6, 2.4, u), son.group.position.z + lerp(12, 7.5, u));
       _p.copy(son.group.position).add(dad.group.position).multiplyScalar(0.5); _p.z -= 3; _p.y += 0.4;
     }
-    camera.lookAt(_p); camera.fov = lerp(44, 52, k);
+    camera.lookAt(_p); camera.fov = lerp(lerp(44, 52, k), 40, tkE);
     if (t >= PRO_TA) {   // …and now it is his eyes
       pro.pov = true; pro.pos.copy(son.group.position); pro.dPos.copy(dad.group.position); son.group.visible = false; me.group.visible = true; pro.flap = 0;
       pro.e = 0.75; pro.lift = 6; pro.vyP = 2; pro.dY = pro.pos.y + 6; pro.povT = pro.rt; pro.lastBeat = pro.rt;   // (the leap carries him a moment; after that it is his wings)
@@ -20329,7 +20497,7 @@ function titleEnd() {
 // a wingbeat: thrown upward, embers off both wings
 function titlePress(down) {
   if (!titleFly.on) return;
-  if (LIVE.on) { if (down) menuTap(); return; }
+  if (LIVE.on) { if (down) { nameAsked = true; menuGo('fly'); } return; }   // (the film of his own flight: a press anywhere on it and the bird is his, there and then)
   titleFly.held = !!down;
   if (!down) return;
   initAudio(); goFull();
@@ -20343,7 +20511,7 @@ function titleAsk() {
   titleFly.asked = true; $('title').classList.add('asked', 'flown');
   if (resumed) { $('nameAsk').textContent = nameInput.value ? `welcome back, ${nameInput.value.toLowerCase()}` : 'welcome back'; $('goBtn').textContent = TOUCH ? 'CONTINUE' : 'ENTER — CONTINUE'; }
   else $('goBtn').textContent = TOUCH ? 'BEGIN' : 'ENTER — BEGIN';
-  if (!TOUCH) setTimeout(() => { if (state === 'title' && document.activeElement !== nameInput) nameInput.focus({ preventScroll: true }); }, 400);
+  if (!TOUCH) setTimeout(() => { if (state === 'title' && !LIVE.on && document.activeElement !== nameInput) nameInput.focus({ preventScroll: true }); }, 400);   // (not over the film of his own bird: there the keys are for flying, and the first one he touches takes it)
 }
 const EMBER_COLS = [[1, 0.3, 0.08], [1, 0.45, 0.12], [0.95, 0.18, 0.05], [1, 0.6, 0.25]];
 // ── The live menu. Someone who has been here before does not come back to a picture: they come back to their own bird,
@@ -20395,7 +20563,7 @@ function menuStart() {
   M.sea = realm === 'over' ? menuSea() : null;
   M.cp.set(p.pos.x + 70, p.pos.y + 18, p.pos.z + 70); M.cl.copy(p.pos); camera.position.copy(M.cp); lookAt.copy(p.pos);
   const T = $('title'); T.classList.add('live', 'flown'); $('liveRow').classList.remove('hidden'); $('liveCap').classList.remove('hidden');
-  $('flyBtn').textContent = TOUCH ? 'FLY ON' : 'ENTER — FLY ON';
+  $('flyBtn').textContent = TOUCH ? 'TAP ANYWHERE — FLY' : 'ANY KEY — FLY';
   $('backBtn').innerHTML = `BACK TO WHERE YOU WERE<small>${menuWhere(M.home.pos, M.home.realm)}</small>`;
   setTimeout(() => T.classList.add('ready'), 60);
   titleAsk();
@@ -20525,7 +20693,7 @@ function updateMenu(dt) {
   if ((M.peersT -= dt) <= 0) { M.peersT = 1; menuPeers();
     if (M.lead && !M.leave && (!M.mv || M.mv.k !== 'wing') && !(M.mv && TRICK_K.has(M.mv.k)) && !M.q.some(m => m.k === 'wing')) { M.q.length = 0; M.mv = { k: 'wing', t: 0, L: M.lead }; } }
   if (M.leave) {   // leaving: whatever it was doing, it comes level and flies straight on
-    M.mv = { k: 'level', t: 0 }; M.pitch = lerp(wrapAngle(M.pitch), 0.03, damp(2.4, dt)); M.roll = lerp(wrapAngle(M.roll), 0, damp(3.2, dt)); M.speed = lerp(M.speed, 72, damp(1.2, dt));
+    const q = M.leave.fast ? 3.2 : 1; M.mv = { k: 'level', t: 0 }; M.pitch = lerp(wrapAngle(M.pitch), 0.03, damp(2.4 * q, dt)); M.roll = lerp(wrapAngle(M.roll), 0, damp(3.2 * q, dt)); M.speed = lerp(M.speed, 72, damp(1.2, dt));
     const fl = menuSafe(P) + 30 * K; if (P.y < fl) M.pitch = Math.max(M.pitch, 0.25);
   } else {
     if (!M.mv || M.mv.done) { if (M.mv && TRICK_K.has(M.mv.k)) { M.pitch = wrapAngle(M.pitch); M.roll = wrapAngle(M.roll); } if (!M.q.length) menuPlan(); M.mv = M.q.shift(); M.mv.t = 0; M.mv.done = false; if (TRICK_K.has(M.mv.k) && !M.mv.copy) menuTold(M.mv.k); }
@@ -20536,7 +20704,7 @@ function updateMenu(dt) {
   // fly: along the way it faces, pitched and rolled however it likes
   const cp = Math.cos(M.pitch);
   dir3.set(-Math.sin(M.yaw) * cp, Math.sin(M.pitch), -Math.cos(M.yaw) * cp);
-  P.addScaledVector(dir3, M.speed * dt);
+  P.addScaledVector(dir3, M.speed * (SMALL.k < 1 ? smallV() : 1) * dt);
   { const fl = menuFloor(P.x, P.z, P.y) + M.clear, rf = menuRoof(P.x, P.z) - 12; if (P.y < fl) P.y = lerp(P.y, fl, 0.5) + 0.01; if (P.y > rf) P.y = rf; }
   p.yaw = M.yaw; p.pitch = wrapAngle(M.pitch); p.bank = wrapAngle(M.roll); p.speed = M.speed; p.vy = 0; p.flame = 1; p.fallTop = P.y;
   // the wings: a glide with a few beats now and then; hard beats climbing and round a loop; folded into a stoop
@@ -20604,7 +20772,8 @@ function menuCam(dt) {
   M.cf = lerp(M.cf, fov, damp(2, dt));
   // and the way out: from the menu's lens round to the one behind him, over a couple of seconds
   const L = M.leave;
-  if (L) {
+  if (L && L.fast) { L.t += dt; camera.position.copy(M.cp); lookAt.copy(M.cl); camera.fov = M.cf * fovK(); }   // (the film's lens until the bird is his; then it comes round: camBlend)
+  else if (L) {
     L.t += dt; const e = smoothstep(0, 1, Math.min(1, L.t / L.T)), ee = e * e * (3 - 2 * e);
     const cd = phxDist * (1 + (K - 1) * 0.6), y = M.yaw;
     _mw.set(P.x + Math.sin(y) * cd, P.y + cd * 0.42 - wrapAngle(M.pitch) * 12, P.z + Math.cos(y) * cd); _ml.copy(P).addScaledVector(dir3, 14);
@@ -20628,10 +20797,34 @@ function menuCaption(dt) {
 function menuGo(kind) {
   const M = LIVE; if (!M.on || M.leave) return;
   initAudio(); goFull(); nameInput.blur();
-  if (!M.song) menuSong();
-  M.leave = { kind, t: 0, T: kind === 'back' ? 0.8 : 2.1 };
+  if (kind === 'back') { if (!M.song) menuSong(); M.leave = { kind, t: 0, T: 0.8 }; }
+  else {
+    // Taken where it is. The bird comes level (a third of a second if it was flying straight, a second out of a loop) and is his;
+    // the lens comes round behind him after that, while he already has it (camBlend). The song comes in a breath before its
+    // first word, so the sung name and the name written in fire across the sky land as the bird becomes his.
+    const T = clamp(0.3 + Math.abs(wrapAngle(M.pitch)) * 0.5 + Math.abs(wrapAngle(M.roll)) * 0.3, 0.3, 1.2);
+    M.leave = { kind, t: 0, T, fast: true };
+    M.song = true; SESSION.titled = true; audio.song(Math.max(0, VOCAL_AT - T - 0.8)); TITLE_SYNC.want = true; TITLE_SYNC.until = performance.now() + 9000;
+    setTimeout(() => { if (TITLE_SYNC.want) { TITLE_SYNC.want = false; if (state === 'play') titleBurn(); } }, (T + 2.6) * 1000);   // (and if the song is not there to land it on: the name, all the same)
+  }
   $('title').classList.add('leaving');
   audio.sfx.whoosh?.(true);
+}
+// ── The lens, handed over. It is wherever the film had it (off a wingtip, out in front, standing still as he went by); it is
+//    wanted behind him. It goes there on an arc about the bird, never through it, eased at both ends, while he is already flying.
+const CAMB = { T: 0, t: 0, off: new THREE.Vector3(), look: new THREE.Vector3(), fov: 60, q: new THREE.Quaternion(), q0: new THREE.Quaternion(), a: new THREE.Vector3(), b: new THREE.Vector3() };
+function camBlendFrom(T) { const P = player.pos, B = CAMB; B.T = T; B.t = 0; B.off.copy(camera.position).sub(P); B.look.copy(lookAt).sub(P); B.fov = camera.fov; }
+function camBlend(dt) {
+  const B = CAMB; if (!B.T) return;
+  B.t += dt; const u = Math.min(1, B.t / B.T), P = player.pos;
+  if (u >= 1 || state !== 'play' || player.form !== 'phoenix' || player.sub) { B.T = 0; return; }
+  const e = u * u * u * (u * (u * 6 - 15) + 10), L0 = B.off.length() || 1, L1 = B.b.copy(camera.position).sub(P).length() || 1;
+  B.a.copy(B.off).divideScalar(L0); B.b.divideScalar(L1);
+  B.q.setFromUnitVectors(B.a, B.b); B.q0.identity().slerp(B.q, e);
+  B.a.applyQuaternion(B.q0).multiplyScalar(lerp(L0, L1, e)); camera.position.copy(P).add(B.a);
+  { const g = Math.max(groundAt(camera.position.x, camera.position.z, camera.position.y + 40), realm === 'under' ? -1e9 : WATER) + 2.5; if (camera.position.y < g) camera.position.y = g; }
+  B.b.copy(lookAt).sub(P).lerp(B.look, 1 - e).add(P);
+  camera.up.set(0, 1, 0); camera.lookAt(B.b); camera.fov = lerp(B.fov, camera.fov, e); camera.updateProjectionMatrix();
 }
 function menuFinish(kind) {
   const M = LIVE, p = player, H = M.home;
@@ -20646,7 +20839,7 @@ function menuFinish(kind) {
   startMic(); if (!PATRON.id) { PRAY.pending = true; PRAY.wait = 3; }
   if (TOUCH) setTimeout(ctlChoose, 1200);
   if (kind === 'back') { warp.exact = { x: H.pos.x, y: H.pos.y, z: H.pos.z, realm: H.realm }; startWarp(H.pos.x, H.pos.z, H.pos.y + 8, p.yaw); warp.to.set(H.pos.x, H.pos.y + 6, H.pos.z); }
-  else toast(realm === 'under' ? 'YOURS AGAIN · IN THE UNDERWORLD' : 'YOURS AGAIN');
+  else { camBlendFrom(1.9); toast(realm === 'under' ? 'YOURS AGAIN · IN THE UNDERWORLD' : 'YOURS AGAIN'); }
 }
 function updateTitle(dt) {
   const T = titleFly, p = player;
@@ -20906,11 +21099,14 @@ addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   if (state === 'title') {
     if (e.code === 'KeyN' && resumed) return newGame();
+    // (come back to a bird already in the air: any key he would fly with takes it, where it is)
+    if (LIVE.on && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) { nameAsked = true; return menuGo('fly'); }
     if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { if (!e.repeat) titlePress(true); return; }
     if (e.code === 'Enter') { nameAsked = true; if (LIVE.on && e.shiftKey) return menuGo('back'); return begin(); }
     if (titleFly.asked && /^(Key[A-Z]|Digit\d)$/.test(e.code) && !e.metaKey && !e.ctrlKey) nameInput.focus({ preventScroll: true });   // (typing goes to the name)
     return;
   }
+  if (state === 'prologue' && pro.talk && pro.talk.on && !pro.talk.done) return proTalkKey(e);
   if (state === 'prologue') { if (['KeyA', 'ArrowLeft'].includes(e.code)) pro.kl = true; if (['KeyD', 'ArrowRight'].includes(e.code)) pro.kr = true;   // (the keys he will fly with later: A and D turn, W lifts the nose, S drops it, Space is a wingbeat)
     if (['KeyW', 'ArrowUp'].includes(e.code)) pro.ku = true; if (['KeyS', 'ArrowDown'].includes(e.code)) pro.kd = true;
     if (e.repeat) return; if (e.code === 'Space' || !pro.pov && ['ArrowUp', 'KeyW'].includes(e.code)) proPress(true); else if (['Enter', 'Escape'].includes(e.code)) proSkip(); return; }
@@ -21852,7 +22048,7 @@ function tick(dt) {
   else if (state === 'end') updateEnding(dt);
   else if (state === 'warp') updateWarp(dt);
   carryOn();    // (and then to where it has stood off to, if a bird is passing through it)
-  updateTail(dt);
+  updateTail(dt); updateSmall(dt);
   updateGodDirector(dt);
   updateCinemaState(dt);
   if (state === 'title') updateTitle(dt);
@@ -21899,6 +22095,7 @@ function tick(dt) {
     const want = _v.z < 1 && realm === 'over' && state !== 'title' ? smoothstep(0.15, 0.85, face) * up * clear * 0.75 * morning * (1 + (WX.gold || 0) * 1.1) : 0;
     if (Number.isFinite(_v.x) && Number.isFinite(_v.y)) postMat.uniforms.uSunUV.value.set(_v.x * 0.5 + 0.5, _v.y * 0.5 + 0.5);
     postMat.uniforms.uRays.value = lerp(postMat.uniforms.uRays.value, want, damp(2, dt)); }
+  if (CAMB.T) camBlend(dt);
   if (window.__icarus?.testCam) window.__icarus.testCam(camera);   // (tests only: look from wherever a test says)
   if (M3.on && mapV.open && state === 'map') m3Present(); else present(scene, camera);
   if (DP.grab) { const r = DP.grab; DP.grab = null; r(dpFrame()); }
@@ -22112,13 +22309,16 @@ function birdStep(dt) {
     const turn = clamp(wrapAngle(BIRD.hd - M.yaw) * 1.4, -0.8, 0.8); M.yaw += turn * dt; M.roll = lerp(M.roll, clamp(turn * 1.5, -1.0, 1.0), damp(2.6, dt));
     M.pitch = lerp(M.pitch, clamp((BIRD.alt - P.y) / 160, -0.55, 0.5), damp(1.8, dt)); M.speed = lerp(M.speed, BIRD.v, damp(0.9, dt));
   } else if (M.mv.k === 'circle') {   // round and round what there is to see, a wing down toward it
-    const T = circleAim(), a = Math.atan2(P.x - T.x, P.z - T.z) + 0.34, tx = T.x + Math.sin(a) * CIRC.r, tz = T.z + Math.cos(a) * CIRC.r;
+    // (small, it goes round close: twenty paces off and a little above whoever it is watching, slowly; and keeps up with him when he flies)
+    const T = circleAim(), st = smallT(), cl = CIRC.close ? 0 : 1, cr = CIRC.r * lerp(0.07, 1, Math.min(st, cl)), chh = CIRC.h * lerp(0.1, 1, Math.min(st, cl)), Q = st < 1 ? cretePeer() : null, qv = Q && Q.s ? Math.hypot(Q.s.vx || 0, Q.s.vy || 0, Q.s.vz || 0) : 0;
+    if (CIRC.close && SMALL.want >= 1 && Math.hypot(P.x - T.x, P.z - T.z) < 125 && player.form === 'phoenix' && state === 'play') { SMALL.want = SMALL.MIN; SMALL.free = false; audio.sfx.morph?.(); }
+    const a = Math.atan2(P.x - T.x, P.z - T.z) + lerp(0.6, 0.34, st), tx = T.x + Math.sin(a) * cr, tz = T.z + Math.cos(a) * cr;
     const turn = clamp(wrapAngle(Math.atan2(-(tx - P.x), -(tz - P.z)) - M.yaw) * 1.6, -0.9, 0.9); M.yaw += turn * dt; M.roll = lerp(M.roll, clamp(turn * 1.4 + 0.22, -1.0, 1.0), damp(2.6, dt));
-    const alt = clamp(T.y + CIRC.h, menuSafe(P) + 40 * K, menuRoof(P.x, P.z) - 30); M.pitch = lerp(M.pitch, clamp((alt - P.y) / 160, -0.5, 0.45), damp(1.8, dt)); M.speed = lerp(M.speed, 50, damp(0.9, dt));
+    const alt = clamp(T.y + chh, menuSafe(P) + 40 * K, menuRoof(P.x, P.z) - 30); M.pitch = lerp(M.pitch, clamp((alt - P.y) / lerp(26, 160, st), -0.5, 0.45), damp(1.8, dt)); M.speed = lerp(M.speed, lerp(24 + qv * 1.25 / 0.3, 50, st), damp(0.9, dt));
   } else menuMove(M.mv, dt);
   const cp = Math.cos(M.pitch);
   dir3.set(-Math.sin(M.yaw) * cp, Math.sin(M.pitch), -Math.cos(M.yaw) * cp);
-  P.addScaledVector(dir3, M.speed * dt);
+  P.addScaledVector(dir3, M.speed * (SMALL.k < 1 ? smallV() : 1) * dt);
   { const fl = menuFloor(P.x, P.z, P.y) + M.clear, rf = menuRoof(P.x, P.z) - 12; if (P.y < fl) P.y = lerp(P.y, fl, 0.5) + 0.01; if (P.y > rf) P.y = rf; }
   p.yaw = M.yaw; p.pitch = wrapAngle(M.pitch); p.bank = wrapAngle(M.roll); p.speed = M.speed; p.vy = 0; p.fallTop = P.y; p.flame = Math.max(p.flame, 0.35); heat = 0;
   const mv = M.mv || {}, climbing = M.pitch > 0.25 && M.pitch < 1.3 || mv.climb, stoop = mv.k === 'dive' && mv.ph === 'stoop' ? smoothstep(-0.3, -0.95, M.pitch) : 0;
@@ -23593,7 +23793,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);
