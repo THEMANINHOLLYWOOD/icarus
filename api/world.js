@@ -86,9 +86,9 @@ async function look(realm, cx, cz, hash) {
     const mx0 = (cx - SPAN * 2) * 200, mx1 = (cx + SPAN * 2) * 200, mz0 = (cz - SPAN * 2) * 200, mz1 = (cz + SPAN * 2) * 200;
     const [m, t, c, n, w, a] = await Promise.all([
       rest(`world_marks?select=kind,x,y,z,god,seed,by_name,by_hash,at&realm=eq.${realm}&x=gte.${mx0}&x=lte.${mx1}&z=gte.${mz0}&z=lte.${mz1}&order=at.desc&limit=300`),
-      rest(`travellers?select=hash,name,x,z,phase,seen&realm=eq.${realm}&phase=neq.agent&seen=gte.${new Date(Date.now() - 14 * 864e5).toISOString()}&order=seen.desc&limit=60`),
+      rest(`travellers?select=hash,name,x,z,phase,seen&realm=eq.${realm}&phase=not.in.(agent,pair)&seen=gte.${new Date(Date.now() - 14 * 864e5).toISOString()}&order=seen.desc&limit=60`),
       rest('world_cells?select=cx&limit=1', { prefer: 'count=estimated' }),
-      rest('travellers?select=hash&limit=1', { prefer: 'count=estimated' }),
+      rest('travellers?select=hash&phase=not.in.(agent,pair)&limit=1', { prefer: 'count=estimated' }),
       rest(`world_winds?select=id,pts,patron,by_name,by_hash,at&realm=eq.${realm}&cx=gte.${mx0}&cx=lte.${mx1}&cz=gte.${mz0}&cz=lte.${mz1}&order=at.desc&limit=40`),
       rest(`world_rings?select=id,patrons,names,at,len&realm=eq.${realm}&cx=gte.${mx0}&cx=lte.${mx1}&cz=gte.${mz0}&cz=lte.${mz1}&order=at.desc&limit=300`),
     ]);
@@ -252,7 +252,7 @@ export async function POST(req) {
         const [c, m, p] = await Promise.all([
           rest(`world_cells?select=cx&at=gt.${s}&by_name=neq.${encodeURIComponent(name)}&limit=1`, { prefer: 'count=estimated' }),
           rest(`world_marks?select=id&at=gt.${s}&by_hash=neq.${hash}&limit=1`, { prefer: 'count=estimated' }),
-          rest(`travellers?select=hash&seen=gt.${s}&hash=neq.${hash}&limit=1`, { prefer: 'count=estimated' }),
+          rest(`travellers?select=hash&seen=gt.${s}&hash=neq.${hash}&phase=not.in.(agent,pair)&limit=1`, { prefer: 'count=estimated' }),
         ]);
         cells = c.count; marks = m.count; people = p.count;
       }

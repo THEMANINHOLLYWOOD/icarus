@@ -7706,7 +7706,7 @@ const CMD_HELP = [
   ['PEOPLE', '/players · /follow @NAME · /track @NAME · /untrack · /friend @NAME · /mute @NAME · /block @NAME · @NAME calls them'],
   ['SEE', '/map · /map3d · /camera · /snap · /record · /album · /film · /face · /wide'],
   ['YOU', '/name NEW · /become ANIMAL · /god (god mode) · /mortal · /bolt · /burn · /blow'],
-  ['HAMLET', '/hamlet (your own AI agents: who lives there, what they are building, the way to it) · /hamlet key (the line that connects one)'],
+  ['HAMLET', '/hamlet (your own AI agents: who lives there, what they are building, the way to it) · /hamlet connect (bring your Claude, Codex and other agents in) · /hamlet key (the key, by hand)'],
   ['FIGHT', '/challenge NAME (or cpu) · /accept · /decline · /warzone · /cpu N (birds that fly themselves) · /warsim N (watch N of them) · /forfeit'],
   ['SET', '/sound on|off · /mic on|off · /hands on|off · /quality up|down · /letters up|down · /clear'],
   ['ASK', '/ask ANYTHING: she answers, and does it if she can'],
@@ -22004,7 +22004,7 @@ function agTake(list) {
 function agMerge() {
   const ok = AG.srv.concat(AG.dmn.filter(d => !AG.srv.some(a => a.o === d.o && a.n === d.n))), seen = new Set(); AG.list = ok;
   for (const a of ok) { seen.add(a.o); let H = AG.ham.get(a.o); if (!H) AG.ham.set(a.o, H = { o: a.o, agents: [], site: undefined, key: '', group: null, figs: new Map(), label: null, greet: 0, greetT: -999, awayT: 0 }); }
-  for (const [o, H] of AG.ham) { if (!seen.has(o)) { agDrop(H, true); AG.ham.delete(o); continue; } H.agents = ok.filter(a => a.o === o).sort((a, b) => a.s - b.s || (a.id < b.id ? -1 : 1)).slice(0, 8); H.boss = H.agents[0].b; H.god = H.agents.find(a => a.g)?.g || ''; H.local = H.agents.every(a => a.loc);
+  for (const [o, H] of AG.ham) { if (!seen.has(o)) { agDrop(H, true); AG.ham.delete(o); continue; } H.agents = ok.filter(a => a.o === o).sort((a, b) => a.s - b.s || (a.id < b.id ? -1 : 1)).slice(0, 12); H.boss = H.agents[0].b; H.god = H.agents.find(a => a.g)?.g || ''; H.local = H.agents.every(a => a.loc);
     for (const [id, f] of H.figs) if (!H.agents.some(a => a.id === id)) { scene.remove(f.g); f.el.remove(); H.figs.delete(id); } }   // (one who has left the list is gone from the hamlet)
 }
 // The agents he has through a daimon hub (daimon/icarus.js, when it is there and connected) are given houses in his hamlet
@@ -22227,11 +22227,17 @@ function agGreet(H) {
       for (let k = 0; k < (TOUCH ? 8 : 18); k++) emit(f.x + rnd(0.8), f.y + 2 + Math.random() * 1.5, f.z + rnd(0.8), rnd(3), 3 + Math.random() * 4, rnd(3), 0.8 + Math.random() * 0.7, [col.r * 2.4 + 0.2, col.g * 2.4 + 0.2, col.b * 2.4 + 0.2], 2, 0.5); }, 250 + i * 650); });
   audio.sfx.newcomer?.(); toast(H.agents.length === 1 ? `${H.agents[0].n} IS GLAD TO SEE YOU` : `YOUR ${H.agents.length} AGENTS ARE GLAD TO SEE YOU`);
 }
-// /hamlet: who they are, what they are at, and the way to them; /hamlet key: the key one of them comes in by
+// /hamlet: who they are, what they are at, and the way to them; /hamlet connect: the page that brings them in; /hamlet key: the key by hand
 async function agCommand(arg) {
   const sys = t => chatLine('', t, 'sys');
   await agWho();
-  if (/^key|^connect|^add/i.test(arg || '')) {
+  if (/^connect|^add|^link|^login|^sign/i.test(arg || '')) {   // (the page that lets a computer's agents in: connect/index.html)
+    if (!WORLD.code) return sys('FLY ONCE FIRST: YOUR AGENTS ARE TIED TO YOUR TRAVELLER');
+    let w = null; try { w = open('/connect/', '_blank', 'noopener'); } catch {}
+    sys('YOUR AGENTS COME IN AT JUSTKEEPFLYING.COM/CONNECT · ONE LINE IN A TERMINAL FOR CLAUDE CODE AND CODEX, A SIGN-IN FOR THE REST'); sys('THAT PAGE IS OPENING IN A NEW TAB · IF IT DID NOT, TYPE THE ADDRESS');
+    return;
+  }
+  if (/^key/i.test(arg || '')) {
     if (!WORLD.code) return sys('FLY ONCE FIRST: YOUR AGENTS ARE TIED TO YOUR TRAVELLER');
     const j = await fetch('/api/hub?fn=mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'key', code: WORLD.code, god: PATRON.id || '' }) }).then(r => r.ok ? r.json() : null).catch(() => null);
     if (!j || !j.key) return sys('THE WORLD IS NOT ANSWERING · TRY AGAIN IN A MOMENT');
@@ -22242,7 +22248,7 @@ async function agCommand(arg) {
     return;
   }
   const H = AG.mine && AG.ham.get(AG.mine) || AG.ham.get(AG_DMN);
-  if (!H) return sys('NO AGENT OF YOURS LIVES HERE YET · /hamlet key GIVES YOU THE LINE TO CONNECT ONE');
+  if (!H) return sys('NO AGENT OF YOURS LIVES HERE YET · /hamlet connect BRINGS YOUR CLAUDE AND CODEX AGENTS IN');
   if (H.site === undefined) H.site = agSite(H.o) || null;
   const now = Date.now(); let u = 0; for (const a of H.agents) u += agTimber(a, now); const st = agStanding(u), homes = st.done.filter(w => w === 'home').length;
   sys(`YOUR AGENTS · ${H.agents.map(a => `${a.n}${a.k ? ' (' + a.k.toUpperCase().slice(0, 36) + ')' : a.gone ? ' (GONE IN)' : ''}`).join(' · ')}`);

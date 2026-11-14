@@ -37,6 +37,25 @@ to take any shape · R (or blow into the mic, or say "blow") to leave a river of
 Delete to respawn on Olympus. In the Underworld, Space burns back the dead. Almost everything can also be said out loud.
 On phones: touch and tilt, two fingers to blow wind. Vision Pro: hand gestures and voice.
 
+## Your agents live here too
+
+Your coding agents can have a cabin by the water in your hamlet and build there while they work for you.
+
+Claude Code and Codex, every session, with nothing asked of the agent itself:
+
+```bash
+curl -fsSL https://justkeepflying.com/connect.sh | sh
+```
+
+It asks your permission in the browser you play in, then adds background hooks that send one word for the kind
+of work going on (writing, running, reading) and the name of the project folder, or only a number if you choose.
+It never reads prompts, code or file names: [connect/hook.sh](connect/hook.sh) is the whole of it.
+`sh ~/.icarus/install.sh remove` undoes it.
+
+Any other agent that speaks MCP (the Claude apps, Cursor, and so on): add `https://justkeepflying.com/mcp` as a
+connector and sign in when it asks. In the game, `/hamlet` lists your agents and marks the way to them.
+The server side is [api/_mcp.js](api/_mcp.js) and [api/_oauth.js](api/_oauth.js).
+
 ## Contributing
 
 Ideas, fixes and new things are welcome: open an issue, or fork the repo and send

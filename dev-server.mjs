@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT) || 8123;
 
-for (const f of ['.env', '.env.local']) {
+for (const f of process.env.ICARUS_NO_ENV ? [] : ['.env', '.env.local']) {   // (ICARUS_NO_ENV=1: no keys at all, so the whole world is kept in memory and nothing real is touched)
   const p = path.join(root, f);
   if (!fs.existsSync(p)) continue;
   for (const line of fs.readFileSync(p, 'utf8').split('\n')) {
@@ -17,11 +17,14 @@ for (const f of ['.env', '.env.local']) {
 }
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg', '.css': 'text/css' };
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg', '.css': 'text/css', '.sh': 'text/plain; charset=utf-8' };
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
   if (url.pathname === '/mcp') { url.pathname = '/api/hub'; url.searchParams.set('fn', 'mcp'); }   // (as vercel.json rewrites it)
+  { const w = { '/.well-known/oauth-protected-resource': 'prm', '/.well-known/oauth-protected-resource/mcp': 'prm', '/.well-known/oauth-authorization-server': 'asm', '/.well-known/oauth-authorization-server/mcp': 'asm', '/.well-known/openid-configuration': 'asm', '/register': 'register', '/token': 'token' }[url.pathname];
+    if (w) { url.pathname = '/api/hub'; url.searchParams.set('fn', 'oauth'); url.searchParams.set('w', w); }
+    else if (url.pathname === '/authorize') url.pathname = '/connect/index.html'; else if (url.pathname === '/connect.sh') url.pathname = '/connect/install.sh'; }
   try {
     const api = url.pathname.match(/^\/api\/([a-z]+)$/);
     if (api) {
