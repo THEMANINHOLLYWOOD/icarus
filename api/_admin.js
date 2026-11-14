@@ -42,5 +42,20 @@ export async function POST(req) {
     if (op === 'ban' || op === 'ipban') await addBans([hash && { key: 'c:' + hash, kind: 'code', name }, op === 'ipban' && ip && { key: 'i:' + ip, kind: 'ip', name }].filter(Boolean));
     return json({ ok: true, op });
   }
+  // The keeper's eye. Faction and private messages are sealed on the players' own machines; the keeper may read them all the
+  // same, and players are told so. A keeper proved here (a signed-in, listed email: never a name) has the key of this visit
+  // vouched for; every page asks this server whether a key shown to it on the channel really is a keeper's before it seals
+  // anything to it. Nothing is kept: the vouching is a signature that runs out.
+  if (b.op === 'eye') {
+    const vk = typeof b.vk === 'string' && /^[A-Za-z0-9+/=]{80,100}$/.test(b.vk) ? b.vk : '';
+    if (!vk) return json({ error: 'bad key' }, 400);
+    const me = await adminOf(req); if (!me) return json({ error: 'not yours' }, 403);
+    const exp = Date.now() + 12 * 3600_000;
+    return json({ ok: true, exp, tok: signOrder('eye', createHash('sha256').update(vk).digest('hex').slice(0, 40), exp) });
+  }
+  if (b.op === 'eyeok') {
+    const vk = typeof b.vk === 'string' && /^[A-Za-z0-9+/=]{80,100}$/.test(b.vk) ? b.vk : '';
+    return json({ ok: !!vk && +b.exp < Date.now() + 13 * 3600_000 && orderOk('eye', createHash('sha256').update(vk).digest('hex').slice(0, 40), b.exp, b.tok) });
+  }
   return json({ error: 'bad request' }, 400);
 }
