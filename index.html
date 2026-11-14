@@ -4403,7 +4403,7 @@ function renameSelf(n) {
 function nameTaken(clean, was) {
   setName(clean); try { $('nameInput').value = heroName; } catch {}
   if (typeof NET !== 'undefined') NET.lastSent = null;
-  toast(`YOU ARE ${heroName} NOW`); if (UIL.on) worldTitle(heroName, `no longer ${was.toLowerCase()}`, 2200); audio.sfx.halo?.(); try { saveSoon(); } catch {}
+  toast(`YOU ARE ${heroName} NOW`); if (UIL.on) worldTitle(heroName, `no longer ${was.toLowerCase()}`, 2200); (audio.sfx.rename || audio.sfx.halo)?.(); try { saveSoon(); } catch {}
 }
 // one name onto its row of the sheet: capitals over small letters, thirteen slots
 function nameRow(slot, name) {
@@ -4760,13 +4760,15 @@ function updateAmbience3D(dt) {
   if ((AMB3.t -= dt) > 0 || state === 'title' || state === 'loading' || state === 'prologue') return;
   AMB3.t = 0.85 + Math.random() * 0.4;
   const c = camera.position, near = (list, pos, max, n) => list.map(o => { const P = pos(o); return P ? [(P.x - c.x) ** 2 + (P.y - c.y) ** 2 + (P.z - c.z) ** 2, P] : null; }).filter(e => e && e[0] < max * max).sort((a, b) => a[0] - b[0]).slice(0, n);
-  for (const [, P] of near([...waterfalls], f => f.visible !== false && f.parent?.visible !== false ? (f.userData.foot || f.userData.lip) : null, 520, 2)) audio.at3(P.x, P.y, P.z, () => audio.sfx.fallGrain?.(1), { ref: 34, max: 560, life: 2600 });
+  for (const [, P] of near([...waterfalls], f => f.visible !== false && f.parent?.visible !== false ? (f.userData.foot || f.userData.lip) : null, 520, 3)) { if (audio.emit) audio.emit('fall:' + Math.round(P.x) + ':' + Math.round(P.z), 'waterfall', P.x, P.y, P.z, { ttl: 2.6 }); else audio.at3(P.x, P.y, P.z, () => audio.sfx.fallGrain?.(1), { ref: 34, max: 560, life: 2600 }); }
   const fires = realm === 'under' ? [...pyres] : [...BLAZE.list.slice(0, 60), ...(PANTHEON.fires || []), ...CRATERS.filter(k => time - k.t < 26).map(k => ({ x: k.x, y: terrainAt(k.x, k.z), z: k.z }))];
-  for (const [, P] of near(fires, f => ({ x: f.x, y: f.y ?? c.y, z: f.z }), 230, 2)) audio.at3(P.x, P.y, P.z, () => audio.sfx.crackle?.(1), { ref: 14, max: 260, life: 2000 });
+  for (const [, P] of near(fires, f => ({ x: f.x, y: f.y ?? c.y, z: f.z }), 260, 6)) { if (audio.emit) audio.emit('fire:' + Math.round(P.x) + ':' + Math.round(P.z), 'fire', P.x, P.y, P.z, { ttl: 2.6 }); else audio.at3(P.x, P.y, P.z, () => audio.sfx.crackle?.(1), { ref: 14, max: 260, life: 2000 }); }
+  if (audio.emit && realm === 'over' && TORCH.ring && (TORCH.ring.x - c.x) ** 2 + (TORCH.ring.z - c.z) ** 2 < 1500 * 1500) audio.emit('ring:fire', 'ring', TORCH.ring.x, TORCH.ring.y, TORCH.ring.z, { ttl: 2.6, size: 3 });   // (the ring of fire: heard coming, heard going)
 }
 function updateAudio(dt) {
   updateAmbience3D(dt);
-  { const c = camera.position; camera.getWorldDirection(_n); audio.listen?.(c.x, c.y, c.z, _n.x, _n.y, _n.z); }   // (the ears are where the lens is)
+  { const c = camera.position, q = player, b = q.form === 'phoenix' && state !== 'prologue'; camera.getWorldDirection(_n);   // (the ears are where the lens is, and they are going as fast as he is: what he passes rises as it comes and falls as it goes)
+    audio.listen?.(c.x, c.y, c.z, _n.x, _n.y, _n.z, b ? dir3.x * q.speed : q.vel.x, b ? dir3.y * q.speed + (q.vy || 0) : q.vel.y, b ? dir3.z * q.speed : q.vel.z); }
   if (!AC) return;
   if (state === 'prologue') {   // over Crete: the flight score, then the long fall
     const f = pro.falling;
@@ -4781,7 +4783,18 @@ function updateAudio(dt) {
     summit: over && isH && p.pos.y > CLOUD_SEA + 200, sky: over ? smoothstep(CLOUD_SEA - 150, CLOUD_SEA + 250, p.pos.y) : 0,
     water: gnd < WATER ? clamp(1 - (p.pos.y - WATER) / 45, 0, 1) : 0, skim: skim.s, sub: SEA.murk, rain: Math.min(1, rainAmt * 1.4), burning: !!p.cine, falling: isH && !p.grounded && !p.wings && p.vel.y < -8,
     wind: clamp(gust * 0.6 + cloudIn + (windLead ? 0.3 : 0) + storm * 0.6, 0, 1),
+    turn: isH ? 0 : -(p.turn || 0) * 2.2, bank: isH ? 0 : -(p.bank || 0), alt: p.pos.y - Math.max(gnd, WATER), perched: !!p.perch,   // (for the air over each wing, and the feathers: to the right is positive)
   });
+  // his burning wingtips through the trees: each wing by itself, by how deep it is in the leaves
+  if (!isH && state === 'play' && over && !p.perch && !p.sub && p.pos.y - gnd < 90 && audio.brush) {
+    for (let i = 0; i < 2; i++) { const tip = phoenix.wings[i].tip.getWorldPosition(i ? _n : _v); let deep = 0;
+      treesNear(tip.x, tip.z, 14, (g, ck, k, t) => { if (!t || tip.y < t.y0 - 1 || tip.y > (t.top ?? t.y0 + 20) + 2.5) return; const d = Math.hypot(tip.x - t.x, tip.z - t.z), R = (t.rad || 3) + 2.2 * birdK(); if (d < R) deep = Math.max(deep, 1 - d / R); });
+      if (deep > 0.03) { audio.brush(i ? 1 : -1, deep, p.speed); if (Math.random() < deep * 0.9) emit(tip.x + rnd(0.8), tip.y + rnd(0.6), tip.z + rnd(0.8), rnd(5) - dir3.x * 8, 1 + Math.random() * 4, rnd(5) - dir3.z * 8, 0.5 + Math.random() * 0.7, pick(Math.random() < 0.5 ? LEAF : EMBER), 2.5); } }
+  }
+  // the other birds, each a fire going by; and the air off the one he is flying behind
+  if (audio.emit && state !== 'title') { const me = realm === 'under' ? 1 : 0, now = performance.now(); let n = 0;
+    for (const P of NET.peers.values()) { if (n >= 8 || !P.s || P.form !== 'p' || P.realm !== me || now - P.s.t > 6000 || P.pos.distanceToSquared(p.pos) > 900 * 900) continue; n++; audio.emit('bird:' + P.id, 'bird', P.pos.x, P.pos.y, P.pos.z, { vx: P.s.vx || 0, vy: P.s.vy || 0, vz: P.s.vz || 0, size: bigName(P.name), ttl: 0.8 }); }
+    if (audio.wake && SLIP.k > 0.02) audio.wake(SLIP.k, 0); }
 }
 
 // ───────────────────────── voices & sound ─────────────────────────
@@ -6458,7 +6471,7 @@ function startClimb(kind, dx, dz, s) {
 function dropClimb(push, slipped) {
   const p = player, C = p.climb;
   p.climb = null; p.grounded = false; p.vel.set(-C.dx * push, slipped ? -1 : 2, -C.dz * push); p.jumpKind = 'stand';
-  if (slipped) { audio.sfx.land(0.4); toast('YOUR GRIP GOES'); }
+  if (slipped) { (audio.sfx.slip || audio.sfx.land)(audio.sfx.slip ? 0.8 : 0.4); toast('YOUR GRIP GOES'); }
 }
 function jumpOff() {
   const p = player, C = p.climb;
@@ -6500,7 +6513,7 @@ function updateClimb(dt) {
     const ah = groundAt(p.pos.x + C.dx * 1.2, p.pos.z + C.dz * 1.2, p.pos.y + 3);
     if ((ah - p.pos.y) / 1.2 < STEEP * 0.7) {
       p.climb = null; p.grounded = true; p.pos.x += C.dx * 0.7; p.pos.z += C.dz * 0.7; p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 3);
-      p.land = { t: 0, T: 0.45, d: 0.85 }; body.exert = Math.min(1, body.exert + 0.05); audio.sfx.land(0.3);
+      p.land = { t: 0, T: 0.45, d: 0.85 }; body.exert = Math.min(1, body.exert + 0.05); (audio.sfx.mantle || audio.sfx.land)(audio.sfx.mantle ? 0.7 : 0.3);
       return bodyLanguage(dt, 0, false);
     }
   }
@@ -7091,7 +7104,7 @@ function slipstream(dt) {
     const cap = bsp * (1 + 0.35 * SLIP.k) + 25;
     if (p.speed < cap) p.speed = Math.min(cap, p.speed + SLIP.k * 95 * dt);
     if (!SLIP.told) { SLIP.told = true; toast(`IN ${bp.name}'S SLIPSTREAM · STAY IN IT TO CATCH THEM`); }
-    if (was < 0.15 && SLIP.k >= 0.15 && SLIP.who !== bp.id) { SLIP.who = bp.id; audio.sfx.whoosh?.(true); }
+    if (was < 0.15 && SLIP.k >= 0.15 && SLIP.who !== bp.id) { SLIP.who = bp.id; (audio.sfx.slipstream || audio.sfx.whoosh)?.(true); }
   }
   if (SLIP.k < 0.05) SLIP.who = '';
   // and he feels it: the air rushing past him, close
@@ -8454,7 +8467,7 @@ function gotChat(m) {
   if (quiet(P)) return;
   P.said = text.slice(0, 160); P.saidT = performance.now();
   const called = !m.v && new RegExp('@' + heroName.replace(/[^A-Z0-9 ]/g, '').replace(/ /g, ' ?') + '(?![A-Z0-9])', 'i').test(text);
-  chatLine(P.name, text, m.v ? 'voice' : called ? 'at' : ''); if (called) { toast(`${P.name} CALLED YOU`); audio.sfx.newcomer?.(); } else if (!m.v) audio.sfx.ui?.();
+  chatLine(P.name, text, m.v ? 'voice' : called ? 'at' : ''); if (called) { toast(`${P.name} CALLED YOU`); (audio.sfx.called || audio.sfx.newcomer)?.(); } else if (!m.v) (audio.sfx.chat || audio.sfx.ui)?.();
 }
 $('chatInput').addEventListener('keydown', e => {
   e.stopPropagation();
@@ -11359,6 +11372,7 @@ function udPose(u, run, dt) {
   }
 }
 function setRealm(to, x = player.pos.x, z = player.pos.z, yaw = player.yaw) {
+  audio.emitClear?.();   // (what stood sounding in the one world is not heard in the other)
   if (to !== realm) { worldDeed(to === 'under' ? 'under' : 'home'); if (state !== 'loading') setTimeout(warmPrograms, 120); }   // (the other world's things, built while the sea is still closing over him)
   realm = to;
   const under = to === 'under';
@@ -11630,7 +11644,7 @@ function fishCook(f) {   // fire, under water: it is done in a breath
 // (if he has the fire for it) straight on out of the sea and into the air, burning.
 function riseFromDeep() {
   const p = player, D = p.dive; if (!D || D.through || D.rise) return;
-  D.rise = true; D.mom = null; audio.sfx.whoosh?.(false); audio.sfx.bubble?.();
+  D.rise = true; D.mom = null; if (audio.sfx.surface) audio.sfx.surface(); else { audio.sfx.whoosh?.(false); audio.sfx.bubble?.(); }
   for (let i = 0; i < 40; i++) emit(p.pos.x + rnd(0.8), p.pos.y + 0.5 + rnd(0.8), p.pos.z + rnd(0.8), rnd(2), 3 + Math.random() * 6, rnd(2), 0.7 + Math.random() * 0.8, i % 3 ? [0.7, 0.86, 1.0] : pick(EMBER), 5, 0.6);
 }
 // the water set alight around him: a ball of steam, and everything in it done
@@ -13380,7 +13394,7 @@ function startShift(def) {
   const c = new THREE.Color(def.color || '#ffd0a0'), G = m.geometry.attributes.aGlyph;
   for (let i = 0; i < N; i++) { const k = 0.65 + Math.random() * 0.75; m.setColorAt(i, _cc.copy(c).multiplyScalar(k * 2.1)); G.array[i] = Math.floor(Math.random() * 64); }
   m.instanceColor.needsUpdate = true; G.needsUpdate = true;
-  flash = Math.max(flash, 0.2); audio.sfx.whoosh?.(true); netFx('rebirth');
+  flash = Math.max(flash, 0.2); if (audio.become && !def.model) audio.become(def); else audio.sfx.whoosh?.(true); netFx('rebirth');   // (a new thing has a voice of its own, made for it there and then)
   for (let i = 0; i < 60; i++) emit(p.pos.x + rnd(2), p.pos.y + Math.random() * 2, p.pos.z + rnd(2), rnd(6), Math.random() * 6, rnd(6), 0.6 + Math.random() * 0.5, pick(EMBER), 2, 1.2);
   if (!def.model) { toast(def.name.toUpperCase()); witness(`turned himself into ${/^[aeiou]/.test(def.name) ? 'an' : 'a'} ${def.name}`); }
   return true;
@@ -20997,7 +21011,7 @@ function menuGo(kind) {
     setTimeout(() => { if (TITLE_SYNC.want) { TITLE_SYNC.want = false; if (state === 'play') titleBurn(); } }, (T + 2.6) * 1000);   // (and if the song is not there to land it on: the name, all the same)
   }
   $('title').classList.add('leaving');
-  audio.sfx.whoosh?.(true);
+  (audio.sfx.titleLeave || audio.sfx.whoosh)?.(true);
 }
 // ── The lens, handed over. It is wherever the film had it (off a wingtip, out in front, standing still as he went by); it is
 //    wanted behind him. It goes there on an arc about the bird, never through it, eased at both ends, while he is already flying.
