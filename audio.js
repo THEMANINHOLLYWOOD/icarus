@@ -28,6 +28,9 @@
 
 const SAMPLE_NAMES = ['flap', 'ignite', 'rebirth', 'morph', 'impact', 'splash', 'roll', 'flameout', 'thunder', 'wingsopen', 'underworld'];   // (the old single takes, if there is no index)
 const LOOPS = ['windloop', 'diveloop', 'fallloop', 'fireloop', 'rainloop', 'waterloop'];
+// (recordings not used: the fire loop measures as broadband hiss — 44% of its energy above 6 kHz, nearly flat, 19 clicks a
+//  second — and under his own fire it was the static. His fire is made here instead.)
+const UNUSED = ['fireloop'];
 // bus levels: the first place to tune the balance
 const MIX = { master: 0.74, voice: 1.3, sfx: 0.8, big: 0.8, sub: 0.62, ui: 0.7, amb: 0.6, air: 0.6, world: 0.7, music: 0.56 };
 // who gives way, and how far: what is left of the soundtrack (m), the world's beds (a), his own air and fire (f) and the
@@ -39,7 +42,8 @@ const DUCK = {
   dead: { m: 1, a: 0.35, f: 0.2, s: 0.85, at: 0.5, rl: 1.6 },
   focus: { m: 0.5, a: 0.5, f: 0.6, s: 0.85, at: 0.4, rl: 1.2 },      // anything the game asks room for by name
 };
-const SOUND_C = 343;   // the speed of sound, in the world's own metres a second: what the pitch of a thing passing bends against
+const SOUND_C = 343;
+const POP_N = 24, POP_SLOT = 0.08;   // (the bank of single crackles: how many, and how long each one's place in it is)   // the speed of sound, in the world's own metres a second: what the pitch of a thing passing bends against
 
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
@@ -94,7 +98,7 @@ export function createAudio() {
   let echoSend = null, master, post, glue, limiter, muteGain, subF, reverb, revIn, echoIn, sfxBus, sfxWet, bigBus, subBus, uiBus, ambBus, airBus, worldBus, musicBus, voiceBus;
   let duckM, duckA, duckF, duckS, dipM, dipA, vAn = null, vBuf = null;
   let surround = null; const ear = { x: 0, y: 0, z: 0, fx: 0, fz: -1, vx: 0, vy: 0, vz: 0, yaw: 0, turn: 0, t: 0, has: false };   // (six speakers, if the machine has them; and where the listener is, faces and is going)
-  let white, pink, brown, crackle, ruffle, grit; const BUF = {};
+  let white, pink, brown, crackle, ruffle, grit, roar, pops; const BUF = {};
   const samples = {};
   let live = 0, made = 0;
   const lastP = new Map();
@@ -124,6 +128,14 @@ export function createAudio() {
     if (last !== undefined && Math.abs(last - v) <= 0.003 * Math.max(1e-3, Math.abs(v), Math.abs(last))) return;
     lastP.set(param, v);
     param.setTargetAtTime(v, ctx.currentTime, tc);
+  }
+  // A bed that has gone quiet is taken off the graph — its source disconnected, so nothing in front of a fader at nought
+  // is worked out any more — and put back the moment it is wanted, with the fader still at nought: it costs nothing while
+  // it is silent, and comes back without a click. (B: { s, head, g } — the source, what it feeds, its fader.)
+  function bed(B, v, tc = 0.15) {
+    if (v > 1e-4) { if (!B.on) { try { B.s.connect(B.head); } catch {} B.on = true; } B.off = 0; P(B.g.gain, v, tc); return; }
+    P(B.g.gain, 0, tc);
+    if (B.on) { const now = ctx.currentTime; if (!B.off) B.off = now + tc * 9 + 0.05; else if (now > B.off) { try { B.s.disconnect(); } catch {} B.on = false; } }
   }
   // (the same, for a place in the world: there the test is a distance, not a proportion — a thing ten thousand metres
   //  from the middle of the map still has to be heard to move a hand's width)
@@ -158,17 +170,61 @@ export function createAudio() {
       let last = 0;
       for (let i = 0; i < d.length; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; }
     }));
-    // fire: sparse snaps and pops, each a few milliseconds of decaying noise
-    // (each has a front a fifth of a millisecond long, so it is a snap and not a click, and the biggest are held in a little)
-    const c = new Float32Array(sr * 4); let e = 0, k = 0.9, up = 0;
-    for (let i = 0; i < c.length; i++) {
-      if (Math.random() < 1 / 1700) { const big = Math.random() < 0.12; e = big ? rnd(0.6, 1) : Math.pow(Math.random(), 2) * 0.5; k = big ? 0.9985 : rnd(0.96, 0.995); up = 0; }
-      c[i] = Math.tanh((Math.random() * 2 - 1) * e * Math.min(1, ++up / 10) * 1.5) * 0.75; e *= k;
+    // Fire. (It used to be milliseconds-long bursts of white noise, twenty-six a second, high-passed: measured, that was
+    // half its energy above 6 kHz and nearly flat — static, not fire. Now it is made the way wood burning makes it.)
+    // The crackle: wood splitting. Each one a snap a fraction of a millisecond long, rounded off and not too bright, ringing
+    // the bit of wood it came out of (a short resonance, somewhere between 700 Hz and 3 kHz), and in the bigger ones the
+    // low pop of the pocket of gas that burst. They come irregularly — about five a second, most of them small, a few
+    // loud — and often in little runs, the way a split runs along the grain; now and then the sap fries for a moment.
+    // (They wrap round the end of the buffer, so it loops without a seam.)
+    const crk = (d, at, amp, small) => {
+      const big = !small && amp > 0.45, len = Math.floor(sr * (big ? 0.07 : 0.022)), N = d.length;
+      const sn = Math.max(2, Math.floor(sr * (small ? rnd(0.00005, 0.0002) : rnd(0.00008, 0.0005)))), lk = 1 - Math.exp(-2 * Math.PI * rnd(small ? 4000 : 2500, small ? 8000 : 6500) / sr);
+      const f = rnd(700, 2800), r = Math.exp(-1 / (rnd(0.0005, 0.0028) * sr)), c1 = 2 * r * Math.cos(2 * Math.PI * f / sr), c2 = -r * r;
+      const tf = rnd(110, 320), tt = rnd(0.004, 0.012), th = big ? rnd(0.3, 0.7) : 0, ring = small ? 0.15 : rnd(0.3, 0.8);
+      const a = new Float32Array(len), b = new Float32Array(len); let lp = 0, y1 = 0, y2 = 0, pa = 1e-9, pb = 1e-9;
+      for (let j = 0; j < len; j++) {
+        const x = j < sn ? (Math.random() * 2 - 1) * Math.sin(Math.PI * (j + 0.5) / sn) : 0;
+        lp += (x - lp) * lk; const y = c1 * y1 + c2 * y2 + lp; y2 = y1; y1 = y;
+        a[j] = lp; b[j] = y; pa = Math.max(pa, Math.abs(lp)); pb = Math.max(pb, Math.abs(y));
+      }
+      let pk = 1e-9; const fadeN = Math.floor(len * 0.3);
+      for (let j = 0; j < len; j++) {
+        const s = j / sr, w = j > len - fadeN ? 0.5 + 0.5 * Math.cos(Math.PI * (j - (len - fadeN)) / fadeN) : 1;
+        a[j] = (a[j] / pa + ring * b[j] / pb + (th ? th * Math.sin(2 * Math.PI * tf * s) * Math.exp(-s / tt) * (1 - Math.exp(-s / 0.0003)) : 0)) * w; pk = Math.max(pk, Math.abs(a[j]));
+      }
+      for (let j = 0; j < len; j++) d[(at + j) % N] += a[j] / pk * amp;
+    };
+    const c = new Float32Array(sr * 6), CN = c.length;
+    for (let t = 0; ;) {
+      t += -Math.log(1 - Math.random()) / 5.5; if (t * sr >= CN) break;
+      const amp = 0.06 + 0.94 * Math.pow(Math.random(), 3); crk(c, Math.floor(t * sr), amp);
+      if (Math.random() < 0.4) for (let i = 0, n = 1 + Math.floor(Math.random() * 4), u = t; i < n; i++) { u += rnd(0.006, 0.07); crk(c, Math.floor(u * sr) % CN, amp * rnd(0.15, 0.6)); }
+      if (Math.random() < 0.05) for (let i = 0, n = 6 + Math.floor(Math.random() * 12), u = t + rnd(0.05, 0.2); i < n; i++) { u += rnd(0.002, 0.012); crk(c, Math.floor(u * sr) % CN, rnd(0.03, 0.1), true); }
     }
-    for (let i = 0, n = Math.floor(sr * 0.02); i < n; i++) { c[i] *= i / n; c[c.length - 1 - i] *= i / n; }   // (so the place where it comes round again is never a snap of its own)
+    { let pk = 1e-9; for (let i = 0; i < CN; i++) pk = Math.max(pk, Math.abs(c[i])); for (let i = 0; i < CN; i++) c[i] *= 0.9 / pk; }
     crackle = put(c);
+    // single crackles, one to a slot (what a spark is now: one pop of wood, not a hiss of noise)
+    { const p = new Float32Array(Math.floor(sr * POP_SLOT) * POP_N); for (let k = 0; k < POP_N; k++) crk(p, Math.floor(sr * POP_SLOT) * k + Math.floor(sr * 0.0005), 1, k % 5 === 4); pops = put(p); }
+    // The roar: the body of a fire, the sound of the air it pulls in. Low (most of it under 400 Hz), never steady — a slow
+    // heave, quicker licks of flame over it in the low mids, and now and then a surge — and never periodic: the wavers are
+    // wandering values, not oscillators, so nothing in it beats like a motor.
+    roar = put(loopable(sr * 8, fade, d => {
+      const k1 = 1 - Math.exp(-2 * Math.PI * 300 / sr), kd = 1 - Math.exp(-2 * Math.PI * 38 / sr), kh = 1 - Math.exp(-2 * Math.PI * 1100 / sr), kl = 1 - Math.exp(-2 * Math.PI * 240 / sr), sd = Math.floor(Math.random() * 1e6);
+      let l1 = 0, l2 = 0, dc = 0, h1 = 0, h2 = 0, sum = 0, e0 = null, e1 = null;
+      const env = t => { const slow = 0.55 * wander(t * 1.7, sd) + 0.3 * wander(t * 4.1, sd + 1) + 0.15 * wander(t * 9.3, sd + 2), fast = 0.6 * wander(t * 13, sd + 3) + 0.4 * wander(t * 27, sd + 4), surge = sstep(0.62, 0.95, wander(t * 0.55, sd + 5));
+        return [5.5 * (0.45 + 0.55 * slow + 0.5 * surge), 2.5 * (0.2 + 0.8 * fast) * (0.3 + 0.7 * slow) * (0.6 + 0.8 * surge)]; };   // (worked out every 64 samples and drawn straight between)
+      for (let i = 0; i < d.length; i++) {
+        if (!(i & 63)) { e0 = e1 || env(i / sr); e1 = env((i + 64) / sr); }
+        const w = Math.random() * 2 - 1, v = Math.random() * 2 - 1, q = (i & 63) / 64;
+        l1 += (w - l1) * k1; l2 += (l1 - l2) * k1; dc += (l2 - dc) * kd; const low = l2 - dc;   // (white, rolled off twice above 300 Hz, nothing under 40)
+        h1 += (v - h1) * kh; h2 += (v - h2) * kl; const mid = h1 - h2;                            // (a band from 240 Hz to 1.1 kHz)
+        d[i] = low * (e0[0] + (e1[0] - e0[0]) * q) + mid * (e0[1] + (e1[1] - e0[1]) * q); sum += d[i] * d[i];
+      }
+      const g = 0.24 / Math.sqrt(sum / d.length || 1); for (let i = 0; i < d.length; i++) d[i] = Math.tanh(d[i] * g);
+    }));
     // grit: stone dust turning under a hand or a foot — a dense run of tiny hard grains, a millisecond or two each
-    const gr = new Float32Array(sr * 2); e = 0; k = 0.98; up = 0;
+    const gr = new Float32Array(sr * 2); let e = 0, k = 0.98, up = 0;
     for (let i = 0; i < gr.length; i++) {
       if (Math.random() < 1 / 150) { e = Math.max(e, 0.16 + Math.pow(Math.random(), 2) * 0.3); k = rnd(0.975, 0.992); up = Math.min(up, 3); }
       gr[i] = (Math.random() * 2 - 1) * e * Math.min(1, ++up / 6); e *= k;
@@ -190,7 +246,7 @@ export function createAudio() {
     for (let i = 0; i < N; i++) peak = Math.max(peak, Math.abs(r[i]));
     for (let i = 0; i < N; i++) r[i] *= 0.9 / (peak || 1);
     ruffle = put(r);
-    Object.assign(BUF, { white, pink, brown, crackle, ruffle, grit });
+    Object.assign(BUF, { white, pink, brown, crackle, ruffle, grit, roar, pops });
   }
   function makeIR() {
     const sr = ctx.sampleRate, secs = low() ? 1.5 : 3.1, n = Math.floor(sr * secs), b = ctx.createBuffer(2, n, sr);
@@ -284,7 +340,7 @@ export function createAudio() {
     const band = (buf, rate, filters, panV, dest) => {
       const g = gain(0), p = panV ? pan(panV) : null, s = loop(buf, rate);
       chain(s, ...filters, g); (p ? chain(g, p) : g).connect(dest);
-      return { g, f: filters[0], s, rate };
+      return { g, f: filters[0], s, rate, head: filters[0] || g, on: true, off: 0 };
     };
     W.low = band(brown, 1, [biq('lowpass', 260, 0.3)], 0, airBus);
     if (low()) W.mid = [band(pink, 1, [biq('bandpass', 500, 0.5)], 0, airBus)];
@@ -293,15 +349,11 @@ export function createAudio() {
     W.whistle = band(white, 1, [biq('bandpass', 1200, 11), biq('lowpass', 5000, 0.5)], 0, airBus);
     W.rumble = band(brown, 0.5, [biq('lowpass', 80, 0.5)], 0, airBus);
     W.fall = band(white, 1, [biq('bandpass', 700, 1.6), biq('lowpass', 5000, 0.5)], 0, airBus);
-    // his fire: a roar that is never steady (two slow wavers that do not agree), and the snap of it on each side
-    {
-      const g = gain(0), flut = gain(0.74), f = biq('lowpass', 480, 0.6), l1 = ctx.createOscillator(), l2 = ctx.createOscillator(), d1 = gain(0.16), d2 = gain(0.1);
-      l1.frequency.value = 6.3; l2.frequency.value = 9.7; l1.start(); l2.start(); chain(l1, d1); d1.connect(flut.gain); chain(l2, d2); d2.connect(flut.gain);
-      chain(loop(brown, 1.3), f, flut, g, airBus);
-      W.fire = { g, f, l1, l2 };
-    }
-    W.crackle = [band(crackle, 1, [biq('highpass', 900, 0.5), biq('lowpass', 7000, 0.5)], low() ? 0 : -0.35, airBus)];
-    if (!low()) W.crackle.push(band(crackle, 1.17, [biq('highpass', 1300, 0.5), biq('lowpass', 8000, 0.5)], 0.35, airBus));
+    // his fire: the roar (its waver is in the recording of it, never two oscillators beating), and the crackle of it on
+    // each side — sparse, and dark enough to be wood and not static
+    W.fire = band(roar, 1, [biq('lowpass', 480, 0.5)], 0, airBus);
+    W.crackle = [band(crackle, 0.72, [biq('lowpass', 5200, 0.5)], low() ? 0 : -0.35, airBus)];
+    if (!low()) W.crackle.push(band(crackle, 0.83, [biq('lowpass', 6000, 0.5)], 0.35, airBus));
     // his feathers: what the air does to them when it is not smooth
     if (low()) W.ruf = [band(ruffle, 1, [biq('bandpass', 2400, 0.6)], 0, airBus)];
     else W.ruf = [band(ruffle, 1, [biq('bandpass', 2400, 0.6)], -0.6, airBus), band(ruffle, 1.13, [biq('bandpass', 2600, 0.6)], 0.6, airBus)];
@@ -313,8 +365,8 @@ export function createAudio() {
     {
       const g = gain(0), flut = gain(0.6), lfo = ctx.createOscillator(), depth = gain(0.4), f = biq('bandpass', 190, 0.9);
       lfo.type = 'sine'; lfo.frequency.value = 9; lfo.start(); chain(lfo, depth); depth.connect(flut.gain);
-      chain(loop(brown, 1), f, flut, g, airBus);
-      W.buffet = { g, f, lfo };
+      const s = loop(brown, 1); chain(s, f, flut, g, airBus);
+      W.buffet = { g, f, lfo, s, head: f, on: true, off: 0 };
     }
 
     // score: every layer has its own level so notes already sounding follow the fades
@@ -443,11 +495,26 @@ export function createAudio() {
   const loops = {};
   function startLoop(name, buf) {
     if (!ctx || loops[name]) return;
+    const peak = analyse(buf)?.gain || 1; buf = seamless(buf);
     const s = ctx.createBufferSource(), g = gain(0);
     s.buffer = buf; s.loop = true; s.playbackRate.value = 1;
     chain(s, g, name === 'rainloop' || name === 'waterloop' ? ambBus : airBus);
     s.start(ctx.currentTime, Math.random() * buf.duration);
-    loops[name] = { s, g, peak: analyse(buf)?.gain || 1 };
+    loops[name] = { s, g, peak, head: g, on: true, off: 0 };
+  }
+  // (A recording looped end to start jumps where it comes round: the fall and the rain by half their own loudness, every
+  //  nine seconds — a tick. Its last tenth of a second is laid over its first instead, so it goes round without a seam.)
+  function seamless(buf) {
+    const sr = buf.sampleRate, F = Math.min(Math.floor(sr * 0.1), Math.floor(buf.length / 4)), n = buf.length - F;
+    if (F < 64) return buf;
+    try {
+      const out = ctx.createBuffer(buf.numberOfChannels, n, sr);
+      for (let c = 0; c < buf.numberOfChannels; c++) {
+        const d = buf.getChannelData(c), o = out.getChannelData(c); o.set(d.subarray(0, n));
+        for (let i = 0; i < F; i++) { const k = (i + 0.5) / F; o[i] = d[i] * Math.sin(k * Math.PI / 2) + d[n + i] * Math.cos(k * Math.PI / 2); }
+      }
+      return out;
+    } catch { return buf; }
   }
   // The soundtrack: one long recording, streamed (not decoded whole), looping, through the music bus so it ducks under
   // every voice. When it is playing the generated score stands aside; the stings still play over it.
@@ -507,7 +574,7 @@ export function createAudio() {
     if (s) setTimeout(() => { try { s.stop(); } catch {} }, fade * 1000 + 150);
   }
   function songStop(fade = 2) { if (!song || !song.on) return; P(song.g.gain, 0, fade / 3); }   // (turned down, never stopped: update brings it back)
-  const loopSet = (name, v, rate, tc = 0.35) => { const L = loops[name]; if (!L) return false; P(L.g.gain, v * Math.min(L.peak, 3) * 0.5, tc); if (rate) P(L.s.playbackRate, rate, 0.5); return true; };
+  const loopSet = (name, v, rate, tc = 0.35) => { const L = loops[name]; if (!L) return false; bed(L, v * Math.min(L.peak, 3) * 0.5, tc); if (rate && L.on) P(L.s.playbackRate, rate, 0.5); return true; };
   function analyse(buf) {
     const d = buf.getChannelData(0); let peak = 0, sum = 0;
     for (let i = 0; i < d.length; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a; sum += a * a; }
@@ -534,6 +601,7 @@ export function createAudio() {
     Promise.resolve().then(() => fetch(iurl)).then(r => r && r.ok ? r.json() : null).catch(() => null).then(index => {
       const list = index || Object.fromEntries(SAMPLE_NAMES.map(n => [n, 0])), jobs = [];
       for (const [name, n] of Object.entries(list)) {
+        if (UNUSED.includes(name)) continue;
         const files = n ? Array.from({ length: n }, (_, k) => `${name}-${k + 1}`) : [name];
         files.forEach(f => jobs.push(loadOne(f).then(buf => {
           if (!buf) return;
@@ -652,7 +720,14 @@ export function createAudio() {
     nz(brown, { t, dur: 0.2, type: 'lowpass', f0: 520, f1: 150, a: 0.003, vol: 0.5 * k, dest: dest || sfxWet });
     nz(pink, { t, dur: 0.05, f0: 900, q: 1, a: 0.002, vol: 0.14 * k, dest: dest || sfxWet });
   }
-  const spark = (t, v, p = 0, d) => nz(white, { t, dur: rnd(0.012, 0.035), type: 'highpass', f0: rnd(1800, 5200), a: 0.001, vol: v, pan: p, dest: d });
+  // a spark: one crackle of burning wood, out of the bank of them (it used to be a burst of white noise above 2 kHz: a tss,
+  // not a snap — and the leaves on fire threw out up to eighteen a second of them)
+  function spark(t, v, p = 0, d) {
+    if (!ctx || !pops || live > cap() || !(v > 0)) return;
+    const s = ctx.createBufferSource(), g = gain(Math.min(2, v * 1.6 * trim)), nodes = [s, g];
+    s.buffer = pops; s.playbackRate.value = rnd(0.85, 1.25) * dop; s.connect(g); out(g, { pan: p, dest: d }, nodes);
+    s.start(t, Math.floor(Math.random() * POP_N) * POP_SLOT, POP_SLOT); done(s, nodes);
+  }
   // a breath let out: air through a throat, no voice in it
   function breath(t, k = 1, p = 0, dur = 0.38) {
     nz(pink, { t, dur, f0: rnd(800, 1100), f1: 600, q: 1.6, a: dur * 0.3, vol: 0.085 * k, pan: p });
@@ -1138,11 +1213,11 @@ export function createAudio() {
     meteor() { if (!ctx) return; tn({ t: T(), dur: 0.5, f0: jit(2600, 0.1), f1: 1300, a: 0.05, vol: 0.02, pan: rnd(-0.7, 0.7) }); },
     // (for sounds placed in the world) falling water, a breath of it; and a fire spitting
     fallGrain(k = 1) { if (!ctx) return; const t = T(); nz(brown, { t, dur: 1.5, type: 'lowpass', f0: rnd(700, 1100), f1: rnd(500, 800), a: 0.5, vol: 0.5 * k }); nz(pink, { t, dur: 1.3, type: 'highpass', f0: rnd(2400, 3600), q: 0.5, a: 0.5, vol: 0.09 * k }); },
-    crackle(k = 1) { if (!ctx) return; const t = T(); for (let i = 0, n = 2 + Math.floor(Math.random() * 4); i < n; i++) nz(pink, { t: t + Math.random() * 0.7, dur: rnd(0.012, 0.04), type: 'highpass', f0: rnd(1500, 4200), a: 0.002, vol: rnd(0.12, 0.3) * k }); nz(brown, { t, dur: 0.8, type: 'lowpass', f0: 320, a: 0.25, vol: 0.14 * k }); },
+    crackle(k = 1) { if (!ctx) return; const t = T(); for (let i = 0, n = 2 + Math.floor(Math.random() * 4); i < n; i++) spark(t + Math.random() * 0.7, rnd(0.12, 0.3) * k); nz(roar, { t, dur: 0.9, type: 'lowpass', f0: 500, f1: 900, a: 0.25, vol: 0.3 * k }); },
     // steam: what a cloud says when something burning goes through it
     sizzle(k = 0.5) {
       if (!ctx) return; const t = T();
-      nz(pink, { t, dur: rnd(0.22, 0.4), type: 'highpass', f0: rnd(3200, 4600), f1: rnd(6500, 8200), q: 0.7, a: 0.015, vol: 0.16 * k, pan: rnd(-0.5, 0.5) });
+      nz(pink, { t, dur: rnd(0.22, 0.4), type: 'highpass', f0: rnd(2400, 3200), f1: rnd(3800, 4800), q: 0.7, a: 0.03, vol: 0.16 * k, pan: rnd(-0.5, 0.5), lp: 7000 });
       nz(pink, { t: t + 0.02, dur: 0.12, f0: rnd(1900, 2600), q: 2.2, a: 0.004, vol: 0.07 * k, pan: rnd(-0.6, 0.6) });
     },
     // a tornado, heard from where it stands: a low roar that never settles, and the higher tearing of the air round it
@@ -1193,8 +1268,8 @@ export function createAudio() {
     // a burning wingtip going into leaves: they are torn aside, they catch, the twigs snap, and the flame takes a mouthful
     brushHit(side = 0, k = 0.6) {
       if (!ctx) return; const t = T(), p = clamp(+side || 0, -1, 1) * 0.75; k = clamp(k);
-      nz(pink, { t, dur: 0.34, f0: jit(3000, 0.12), f1: 1100, q: 0.7, a: 0.012, vol: 0.6 * (0.4 + k), pan: p });
-      nz(white, { t: t + 0.02, dur: 0.3, type: 'highpass', f0: 5200, f1: 3000, a: 0.03, vol: 0.12 * (0.4 + k), pan: p, lp: 9000 });
+      nz(ruffle, { t, dur: 0.34, f0: jit(2200, 0.12), f1: 900, q: 0.8, a: 0.012, vol: 0.75 * (0.4 + k), pan: p, rate: rnd(1.2, 1.5) });
+      nz(roar, { t: t + 0.02, dur: 0.4, type: 'lowpass', f0: 400, f1: jit(1500, 0.12), f2: 450, tf: 0.35, a: 0.04, vol: 0.45 * (0.4 + k), pan: p, rate: 1.2 });
       for (let i = 0, n = 3 + Math.floor(k * 4); i < n; i++) spark(t + rnd(0.01, 0.28), rnd(0.06, 0.15) * (0.4 + k), p + rnd(-0.2, 0.2));
       nz(brown, { t: t + 0.04, dur: 0.28, type: 'lowpass', f0: 240, f1: jit(900, 0.15), f2: 300, tf: 0.4, a: 0.06, vol: 0.3 * k, pan: p * 0.7 });
       kickFire(0.4 + 0.4 * k); kickRuffle(0.3 + 0.3 * k);
@@ -1202,7 +1277,8 @@ export function createAudio() {
     // out of them again: what he lit still fizzing behind the wing, and embers going out one by one
     singe(side = 0, k = 0.5) {
       if (!ctx) return; const t = T(), p = clamp(+side || 0, -1, 1) * 0.7; k = clamp(k);
-      nz(pink, { t, dur: 0.7 + k * 0.5, type: 'highpass', f0: jit(4200, 0.1), f1: 7000, q: 0.7, a: 0.03, vol: 0.4 * (0.4 + k), pan: p });
+      nz(crackle, { t, dur: 0.7 + k * 0.5, type: 'lowpass', f0: 5500, f1: 2500, a: 0.03, vol: 0.5 * (0.4 + k), pan: p, rate: rnd(1.1, 1.4) });
+      nz(roar, { t, dur: 0.6 + k * 0.4, type: 'lowpass', f0: jit(900, 0.1), f1: 260, a: 0.02, vol: 0.3 * (0.4 + k), pan: p });
       for (let i = 0, n = 2 + Math.floor(k * 4); i < n; i++) spark(t + 0.05 + Math.pow(Math.random(), 1.6) * 0.9, rnd(0.02, 0.05) * (0.4 + k), p + rnd(-0.25, 0.25));
     },
     // ── birds among birds ──
@@ -1507,7 +1583,7 @@ export function createAudio() {
     whoosh: 5.5, chime: 1.5, ui: 9, menuOpen: 0.5, menuClose: 6.5, menuHover: 25.5, menuPick: 6.5, guideOpen: 6, screech: 2.5,
     god: 1, lookout: 4, plunge: 3, bubble: 12.5, mapOpen: 5, mapClose: 7, mapFlip: 5.5, mapTurn: 6.5, mapZoom: 3, mapMove: 18,
     mapHover: 4, mapPick: 6, mapNo: 7, mapNorth: 1.5, hammer: -8, newcomer: 9.5, beamUp: -1, beamDown: 0.5, shutter: 2,
-    halo: 8, meteor: 3, fallGrain: 4, crackle: 7, sizzle: 17.5, twister: 2, wave: 2.5, heart: -3.5, cry: 0, jump: 8, flyby: 3,
+    halo: 8, meteor: 3, fallGrain: 4, crackle: 7, sizzle: 12, twister: 2, wave: 2.5, heart: -3.5, cry: 0, jump: 8, flyby: 3,
     brushHit: 8, singe: 1.5, pass: 1.5, clip: 3, hit: -3, strike: -3.5, challenge: 0, challengeSent: 2, challengeAccept: -1.5,
     challengeDecline: 5, countdown: -2.5, victory: -3, defeat: 6, matchCalled: 4.5, fightCard: 1, matchStart: -2.5, hold: 6,
     foothold: 16, scrape: 18.5, pebbles: 13, effort: 18, climbOff: 9.5, fallThrough: -3, catchWind: 6.5, surface: 1,
@@ -1633,14 +1709,16 @@ export function createAudio() {
   // top the sear. In among that, things happen one at a time, never evenly: a twig going, a cluster catching, a mouthful
   // of flame. The first touch and the leaving have sounds of their own. (Made when first needed, put away when not.)
   const BRK = { leaves: [1, 1, 1, 1], pine: [1.25, 0.8, 1.3, 1.3], dry: [0.9, 0.7, 1.6, 0.8], grass: [1.1, 0.8, 0.4, 0.6], reeds: [1.1, 0.8, 0.4, 0.6], cloud: [1.5, 0.5, 0, 1.6] };   // [how bright the rush, how much of it, how much snapping, how much searing]
+  // (each wing: the leaves torn past — their own flutter, not a band of hiss; the wood catching; and the flame taking hold,
+  //  which is a roar, not the white noise it used to be)
   function brushBuild() {
     const mk = side => {
       const outG = gain(1), p = pan(side * 0.78), rush = gain(0), crk = gain(0), sear = low() ? null : gain(0);
-      const f1 = biq('bandpass', 2800, 0.7), s1 = loop(pink, 1.07 + side * 0.04), s2 = loop(crackle, 1.5 + side * 0.1);
-      chain(s1, f1, rush, outG); chain(s2, biq('highpass', 1300, 0.6), biq('lowpass', 7500, 0.5), crk, outG);
-      let s3 = null; if (sear) { s3 = loop(white, 1); chain(s3, biq('highpass', 5200, 0.6), sear, outG); }
+      const f1 = biq('bandpass', 1500, 0.8), s1 = loop(ruffle, 1.2 + side * 0.05), s2 = loop(crackle, 1.2 + side * 0.08);
+      chain(s1, f1, rush, outG); chain(s2, biq('lowpass', 6500, 0.5), crk, outG);
+      let s3 = null, f3 = null; if (sear) { s3 = loop(roar, 1.15); f3 = biq('lowpass', 900, 0.5); chain(s3, f3, sear, outG); }
       (p ? chain(outG, p) : outG).connect(airBus);
-      return { rush, crk, sear, f1, s2, srcs: [s1, s2, s3].filter(Boolean), outG, p };
+      return { rush, crk, sear, f1, f3, s1, s2, srcs: [s1, s2, s3].filter(Boolean), outG, p };
     };
     BR.v = [mk(-1), mk(1)];
   }
@@ -1649,7 +1727,7 @@ export function createAudio() {
     for (const V of BR.v) {
       for (const s of V.srcs) { try { s.stop(); } catch {} }
       try { V.outG.disconnect(); V.p && V.p.disconnect(); } catch {}
-      for (const prm of [V.rush.gain, V.crk.gain, V.sear && V.sear.gain, V.f1.frequency, V.s2.playbackRate]) prm && lastP.delete(prm);
+      for (const prm of [V.rush.gain, V.crk.gain, V.sear && V.sear.gain, V.f1.frequency, V.f3 && V.f3.frequency, V.s1.playbackRate, V.s2.playbackRate]) prm && lastP.delete(prm);
     }
     BR.v = null;
   }
@@ -1668,15 +1746,15 @@ export function createAudio() {
     if (any > 0.004) { BR.idle = now; if (!BR.v) brushBuild(); } else if (BR.v && now - BR.idle > 4) brushFree();
     if (BR.v) for (let i = 0; i < 2; i++) {
       const V = BR.v[i], a = BR.side[i].cur;
-      P(V.rush.gain, a * (0.3 + 0.7 * spd) * 0.5 * K[1], 0.05); P(V.f1.frequency, (1700 + 1900 * spd) * K[0], 0.1);
-      P(V.crk.gain, a * 0.7 * K[2], 0.05); P(V.s2.playbackRate, 1.2 + 0.9 * spd, 0.2);
-      if (V.sear) P(V.sear.gain, a * (0.5 + 0.5 * spd) * 0.1 * K[3], 0.06);
+      P(V.rush.gain, a * (0.3 + 0.7 * spd) * 0.7 * K[1], 0.05); P(V.f1.frequency, (1100 + 900 * spd) * K[0], 0.1); P(V.s1.playbackRate, 1.1 + 0.4 * spd, 0.2);
+      P(V.crk.gain, a * 1.1 * K[2], 0.05); P(V.s2.playbackRate, 1.05 + 0.45 * spd, 0.2);
+      if (V.sear) { P(V.sear.gain, a * (0.5 + 0.5 * spd) * 0.3 * K[3], 0.06); P(V.f3.frequency, 600 + 900 * a + 300 * spd, 0.1); }
     }
     if (any > 0.06 && now >= BR.next && live < cap() - 24) {
       const i = BR.side[0].cur * Math.random() > BR.side[1].cur * Math.random() ? 0 : 1, a = BR.side[i].cur, p = (i ? 1 : -1) * rnd(0.5, 0.9), r = Math.random(), t = now + rnd(0.005, 0.03);
       if (r < 0.7) spark(t, rnd(0.1, 0.26) * (0.4 + a) * K[2], p, airBus);
-      else if (r < 0.93) nz(pink, { t, dur: rnd(0.08, 0.16), f0: rnd(2400, 3400), f1: rnd(4500, 6500), q: 1.2, a: 0.01, vol: 0.14 * (0.4 + a), pan: p, dest: airBus });
-      else { nz(brown, { t, dur: 0.22, type: 'lowpass', f0: 260, f1: rnd(700, 1100), f2: 300, tf: 0.4, a: 0.05, vol: 0.26 * a, pan: p * 0.7, dest: airBus }); kick.fire = Math.max(kick.fire, 0.3); }
+      else if (r < 0.93) nz(ruffle, { t, dur: rnd(0.1, 0.18), f0: rnd(1300, 1900), f1: rnd(2200, 3000), q: 0.9, a: 0.01, vol: 0.22 * (0.4 + a), pan: p, rate: rnd(1.1, 1.5), dest: airBus });   // (a spray of leaves)
+      else { nz(roar, { t, dur: 0.26, type: 'lowpass', f0: 300, f1: rnd(900, 1400), f2: 350, tf: 0.4, a: 0.05, vol: 0.5 * a, pan: p * 0.7, rate: 1.2, dest: airBus }); kick.fire = Math.max(kick.fire, 0.3); }   // (a mouthful of flame)
       BR.next = now - Math.log(1 - Math.random() * 0.999) / (3 + 15 * any * Math.min(1.2, spd));
     }
   }
@@ -1691,9 +1769,10 @@ export function createAudio() {
   //   kind: [noise, filter, Hz, Q, level, rate] for each of two layers, an optional tone [wave, Hz, level], how near it is
   //   at full level (ref), how far it carries (max), and whether passing it at speed is worth a sound of its own
   const EMK = {
-    fire: { a: ['brown', 'lowpass', 440, 0.6, 0.36, 1.3], b: ['crackle', 'highpass', 1100, 0.5, 0.6, 1], ref: 14, max: 280, pass: 'fire' },
-    torch: { a: ['brown', 'lowpass', 620, 0.6, 0.14, 1.5], b: ['crackle', 'highpass', 1700, 0.5, 0.4, 1.2], ref: 5, max: 80 },
-    ring: { a: ['brown', 'lowpass', 560, 0.7, 0.32, 1.4], b: ['crackle', 'highpass', 1400, 0.5, 0.36, 1.1], tone: ['sine', 196, 0.03], ref: 14, max: 320, pass: 'fire' },
+    // (a fire: the roar of it, and the wood crackling — dark, so that it is fire and not static; nothing high-passed)
+    fire: { a: ['roar', 'lowpass', 900, 0.5, 0.28, 1], b: ['crackle', 'lowpass', 7000, 0.5, 0.85, 0.95], ref: 14, max: 280, pass: 'fire' },
+    torch: { a: ['roar', 'lowpass', 1200, 0.5, 0.12, 1.25], b: ['crackle', 'lowpass', 7000, 0.5, 0.5, 1.3], ref: 5, max: 80 },
+    ring: { a: ['roar', 'lowpass', 1000, 0.6, 0.26, 1.1], b: ['crackle', 'lowpass', 6500, 0.5, 0.55, 1.05], tone: ['sine', 196, 0.03], ref: 14, max: 320, pass: 'fire' },
     bird: { a: ['brown', 'lowpass', 760, 0.6, 0.36, 1.4], b: ['pink', 'bandpass', 950, 0.7, 0.4, 1], ref: 9, max: 240, pass: 'bird' },
     waterfall: { a: ['brown', 'lowpass', 950, 0.5, 0.56, 1], b: ['pink', 'highpass', 2600, 0.5, 0.1, 1], ref: 34, max: 600 },
     storm: { a: ['brown', 'lowpass', 150, 0.5, 1, 0.5], b: ['white', 'bandpass', 2600, 0.4, 0.08, 1], ref: 320, max: 2800 },
@@ -1741,7 +1820,7 @@ export function createAudio() {
       if (K.pass && E.V && !gone && E.pc > 25 && closing <= 0 && d < ref * 5 && now > E.passT) {
         E.passT = now + 1.5; const side = clamp(ux * rx + uz * rz, -1, 1), k = clamp(E.pc / 160) * clamp(1.3 - d / (ref * 5));
         if (K.pass === 'bird') sfx.pass(side, 0.35 + 0.65 * k, E.pc);
-        else if (E.pc > 60 && k > 0.15) { const t = now + 0.005, p = side * 0.8; nz(brown, { t, dur: 0.5, type: 'lowpass', f0: 900, f1: 1500, f2: 260, tf: 0.25, a: 0.1, vol: 0.6 * k, pan: p, rate: 1.4, dest: worldBus }); nz(crackle, { t, dur: 0.5, type: 'highpass', f0: 1400, a: 0.08, vol: 0.6 * k, pan: p, lp: 8000, rate: 1.3, dest: worldBus }); }
+        else if (E.pc > 60 && k > 0.15) { const t = now + 0.005, p = side * 0.8; nz(roar, { t, dur: 0.6, type: 'lowpass', f0: 700, f1: 1600, f2: 300, tf: 0.25, a: 0.1, vol: 0.9 * k, pan: p, rate: 1.3, dest: worldBus }); nz(crackle, { t, dur: 0.6, type: 'lowpass', f0: 6500, a: 0.06, vol: 0.9 * k, pan: p, rate: 1.4, dest: worldBus }); }
       }
       E.pc = closing; E.d = d; E.fwd = ux * ear.fx + uz * ear.fz; E.score = E.aud * (E.V ? 1.3 : 1);
       if (gone && !E.V) EM.all.delete(E.id); else list.push(E);
@@ -1908,45 +1987,44 @@ export function createAudio() {
       P(m.g.gain, (0.03 + top * 0.05 + sp * 0.34 + gust * 0.14 + turb * 0.05) * (0.5 + 0.5 * g) * (1 - side * bank * 0.45) * hush * kW, 0.2);
       P(m.f.frequency, (340 + k * 60 + sp * 720 + g * 130 - top * 60) * tone * (1 - side * bank * 0.16), 0.3);
     });
-    P(W.high.g.gain, (sp * sp * 0.12 + turb * 0.04) * (0.6 + 0.4 * g2) * hush, 0.25);
+    bed(W.high, (sp * sp * 0.12 + turb * 0.04) * (0.6 + 0.4 * g2) * hush, 0.25);
     P(W.high.f.frequency, 1800 + sp * 900 + turb * 500, 0.4);
     const dive = s.diving ? clamp((speed - 150) / 160) : 0;
-    P(W.whistle.g.gain, dive * 0.38 * (0.6 + 0.4 * g1), 0.3);
+    bed(W.whistle, dive * 0.38 * (0.6 + 0.4 * g1), 0.3);
     P(W.whistle.f.frequency, 900 + speed * 4 + g2 * 120 + (wander(clock * 3.1, 91) - 0.5) * 70, 0.3);
-    P(W.rumble.g.gain, clamp((airspeed - 120) / 190) * 0.4 + (s.boost && flying ? 0.07 : 0), 0.4);
+    bed(W.rumble, clamp((airspeed - 120) / 190) * 0.4 + (s.boost && flying ? 0.07 : 0), 0.4);
     const fl_ = falling ? clamp(-vy / 60) : 0;
-    P(W.fall.g.gain, (falling ? 0.03 + fl_ * 0.2 : 0) * kF, 0.2);
+    bed(W.fall, (falling ? 0.03 + fl_ * 0.2 : 0) * kF, 0.2);
     P(W.fall.f.frequency, 500 + fl_ * 1800, 0.3);
     // ── feathers: the inside wing of a turn, slow and near its stall, is the one that flutters most
     const plume = title || dead ? 0 : phoenix ? 1 : wings && air ? 0.6 : 0;
     W.ruf.forEach((m, k) => {
       const side = W.ruf.length > 1 ? (k ? 1 : -1) : 0;
-      P(m.g.gain, plume * fl.turb * (0.75 + 0.25 * (k ? g1 : g2)) * (1 + side * bank * 0.35) * 0.9, 0.05);
-      P(m.f.frequency, (wings ? 1300 : 1900) + sp * 1500 + fl.turb * 700, 0.2);
+      bed(m, plume * fl.turb * (0.75 + 0.25 * (k ? g1 : g2)) * (1 + side * bank * 0.35) * 0.9, 0.05);
+      P(m.f.frequency, (wings ? 1300 : 1700) + sp * 1000 + fl.turb * 500, 0.2);   // (no higher than about 4 kHz: above that a flutter is a fizz)
       P(m.s.playbackRate, m.rate * (0.8 + sp * 0.45 + fl.turb * 0.35), 0.2);
     });
     // ── fire: his own. It roars with speed, is torn harder the faster he goes, gasps on every wingbeat, and takes a
     //    mouthful whenever it finds something to burn
     const fireOn = !title && !dead, kf = kick.flap * 0.5 + kick.fire;
-    P(W.fire.g.gain, (!fireOn ? 0 : s.burning ? 0.5 : phoenix ? 0.07 + flame * 0.1 + sp * 0.09 + kf * 0.1 : wings && air ? 0.04 : 0) * kX, 0.2);
-    P(W.fire.f.frequency, 360 + sp * 480 + (s.burning ? 500 : 0) + kf * 260, 0.3);
-    P(W.fire.l1.frequency, 5.5 + sp * 6, 0.5); P(W.fire.l2.frequency, 8.7 + sp * 9, 0.5);
+    bed(W.fire, (!fireOn ? 0 : s.burning ? 0.5 : phoenix ? 0.07 + flame * 0.1 + sp * 0.09 + kf * 0.1 : wings && air ? 0.04 : 0) * kX * 0.4, 0.2);
+    if (W.fire.on) { P(W.fire.f.frequency, 360 + sp * 480 + (s.burning ? 500 : 0) + kf * 260, 0.3); P(W.fire.s.playbackRate, 0.9 + Math.min(sp, 1.4) * 0.3 + kf * 0.1, 0.4); }   // (torn faster, the faster he goes)
     const fc = !fireOn ? 0 : s.burning ? 0.5 : phoenix ? 0.09 + flame * 0.12 + kf * 0.05 : wings ? 0.05 : 0;
-    W.crackle.forEach((m, k) => { P(m.g.gain, fc * (k ? 0.8 : 1), 0.3); P(m.s.playbackRate, m.rate * (0.92 + sp * 0.25), 0.5); });
+    W.crackle.forEach((m, k) => { bed(m, fc * (k ? 1.1 : 1.4), 0.3); if (m.on) P(m.s.playbackRate, m.rate * (0.92 + sp * 0.25), 0.5); });
     // ── wings as a man; and his own, as a bird, in the broken air behind another
     if (now > WK.until) WK.tgt = 0; WK.cur += (WK.tgt - WK.cur) * (1 - Math.exp(-dtT / 0.25)); if (WK.cur < 0.003) WK.cur = 0;
     const buf = wings && air && !dead, wk = dead || title ? 0 : WK.cur;
-    P(W.buffet.g.gain, Math.max(buf ? 0.25 + sp * 0.5 : 0, wk * (0.25 + sp * 0.3)), 0.25);
+    bed(W.buffet, Math.max(buf ? 0.25 + sp * 0.5 : 0, wk * (0.25 + sp * 0.3)), 0.25);
     if (buf || wk > 0) { P(W.buffet.lfo.frequency, 7 + sp * 9 + g1 * 2 + wk * 5, 0.3); P(W.buffet.f.frequency, 170 + sp * 160, 0.3); }
     // ── water
     // (skimming it, he hisses: fire on water; inside it, everything else goes dull)
     const wet = realmUnder || title ? 0 : clamp(+s.water || 0), wave = Math.pow(0.5 + 0.5 * Math.sin(clock * 0.9 + Math.sin(clock * 0.23) * 2), 2);
     const skim = title || dead ? 0 : clamp((+s.skim || 0) / 2), sub = clamp(+s.sub || 0);
-    P(W.water.g.gain, Math.max(wet * (0.2 + 0.5 * wave) * kA, skim * 0.5, sub * 0.6), 0.3);
+    bed(W.water, Math.max(wet * (0.2 + 0.5 * wave) * kA, skim * 0.5, sub * 0.6), 0.3);
     P(W.water.f.frequency, sub > 0.5 ? 240 : 560 + wave * 380 + skim * 900, 0.4);
-    P(W.foam.g.gain, wet * wave * 0.05 + skim * 0.16, 0.2);
+    bed(W.foam, wet * wave * 0.05 + skim * 0.16, 0.2);
     const rain = title || dead ? 0 : clamp(+s.rain || 0);   // a storm coming down on stone
-    P(W.rain.g.gain, rain * (0.3 + 0.08 * g1) * kR, 0.4); P(W.rainLow.g.gain, rain * 0.22 * kR, 0.4);
+    bed(W.rain, rain * (0.3 + 0.08 * g1) * kR, 0.4); bed(W.rainLow, rain * 0.22 * kR, 0.4);
     // ── the recorded beds: wind round him (harder, and higher, the faster he goes), the dive's roar, the rush of a fall,
     //    his fire, the storm's rain, water lapping nearby. Pitch rides speed so a recording never sounds like a recording.
     const muffle = sub > 0.5 ? 0.25 : 1;

@@ -193,6 +193,8 @@
   .touch #who .r s[data-g] { font-size:0; padding:12px 12px; } .touch #who .r s[data-g]::before { content:attr(data-g); font-size:14px; } .touch #who .r { grid-template-columns:14px 1fr auto 52px 14px auto; gap:6px; } .touch #who .r u { display:none; }
   .touch #who .r { padding:3px 0; } .touch #who .r span[data-n] { padding:12px 0; } #who .r s.on { color:#ff8a7a; border-color:rgba(255,138,122,.5); }
   .cl.voice { font-style:italic; } .cl.voice b::before { content:'◉ '; opacity:.55; font-style:normal; }
+  #who .kp { margin-top:10px; padding-top:6px; border-top:1px solid rgba(255,214,138,.25); white-space:normal; } #who .kp h4 { color:#ffd27a; } #who .kp p { margin:6px 0; color:#9c958b; font-size:11px; letter-spacing:.08em; }
+  #who .kp s { display:inline-block; margin:2px 3px; padding:6px 9px; border:1px solid rgba(255,214,138,.35); color:#ffe6b0; text-decoration:none; cursor:pointer; pointer-events:auto; } #who .kp s:hover { border-color:#fff; color:#fff; } .touch #who .kp s { padding:10px 12px; }
   #who .r { display:grid; grid-template-columns:16px 1fr auto 64px 18px auto; gap:10px; align-items:center; padding:4px 0; border-top:1px solid rgba(255,255,255,.05); white-space:nowrap; }
   #who .r:first-of-type { border-top:none; }
   #who .r i { font-style:normal; text-align:right; color:var(--dim); } #who .r u { text-decoration:none; color:var(--dim); font-size:10px; } #who .r em { font-style:normal; text-align:center; }
@@ -441,6 +443,8 @@
   #bldBar .bc { display:flex; gap:6px; align-items:center; margin-top:8px; flex-wrap:wrap; } #bldBar .bl { color:#ffd8a8; margin-right:auto; } #bldBar .bc button.go { background:rgba(255,176,112,.22); border-color:#ffb070; }
   #bldBar .bw { color:#ffb49a; font-size:11px; min-height:14px; margin-top:6px; }
   @media (max-height:460px) { #bag { bottom:calc(var(--sb, 0px) + 60px); font-size:11px; } #bldBar { bottom:calc(var(--sb, 0px) + 56px); } #bag .br { padding:4px 0; } #bldBar .bp button { min-height:44px; } #bldBar { padding:6px 8px; } #bldBar .bc { margin-top:5px; } }
+  #waveBtn { position:fixed; left:50%; bottom:calc(var(--sb, 0px) + 130px); transform:translate(-50%, 8px); z-index:7; background:rgba(6,20,30,.72); border:1px solid rgba(140,220,255,.5); border-radius:999px; padding:10px 18px; color:#d6f3ff; font:inherit; font-size:11px; letter-spacing:.2em; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .3s, transform .3s; }
+  #waveBtn.on { opacity:.95; transform:translate(-50%, 0); pointer-events:auto; } #waveBtn:hover { border-color:#fff; color:#fff; }
   .touch #friendAsk { padding:14px 8px 10px; font-size:9px; letter-spacing:.16em; max-width:92vw; overflow:hidden; text-overflow:ellipsis; }
   .touch #photoHint, .touch #chat:not(.open) #chatRow { display:none; }
   .photo #micBtn, .photo #whoBtn, .photo #chat:not(.open) { opacity:0 !important; pointer-events:none; }
@@ -800,7 +804,7 @@
 <div id="looks" role="dialog" aria-label="Visuals"></div><div id="guide" role="dialog" aria-label="Ask for help"><div class="gbox"><button class="gb" id="guideX" type="button" aria-label="Close">✕</button><div id="guideAsked"></div><div id="guideSay" aria-live="polite"></div><div id="guideChips"></div>
   <form id="guideForm" autocomplete="off"><button class="gb" id="guideMic" type="button" aria-label="Speak to her"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11.5a6 6 0 0 0 12 0M12 17.5V21M9 21h6"/></svg></button><input id="guideIn" maxlength="160" autocomplete="off" autocapitalize="sentences" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="Ask her" placeholder="ask how to do anything · or tell her to do it"><button class="gb" id="guideGo" type="submit" aria-label="Ask">↵</button></form></div></div>
 <div id="health"><button id="healthPill" type="button" aria-label="Site health" aria-expanded="false" aria-controls="healthBox"><i></i><span></span></button><div id="healthBox"></div></div>
-<button id="newcomer" type="button"></button><button id="friendAsk" type="button"></button><div id="xfCard" role="status" aria-live="polite"></div><div id="bag" role="dialog" aria-label="Your bag"></div><div id="bldBar" role="toolbar" aria-label="The builder"></div><div id="xfList" role="dialog" aria-label="What has been brought to you"></div><input id="xfPick" type="file" tabindex="-1" aria-hidden="true"><div id="who"></div><button id="micBtn" type="button" aria-label="Microphone"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15"/><path class="x" d="M2 2l12 12" style="display:none"/></svg></button><button id="whoBtn" type="button"></button>
+<button id="newcomer" type="button"></button><button id="friendAsk" type="button"></button><div id="xfCard" role="status" aria-live="polite"></div><div id="bag" role="dialog" aria-label="Your bag"></div><button id="waveBtn" type="button"></button><div id="bldBar" role="toolbar" aria-label="The builder"></div><div id="xfList" role="dialog" aria-label="What has been brought to you"></div><input id="xfPick" type="file" tabindex="-1" aria-hidden="true"><div id="who"></div><button id="micBtn" type="button" aria-label="Microphone"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15"/><path class="x" d="M2 2l12 12" style="display:none"/></svg></button><button id="whoBtn" type="button"></button>
 <div id="map"><canvas id="mapC"></canvas><div id="mapTitle"></div><div id="mapHint"></div><button id="mapMode" type="button" aria-label="Flat map or 3D model">FLAT</button><button id="mapNorth" type="button" aria-label="Turn the map north up"><span><svg viewBox="0 0 16 16" width="18" height="18"><path d="M8 1.5l3 6.5H5z" fill="currentColor"/><path d="M8 14.5L5 8h6z" fill="none" stroke="currentColor" stroke-width="1"/></svg></span></button></div>
 
 
@@ -2300,15 +2304,16 @@ function crash(what) {
   return true;
 }
 
-let streamSig = '', streamIdle = false, streamN = -1, streamRush = 0;
+let streamSig = '', streamIdle = false, streamN = -1, streamRush = 0, VIEW_X = 0;   // (VIEW_X: more country built, for a wide shot)
 function streamChunks(cx0, cz0, budget) {
-  const sig = cx0 + ',' + cz0 + ',' + VIEW_R + ',' + realm;
+  const VR = VIEW_R + VIEW_X;
+  const sig = cx0 + ',' + cz0 + ',' + VR + ',' + realm;
   if (sig === streamSig && streamIdle && chunks.size === streamN) return;   // same place, everything built: nothing to do
   const moved = sig !== streamSig; streamSig = sig;
   const want = [];
-  for (let dz = -VIEW_R; dz <= VIEW_R; dz++) for (let dx = -VIEW_R; dx <= VIEW_R; dx++) {
+  for (let dz = -VR; dz <= VR; dz++) for (let dx = -VR; dx <= VR; dx++) {
     const d2 = dx * dx + dz * dz;
-    if (d2 > (VIEW_R + 0.5) ** 2) continue;
+    if (d2 > (VR + 0.5) ** 2) continue;
     const key = `${cx0 + dx},${cz0 + dz}`;
     if (!chunks.has(key)) want.push([d2, cx0 + dx, cz0 + dz, key]);
   }
@@ -2327,7 +2332,7 @@ function streamChunks(cx0, cz0, budget) {
   streamIdle = built >= want.length;
   if (moved) for (const [key, g] of chunks) {
     const [cx, cz] = key.split(',').map(Number);
-    if ((cx - cx0) ** 2 + (cz - cz0) ** 2 > (VIEW_R + 2) ** 2) {
+    if ((cx - cx0) ** 2 + (cz - cz0) ** 2 > (VR + 2) ** 2) {
       scene.remove(g); disposeFeatures(g); g.traverse(o => o.geometry && o.geometry !== sailGeo && o.geometry.dispose()); chunks.delete(key);
     }
   }
@@ -2915,7 +2920,11 @@ function farStep(dt) {
       FAR.cx = J.cx; FAR.cz = J.cz; FAR.job = null; } }
   // how far he can see: from up high, or going fast, a long way; down among the hills, as before
   const alt = c.y - Math.max(terrainAt(c.x, c.z), WATER), sp = p.form === 'phoenix' ? p.speed : Math.hypot(p.vel.x, p.vel.y, p.vel.z);
-  const want = FAR.mesh ? Math.max(smoothstep(60, 700, alt), smoothstep(110, 280, sp) * 0.75) : 0;
+  // and on a wide shot (the director's long lenses, a camera far off him, the photo camera on a long lens) all the way out
+  const wideShot = (cinema.on && cinema.shot && /^(profile|wide|crane|top|orbit)$/.test(cinema.shot.type)) || (state === 'photo' && camera.fov < 42) || (state === 'play' && c.distanceTo(p.pos) > 95);
+  FAR.wide = lerp(FAR.wide || 0, wideShot ? 1 : 0, damp(wideShot ? 1.4 : 0.6, dt));
+  VIEW_X = FAR.wide > 0.6 && !XR.on ? (TOUCH ? 1 : 2) : FAR.wide < 0.3 ? 0 : VIEW_X;
+  const want = FAR.mesh ? Math.max(smoothstep(60, 700, alt), smoothstep(110, 280, sp) * 0.75, FAR.wide) : 0;
   FAR.k = lerp(FAR.k, want, damp(want > FAR.k ? 1.6 : 0.8, dt));
   FAR.uR.value = Math.max(0, (VIEW_R - 1.6) * CHUNK - (FAR.lead || 0));   // (when the built country runs ahead of him, behind him it is the far country sooner)
 }
@@ -2970,7 +2979,8 @@ function updateClouds(dt) {
   { const sp = player.form === 'phoenix' ? player.speed : 0, fast = smoothstep(120, 300, sp); cloudIn = lerp(cloudIn, clamp(inside * 1.6, 0, 1) * (1 - 0.55 * fast), damp(3.5 + fast * 9, dt)); }   // (at speed he is through it in a breath)
   _cc.copy(pal.hor).lerp(WHITE_C, under ? 0.05 : 0.45);
   scene.fog.color.lerp(_cc, cloudIn * 0.8);
-  const fFar = lerp(fogFar, Math.max(fogFar, FAR.span * 0.46), FAR.k), fNear = lerp(260, 900, FAR.k);
+  const fFar = lerp(lerp(fogFar, Math.max(fogFar, FAR.span * 0.46), FAR.k), FAR.span * 0.66, (FAR.wide || 0) * 0.9), fNear = lerp(lerp(260, 900, FAR.k), 1600, (FAR.wide || 0) * 0.8);   // (a wide shot sees nearly all the way to the far country's edge)
+  { const cf = Math.max(14000, fFar * 1.35); if (Math.abs(camera.far - cf) > 400) { camera.far = cf; camera.updateProjectionMatrix(); } }
   scene.fog.near = lerp(fNear, 40, cloudIn); scene.fog.far = lerp(fFar, 720, cloudIn);
   if (!under && WX.fog > 0.01) {   // rain and mist close the world in, and grey it
     scene.fog.near = lerp(scene.fog.near, 30, WX.fog * 0.8); scene.fog.far = lerp(scene.fog.far, Math.min(scene.fog.far, 560), WX.fog * 0.85);
@@ -3878,6 +3888,8 @@ function makePhoenix() {
 }
 // the tail is a set of chains: each link eases toward its place behind the one before, so turns and dives whip through it
 const _tinv = new THREE.Matrix4(), _tz = new THREE.Vector3(), SWIMT = { k: 0, ph: 0 };
+const CAPE_Z = [-1.45, -0.95, -0.3, 0.5, 1.2, 1.8], CAPE_R = [0.3, 0.5, 0.62, 0.56, 0.34, 0.1];
+const capeTop = z => { let i = 0; while (i < 4 && z > CAPE_Z[i + 1]) i++; const u = clamp((z - CAPE_Z[i]) / (CAPE_Z[i + 1] - CAPE_Z[i]), 0, 1); return lerp(CAPE_R[i], CAPE_R[i + 1], u) * 0.95 + 0.32; };   // (how high the back stands at each point along the body, feathers and all)
 function updateTails(dt, snap, P = phoenix) {
   const G = P.group; G.updateMatrixWorld();
   const sc = G.scale.x, up = _n.set(0, 1, 0).transformDirection(G.matrixWorld), inv = _tinv.copy(G.matrixWorld).invert();
@@ -3903,6 +3915,7 @@ function updateTails(dt, snap, P = phoenix) {
       _s.copy(n[i - 1]).addScaledVector(_v, seg).addScaledVector(up, wv);
       if (fresh) n[i].copy(_s); else n[i].lerp(_s, damp(lerp(26, 9, i / t.N), dt));
       _s.subVectors(n[i], n[i - 1]).setLength(seg); n[i].copy(n[i - 1]).add(_s);
+      if (t.root) { _tz.copy(n[i]).applyMatrix4(inv); if (_tz.z > -1.45 && _tz.z < 1.8 && Math.abs(_tz.x) < 1.1) { const top = capeTop(_tz.z); if (_tz.y < top && _tz.y > -0.7) { _tz.y = top; n[i].copy(_tz.applyMatrix4(G.matrixWorld)); } } }   // (the cape lies over his back, never through it, at any size)
       if (down) { const q = n[i], gy = groundAt(q.x, q.z, q.y + 3) + 0.06; if (q.y < gy) q.y = gy;   // (down: it lies along the ground, and gives way to what stands there)
         if (i % 3 === 0) { _tz.set(0, 0, 0); pushOut(q, _tz, 0.2); } }
     }
@@ -6928,7 +6941,7 @@ function netJoin() {
     const st = ch.presenceState(), here = new Set();
     const quiet = performance.now() - CHAT.joinedAt < 4000;
     for (const id in st) { if (id === NET.id) continue; here.add(id); const m = st[id][0] || {}; const P = peerOf(id); P.name = cleanName(m.n);
-      if (!P.seen) { P.seen = true; GUST.shareT = 1.5; setTimeout(woodShare, 1500 + Math.random() * 2500); if (!quiet) { chatLine('', `${P.name} IS FLYING`, 'sys'); joinStorm(); npcNoticed(id); } } }
+      if (!P.seen) { P.seen = true; regNote('join', P); GUST.shareT = 1.5; setTimeout(woodShare, 1500 + Math.random() * 2500); if (!quiet) { chatLine('', `${P.name} IS FLYING`, 'sys'); joinStorm(); npcNoticed(id); } } }
     for (const [id, P] of NET.peers) if (!here.has(id) && !P.memory && !P.npc) dropPeer(id, P);
   });
   ch.on('broadcast', { event: 's' }, ({ payload: m }) => gotState(m));
@@ -6954,7 +6967,7 @@ function netJoin() {
   ch.on('broadcast', { event: 'trail' }, ({ payload: m }) => gotTrail(m));
   ch.on('broadcast', { event: 'friend' }, ({ payload: m }) => gotFriend(m));
   ch.on('broadcast', { event: 'xf' }, ({ payload: m }) => gotXf(m));
-  ch.on('broadcast', { event: 'fell' }, ({ payload: m }) => gotFell(m)); ch.on('broadcast', { event: 'plant' }, ({ payload: m }) => gotPlant(m)); ch.on('broadcast', { event: 'bld' }, ({ payload: m }) => gotBld(m));
+  ch.on('broadcast', { event: 'fell' }, ({ payload: m }) => gotFell(m)); ch.on('broadcast', { event: 'plant' }, ({ payload: m }) => gotPlant(m)); ch.on('broadcast', { event: 'bld' }, ({ payload: m }) => gotBld(m)); ch.on('broadcast', { event: 'wave' }, ({ payload: m }) => gotWave(m)); ch.on('broadcast', { event: 'decree' }, ({ payload: m }) => gotDecree(m));
   ch.subscribe((status, err) => {
     NET.log.push([Math.round(performance.now() / 100) / 10, status, err ? String(err.message || err).slice(0, 120) : '']); if (NET.log.length > 20) NET.log.shift();
     if (ch !== NET.ch) return;
@@ -6972,7 +6985,7 @@ function peerOf(id) {
   return P;
 }
 function dropPeer(id, P) {
-  xfGone(id); bldPeerGone(id);
+  xfGone(id); bldPeerGone(id); if (P && P.seen) regNote('left', P);
   if (P.seen && performance.now() - CHAT.joinedAt > 4000) chatLine('', `${P.name} LANDED · GONE`, 'sys');
   if (P.av) { scene.remove(P.av.man.group, P.av.bird.group);
     for (const g of [P.av.man.group, P.av.bird.group]) g.traverse(o => { if (!o.isMesh) return; o.geometry?.dispose(); for (const m of [].concat(o.material)) if (m && m !== INK && m !== capeMat && m !== fireMat) m.dispose?.(); });
@@ -7266,17 +7279,22 @@ function updateWho(dt) {
   const esc = t => String(t).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
   const wbtn = (n, k, g, text, on, title) => `<s data-n="${esc(n)}" data-k="${k}" data-g="${g}" title="${title}" class="${on ? 'on' : ''}">${text}</s>`;
   const ctl = P => { const n = P.name; return wbtn(n, 'go', '➤', 'go', false, 'Be carried to them') + wbtn(n, 'track', '◎', 'track', TRACK.id === P.id, 'Keep their mark on screen, however far they go') + wbtn(n, 'follow', '⇢', 'follow', following(P), 'Fly after them')
-    + wbtn(n, 'friend', '♦', 'friend', FRIENDS.has(n), 'Add them as a friend: they are told, and can add you back') + wbtn(n, 'mute', '◌', 'mute', SHUN.mute.has(n), 'Stop hearing them') + wbtn(n, 'block', '⊘', 'block', SHUN.block.has(n), 'Stop seeing them') + wbtn(n, 'xf', '✉', 'send', false, 'Send them a voice note or a file'); };
+    + wbtn(n, 'friend', '♦', 'friend', FRIENDS.has(n), 'Add them as a friend: they are told, and can add you back') + wbtn(n, 'mute', '◌', 'mute', SHUN.mute.has(n), 'Stop hearing them') + wbtn(n, 'block', '⊘', 'block', SHUN.block.has(n), 'Stop seeing them') + wbtn(n, 'xf', '✉', 'send', false, 'Send them a voice note or a file') + (P.npc && MOD.admin ? wbtn(n, 'npcx', '✕', 'send away', false, 'Send this regular away') : ''); };
   const row = (col, name, form, dist, arrow, c = '', go = '') => `<div class="r"><b style="color:${col}">◆</b><span style="color:${col}"${go ? ` data-n="${esc(go)}" data-k="go"` : ''}>${esc(name)}</span><u>${form}</u><i>${dist}</i><em>${arrow}</em><p>${c}</p></div>`;
   const formOf = P => (performance.now() - (P.ring?.t || -1e9) < 9000 ? 'in the rings' : P.form === 'p' ? 'phoenix' : 'on foot') + (P.patron ? ` · ${godById[P.patron]?.name || ''}` : '');
   let h = `<h4>IN THE SKY · ${list.length + 1}</h4>` + row(PATRONS[PATRON.id]?.[0] || '#ff1206', `${heroName} (you)`, (player.form === 'phoenix' ? 'phoenix' : 'on foot') + (PATRON.id ? ` · ${godById[PATRON.id]?.name}` : ''), realm === 'under' ? 'below' : '', '·');
   for (const w of list) h += row(w.P.css || '#bfe6ff', (FRIENDS.has(w.P.name) ? '♦ ' : '') + w.P.name, formOf(w.P), w.there ? fmtDist(w.d) : (w.P.realm ? 'below' : 'above'), w.there ? w.arrow : '', ctl(w.P), w.P.name);
   if (!list.length) h += `<div class="none">${NET.on || NET.ch ? 'nobody else is flying right now' : 'not connected'}</div>`;
   else if (flags.morphed) h += `<div class="none">${TOUCH ? 'tap a name to be carried to them · ➤ go · ◎ track · ⇢ follow · ♦ friend' : 'click a name and the gods will carry you to them'}</div>`;
+  if (MOD.admin) { const kb = (k, t, title) => `<s data-n="__k" data-k="${k}" title="${title}">${t}</s>`, off = Date.now() < DECREE.until && DECREE.npcs === '00000000';
+    h += `<div class="kp"><h4>THE KEEPER</h4><p>regulars ${kb(off ? 'npcon' : 'npcoff', off ? 'bring them back' : 'send all away', 'The game\'s own fliers')} ${kb('npcadd', '+ one more', 'Call up another regular')} ${kb('npcon', 'as they like', 'Let them come and go by themselves')}</p>`
+      + `<p>olympus ${['clear', 'storm', 'rain', 'mist', 'day', 'night'].map(w => kb('wx:' + w, w, 'Over Olympus, for everyone')).join(' ')}</p><p>everyone ${kb('go:me', 'to me', 'Carry everyone flying to you')} ${kb('go:oly', 'to the summit', 'Carry everyone to the top of Olympus')} ${kb('go:crete', 'to crete', 'Carry everyone to Crete')}</p></div>`; }
   el.innerHTML = h;
 }
 $('whoBtn').addEventListener('click', e => { e.stopPropagation(); who.pinned = !who.pinned; who.t = 0; });
 $('who').addEventListener('pointerdown', e => { const b = e.target.closest('[data-n]'); if (!b) return; e.stopPropagation(); e.preventDefault(); const k = b.dataset.k;
+  if (b.dataset.n === '__k') { keeperAct(k); return; }   // (the keeper's own buttons)
+  if (k === 'npcx') { const C = NPCS.list.find(c => c && c.name === b.dataset.n); if (C) keeperAct('npcx:' + C.i); return; }
   if (k === 'xf') { const P = peerNamed(b.dataset.n); if (P) xfChoose(P); else toast('THEY HAVE GONE'); return; }   // (it only opens the card: its buttons are pressed with a click, which a phone lets ask for the microphone)
   if (k === 'go' || k === 'track' || k === 'follow' || k === 'friend') { const P = peerNamed(b.dataset.n); who.t = 0;
     if (!P) toast('THEY HAVE GONE'); else if (k === 'go') warpToPeer(P); else if (k === 'track') trackPeer(P); else if (k === 'follow') followPeer(P); else if (FRIENDS.has(P.name)) unfriend(P); else befriend(P, 'asked');
@@ -8052,7 +8070,7 @@ try { new PerformanceObserver(l => { for (const e of l.getEntries()) HEALTH.byte
 function healthCount(ch) {   // the shared channel: what goes out and what comes in
   const s0 = ch.send.bind(ch), on0 = ch.on.bind(ch);
   ch.send = (m, o) => { HEALTH.out++; if (HEALTH.me) try { HEALTH.ws += JSON.stringify(m.payload || '').length + 60; } catch {} return s0(m, o); };
-  ch.on = (type, f, cb) => on0(type, f, type === 'broadcast' ? x => { HEALTH.in++; if (HEALTH.me) try { HEALTH.ws += JSON.stringify(x.payload || '').length + 60; } catch {} if (state === 'prologue' && f.event !== 's') return; return cb(x); } : cb);
+  ch.on = (type, f, cb) => on0(type, f, type === 'broadcast' ? x => { HEALTH.in++; if (HEALTH.me) try { HEALTH.ws += JSON.stringify(x.payload || '').length + 60; } catch {} if (state === 'prologue' && f.event !== 's' && f.event !== 'wave') return; return cb(x); } : cb);
 }
 const hAgo = t => { const sec = Math.max(0, Math.round((performance.now() - t) / 1000)); return sec < 90 ? `${sec}s ago` : `${Math.round(sec / 60)}m ago`; };
 const hSize = b => b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`;
@@ -8325,6 +8343,9 @@ function chatCommand(text) {
     case 'faction': case 'factions': factionCmd(arg); return true;
     case 'f': if (arg) { if (FAC.key) sendTo('fac', cleanText(arg)); else sys('NO FACTION YET · /faction make NAME'); } else factionCmd(''); return true;
     case 'all': case 'everyone': CH.cur = 'pub'; chShow(); if (arg) sendChat(arg); return true;
+    case 'gather': case 'summonall': keeperAct(/^(olympus|summit|top)$/.test(low) ? 'go:oly' : /^crete$/.test(low) ? 'go:crete' : 'go:me'); return true;
+    case 'weather': case 'wx': if (['clear', 'storm', 'rain', 'mist', 'day', 'night'].includes(low)) keeperAct('wx:' + low); else sys('/weather clear · storm · rain · mist · day · night'); return true;
+    case 'regulars': keeperAct(/^(off|away|none|0)$/.test(low) ? 'npcoff' : /^(more|add|\+)$/.test(low) ? 'npcadd' : 'npcon'); return true;
     case 'sky': case 'announce': if (!(KEEP_ON || MOD.admin)) { sys('THAT IS THE KEEPER\'S'); return true; } if (arg) { if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'god', payload: { i: NET.id, n: heroName, t: cleanText(arg) } }); skyWord(cleanText(arg), true); } return true;
     case 'small': case 'shrink': case 'tiny': case 'hawk': small(SMALL.want >= 1 || /^(on|yes)$/i.test(arg || ''), true); return true;
     case 'big': case 'grow': case 'whole': small(false); return true;
@@ -8406,7 +8427,7 @@ function facKeep(o) { try { if (o) localStorage.setItem('icarus.faction', JSON.s
 async function symSeal(key, ad, text) { const E = new TextEncoder(), iv = crypto.getRandomValues(new Uint8Array(12)), ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: E.encode(ad) }, key, E.encode(text))), out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12); return b64(out); }
 async function symOpen(key, ad, c) { const u = unb64(c); return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: u.subarray(0, 12), additionalData: new TextEncoder().encode(ad) }, key, u.subarray(12))); }
 const facMates = () => FAC.tag ? [...NET.peers.values()].filter(P => P.seen && P.fa === FAC.tag && P.s && performance.now() - P.s.t < 15000) : [];
-function chList() { const L = ['pub']; if (FAC.key) L.push('fac'); L.push('dm'); if (KEEP_ON || MOD.admin) L.push('god'); return L; }
+function chList() { const L = ['pub']; if (FAC.key) L.push('fac'); L.push('dm', 'ask'); if (KEEP_ON || MOD.admin) L.push('god', 'reg'); return L; }
 function chTarget() {   // who a message to one person goes to: whoever was last written to or heard from, else whoever he is looking at, else whoever is nearest
   let P = CH.to ? peerNamed(CH.to) : null; if (P && P.name !== CH.to) P = null;
   if (!P && typeof AIM !== 'undefined' && AIM.P && AIM.P.seen) P = AIM.P;
@@ -8416,8 +8437,8 @@ function chTarget() {   // who a message to one person goes to: whoever was last
 function chShow() {
   const row = $('chatRow'); if (!row) return; const sp = row.firstElementChild, inp = $('chatInput'); if (!chList().includes(CH.cur)) CH.cur = 'pub';
   const k = CH.cur, T = k === 'dm' ? chTarget() : null;
-  sp.textContent = k === 'fac' ? `${FAC.name} ›` : k === 'dm' ? `TO ${T ? T.name : '…'} ›` : k === 'god' ? 'THE SKY ›' : chList().length > 2 || FAC.key ? 'ALL ›' : '›'; sp.className = 'ch-' + k;
-  inp.placeholder = k === 'fac' ? 'say something to your faction' : k === 'dm' ? (T ? `say something to ${T.name.toLowerCase()} alone` : 'nobody to write to yet · @name first') : k === 'god' ? 'say it to everyone, from the sky' : 'say something to everyone · tab changes who hears it';
+  sp.textContent = k === 'fac' ? `${FAC.name} ›` : k === 'dm' ? `TO ${T ? T.name : '…'} ›` : k === 'god' ? 'THE SKY ›' : k === 'ask' ? 'THE GODS ›' : k === 'reg' ? 'REGULARS ›' : chList().length > 2 || FAC.key ? 'ALL ›' : '›'; sp.className = 'ch-' + k;
+  inp.placeholder = k === 'ask' ? 'ask the gods anything · they answer, and do it if they can' : k === 'reg' ? 'say something to your regulars · they answer you alone' : k === 'fac' ? 'say something to your faction' : k === 'dm' ? (T ? `say something to ${T.name.toLowerCase()} alone` : 'nobody to write to yet · @name first') : k === 'god' ? 'say it to everyone, from the sky' : 'say something to everyone · tab changes who hears it';
 }
 function chNext() { const L = chList(); CH.cur = L[(L.indexOf(CH.cur) + 1) % L.length]; chShow(); audio.sfx.menuHover?.(); }
 async function sendTo(kind, text, P) {   // sealed: to his faction ('fac'), or to one person ('dm')
@@ -8432,6 +8453,9 @@ async function sendTo(kind, text, P) {   // sealed: to his faction ('fac'), or t
 }
 function sendCh(text) {   // a line typed with a channel other than everyone chosen
   const k = CH.cur;
+  if (k === 'ask') { chatLine(`${heroName} → THE GODS`, text, 'dm me'); guideAsk(text, { auto: true }); return true; }   // (said to the gods themselves: they answer, and do it if they can)
+  if (k === 'reg') { if (!keeperHere()) { CH.cur = 'pub'; chShow(); return false; } chatLine(`${heroName} → REGULARS`, text, 'reg me'); const L = NPCS.list.filter(C => C && C.on); if (!L.length) { sysLine('NONE OF THEM IS UP'); return true; }
+    const U = ' ' + text.toUpperCase().replace(/[^A-Z0-9 ]/g, ' ') + ' ', C = L.find(c => U.includes(' ' + c.name + ' ')) || npcPick(L); npcAsk(C, heroName, NET.id, text, false, true, true); return true; }
   if (k === 'god') { if (!(KEEP_ON || MOD.admin)) { CH.cur = 'pub'; chShow(); return false; } if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'god', payload: { i: NET.id, n: heroName, t: text } }); skyWord(text, true); return true; }
   if (k === 'fac') { if (!FAC.key) { CH.cur = 'pub'; chShow(); return false; } sendTo('fac', text); return true; }
   if (k === 'dm') { let P = null, t = text; const m = /^@([A-Za-z0-9]{2,12})[:,]?\s+(.+)$/.exec(text); if (m) { const Q = peerNamed(m[1]); if (Q) { P = Q; t = m[2]; CH.to = Q.name; } }
@@ -8546,13 +8570,13 @@ const NPC_SUF = ['y', 'o', 'ie', 'ish', 'er', 'ito', 'zz', 'ette'];
 const npcHandle = R => {   // a name the way people make them up: run-together words, a nickname, a made-up word; numbers only now and then
   const p = a => a[Math.floor(R() * a.length)], leet = t => t.replace(/[aeios]/g, c => R() < 0.4 ? ({ a: '4', e: '3', i: '1', o: '0', s: '5' })[c] : c);
   const w1 = p(NPC_W1), w2 = p(NPC_W2), r = R(), made = () => p(NPC_SY[0]) + (R() < 0.7 ? p(NPC_SY[1]) : '') + p(NPC_SY[2]);
-  let n = r < 0.22 ? w1 + w2 : r < 0.36 ? made() : r < 0.46 ? w1 + ' ' + w2 : r < 0.54 ? w1 + p(NPC_SUF) : r < 0.61 ? 'the' + w2 : r < 0.67 ? made() + ' ' + w2 : r < 0.72 ? w1 + w1.slice(-1).repeat(2)
+  let n = r < 0.22 ? w1 + w2 : r < 0.36 ? made() : r < 0.46 ? w1 + ' ' + w2 : r < 0.54 ? w1 + p(NPC_SUF) : r < 0.61 ? made() + p(NPC_SUF) : r < 0.67 ? made() + ' ' + w2 : r < 0.72 ? w1 + w1.slice(-1).repeat(2)
     : r < 0.77 ? 'x' + w1 + 'x' : r < 0.82 ? leet(w1 + w2) : r < 0.87 ? (w1 + w2).replace(/[aeiou]/g, '') : r < 0.94 ? w1 + String(Math.floor(R() * 100)) : made() + String(Math.floor(R() * 10));
   if (n.length > 12) n = n.replace(/ /g, ''); if (n.length > 12) n = w1.length <= 9 ? w1 + p(NPC_SUF) : w1;   // (never cut off in the middle of a word)
   return cleanName(n.slice(0, 12));
 };
 const NPC_F = i => 3900 + i * 1130;   // (how long one turn in place i lasts, in seconds: each place its own, so they never all change at once)
-function npcWho(i, T) {   // who is flying in place i at T (seconds, by the clock), or null between turns
+function npcWho(i, T, force) {   // who is flying in place i at T (seconds, by the clock), or null between turns
   const F = NPC_F(i), s = T + i * 977, k = Math.floor(s / F), u = s - k * F, key = i + ':' + k;
   let W = NPCS.cache.get(key);
   if (!W) { const R = mulberry32((Math.imul(i + 11, 0x9e3779b1) ^ Math.imul(k + 7, 0x85ebca6b)) >>> 0), extra = i >= 5;
@@ -8561,7 +8585,7 @@ function npcWho(i, T) {   // who is flying in place i at T (seconds, by the cloc
     for (const [k2, V] of NPCS.cache) if (V.name === name && k2 !== key) name = cleanName(name.slice(0, 10) + (k % 90 + 10));
     W = { key, k, a, b, used, name, sty, att, int, pat: pats[Math.floor(R() * pats.length)] || 'zeus', chat: 0.3 + R() * 0.7, speed: 0.6 + R() * 0.9, on0: k * F - i * 977 + a };
     if (NPCS.cache.size > 64) NPCS.cache.clear(); NPCS.cache.set(key, W); }
-  return W.used && u >= W.a && u <= F - W.b ? W : null;
+  return force || W.used && u >= W.a && u <= F - W.b ? W : null;
 }
 function npcStyle(C, t) {   // a stock line said the way this one types
   t = String(t); const R = Math.random;
@@ -8615,7 +8639,7 @@ function updateNpcs(dt) {
   const T = Date.now() / 1000, now = performance.now(), h = Math.max(dt, 1e-3);
   if (state === 'play') N.up += dt;
   for (let i = 0; i < NPC_N; i++) {
-    const W = npcWho(i, T); let C = N.list[i];
+    const mk = npcMask(i), W = mk === '0' ? null : npcWho(i, T, mk === '1'); let C = N.list[i];   // (the keeper may have sent this one away, or called it up)
     if (C && (!W || C.key !== W.key)) { const Q = NET.peers.get(C.id); if (Q) dropPeer(C.id, Q); N.list[i] = C = null; }   // (that one has logged off: whoever comes next is someone else)
     if (W && !C) { const Cn = C = N.list[i] = npcMake(i, W);
       if (state === 'play' && N.up > 20) { chatLine('', `${Cn.name} IS FLYING`, 'sys'); if (npcHost() && Math.random() < 0.55) N.q.push({ at: time + 4 + Math.random() * 10, f: () => { if (Cn.on && N.list[i] === Cn) npcSay(Cn, npcLine(NPC_IN, '', Cn), null, 0.3); } }); } }
@@ -8639,7 +8663,7 @@ function updateNpcs(dt) {
     if (first) { P.pos.set(x, y, z); P.yaw = C.yaw; } if (P.patron !== C.pat) { P.patron = C.pat; if (P.av) paintPeer(P); }
   }
   // what they say, and when: one page's to do
-  if (!N.selfDone && state === 'play' && (N.selfT += dt) > 7) { N.selfDone = true; npcNoticed(NET.id); }   // (he has just arrived himself)
+  if (!N.selfDone && state === 'play' && (N.selfT += dt) > 7) { N.selfDone = true; if (keeperHere()) regReport(); else npcNoticed(NET.id); }   // (he has just arrived himself; the keeper is told the news instead)   // (he has just arrived himself)
   for (let k = 0; k < N.q.length; k++) if (time >= N.q[k].at) { const e = N.q[k]; N.q.splice(k--, 1); try { e.f(); } catch {} }
   if ((N.idleT -= dt) < 0) { N.idleT = 150 + Math.random() * 240; if (npcHost() && state === 'play') { const L = N.list.filter(C => C && C.on); if (L.length) { const A = npcPick(L), t = npcLine(NPC_IDLE, '', A), D = L.filter(c => c !== A); npcSay(A, t, null, 0.5);
     if (D.length && Math.random() < 0.45) N.q.push({ at: time + 8 + Math.random() * 12, f: () => { if (A.on && N.list.includes(A)) { const B = npcPick(D); if (B && B.on) npcAsk(B, A.name, A.id, t, false, false); } } }); } } }   // (and now and then another of them answers it: once, not back and forth)
@@ -8698,13 +8722,13 @@ function npcHeard(from, fromId, text, priv, j, voice) {
   N.rep.push(time); N.replyT = time + 3.5; C.sayT = time + 5; C.talkTo = fromId; C.talkT = time;
   npcAsk(C, from, fromId, text, priv, addressed);
 }
-function npcAsk(C, from, fromId, text, priv, addressed) {
+function npcAsk(C, from, fromId, text, priv, addressed, reg) {
   npcMem(C, `${from}${priv ? ' (to you alone)' : ''}: ${text}`);
   let ctx = {}; try { ctx = npcCtx(C, fromId); } catch {}
   const hist = NPCS.hist.slice(-13).filter(x => x !== `${from}: ${text}`).slice(-12);
   fetch('/api/hub?fn=npc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ who: C.name, vibe: C.vibe, style: C.style, from, said: text, priv: !!priv, addressed: !!addressed, hist, mem: C.mem.slice(-17, -1), ctx }), signal: AbortSignal.timeout(9000) })
     .then(r => r.ok ? r.json() : null).then(o => o && typeof o.say === 'string' ? o.say : '').catch(() => '')
-    .then(say => { if (!C.on || !NPCS.list.includes(C)) return; if (!say && !addressed && !priv) return; npcSay(C, say || npcLine(NPC_MEH, '', C), priv ? fromId : null); });
+    .then(say => { if (!C.on || !NPCS.list.includes(C)) return; if (!say && !addressed && !priv) return; if (reg) return regSay(C, say || npcLine(NPC_MEH, '', C)); npcSay(C, say || npcLine(NPC_MEH, '', C), priv ? fromId : null); });
 }
 function npcPlace(v) {   // where something is, in words a player would use
   const x = v.x, z = v.z, g = overHeight(x, z), dM = Math.hypot(x - MOUNT.x, z - MOUNT.z), out = [], a = typeof AREA !== 'undefined' && AREA.names.get(areaKey(x, z, 'over'));
@@ -8717,6 +8741,7 @@ function npcPlace(v) {   // where something is, in words a player would use
 function npcDoing(C) { return C.px == null ? 'flying' : `flying ${npcPlace({ x: C.px, y: C.py, z: C.pz })}`; }
 function npcThem(fromId) {   // what can be told about whoever spoke
   const first = NPCS.firstSeen.get(fromId), mins = first ? (performance.now() - first) / 60000 : null;
+  if (fromId === NET.id && keeperHere()) return `${heroName} is the keeper: the one who made this world and keeps it. You know him well, he is your boss and you like him; you never greet him like a newcomer, you talk to him like a teammate reporting in, and you tell him plainly what you know of what is going on in the game.`;
   if (fromId === NET.id) { const p = player, f = p.form === 'phoenix' ? (p.sub ? 'swimming in the sea as a bird' : p.perch ? 'perched as a bird' : 'flying as a phoenix') : p.sub ? 'swimming' : 'on foot, as the boy';
     return `${heroName} is ${f}, ${npcPlace(p.pos)}${realm === 'under' ? ', down in the Underworld' : ''}; their god is ${PATRON.id ? godById[PATRON.id]?.name || PATRON.id : 'not chosen yet'}; their rank is ${String(rankOf()).toLowerCase()}${flags.morphed ? '' : '; they are brand new to the game'}; lately they: ${(story.self || []).slice(-5).join('; ') || 'nothing much yet'}`; }
   const P = NET.peers.get(fromId); if (!P || !P.s) return '';
@@ -9842,8 +9867,145 @@ function woodShare() {   // someone new is in the sky: what is his is shown to t
       return; }
     if (e.code === 'KeyI' && !e.repeat) { eat(); bagShow(!INV.open); return; }
     if (INV.open && e.code === 'Escape') { eat(); bagShow(false); return; }
+    if (e.code === 'KeyE' && !e.repeat && player.form === 'phoenix' && RWAVE.btn) { eat(); waveRaise(); return; }
     if (e.code === 'KeyE' && !e.repeat && player.form === 'human' && INV.sapling && !MOD.noclip) { eat(); plantHere(); return; }
   }, true); }
+
+// ── Waves. Someone is flying out of Crete for the first time (the boy, his father ahead of him), and the phoenixes watching can
+//    make it harder: one low over the sea near him presses E (or the button) and a wave stands up out of the water and rolls at
+//    his line. On his screen it is the same wave, from the same moment: he sees it coming and has to beat his wings and climb
+//    over it. If it catches him he goes into the sea, and it is the fall, now: his father sees him go.
+const RWAVE = { list: [], cd: 0, t: 0, geo: null, mat: null, tgt: null, btn: '', told: false, H: 72, W: 260, sp: 46, life: 16 };
+function waveGeo() {   // a wall of water with a curling lip, one unit wide, high and deep; it travels along its own +z
+  const PR = [[-1.6, 0], [-1.05, 0.22], [-0.55, 0.58], [-0.18, 0.9], [0, 1], [0.12, 0.97], [0.22, 0.86], [0.27, 0.7]], NW = 28, NP = PR.length, pos = [], col = [], idx = [];
+  const deep = [0.06, 0.24, 0.34], mid = [0.14, 0.5, 0.56], foam = [0.95, 0.98, 1];
+  for (let i = 0; i < NW; i++) { const u = i / (NW - 1), x = u - 0.5, taper = Math.pow(Math.cos(x * Math.PI), 0.55);
+    for (let j = 0; j < NP; j++) { const [z, y] = PR[j]; pos.push(x, y * taper, z * (0.7 + 0.3 * taper)); const c = j >= NP - 3 ? foam : j >= 3 ? mid : deep, k = j >= NP - 3 ? 1 : 0.85 + 0.15 * taper; col.push(c[0] * k, c[1] * k, c[2] * k); } }
+  for (let i = 0; i < NW - 1; i++) for (let j = 0; j < NP - 1; j++) { const a = i * NP + j, b = a + NP; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+}
+function waveAdd(o, sc, base, pro) {
+  if (RWAVE.list.length > 8) return null; RWAVE.geo ||= waveGeo(); RWAVE.mat ||= new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.93 });
+  const m = new THREE.Mesh(RWAVE.geo, RWAVE.mat); m.frustumCulled = false; sc.add(m);
+  const W = { x: o.x, z: o.z, dx: o.dx, dz: o.dz, H: o.H || RWAVE.H, Wd: o.W || RWAVE.W, sp: o.sp || RWAVE.sp, life: o.life || RWAVE.life, t0: performance.now(), m, sc, base, pro, hit: false, from: o.from || '', rang: false };
+  RWAVE.list.push(W); return W;
+}
+const waveAge = W => (performance.now() - W.t0) / 1000;
+const waveH = W => { const a = waveAge(W); return W.H * smoothstep(0, 2.2, a) * (1 - smoothstep(W.life - 3, W.life, a)); };
+function waveTarget() {   // someone in the opening whom he could raise a wave at, from where he is
+  const p = player; if (state !== 'play' || realm !== 'over' || p.form !== 'phoenix' || p.sub || p.perch || RWAVE.cd > performance.now()) return null;
+  const g = groundAt(p.pos.x, p.pos.z, p.pos.y); if (g > WATER || p.pos.y - WATER > 70) return null;   // (low over open sea)
+  let best = null, bd = 760 * 760; const now = performance.now();
+  for (const P of NET.peers.values()) { if (!P.crete || P.form !== 'w' || !P.s || now - P.s.t > 3000 || quiet(P) || P.npc) continue; const d = (P.pos.x - p.pos.x) ** 2 + (P.pos.z - p.pos.z) ** 2; if (d < bd) { bd = d; best = P; } }
+  return best;
+}
+function waveRaise() {
+  const P = waveTarget(); if (!P) return; const p = player, ax = P.pos.x + (P.s.vx || 0) * 4, az = P.pos.z + (P.s.vz || 0) * 4, dx = ax - p.pos.x, dz = az - p.pos.z, l = Math.hypot(dx, dz) || 1;
+  const o = { x: p.pos.x, z: p.pos.z, dx: dx / l, dz: dz / l, from: heroName };
+  waveAdd(o, scene, WATER - 1, false); RWAVE.cd = performance.now() + 15000;
+  if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'wave', payload: { i: NET.id, to: P.id, x: Math.round(o.x), z: Math.round(o.z), dx: Math.round(o.dx * 1000) / 1000, dz: Math.round(o.dz * 1000) / 1000 } });
+  (audio.sfx.splash || audio.sfx.whoosh)?.(true); audio.sfx.thunder?.(); camShake = Math.max(camShake, 0.5); toast(`A WAVE · AT ${P.name}`);
+  if (!RWAVE.told) { RWAVE.told = true; witness(`raised a wave out of the sea off Crete at ${P.name}, the newcomer flying out of the Labyrinth`, true); }
+}
+function gotWave(m) {
+  if (!m || !ok(m.i) || typeof m.to !== 'string') return; const P = peerOf(m.i); if (flood(P) || quiet(P)) return;
+  const x = num(m.x, -1e6, 1e6), z = num(m.z, -1e6, 1e6), dx = num(m.dx, -1, 1), dz = num(m.dz, -1, 1), l = Math.hypot(dx, dz); if (l < 0.5) return;
+  const o = { x, z, dx: dx / l, dz: dz / l, from: P.name };
+  if (state === 'prologue' && pro.on && pro.sc && m.to === NET.id) {   // (at him: in his own sea, where his Crete is)
+    if (RWAVE.list.filter(W => W.pro).length >= 3 || !pro.pov || pro.falling) return;
+    o.x = PRO_C.x + (x - CRETE.x); o.z = PRO_C.z + (z - CRETE.z); waveAdd(o, pro.sc, 0, true); audio.sfx.thunder?.(); return; }
+  if (state !== 'prologue' && realm === 'over' && (x - player.pos.x) ** 2 + (z - player.pos.z) ** 2 < 4000 * 4000) waveAdd(o, scene, WATER - 1, false);   // (anyone else near Crete sees it too)
+}
+function waveTick(dt, inPro) {
+  for (let i = RWAVE.list.length - 1; i >= 0; i--) { const W = RWAVE.list[i], a = waveAge(W);
+    if (W.pro !== !!inPro) { if (W.pro && !inPro) { W.sc.remove(W.m); RWAVE.list.splice(i, 1); } continue; }
+    if (a > W.life) { W.sc.remove(W.m); RWAVE.list.splice(i, 1); continue; }
+    const h = waveH(W), cx = W.x + W.dx * W.sp * a, cz = W.z + W.dz * W.sp * a, M = W.m;
+    M.position.set(cx, W.base - 0.5, cz); M.rotation.y = Math.atan2(W.dx, W.dz); M.scale.set(W.Wd, Math.max(0.05, h), 46 * (0.55 + 0.45 * h / W.H));
+    if (!W.pro && h > 4 && Math.random() < 0.5) { const s = (Math.random() - 0.5) * W.Wd * 0.8; emit(cx + W.dz * s, W.base + h, cz - W.dx * s, W.dx * 8 + rnd(3), 3 + Math.random() * 5, W.dz * 8 + rnd(3), 0.9, [0.9, 0.95, 1], -2, 1.4); }   // (spray off the crest)
+    if (W.pro && !W.hit && pro.pov && !pro.falling && !(pro.dead > 0)) {   // (the boy: is it on him?)
+      const rx = pro.pos.x - cx, rz = pro.pos.z - cz, along = rx * W.dx + rz * W.dz, lat = Math.abs(rx * W.dz - rz * W.dx);
+      if (along > -16 && along < 5 && lat < W.Wd * 0.45 && pro.pos.y < h * 0.95 + 2) { W.hit = true; proWaveHit(); } } }
+  if (inPro) return;
+  if ((RWAVE.t -= dt) <= 0) { RWAVE.t = 0.25; const P = waveTarget(), lab = P ? (TOUCH ? `RAISE A WAVE AT ${P.name}` : `E — RAISE A WAVE AT ${P.name}`) : '';
+    if (lab !== RWAVE.btn) { RWAVE.btn = lab; const b = $('waveBtn'); b.textContent = lab; b.classList.toggle('on', !!lab); } }
+}
+function proWaveWarn() {   // (on his screen: a wave coming at him, and how to get over it)
+  for (const W of RWAVE.list) { if (!W.pro || W.hit) continue; const a = waveAge(W), h = waveH(W), cx = W.x + W.dx * W.sp * a, cz = W.z + W.dz * W.sp * a, rx = pro.pos.x - cx, rz = pro.pos.z - cz, along = rx * W.dx + rz * W.dz, lat = Math.abs(rx * W.dz - rz * W.dx);
+    if (along > -10 && along < 320 && lat < W.Wd * 0.6 && h > pro.pos.y - 8) return TOUCH ? 'A WAVE  —  TAP TAP TAP  —  CLIMB OVER IT' : 'A WAVE  —  SPACE SPACE SPACE · W  —  CLIMB OVER IT'; }
+  return '';
+}
+function proWaveHit() {   // the wave has him: into the sea, and it is the fall, now — his father sees him go
+  audio.sfx.splash?.(true); flash = 1.2; postMat.uniforms.uFlashCol.value.setRGB(0.82, 0.94, 1); camShake = Math.max(camShake, 1.2);
+  $('proSub').firstChild.textContent = ''; $('proSub').lastChild.textContent = 'The wave took him.'; $('proSub').classList.add('show'); pro.subT = 1.8;
+  proFx('wave');
+  pro.t = Math.max(pro.t, PRO_FAIL); pro.vy = -12; pro.speed = Math.min(pro.speed, 20);
+  while (pro.li < pro.lines.length && pro.lines[pro.li].t < PRO_FAIL - 0.05) pro.li++;   // (what was still to be said before the fall is not said)
+}
+
+{ const b = $('waveBtn'); b.addEventListener('click', e => { e.stopPropagation(); b.blur(); waveRaise(); }); for (const ev of ['pointerdown', 'pointerup', 'touchstart']) b.addEventListener(ev, e => e.stopPropagation(), { passive: true }); }
+// ── The keeper's hand over the whole sky (signed in with the keeper's email: a name is not enough). From the players panel:
+//    send the regulars away or bring them back, one at a time or all; the weather over Olympus; everyone flying carried to
+//    him, to the summit, or to Crete. Each is a decree the server signs; every page shows it back to the server before it obeys.
+//    And the regulars are his: with nobody else up they do not greet him like a stranger, they tell him what has been going on,
+//    on a channel of their own (Tab in chat), and they tell him as it happens: who comes, who goes, what land has been named.
+const DECREE = { seen: new Map(), npcs: 'aaaaaaaa', until: 0, mine: null, t: 0 }, REG = { log: [], told: false, last: 0 };
+async function decree(kind, arg) {
+  if (!MOD.admin) { sysLine(AUTH.s ? 'THAT IS NOT YOURS TO DO' : 'THAT IS THE KEEPER\'S · SIGN IN WITH THE KEEPER\'S EMAIL'); return; }
+  try { const r = await fetch('/api/hub?fn=admin', { method: 'POST', headers: authH({ 'Content-Type': 'application/json' }), body: JSON.stringify({ op: 'decree', kind, arg }) }), j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) { sysLine('THE SERVER DID NOT SIGN IT'); return; }
+    const m = { i: NET.id, kind, arg, exp: j.exp, tok: j.tok }; if (kind === 'npcs') DECREE.mine = arg === 'aaaaaaaa' ? null : m;
+    if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'decree', payload: m });
+    decreeDo(kind, arg, true, j.exp); } catch { sysLine('THE SERVER IS NOT ANSWERING'); }
+}
+async function gotDecree(m) {
+  if (!m || !ok(m.i) || typeof m.kind !== 'string' || typeof m.arg !== 'string' || m.arg.length > 40 || typeof m.tok !== 'string' || m.tok.length !== 40) return; const P = peerOf(m.i); if (flood(P)) return;
+  if (DECREE.seen.has(m.tok)) return; DECREE.seen.set(m.tok, 1); if (DECREE.seen.size > 60) DECREE.seen.delete(DECREE.seen.keys().next().value);
+  try { const r = await fetch('/api/hub?fn=admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'decreeok', kind: m.kind, arg: m.arg, exp: m.exp, tok: m.tok }) }), j = await r.json(); if (!j || !j.ok) return; } catch { return; }
+  decreeDo(m.kind, m.arg, false, +m.exp);
+}
+function decreeDo(kind, arg, mine, exp) {
+  if (kind === 'gather') { const [x, z] = arg.split(',').map(Number); if (mine) { sysLine('EVERYONE FLYING IS BEING CARRIED THERE'); return; }
+    if (state === 'play' && flags.morphed && realm === 'over' && !player.cine) { startWarp(x, z); toast('THE KEEPER CALLS EVERYONE TOGETHER'); } else sysLine('THE KEEPER CALLED EVERYONE TOGETHER'); }
+  else if (kind === 'weather') { if (arg === 'day' || arg === 'night') godTime(arg); else WX.god.push({ x: MOUNT.x, z: MOUNT.z, r: 2600, kind: { clear: 'calm', storm: 'thunder', rain: 'rain', mist: 'mist' }[arg], t0: time, until: time + 600 });
+    toast(`THE KEEPER · ${({ clear: 'CLEAR SKIES', storm: 'A STORM', rain: 'RAIN', mist: 'MIST', day: 'DAY', night: 'NIGHT' })[arg]} OVER OLYMPUS`); }
+  else if (kind === 'npcs') { DECREE.npcs = arg; DECREE.until = exp || Date.now() + 600e3; if (mine) sysLine(arg === '00000000' ? 'THE REGULARS ARE GONE · BRING THEM BACK FROM THE PLAYERS PANEL' : arg === 'aaaaaaaa' ? 'THE REGULARS COME AND GO AS THEY LIKE AGAIN' : 'THE REGULARS · AS YOU SAY'); }
+}
+const npcMask = i => Date.now() < DECREE.until ? DECREE.npcs[i] || 'a' : 'a';
+function keeperAct(k) {
+  const m = (Date.now() < DECREE.until ? DECREE.npcs : 'aaaaaaaa').split('');
+  if (k === 'npcoff') return decree('npcs', '00000000');
+  if (k === 'npcon') return decree('npcs', 'aaaaaaaa');
+  if (k === 'npcadd') { const i = m.findIndex((c, j) => c === '0' || c === 'a' && !(NPCS.list[j] && NPCS.list[j].on)); if (i < 0) { toast('ALL EIGHT ARE UP'); return; } m[i] = '1'; return decree('npcs', m.join('')); }
+  if (k.startsWith('npcx:')) { const i = +k.slice(5); if (i >= 0 && i < 8) { m[i] = '0'; return decree('npcs', m.join('')); } return; }
+  if (k.startsWith('wx:')) return decree('weather', k.slice(3));
+  if (k === 'go:me') return decree('gather', `${Math.round(player.pos.x)},${Math.round(player.pos.z)}`);
+  if (k === 'go:oly') return decree('gather', `${Math.round(START.x)},${Math.round(START.z)}`);
+  if (k === 'go:crete') return decree('gather', `${Math.round(CRETE.x + 320)},${Math.round(CRETE.z)}`);
+}
+function keeperTick(dt) {   // (his word on the regulars, said again now and then, so whoever arrives later hears it too)
+  if ((DECREE.t -= dt) > 0) return; DECREE.t = 30; const M = DECREE.mine; if (!M || !MOD.admin) return;
+  if (M.exp - Date.now() < 180e3) { decree('npcs', M.arg); return; } if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'decree', payload: M });
+}
+const keeperHere = () => (KEEP_ON || MOD.admin);
+function regSay(C, text) { if (!C || !text) return; chatLine(`${C.name} · REGULARS`, text, 'reg'); REG.log.push(`${C.name}: ${text}`); if (REG.log.length > 12) REG.log.shift(); npcMem(C, `you (to the keeper): ${text}`); (audio.sfx.chat || audio.sfx.ui)?.(); }
+function regNote(what, P) {   // something the keeper should hear about, from one of his regulars
+  if (!keeperHere() || !P || P.npc || P.cpu || P.memory || state === 'title' || state === 'loading') return; const L = NPCS.list.filter(C => C && C.on); if (!L.length) return; const C = npcPick(L);
+  const n = P.name, lines = what === 'join' ? [`${n} just showed up`, `heads up, ${n} is here`, `${n} logged on`] : what === 'left' ? [`${n} left`, `${n} logged off`, `lost ${n}`] : [`${n}`];
+  setTimeout(() => regSay(C, npcStyle(C, pick(lines))), 1500 + Math.random() * 3000);
+}
+function regReport() {   // the keeper has just come in: what is going on, said plainly
+  if (!keeperHere() || REG.told) return; const L = NPCS.list.filter(C => C && C.on); if (!L.length) return; REG.told = true;
+  const ppl = [...NET.peers.values()].filter(P => P.seen && P.s && !P.npc && !P.cpu && !P.memory), names = ppl.slice(0, 5).map(P => P.name).join(', ');
+  const named = [...(AREA.names || new Map()).values()].filter(a => a && a.fresh && a.name).slice(-3).map(a => `${a.name}${a.by ? ' (' + a.by + ')' : ''}`);
+  const A = npcPick(L), B = npcPick(L.filter(C => C !== A)) || A, D = npcPick(L.filter(C => C !== A && C !== B)) || B;
+  const out = [[A, ppl.length ? `welcome back boss · ${ppl.length} flying right now: ${names}` : 'welcome back boss · nobody else up right now, just us'],
+    [B, `${L.length} of us up · ${L.map(C => C.name).join(', ')}`]];
+  if (named.length) out.push([D, `new land got named: ${named.join(' · ')}`]);
+  if (MATCH.phase) out.push([D, `a ${MATCH.kind || 'match'} is going on`]);
+  out.forEach(([C, t], k) => setTimeout(() => regSay(C, t), 2500 + k * 2600));
+  if (!REG.hint) { REG.hint = true; setTimeout(() => sysLine('YOUR REGULARS · TAB IN CHAT TO TALK TO THEM · THE PLAYERS PANEL TO SEND THEM AWAY OR BRING MORE'), 2500 + out.length * 2600); }
+}
 
 function sendChat(raw) {
   const text = String(raw || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
@@ -9852,6 +10014,8 @@ function sendChat(raw) {
   if (text[0] === '/' && chatCommand(text)) return;
   if (text[0] !== '/' && GFLY.on && state === 'play') { statsWords(text, true); chatLine(heroName, text); airSay(text); return; }   // (with a god beside him, what he writes is for the god: nobody else reads it)
   statsWords(text, true);
+  if (text[0] === '/' && !/^\/(become|be|turn into|shape|shift|transform into)\b/i.test(text) && text.slice(1).trim().split(/\s+/).length > 2) {   // (anything else after a slash is a request, in plain words: the keeper's agent does it for him; for anyone else, the gods)
+    const ask = text.slice(1).trim(); if (MOD.admin) agentAsk(ask); else { chatLine(`${heroName} → THE GODS`, ask, 'dm me'); guideAsk(ask, { auto: true }); } return; }
   if (text[0] === '/') {   // a command, not a message: /become a whale, /be an owl, /wolf
     const w = text.slice(1).toLowerCase().replace(/^(become|be|turn into|shape|shift|transform into)\s+/, '').replace(/^(a|an|the)\s+/, '').trim();
     if (w) { chatLine('', `→ ${w.toUpperCase()}`, 'sys'); shapeshift(w); }
@@ -10206,7 +10370,7 @@ function updatePhoenix(dt) {
   const tHit = diving && !plunge && state === 'play' && dir3.y < -0.2 ? (p.pos.y - ahead) / Math.max(1, -dir3.y * p.speed) : 99, dWant = clamp((1.8 - tHit) / 1.3, 0, 1);
   p.danger = lerp(p.danger || 0, dWant, damp(dWant > (p.danger || 0) ? 7 : 2.5, dt));
   if (p.danger > 0.3 && time > (p.beatT || 0)) { p.beatT = time + lerp(0.95, 0.42, p.danger); audio.sfx.heart?.(p.danger); }
-  const p0x = p.pos.x, p0y = p.pos.y, p0z = p.pos.z, sv = SMALL.k < 1 ? smallV() : 1;   // (a small bird covers less ground: its own lengths a second are what they were)
+  const p0x = p.pos.x, p0y = p.pos.y, p0z = p.pos.z, K0 = birdK(), sv = SMALL.k < 1 ? smallV() : K0 > 1.01 ? 1 + 0.18 * (K0 - 1) : 1;   // (and a big one covers more: the keeper's bird is a third as fast again for its size)   // (a small bird covers less ground: its own lengths a second are what they were)
   p.pos.addScaledVector(dir3, p.speed * sv * dt);
   p.pos.y += p.vy * sv * dt;
   const gHere = groundAt(p.pos.x, p.pos.z, p.pos.y);
@@ -10268,7 +10432,9 @@ function updatePhoenix(dt) {
   slipstream(dt);
   if (perks.tide && gHere < WATER && p.pos.y < WATER + 12) p.flame = Math.min(1, p.flame + dt * 0.07);
   if (p.skyT > 0.8) { burnOut('sun'); return; }
-  if (!p.riding) p.flame -= (dt / 85 * (boost ? 2.8 : 1) * (1 - 0.55 * glide) * (realm === 'under' ? UNDER_BURN : 1) + heat * dt / 6) / (1 + 0.4 * perks.ember + IS.ember) * (GODM.on ? 0.33 : 1);
+  { const over = realm !== 'under';   // (over the world his fire hardly burns down: flying is free. The Underworld eats it, and so does the sun; so do many rebirths one on another)
+    if (!p.riding) p.flame -= (dt / 85 * (boost ? 2.8 : 1) * (1 - 0.55 * glide) * (over ? 0.04 : UNDER_BURN) + heat * dt / 6) / (1 + 0.4 * perks.ember + IS.ember) * (GODM.on ? 0.33 : 1);
+    if (over && heat < 0.02 && p.flame < 1) p.flame = Math.min(1, p.flame + dt / 75); }
   if (perks.fire && !boost && !p.riding) p.flame = Math.min(1, p.flame + dt * 0.0055 * perks.fire);   // (the stolen fire: it feeds itself)
   if (p.flame <= 0) { p.flame = 0; burnOut('ember'); return; }
 
@@ -17417,7 +17583,7 @@ function footShotPos(sh, out) {
   return out;
 }
 function newShot() {
-  const p = player, foot = p.form === 'human', sc = cinema.sc = foot ? 0.085 : 1 + (birdK() - 1) * 0.85, fast = !foot && p.speed > 150;   // (the big bird: every shot stands back for it, a little less than its size, so it still fills more of the frame)
+  const p = player, foot = p.form === 'human', sc = cinema.sc = foot ? 0.085 : (1 + (birdK() - 1) * 0.85) * (1 + GODM.k * 0.3 + smoothstep(220, 700, p.speed) * 0.55), fast = !foot && p.speed > 150;   // (and in god mode, or going very fast, further again, so he stays in the frame)   // (the big bird: every shot stands back for it, a little less than its size, so it still fills more of the frame)
   if (foot && !SH.def) return newFootShot();
   // what he is doing chooses the shot: low over water, the lens goes down to the water; in a dive, over his back; with
   // the sun low and clear, against it
@@ -20958,7 +21124,7 @@ function netWarp(a, b) { if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', 
 function gotWarp(m) {
   if (!m || !ok(m.i) || !Array.isArray(m.a) || !Array.isArray(m.b) || aloneNow() || state === 'title' || state === 'loading') return;
   const P = peerOf(m.i); if (flood(P) || (m.R ? 1 : 0) !== (realm === 'under' ? 1 : 0)) return;
-  for (const [q, at] of [[m.a, 0], [m.b, 1.55]]) {
+  for (const [q, at] of [[m.a, 0], [m.b, 0.8]]) {
     const x = num(q[0], -1e6, 1e6), y = num(q[1], -2000, 20000), z = num(q[2], -1e6, 1e6);
     if ((x - player.pos.x) ** 2 + (z - player.pos.z) ** 2 < 9000 * 9000 && RBEAM.length < 8) remoteBeam(x, y, z, at, !!at);
   }
@@ -20987,7 +21153,7 @@ function startWarp(x, z, y = null, yaw = null) {
   if (GODM.on && !warp.home && !warp.exact && godDash(x, z, y)) return;   // (the god in him does not wait to be carried)
   const g = Math.max(height(x, z), WATER), top = realm === 'under' ? UNDER.ceil - 100 : 1e9;
   warp.to.set(x, y != null ? clamp(y, g + 14, Math.max(g + 14, top)) : Math.min(top, g + (realm === 'under' ? 220 : 260)), z);   // (over a place: high above it. To a flier: where they are)
-  warp.t = 0; warp.swapped = false; warp.R = p.form === 'human' ? 5 : 16;
+  warp.t = 0; warp.swapped = false; warp.y0 = null; warp.went = false; warp.R = p.form === 'human' ? 5 : 16;
   warp.yaw = yaw != null ? yaw : Math.hypot(x - p.pos.x, z - p.pos.z) > 5 ? Math.atan2(-(x - p.pos.x), -(z - p.pos.z)) : p.yaw;
   netWarp(p.pos, warp.to);   // (everyone else sees the light take him, and sees it set him down)
   state = 'warp';
@@ -21004,33 +21170,38 @@ function startWarp(x, z, y = null, yaw = null) {
 function updateWarp(dt) {
   if (warp.dash) return updateDash(dt);
   const p = player, W = warp, t = W.t += dt, isH = p.form === 'human';
-  const A = W.swapped ? smoothstep(2.75, 1.9, t) : smoothstep(0, 0.28, t);
+  const A = W.swapped ? smoothstep(W.ts + 1.15, W.ts + 0.55, t) : smoothstep(0, 0.2, t);
   beamMat.uniforms.uA.value = A;
   lightBeam.scale.set(W.R * (0.5 + 0.5 * A), 7000, W.R * (0.5 + 0.5 * A));
   for (let i = 0; i < 7; i++) emit(p.pos.x + rnd(W.R * 0.8), p.pos.y - Math.random() * 40, p.pos.z + rnd(W.R * 0.8), 0, 70 + Math.random() * 120, 0, 0.45, pick(BIFROST), 60);
   if (!W.swapped) {
-    // lifted, slowly; then gone
-    p.pos.y += (t < 0.9 ? 2 + 16 * t * t : 30 + 9000 * (t - 0.9) * (t - 0.9)) * dt;
+    // the jump to light: half a second gathering, then straight up, gone faster than the eye, a line of light left behind him
+    if (W.y0 == null) W.y0 = p.pos.y;
+    const was = p.pos.y, j = clamp((t - 0.5) / 0.3, 0, 1);
+    p.pos.y = W.y0 + 1.6 * smoothstep(0, 0.5, t) + 9000 * j * j * j;
+    if (j > 0 && !W.went) { W.went = true; flash = Math.max(flash, 0.35); camShake = Math.max(camShake, 1.1); shock(p.pos.x, W.y0, p.pos.z, 0xeafff4, 70, 0.9); shock(p.pos.x, W.y0, p.pos.z, 0xffffff, 26, 0.5, true); (audio.sfx.boom || audio.sfx.thunder)?.(1); }
+    if (j > 0) for (let i = 0; i < 26; i++) { const y = lerp(was, p.pos.y, Math.random()); if (y - W.y0 < 1400) emit(p.pos.x + rnd(0.6), y, p.pos.z + rnd(0.6), 0, 12 + Math.random() * 30, 0, 0.5 + Math.random() * 0.6, pick(BIFROST), 0, 1.6); }   // (the streak)
+    else if (t > 0.15) { camShake = Math.max(camShake, 0.25 * smoothstep(0.15, 0.5, t)); for (let i = 0; i < 4; i++) { const a = Math.random() * 6.283, r = 3 + Math.random() * 6; emit(p.pos.x + Math.cos(a) * r, p.pos.y - 1, p.pos.z + Math.sin(a) * r, -Math.cos(a) * r * 2, 2, -Math.sin(a) * r * 2, 0.45, pick(BIFROST), 0, 1); } }   // (the light drawn in to him)
     if (isH) {
-      const k = smoothstep(0, 0.7, t), H = human;
+      const k = smoothstep(0, 0.45, t), H = human;
       H.rig.rotation.x = -0.25 * k; H.head.rotation.x = -0.6 * k; H.chest.rotation.x = -0.2 * k;
       H.armL.rotation.set(0, 0, -0.7 * k); H.armR.rotation.set(0, 0, 0.7 * k); H.foreL.rotation.x = H.foreR.rotation.x = 0.2;
       H.legL.rotation.x = -0.1 * k; H.legR.rotation.x = 0.12 * k; H.shinL.rotation.x = -0.25 * k; H.shinR.rotation.x = -0.1 * k; H.footL.rotation.x = H.footR.rotation.x = 0.6 * k;
       H.scarf.rotation.x = 0.4;
     } else {
       p.pitch = lerp(p.pitch, 1.4, damp(4, dt)); p.bank = lerp(p.bank, 0, damp(4, dt)); p.yaw += wrapAngle(W.yaw - p.yaw) * damp(2.5, dt);
-      const tuck = smoothstep(0.7, 1.3, t);
+      const tuck = smoothstep(0.35, 0.7, t);
       setWings(0.4 + Math.sin(t * 8) * 0.12 * (1 - tuck), tuck * 0.6, tuck * 0.9, 1.15);
     }
-    postMat.uniforms.uWarp.value = smoothstep(0.75, 1.5, t);
-    if (t < 1.55) return;
+    postMat.uniforms.uWarp.value = smoothstep(0.42, 0.8, t);
+    if (t < 0.8) return;
     // set down: high over the place he chose, as the bird, and falling into its own flight
-    W.swapped = true;
+    W.swapped = true; W.ts = t; W.y0 = null; W.went = false;
     p.form = 'phoenix'; p.cine = null; p.grounded = false; p.scale = 1; p.morphT = 0; p.ghost = null; p.burnout = false; p.skyT = 0; p.armed = false;
     resetPose(); setBurn(0);
     p.yaw = W.yaw; p.bank = 0; p.turn = 0; p.speed = 70; p.vy = 0; p.flame = Math.max(p.flame, 0.6);
     if (W.exact && W.exact.realm !== realm) setRealm(W.exact.realm, W.to.x, W.to.z);
-    W.drop = realm === 'under' ? 240 : 800;
+    W.drop = realm === 'under' ? 240 : 2400;   // (and down out of the sky over the place, as fast as it went up)
     p.pos.set(W.to.x, W.to.y + W.drop, W.to.z);
     trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
     streamChunks(Math.floor(W.to.x / CHUNK), Math.floor(W.to.z / CHUNK), 50);
@@ -21039,13 +21210,14 @@ function updateWarp(dt) {
     if (audio.sfx.beamDown) audio.sfx.beamDown(); else audio.sfx.whoosh(false);
     return;
   }
-  const u = clamp((t - 1.55) / 1.05, 0, 1), e = 1 - Math.pow(1 - u, 3);
+  const u = clamp((t - W.ts) / 0.85, 0, 1), e = 1 - Math.pow(1 - u, 4), wasY = p.pos.y;
   p.pos.set(W.to.x, W.to.y + W.drop * (1 - e), W.to.z);
+  if (u < 0.9) for (let i = 0; i < 16; i++) emit(p.pos.x + rnd(0.6), lerp(p.pos.y, wasY, Math.random()) + 2, p.pos.z + rnd(0.6), 0, 10 + Math.random() * 20, 0, 0.45 + Math.random() * 0.4, pick(BIFROST), 0, 1.4);
   p.pitch = lerp(-1.3, -0.04, e * e);
   setWings(0.24 + (1 - e) * 0.3, lerp(0.7, -0.34, e), 0.9 * (1 - e), 1.12);
-  postMat.uniforms.uWarp.value = 1 - smoothstep(0, 0.55, u);
-  if (!W.rang && u > 0.85) { W.rang = true; shock(W.to.x, W.to.y, W.to.z, 0xbfffe0, 60, 1.2, true); chime([523.25, 783.99, 1046.5], 0.08); }
-  if (t < 2.8) return;
+  postMat.uniforms.uWarp.value = 1 - smoothstep(0, 0.6, u);
+  if (!W.rang && u > 0.9) { W.rang = true; shock(W.to.x, W.to.y, W.to.z, 0xbfffe0, 60, 1.2, true); chime([523.25, 783.99, 1046.5], 0.08); }
+  if (t < W.ts + 1.05) return;
   W.rang = false; lightBeam.visible = false; postMat.uniforms.uWarp.value = 0;
   dir3.set(-Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(p.yaw) * Math.cos(p.pitch));
   if (W.exact) {   // where he left off: set down on the very spot, on his feet
@@ -21890,7 +22062,7 @@ function proFeather(x, y, z, vx, vy, vz) {
   f.life = 2.6; f.p.set(x, y, z); f.v.set(vx, vy, vz); f.a = Math.random() * 6.28; f.w = rnd(7);
 }
 function updatePrologue(dt) {
-  proNet(dt);
+  proNet(dt); waveTick(dt, true);
   // the moment his father reaches for him and misses is the one moment that runs slow
   const near = pro.falling && !pro.hitT && (pro.dPass ? pro.t - pro.dPass < 0.24 : pro.dd < 30);
   pro.slow = lerp(pro.slow, near ? 0.2 : 1, damp(near ? 9 : 4, dt)); dt *= pro.slow;
@@ -21936,7 +22108,8 @@ function updatePrologue(dt) {
   pro.fx.uTime.value = pro.rt; pro.seaU.uTime.value = pro.rt;
   // what he is being asked to do, and his father asking again if he stands there
   const waiting = !pro.jumped && t >= PRO_JUMP - 0.4;
-  proAct(pro.falling ? '' : pro.dead > 0 ? 'THE SEA TOOK HIM  —  AGAIN' : pro.pov && !pro.falling && pro.lowT > 0.25 ? (TOUCH ? 'TOO LOW  —  TAP  —  BEAT YOUR WINGS' : 'TOO LOW  —  SPACE  —  BEAT YOUR WINGS')
+  const WV = pro.pov && !pro.falling && !(pro.dead > 0) ? proWaveWarn() : '';
+  proAct(WV ? WV : pro.falling ? '' : pro.dead > 0 ? 'THE SEA TOOK HIM  —  AGAIN' : pro.pov && !pro.falling && pro.lowT > 0.25 ? (TOUCH ? 'TOO LOW  —  TAP  —  BEAT YOUR WINGS' : 'TOO LOW  —  SPACE  —  BEAT YOUR WINGS')
     : speaking ? (mic.stream && !VC.muted && pro.sayT < 9 ? 'SAY IT  ALOUD' : TOUCH ? 'TAP  —  SAY IT' : 'SPACE  —  SAY IT')
     : waiting ? (TOUCH ? 'TAP  —  JUMP' : 'SPACE  —  JUMP')
     : pro.pov && !pro.falling && pro.speed < 17.5 && pro.vyNow < 3 ? (TOUCH ? 'TOO SLOW  —  TAP  —  BEAT YOUR WINGS' : 'TOO SLOW  —  S  —  NOSE DOWN  ·  SPACE  —  BEAT')
@@ -23706,7 +23879,7 @@ function tick(dt) {
   else if (state === 'end') updateEnding(dt);
   else if (state === 'warp') updateWarp(dt);
   carryOn();    // (and then to where it has stood off to, if a bird is passing through it)
-  updateTail(dt); updateSmall(dt); updateCourier(dt); xfTick(dt); woodTick(dt); eyeStep(dt);
+  updateTail(dt); updateSmall(dt); updateCourier(dt); xfTick(dt); woodTick(dt); waveTick(dt, false); keeperTick(dt); eyeStep(dt);
   updateGodDirector(dt);
   updateCinemaState(dt);
   if (state === 'title') updateTitle(dt);
@@ -24022,7 +24195,7 @@ const GOD_PHX = 4.2;
 const GFLY = { on: false, g: null, mode: '', B: null, busy: false, pend: '', last: -99, heard: -99, tour: null, land: null, gone: null, birds: new Map(), dest: null, t: 0, side: 1, sideT: 20, idleT: 0, nudges: 0, hd: 0, route: null, sent: 0, far: 0 };
 const TOUR_BEATS = [   // what Hermes shows a new arrival, in order, and the few words that go on the screen as he does
   ['hello', 'A · D STEER    SPACE BEAT YOUR WINGS', 'TILT OR THUMB TO STEER    TAP TO BEAT YOUR WINGS'],
-  ['fire', 'YOUR FIRE IS YOUR FUEL    LAND TO GET IT BACK    DIVE TO GO FAST', 'YOUR FIRE IS YOUR FUEL    LAND TO GET IT BACK'],
+  ['fire', 'YOUR FIRE CARRIES YOU    ONLY THE SUN AND THE UNDERWORLD EAT IT    DIVE TO GO FAST', 'YOUR FIRE CARRIES YOU    ONLY THE SUN AND THE UNDERWORLD EAT IT'],
   ['voice', 'JUST SAY IT: LAND · MAP · CAMERA    T CHAT    M MAP', 'JUST SAY IT: LAND · MAP · CAMERA    THE MENU HAS THE REST'],
   ['camera', 'C CINEMATIC CAMERA    + PHOTO CAMERA', 'CINEMATIC AND PHOTO CAMERAS ARE IN THE MENU'],
   ['godmode', 'SAY “GOD MODE”', 'SAY “GOD MODE”'],
@@ -25353,6 +25526,7 @@ async function agentAsk(text) {
     for (const a of j.actions || []) {
       if (a.type === 'mod' && NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'mod', payload: { i: NET.id, order: a.order, target: a.target, exp: a.exp, tok: a.tok } });
       if (a.type === 'chat' && a.text) sendChat(`THE KEEPER: ${a.text}`);
+      if (a.type === 'decree') keeperAct(a.kind === 'gather' ? { olympus: 'go:oly', crete: 'go:crete', me: 'go:me' }[a.value] : a.kind === 'weather' ? 'wx:' + a.value : { off: 'npcoff', on: 'npcon', more: 'npcadd' }[a.value]);
     }
   } catch { sys('THE AGENT IS NOT ANSWERING'); }
   AGENT.busy = false;
@@ -25452,7 +25626,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);

@@ -42,6 +42,17 @@ export async function POST(req) {
     if (op === 'ban' || op === 'ipban') await addBans([hash && { key: 'c:' + hash, kind: 'code', name }, op === 'ipban' && ip && { key: 'i:' + ip, kind: 'ip', name }].filter(Boolean));
     return json({ ok: true, op });
   }
+  // A decree, from the keeper, to everyone flying: gather them somewhere, change the weather over Olympus, send the regulars
+  // away or bring them back. Signed here; every page shows it back here before it does anything, so nobody else can give one.
+  if (b.op === 'decree' || b.op === 'decreeok') {
+    const kind = String(b.kind || ''), arg = String(b.arg || '').slice(0, 40);
+    const okArg = kind === 'gather' ? /^-?\d{1,7},-?\d{1,7}$/.test(arg) : kind === 'weather' ? /^(clear|storm|rain|mist|day|night)$/.test(arg) : kind === 'npcs' ? /^[01a]{8}$/.test(arg) : false;
+    if (!okArg) return json({ ok: false, error: 'bad decree' }, 400);
+    if (b.op === 'decreeok') return json({ ok: +b.exp < Date.now() + 11 * 60_000 && orderOk('decree', kind + ':' + arg, b.exp, b.tok) });
+    const me = await adminOf(req); if (!me) return json({ error: 'not yours to give' }, 403);
+    const exp = Date.now() + (kind === 'npcs' ? 10 * 60_000 : 90_000);
+    return json({ ok: true, exp, tok: signOrder('decree', kind + ':' + arg, exp) });
+  }
   // The keeper's eye. Faction and private messages are sealed on the players' own machines; the keeper may read them all the
   // same, and players are told so. A keeper proved here (a signed-in, listed email: never a name) has the key of this visit
   // vouched for; every page asks this server whether a key shown to it on the channel really is a keeper's before it seals
