@@ -5124,7 +5124,7 @@ const beaconsAwake = () => realm === 'over' && (story.phase === 'gods' || story.
 const keys = {};
 const down = (...codes) => codes.some(c => keys[c]);
 const stick = { x: 0, y: 0 };  // virtual thumbstick, -1..1, y up
-const boosting = () => down('ShiftLeft', 'ShiftRight', 'TouchBoost') || AP.boost;
+const boosting = () => down('ShiftLeft', 'ShiftRight', 'TouchBoost') || AP.boost || PAD.boost;
 function axes() {
   const kx = (down('KeyD', 'ArrowRight') ? 1 : 0) - (down('KeyA', 'ArrowLeft') ? 1 : 0);
   const ky = (down('KeyW', 'ArrowUp') ? 1 : 0) - (down('KeyS', 'ArrowDown') ? 1 : 0);
@@ -5132,7 +5132,7 @@ function axes() {
   if (air && !tilt.wasAir) tilt.p0 = tilt.pitch;   // each time he takes to the air, however the phone is held then is level
   tilt.wasAir = air;
   const tx = tilt.on && air ? tilt.x : 0, ty = tilt.on && air ? tilt.y : 0;
-  return [clamp(kx + stick.x + tx + AP.ax, -1, 1), clamp(ky + stick.y + ty + AP.ay, -1, 1)];
+  return [clamp(kx + stick.x + tx + AP.ax + PAD.x, -1, 1), clamp(ky + stick.y + ty + AP.ay + PAD.y, -1, 1)];
 }
 // ── phones. Hold it sideways. Either the left thumb is the stick, or the phone itself is the wheel: turn it like a steering
 //    wheel to bank, tip the top away from you to dive and toward you to climb.
@@ -7309,7 +7309,7 @@ function netSend(dt) {
   NET.lastSent = { x: p.pos.x, y: p.pos.y, z: p.pos.z, f, yaw, fc, t: performance.now() };
   let tp, ts; { const T = TRON.trails.get(NET.id); if (T && T.n > T.start) { const end = T.base + T.n, g0 = Math.max(TRON.sent, T.base + T.start, end - 40); if (g0 < end) { ts = g0; tp = []; for (let gi = g0; gi < end; gi++) { const i = (gi - T.base) * 3; tp.push(r1(T.pts[i]), r1(T.pts[i + 1]), r1(T.pts[i + 2])); } TRON.sent = end; } } }   // (the wall behind him: the pieces laid since he last said)
   NET.ch.send({ type: 'broadcast', event: 's', payload: { i: NET.id, n: heroName, p: [r1(p.pos.x), r1(p.pos.y), r1(p.pos.z)], v: [r1(v.x), r1(v.y), r1(v.z)],
-    y: r2(yaw), pi: r2(p.pitch || 0), b: r2(p.bank || 0), f, r: realm === 'under' ? 1 : 0, gm: GODM.on ? 1 : undefined, sm: SMALL.want < 1 ? 1 : undefined, bk: BIG.k && BIG.k < bigName(heroName) - 0.5 && !BIG.anim ? Math.round(BIG.k * 10) / 10 : undefined, fa: FAC.tag || undefined, rd: XR.on && XR.mode === 'rider' && p.form === 'phoenix' ? 1 : undefined, gf: GFLY.on ? [GFLY.g.id, Math.round(GFLY.B.pos.x), Math.round(GFLY.B.pos.y), Math.round(GFLY.B.pos.z)] : undefined, ma: MATCH.phase === 'live' && MATCH.me.alive ? MATCH.id : undefined, ts, tp, m: LIVE.on ? 1 : undefined, tk: LIVE.on && LIVE.tk ? LIVE.tk : undefined, g: p.grounded ? 1 : 0, w: r2(p.wingF || 0), pt: PATRON.id || undefined, fc: fc || undefined,
+    ...(p.form === 'phoenix' ? (([a, b, c]) => ({ y: r2(a), pi: r2(b), b: r2(c) }))(flipNet(p)) : { y: r2(yaw), pi: r2(p.pitch || 0), b: r2(p.bank || 0) }), f, r: realm === 'under' ? 1 : 0, gm: GODM.on ? 1 : undefined, sm: SMALL.want < 1 ? 1 : undefined, bk: BIG.k && BIG.k < bigName(heroName) - 0.5 && !BIG.anim ? Math.round(BIG.k * 10) / 10 : undefined, fa: FAC.tag || undefined, rd: XR.on && XR.mode === 'rider' && p.form === 'phoenix' ? 1 : undefined, gf: GFLY.on ? [GFLY.g.id, Math.round(GFLY.B.pos.x), Math.round(GFLY.B.pos.y), Math.round(GFLY.B.pos.z)] : undefined, ma: MATCH.phase === 'live' && MATCH.me.alive ? MATCH.id : undefined, ts, tp, m: LIVE.on ? 1 : undefined, tk: LIVE.on && LIVE.tk ? LIVE.tk : undefined, g: p.grounded ? 1 : 0, w: r2(p.wingF || 0), pt: PATRON.id || undefined, fc: fc || undefined,
     vk: VK.pub || undefined } });   // (in every one: someone just arrived has it at once, before anyone else can claim this id)
 }
 // ── what other people look like: a man, or a burning bird, with their name over them
@@ -7412,9 +7412,9 @@ function updatePeers(dt) {
     if (P.rode && !(bird && P.rider && !far)) { P.rode = false; reinsHide(P.reins); A.man.group.scale.setScalar(MAN_SCALE); A.man.group.rotation.set(0, P.yaw || 0, 0); }
     if (!bird && !far) humanLod(A.man, Math.sqrt(P.pos.distanceToSquared(camera.position)));
     if (bird) {
-      const G = A.bird.group; G.position.copy(P.pos); if (P.menu) G.rotation.set(P.pitch, P.yaw, P.bank, 'YXZ'); else G.rotation.set(P.pitch * 0.8, P.yaw, P.bank, 'XYZ');   // (nose up as it climbs: a positive turn about x lifts the beak)
+      const G = A.bird.group; G.position.copy(P.pos); G.rotation.set(P.menu ? P.pitch : flipShow(P.pitch), P.yaw, P.bank, 'YXZ');   // (nose up as it climbs: a positive turn about x lifts the beak; round, if it loops; its roll is its own and its turn's)
       P.ph += dt * (1.2 + Math.hypot(P.s.vx, P.s.vy, P.s.vz) / 60);
-      const f = P.wing > 0.15 ? P.wing : 0.24 + Math.sin(P.ph * 1.4) * 0.06, dive = smoothstep(-0.2, -0.8, P.pitch);
+      const f = P.wing > 0.15 ? P.wing : 0.24 + Math.sin(P.ph * 1.4) * 0.06, dive = smoothstep(-0.2, -0.8, Math.asin(Math.sin(P.pitch)));
       A.bird.wings.forEach((w, i) => { w.shoulder.rotation.z = -f; w.elbow.rotation.z = -lerp(-0.34, 0.75, dive); w.wrist.rotation.z = w.elbow.rotation.z * 0.6; w.root.rotation.y = dive * 0.9 * (i === 0 ? 1 : -1); w.shoulder.scale.x = 1.12 - dive * 0.35; });
       updateTails(dt, false, A.bird);
       if (P.rider) { P.reins ||= reinPair(); riderOn(G, A.man.group, G.scale.x / PHX_S, P.reins, null, true); P.rode = true; }   // (someone riding theirs: there they are, up on its back, reins in hand)
@@ -8853,6 +8853,7 @@ function closeChat() {
 //    lists them. And in something that is said, @NAME calls that flier: it rings for them, and stands out in their log.
 const CMD_HELP = [
   ['MOVE', '/takeoff  /land  /perch  /glide  /dive  /bird  /human  /stop'],
+  ['FLY', 'hold W (the stick up) past straight up and over: a loop · let go on your back: he rolls the right way up (an Immelmann) · Q / E roll (let go half way: knife-edge) · on your back, hold S: a split-S · straight up, let go and turn: a stall turn · Z (held flip button) brakes and hovers · /level off stays on your back after a loop · or say it: loop, go over the top, immelmann, split-s, barrel roll, knife edge, stall turn, upside down, brake · /loop /immelmann /splits /barrel /knife /stall /brake'],
   ['GO', '/tp NAME or PLACE · /tp X Z · /tp X Y Z · /goto PLACE (flown, not carried) · /where'],
   ['MISSION', '/mission (carried straight to what you are doing) · J the list, a GO button on each · shift+J goes to the one you follow'],
   ['PLACES', 'summit · crete · volcano · temple · parthenon · monasteries · cave · my island · objective · any god · any flier'],
@@ -8936,6 +8937,10 @@ function chatCommand(text) {
     case 'race': if (/^(end|stop|quit|leave|off)$/i.test((arg || '').trim())) matchStop(); else matchChallenge(arg, 'rings'); return true;
     case 'bird': if (!arg) birdSay(); else if (!birdHear(String(arg).toLowerCase(), String(arg).trim().split(/\s+/).length)) chatLine('', 'IT DOES NOT KNOW THAT ONE · /bird ALONE SAYS WHAT IT DOES', 'sys'); return true;
     case 'pet': if (player.form === 'phoenix') birdPet(1); else chatLine('', 'THERE IS NO BIRD TO STROKE', 'sys'); return true;
+    case 'loop': case 'immelmann': case 'splits': case 'split-s': case 'barrel': case 'knife': case 'knife-edge': case 'stall': case 'hammerhead': case 'roll': {   // the aerobatics, flown for him (see FLIP for flying them by hand)
+      const k = { 'split-s': 'splits', 'knife-edge': 'knife', stall: 'hammer', hammerhead: 'hammer' }[c] || c; if (p.form !== 'phoenix') sys('BE THE BIRD FIRST'); else birdTrick(k); return true; }
+    case 'brake': if (p.form === 'phoenix') { FLIP.brakeT = 4; sys('HOVERING · HOLD Z TO STAY'); } else sys('BE THE BIRD FIRST'); return true;
+    case 'level': case 'autolevel': FLIP.auto = arg ? !off : !FLIP.auto; try { localStorage.setItem('icarus.autolevel', FLIP.auto ? '1' : '0'); } catch {} sys(FLIP.auto ? 'AFTER A LOOP HE ROLLS THE RIGHT WAY UP' : 'AFTER A LOOP HE STAYS ON HIS BACK UNTIL YOU ROLL HIM'); return true;
     case 'dp': case 'shot': case 'director': if (state === 'play' || state === 'photo') dpHear(arg || 'wide shot', true); return true;
     case 'tour': case 'hermes': if (GFLY.tour) tourSkip(); else if (GFLY.on) gflyEnd(); else if (!tourStart()) chatLine('', player.form === 'phoenix' ? 'NOT NOW' : 'TAKE OFF FIRST · HERMES MEETS YOU IN THE AIR', 'sys'); return true;
     case 'crete': case 'prologue': case 'opening': if (CHAT.open) closeChat(); creteCmd(); return true;   // (the opening once more, and back here after)
@@ -10577,7 +10582,11 @@ function proWaveHit() {   // the wave has him: into the sea, and it is the fall,
   while (pro.li < pro.lines.length && pro.lines[pro.li].t < PRO_FAIL - 0.05) pro.li++;   // (what was still to be said before the fall is not said)
 }
 
-{ const f = $('flipBtn'); f.addEventListener('click', e => { e.stopPropagation(); f.blur(); flipTo(Math.abs(Math.cos(FLIP.to)) > 0.5 && Math.cos(FLIP.to) > 0); }); for (const ev of ['pointerdown', 'pointerup', 'touchstart']) f.addEventListener(ev, e => e.stopPropagation(), { passive: true }); }
+{ const f = $('flipBtn'); let hold = 0, held = false;   // a tap turns him over (two: right round); held, it is the brake
+  f.addEventListener('pointerdown', e => { e.stopPropagation(); held = false; clearTimeout(hold); hold = setTimeout(() => { held = true; FLIP.tb = true; }, 320); });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) f.addEventListener(ev, e => { e.stopPropagation(); clearTimeout(hold); if (FLIP.tb) FLIP.tb = false; else if (ev === 'pointerup' && !held) flipHalf(); held = true; });
+  f.addEventListener('click', e => { e.stopPropagation(); f.blur(); if (e.detail === 0) flipHalf(); });   // (a key on it, not a finger)
+  f.addEventListener('touchstart', e => e.stopPropagation(), { passive: true }); }
 { const b = $('waveBtn'); b.addEventListener('click', e => { e.stopPropagation(); b.blur(); waveRaise(); }); for (const ev of ['pointerdown', 'pointerup', 'touchstart']) b.addEventListener(ev, e => e.stopPropagation(), { passive: true }); }
 // ── The keeper's hand over the whole sky (signed in with the keeper's email: a name is not enough). From the players panel:
 //    send the regulars away or bring them back, one at a time or all; the weather over Olympus; everyone flying carried to
@@ -10721,13 +10730,20 @@ function keeperSizeTick(dt) {
 //    ones are understood here at once; with the god in him, anything longer is planned by api/_fly.js out of the same moves.
 //    Every move goes through the bird's own autopilot, which keeps it off the ground and under the sky.
 const FLYP = { busy: false };
-const FLY_STRONG = /\b(upside|inverted|flip|upright|vertical|figure|eights?|circles?|orbit|loops?|rolls?|corkscrew|spiral|wingover|skim|water|sea|ocean|waves?|tsunami|tidal|climb|dive|stoop|plunge|swoop|higher|lower|faster|slower|altitude|fly (me|us|over|around|round|to|up|down|low|high|along|near|through))\b/i;
-const FLY_WORDS = /\b(upside|inverted|flip|upright|vertical|figure|eights?|8s?|circle|circles|orbit|round|around|loop|roll|corkscrew|spiral|wingover|skim|water|sea|ocean|waves?|tsunami|tidal|high(er)?|climb|up|dive|stoop|plunge|down|low(er)?|faster|slower|speed|straight|turn|fly|swoop|land)\b/i;
+const FLY_STRONG = /\b(upside|inverted|flip|upright|vertical|split|splits|immelmann|immelman|knife|stall turn|hammerhead|brake|over the top|barrel|figure|eights?|circles?|orbit|loops?|rolls?|corkscrew|spiral|wingover|skim|water|sea|ocean|waves?|tsunami|tidal|climb|dive|stoop|plunge|swoop|higher|lower|faster|slower|altitude|fly (me|us|over|around|round|to|up|down|low|high|along|near|through))\b/i;
+const FLY_WORDS = /\b(upside|inverted|flip|upright|vertical|split|splits|immelmann|immelman|knife|stall|hammerhead|brake|top|barrel|figure|eights?|8s?|circle|circles|orbit|round|around|loop|roll|corkscrew|spiral|wingover|skim|water|sea|ocean|waves?|tsunami|tidal|high(er)?|climb|up|dive|stoop|plunge|down|low(er)?|faster|slower|speed|straight|turn|fly|swoop|land)\b/i;
 function flyNum(t, d) { const m = t.match(/\b(\d+(\.\d+)?)\b/); if (m) return +m[1]; const w = { one: 1, once: 1, two: 2, twice: 2, three: 3, four: 4, five: 5, couple: 2, few: 3 }; for (const k in w) if (new RegExp('\\b' + k + '\\b').test(t)) return w[k]; return d; }
 function flyLocal(text) {   // the plain requests, understood without asking anyone; null when it is not all plain
   const parts = String(text).toLowerCase().replace(/[.!?]+/g, ' ').split(/\s*(?:,|\bthen\b|\band then\b|\bafter that\b|\bfollowed by\b)\s*/).map(s => s.trim()).filter(Boolean), steps = [];
   for (const t of parts) {
-    if (/\b(upside down|inverted|on (your|my|its) back|flip( over)?)\b/.test(t)) steps.push({ do: 'flip', inv: true });
+    if (/\bsplit[- ]?s\b|\bsplits\b/.test(t)) steps.push({ do: 'trick', k: 'splits' });   // (the aerobatics, by name: see FLIP)
+    else if (/\bimm?ell?mann?\b|\bhalf (a )?loop\b/.test(t)) steps.push({ do: 'trick', k: 'immelmann' });
+    else if (/\b(over the top|loop the loop|loop-the-loop|back over)\b/.test(t)) steps.push({ do: 'trick', k: 'loop' });
+    else if (/\bbarrel rolls?\b/.test(t)) steps.push({ do: 'trick', k: 'barrel' });
+    else if (/\bknife[- ]?edge\b|\bon (your|my|its) side\b/.test(t)) steps.push({ do: 'trick', k: 'knife' });
+    else if (/\b(stall turn|hammer ?head)\b/.test(t)) steps.push({ do: 'trick', k: 'hammer' });
+    else if (/\b(brake|put the brakes on|hover in the air|hang (there|in the air)|stop in the air)\b/.test(t)) steps.push({ do: 'hover' });   // (plain "hover" is the camera's: see voiceParse)
+    else if (/\b(upside down|inverted|on (your|my|its) back|flip( over)?)\b/.test(t)) steps.push({ do: 'flip', inv: true });
     else if (/\b(right side up|right way up|upright|the right way)\b/.test(t)) steps.push({ do: 'flip', inv: false });
     else if (/\b(straight up|vertical|vertically|go up up|rocket)\b/.test(t)) steps.push({ do: 'vert' });
     else if (/\bfigure ?(8|eight)s?\b|\beights?\b/.test(t)) steps.push({ do: 'figure8', r: /\b(big|wide|huge)\b/.test(t) ? 420 : /\b(small|tight)\b/.test(t) ? 140 : 240, n: flyNum(t.replace(/figure ?8/, ''), 2) });
@@ -10737,7 +10753,7 @@ function flyLocal(text) {   // the plain requests, understood without asking any
     else if (/\b(dive|stoop|plunge|nose ?dive|drop)\b/.test(t) && /\b(high|up|climb|top)\b/.test(t)) steps.push({ do: 'climb', alt: /\b(really|very|super|so)\b/.test(t) ? 2600 : 1400 }, { do: 'dive' });
     else if (/\b(climb|higher|go up|fly up|up high|go high|fly high|really high|very high|so high|into the (sky|clouds)|to the clouds|as high)\b/.test(t) && !/\b(down)\b/.test(t)) steps.push({ do: 'climb', alt: /\b(really|very|super|so|clouds|sky)\b/.test(t) ? 2600 : 900 });
     else if (/\b(dive|stoop|plunge|nose ?dive|go down|down low|lower)\b/.test(t)) steps.push({ do: 'dive' });
-    else if (/\b(barrel rolls?|rolls?)\b/.test(t)) steps.push({ do: 'trick', k: /\b(two|twice|double)\b/.test(t) ? 'roll2' : 'roll' });
+    else if (/\b(aileron rolls?|rolls?)\b/.test(t)) steps.push({ do: 'trick', k: /\b(two|twice|double)\b/.test(t) ? 'roll2' : 'roll' });
     else if (/\bloops?\b/.test(t)) steps.push({ do: 'trick', k: 'loop' });
     else if (/\b(corkscrew|spiral)\b/.test(t)) steps.push({ do: 'trick', k: 'corkscrew' });
     else if (/\bwing ?over\b/.test(t)) steps.push({ do: 'trick', k: 'wingover' });
@@ -10764,7 +10780,7 @@ function flyCompile(steps) {   // words into the autopilot's moves, laid out fro
     else if (s.do === 'skim' || s.do === 'dive' && flySea(1500)) { const S = flySea(); if (!S) { said.push('NO SEA NEAR ENOUGH'); continue; } moves.push({ k: 'dive', S: { x: S.x, z: S.z }, t: 0 }); x = S.x; z = S.z; y = WATER + 6; said.push(s.do === 'skim' ? 'DOWN TO THE WATER' : 'A DIVE TO THE SEA'); }
     else if (s.do === 'dive') { const [fx, fz] = fw(), d = Math.max(400, (y - floor(x, z)) * 1.3), X = x + fx * d, Z = z + fz * d; moves.push({ k: 'to', x: X, y: floor(X, Z) + 40 * K, z: Z, r: 80, rate: 0.5, v: Math.max(v, GODM.on ? 320 : 170), t: 0 }); x = X; z = Z; y = floor(X, Z) + 40 * K; said.push('A DIVE'); }
     else if (s.do === 'climb') { const [fx, fz] = fw(), d = Math.max(600, s.alt * 1.1), X = x + fx * d, Z = z + fz * d, Y = floor(X, Z) + s.alt * Math.max(1, K * 0.7); moves.push({ k: 'to', x: X, y: Y, z: Z, r: 120, rate: 0.5, climb: true, v, t: 0 }); x = X; z = Z; y = Y; said.push(s.alt > 2000 ? 'UP AS HIGH AS IT GOES' : 'UP'); }
-    else if (s.do === 'trick') { moves.push({ k: s.k, t: 0 }); said.push(({ loop: 'A LOOP', roll: 'A ROLL', roll2: 'TWO ROLLS', corkscrew: 'A CORKSCREW', wingover: 'A WINGOVER' })[s.k]); }
+    else if (s.do === 'trick') { moves.push({ k: s.k, t: 0 }); said.push(TRICK_NAME[s.k]); }
     else if (s.do === 'straight') { const [fx, fz] = fw(), X = x + fx * s.d, Z = z + fz * s.d; moves.push({ k: 'to', x: X, y: Math.max(y, floor(X, Z) + 60 * K), z: Z, r: 90, v, t: 0 }); x = X; z = Z; said.push('STRAIGHT ON'); }
     else if (s.do === 'turn') { yaw += (s.deg || 180) * Math.PI / 180; const [fx, fz] = fw(), X = x + fx * 500, Z = z + fz * 500; moves.push({ k: 'to', x: X, y: Math.max(y, floor(X, Z) + 60 * K), z: Z, r: 90, rate: 0.9, v, t: 0 }); x = X; z = Z; said.push('ROUND'); }
     else if (s.do === 'speed') { v = s.v; moves.push({ k: 'act', f: () => { LIVE.speed = Math.max(LIVE.speed, v * 0.8); }, t: 0 }); said.push(v > 120 ? 'FASTER' : 'EASY'); }
@@ -10773,6 +10789,7 @@ function flyCompile(steps) {   // words into the autopilot's moves, laid out fro
       if (S.d > 300) moves.push({ k: 'dive', S: { x: S.x, z: S.z }, t: 0 });
       moves.push({ k: 'act', f: () => { const P = player.pos; tsunami(P.x, P.z, 1.6 * birdPow()); camShake = Math.max(camShake, 1.4); flash = Math.max(flash, 0.3); (audio.sfx.splash || audio.sfx.boom)?.(true); audio.sfx.thunder?.(); toast('THE SEA RISES'); witness('raised a tsunami out of the sea with the god in him', true); }, t: 0 }); said.push('A TSUNAMI'); }
     else if (s.do === 'flip') { moves.push({ k: 'act', f: () => { flipTo(s.inv); }, t: 0 }); said.push(s.inv ? 'UPSIDE DOWN' : 'RIGHT SIDE UP'); }
+    else if (s.do === 'hover') { moves.push({ k: 'act', f: () => { FLIP.brakeT = 4; }, t: 0 }); said.push('HOVERING'); }
     else if (s.do === 'vert') { moves.push({ k: 'act', f: () => { LIVE.speed = Math.max(LIVE.speed, 150); FLIP.vertT = 4.5; }, t: 0 }); said.push('STRAIGHT UP'); }
     else if (s.do === 'land') { moves.push({ k: 'act', f: () => { birdAuto('', ''); voiceRun('land'); }, t: 0 }); said.push('DOWN'); }
   }
@@ -10795,21 +10812,84 @@ function flyAsk(text, typed) {   // true if it was about how to fly (and so has 
   return true;
 }
 
-// ── Upside down. Q and E roll him over (held: round he goes; let go: he settles the right way up or on his back, whichever
-//    is nearer), the flip button on a phone turns him over, and "upside down" / "right side up" said or typed do it too.
-//    It is how he looks and how the lens leans a little, not how he steers: up is still up, so it is never confusing.
-const FLIP = { a: 0, v: 0, to: 0, vert: 0, vertT: 0 };
-for (const t of ['keydown', 'keyup']) addEventListener(t, e => { if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return; if (e.code === 'KeyQ') FLIP.kq = t === 'keydown'; if (e.code === 'KeyE') FLIP.ke = t === 'keydown' && !RWAVE.btn; }, true);   // (Q and E held, for the roll)
-addEventListener('blur', () => { FLIP.kq = FLIP.ke = false; });
-function flipTo(inv) { FLIP.to = inv ? Math.PI : 0; if (inv) toast('UPSIDE DOWN'); }
+// ── Upside down, and over the top. Q and E roll him (held: round he goes; let go: he settles at the nearest quarter — the
+//    right way up, on his side, knife-edge, or on his back), the flip button on a phone turns him over (twice: right round;
+//    held: the brake), and "upside down" / "right side up" said or typed do it too. However he is rolled, up is still up:
+//    W lifts the nose toward the sky and S drops it. Held, W brings him up to straight up and on, over onto his back and
+//    down the other way: a loop (FLIP.over: the pitch runs on past straight up, the heading kept, and is written the plain
+//    way again when he lets go). Let go on his back and he rolls the right way up (an Immelmann; /level off keeps him on
+//    it). On his back, S takes him down past straight down and out the way he came (a split-S). Straight up and slowing,
+//    a turn pivots him round (a stall turn). Z (a pad's left trigger, a phone's held flip button, palms out in the headset)
+//    is the brake: the wings thrown forward, he slows to a hover and hangs there beating.
+const FLIP = { a: 0, v: 0, to: 0, vert: 0, vertT: 0, over: 0, qv: 0, hangT: 0, hung: false, follow: 0, auto: true, brake: 0, brakeT: 0, kz: false, tb: false, xrBrake: 0, xrTo: null, camK: 0, cu: new THREE.Vector3(0, 1, 0), net: null };
+try { FLIP.auto = localStorage.getItem('icarus.autolevel') !== '0'; } catch {}
+for (const t of ['keydown', 'keyup']) addEventListener(t, e => { if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return; if (e.code === 'KeyQ') FLIP.kq = t === 'keydown'; if (e.code === 'KeyE') FLIP.ke = t === 'keydown' && !RWAVE.btn; if (e.code === 'KeyZ') FLIP.kz = t === 'keydown' && state === 'play'; }, true);   // (Q and E held, for the roll; Z, the brake)
+addEventListener('blur', () => { FLIP.kq = FLIP.ke = FLIP.kz = FLIP.tb = false; });
+function flipTo(inv) { FLIP.to = inv ? Math.PI : 0; FLIP.loop = false; if (inv) toast('UPSIDE DOWN'); }
+function flipHalf() { FLIP.to = Math.round(FLIP.to / Math.PI) * Math.PI + Math.PI; FLIP.loop = false; }   // (over the same way each time: twice is right round)
+function flipLevel() {   // out of a loop: the way he is pointing, written the plain way again — heading back and on his back, if that is where it left him
+  const p = player; FLIP.over = 0; FLIP.qv = 0;
+  const P = wrapAngle(p.pitch);
+  if (Math.abs(P) <= Math.PI / 2) { p.pitch = P; return; }
+  p.pitch = (P > 0 ? Math.PI : -Math.PI) - P; p.yaw = wrapAngle(p.yaw + Math.PI); FLIP.a += Math.PI; FLIP.follow = 1.4;   // (the same body, the same way: (yaw + π, π − pitch, roll + π) is (yaw, pitch, roll))
+  if (Math.cos(FLIP.a) < 0) { FLIP.loop = true; FLIP.to = FLIP.auto ? Math.round(FLIP.a / (2 * Math.PI) + (FLIP.v < 0 ? -0.01 : 0.01)) * 2 * Math.PI : Math.round(FLIP.a / Math.PI) * Math.PI; }
+  else { FLIP.loop = false; FLIP.to = Math.round(FLIP.a / (Math.PI / 2)) * (Math.PI / 2); }
+}
 function flipTick(dt) {
   const p = player, can = p.form === 'phoenix' && !p.perch && !p.perchGo && !p.takeoff && !p.sub && state === 'play', flying = can && !BIRD.auto;
-  if (!can) { FLIP.to = 0; FLIP.a = lerp(FLIP.a, Math.round(FLIP.a / (2 * Math.PI)) * 2 * Math.PI, damp(5, dt)); if (Math.abs(FLIP.a) < 0.002) FLIP.a = 0; }
-  else { const r = flying ? (FLIP.ke ? 1 : 0) - (FLIP.kq ? 1 : 0) : 0;
-    if (r) { FLIP.v = lerp(FLIP.v, r * 4.2, damp(6, dt)); FLIP.a += FLIP.v * dt; FLIP.to = Math.round(FLIP.a / Math.PI) * Math.PI; }   // (held: round he goes)
-    else { FLIP.v = 0; FLIP.a = lerp(FLIP.a, FLIP.to, damp(4.5, dt)); } }
+  if (!can && FLIP.over) flipLevel();
+  if (!can) { FLIP.to = 0; FLIP.loop = false; FLIP.xrTo = null; FLIP.camK = 0; FLIP.cu.set(0, 1, 0); FLIP.follow = 0; FLIP.a = lerp(FLIP.a, Math.round(FLIP.a / (2 * Math.PI)) * 2 * Math.PI, damp(5, dt)); if (Math.abs(FLIP.a) < 0.002) FLIP.a = 0; }
+  else { const r = flying ? (FLIP.kq ? 1 : 0) - (FLIP.ke ? 1 : 0) + (PAD.roll || 0) : 0;   // (Q rolls him to the left, E to the right)
+    if (r) { FLIP.v = lerp(FLIP.v, clamp(r, -1, 1) * 4.2, damp(6, dt)); FLIP.a += FLIP.v * dt; FLIP.to = Math.round(FLIP.a / (Math.PI / 2)) * (Math.PI / 2); FLIP.loop = false; }   // (held: round he goes; let go, the nearest quarter)
+    else { if (FLIP.xrTo !== null) FLIP.to = FLIP.xrTo;   // (a pinch, twisted, in the headset: he turns with the wrist)
+      const d = FLIP.to - FLIP.a; FLIP.a += clamp(d * damp(4.5, dt), -5.5 * dt, 5.5 * dt); FLIP.v = Math.abs(d) > 0.01 ? Math.sign(d) * Math.min(5.5, Math.abs(d) * 4.5) : 0; } }
+  if (FLIP.loop && Math.cos(FLIP.a) > 0.98 && Math.abs(FLIP.to - FLIP.a) < 0.05) FLIP.loop = false;
+  if (Math.abs(FLIP.a) > 40 && Math.abs(FLIP.to - FLIP.a) < 0.01) { const k = Math.round(FLIP.a / (2 * Math.PI)) * 2 * Math.PI; FLIP.a -= k; FLIP.to -= k; }   // (round and round: the count kept small)
+  FLIP.follow = Math.max(0, FLIP.follow - dt); if (FLIP.loop && FLIP.auto) FLIP.follow = Math.max(FLIP.follow, 0.3);
   if (FLIP.vertT > 0) { FLIP.vertT -= dt; FLIP.vert = smoothstep(0, 0.4, FLIP.vertT); } else FLIP.vert = 0;   // (told to go straight up: the nose comes up for a few seconds)
-  const inv = Math.abs(Math.cos(FLIP.a)) < 0.5 ? 1 : 0, b = $('flipBtn'); if (b) { const on = TOUCH && flying && p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER) > 40; if (b._on !== on) { b._on = on; b.classList.toggle('on', on); } }
+  if (FLIP.brakeT > 0) FLIP.brakeT -= dt;
+  const bw = can && (FLIP.kz || FLIP.tb || PAD.brake > 0.3 || FLIP.xrBrake > 0.5 || FLIP.brakeT > 0) ? 1 : 0;
+  FLIP.brake = lerp(FLIP.brake, bw, damp(bw ? 2.6 : 3.5, dt)); if (FLIP.brake < 0.002) FLIP.brake = 0;
+  const b = $('flipBtn'); if (b) { const on = TOUCH && flying && p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER) > 40 || FLIP.tb; if (b._on !== on) { b._on = on; b.classList.toggle('on', on); } }
+}
+// the lens over the top: how far it has gone from behind him on the level to behind him along his line of flight, and which
+// way is up for it — his back while he goes round (it pitches with him, it never rolls on its own), the sky again after
+const _fu = new THREE.Vector3(), _fr = new THREE.Vector3();
+function flipCam(dt) {
+  const p = player, sp = Math.sin(p.pitch), cp = Math.cos(p.pitch), sy = Math.sin(p.yaw), cy = Math.cos(p.yaw), steep = sp > 0.92;   // (straight up: the lens comes round behind him; a dive keeps its own)
+  const want = FLIP.over || cp < 0 || FLIP.follow > 0 || steep ? 1 : 0;
+  FLIP.camK = lerp(FLIP.camK, want, damp(want ? 3.2 : 1.6, dt));
+  if (FLIP.follow > 0 && !FLIP.over && cp >= 0) { const sa = Math.sin(FLIP.a), ca = Math.cos(FLIP.a); _fu.set(-sa * cy + ca * sp * sy, ca * cp, sa * sy + ca * sp * cy); }   // (rolling the right way up after: it rolls with him)
+  else if (want) _fu.set(sp * sy, cp, sp * cy);   // (his back, as he goes round, whatever he is doing with his wings)
+  else _fu.set(0, 1, 0);
+  const C = FLIP.cu;
+  if (C.dot(_fu) < -0.6) { _fr.crossVectors(dir3, C); if (_fr.lengthSq() < 1e-4) _fr.set(cy, 0, -sy); C.addScaledVector(_fr.normalize(), 0.35); }   // (the other way up entirely: round through the side, never through nothing)
+  C.lerp(_fu, damp(want ? 4.5 : 2.2, dt)).normalize();
+  return FLIP.camK;
+}
+// the attitude he shows: his pitch a little flattened toward level, as it always was, but never at straight up or down, and
+// never so that one way of writing it looks different from the other; and the brake's flare
+const flipShow = pitch => pitch - 0.1 * Math.sin(2 * pitch);
+// what everyone else is told: the same three numbers, written whichever way is nearest the last ones sent, so a loop reaches
+// them as a loop (pitch running on round) and not as a bird flicking about-face at the top
+function flipNet(p) {
+  const r = p.bank + FLIP.a, A = [p.yaw, p.pitch, r], P = wrapAngle(p.pitch), B = [p.yaw + Math.PI, (P > 0 ? Math.PI : -Math.PI) - P, r + Math.PI], L = FLIP.net;
+  const d = T => !L ? Math.abs(wrapAngle(T[1])) : Math.abs(wrapAngle(T[0] - L[0])) + Math.abs(wrapAngle(T[1] - L[1])) + Math.abs(wrapAngle(T[2] - L[2]));
+  const W = d(B) + 0.05 < d(A) ? B : A; FLIP.net = [wrapAngle(W[0]), wrapAngle(W[1]), wrapAngle(W[2])]; return FLIP.net;
+}
+// a pad, if one is plugged in: the left stick flies, the right one looks round, the triggers are the fire and the brake,
+// the shoulders roll him, A is the one button (space), Y a trick
+const PAD = { x: 0, y: 0, roll: 0, brake: 0, boost: false, on: false, b: [] };
+function padTick() {
+  const gp = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g && g.connected && g.axes.length >= 2) : null;
+  if (!gp) { if (PAD.on) { PAD.on = false; PAD.x = PAD.y = PAD.roll = PAD.brake = 0; PAD.boost = false; } return; }
+  if (!PAD.on) { PAD.on = true; toast('A PAD · LEFT STICK FLIES · BUMPERS ROLL · TRIGGERS: FIRE AND BRAKE'); }
+  const dz = v => Math.abs(v) < 0.15 ? 0 : (v - Math.sign(v) * 0.15) / 0.85, btn = i => !!(gp.buttons[i] && gp.buttons[i].pressed), val = i => gp.buttons[i] ? gp.buttons[i].value : 0;
+  PAD.x = dz(gp.axes[0]); PAD.y = -dz(gp.axes[1]); PAD.roll = (btn(4) ? 1 : 0) - (btn(5) ? 1 : 0); PAD.brake = val(6); PAD.boost = val(7) > 0.3;
+  if (gp.axes.length >= 4 && player.form === 'phoenix' && !dragging) camYawOff = clamp(camYawOff - dz(gp.axes[2]) * 0.04, -Math.PI, Math.PI);
+  const was = PAD.b; PAD.b = gp.buttons.map(b => b.pressed);
+  if (state === 'play' && PAD.b[0] && !was[0]) pressSpace();
+  if (state === 'play' && PAD.b[3] && !was[3] && player.form === 'phoenix') birdTrick('');
 }
 function sendChat(raw) {
   const text = String(raw || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
@@ -11123,19 +11203,37 @@ function updatePhoenix(dt) {
   const glide = smoothstep(0.7, 2.2, p.glideT);
   if (glide > 0.98 && !SESSION.glideTold && state === 'play' && flags.morphed) { SESSION.glideTold = true; toast('GLIDING · YOUR FIRE HARDLY BURNS'); }
   const stag = p.stagger = Math.max(0, (p.stagger || 0) - dt);   // just hit something: half in control, rolling
-  p.turn = lerp(p.turn, turn * (stag > 0 ? 0.35 : 1), damp(4, dt));
-  p.yaw += p.turn * (diving ? 0.85 : 1.25) * dt;
+  p.turn = lerp(p.turn, turn * (stag > 0 ? 0.35 : 1) * (FLIP.cu.y < -0.25 ? -1 : 1), damp(4, dt));   // (the lens upside down with him, over the top: left is still the left of the picture)
+  const elev = Math.asin(clamp(Math.sin(p.pitch), -1, 1)), brk = FLIP.brake;   // (how steeply he is going, however the pitch is written)
+  const pivot = FLIP.over ? 0 : FLIP.hangT > 0 ? 1 : smoothstep(0.75, 1.25, elev) * smoothstep(55, 28, p.speed);   // straight up and slowing: a turn swings him round where he hangs (the stall turn)
+  p.yaw += p.turn * (diving ? 0.85 : 1.25) * (1 + 2.6 * pivot) * (1 + 0.6 * brk) * dt;
   // S folds the wings and drops him out of the sky; W climbs, and climbing takes wingbeats
   p.climbT = pin > 0.6 ? (p.climbT || 0) + dt : Math.max(0, (p.climbT || 0) - dt * 3);   // (held: the nose keeps coming up, past a climb to straight up)
-  const up = smoothstep(0.5, 1.6, p.climbT) * smoothstep(35, 70, p.speed) + (FLIP.vert || 0);
-  p.pitch = lerp(p.pitch, pin > 0 || FLIP.vert > 0 ? lerp(Math.max(0, pin) * 0.6, 1.45, Math.min(1, up)) : pin * 1.38, damp(diving ? 4.5 : up > 0.2 ? 2.4 : 1.8, dt));
-  if (p.speed < 30 && !diving) p.pitch = lerp(p.pitch, -0.45, damp(2.5, dt));  // stall: the nose drops
-  if (GODM.spent) p.pitch = Math.min(p.pitch, -0.06);   // spent: the wings are heavy, and will not take him up
+  const up = smoothstep(0.5, 1.6, p.climbT) * Math.max(smoothstep(35, 70, p.speed), smoothstep(1.4, 2.4, p.climbT)) + (FLIP.vert || 0);   // (fast, the nose comes right up; slower, it takes a longer hold)
+  // held on, past straight up: over the top (or, on his back, S past straight down). Only his own hands do it, never the autopilot's
+  if (!FLIP.over && state === 'play' && !GODM.spent && !p.wasRiding && Math.abs(AP.ay || 0) < 0.05 && brk < 0.3) {
+    if (pin > 0.6 && p.pitch > 1.36 && p.speed > 24 && !FLIP.vert) FLIP.over = 1;
+    else if (pin < -0.6 && p.pitch < -1.3 && Math.cos(FLIP.a) < -0.5) FLIP.over = -1;
+    if (FLIP.over) FLIP.qv = 0.35;   // (it goes on at about the rate it came up at, and gathers)
+  }
+  if (FLIP.over && (pin * FLIP.over < 0.15 || GODM.spent || AP.kind || state !== 'play')) flipLevel();   // let go: the plain way again
+  if (FLIP.over) {   // the nose keeps going round, as fast as his speed allows: slow over the top, quick through the bottom
+    FLIP.qv = lerp(FLIP.qv, clamp(0.55 + p.speed / 52, 0.95, 2.5) * Math.abs(pin), damp(3, dt));
+    p.pitch += FLIP.over * FLIP.qv * dt; if (p.pitch > Math.PI) p.pitch -= 2 * Math.PI; else if (p.pitch < -Math.PI) p.pitch += 2 * Math.PI;
+  } else {
+    // let go nearly straight up: he hangs there a moment, slowing — turn then, and he swings round on a wingtip before the nose falls
+    if (pin < 0.2 && p.pitch > 1.15 && !FLIP.hung && brk < 0.2 && state === 'play') { FLIP.hung = true; FLIP.hangT = 1.1; }
+    if (FLIP.hangT > 0) FLIP.hangT = pin > 0.2 || pin < -0.2 ? 0 : FLIP.hangT - dt; else if (p.pitch < 0.6) FLIP.hung = false;
+    p.pitch = lerp(p.pitch, lerp(pin > 0 || FLIP.vert > 0 ? lerp(Math.max(0, pin) * 0.6, 1.45, Math.min(1, up)) : pin * 1.38, 0, brk), damp(FLIP.hangT > 0 ? 0.25 : p.pitch > 1.0 && pin < 0.2 && brk < 0.2 ? 0.6 : diving ? 4.5 : up > 0.2 ? 2.4 : 1.8, dt));   // (let go straight up and he carries on up a while, slowing)
+    if (p.speed < 30 && !diving && brk < 0.2 && !(FLIP.hangT > 0)) p.pitch = lerp(p.pitch, -0.45, damp(2.5, dt));  // stall: the nose drops
+    if (GODM.spent) p.pitch = Math.min(p.pitch, -0.06);   // spent: the wings are heavy, and will not take him up
+  }
   // a jetstream takes him if he flies into one: carried down its line, very fast, and it costs him nothing
   p.riding = false;
   if ((p.jetCool = Math.max(0, (p.jetCool || 0) - dt)) <= 0 && jet.on && state === 'play') {
     const t = jetNearest(p.pos);
     if (jet.d < 70 && t > 0.005 && t < 0.975) {
+      if (FLIP.over) flipLevel();
       p.riding = true; jet.t = t;
       jetAt(Math.min(1, t + 0.012), _v).sub(jetAt(t, _n)).normalize();
       p.yaw += wrapAngle(Math.atan2(-_v.x, -_v.z) - p.yaw) * damp(3.2, dt);
@@ -11151,6 +11249,7 @@ function updatePhoenix(dt) {
   if (!p.riding && state === 'play' && (p.gustCool = Math.max(0, (p.gustCool || 0) - dt)) <= 0 && GUST.list.length) {
     const R = gustAt(p.pos);
     if (R && R.d < 24 && R.u < 0.97 && _gustD.x * dir3.x + _gustD.y * dir3.y + _gustD.z * dir3.z > 0.2) {
+      if (FLIP.over) flipLevel();
       p.riding = true;
       p.yaw += wrapAngle(Math.atan2(-_gustD.x, -_gustD.z) - p.yaw) * damp(3.2, dt);
       p.pitch = lerp(p.pitch, Math.asin(clamp(_gustD.y, -1, 1)), damp(3.2, dt));
@@ -11165,10 +11264,12 @@ function updatePhoenix(dt) {
   const sp = Math.sin(p.pitch);
   const BK = 1 + (birdK() - 1) * 0.3, RK = 1 + (birdK() - 1) * 0.6;   // (the big bird: a stronger stroke, and the currents take it further and faster)
   p.overT = boost && sp < -0.25 ? (p.overT || 0) + dt : Math.max(0, (p.overT || 0) - dt * 1.5);   // (no top speed: the longer a dive is held with the boost, the faster it goes, without end)
-  const target = ((boost ? 125 : 64) - (sp > 0 ? sp * (GODM.on ? 30 : boost ? 55 : 75) : sp * 240)) * (1 + 0.12 * perks.swift + IS.swift) * BK * (1 + p.overT * 0.14) * (GODM.spent ? 0.6 : 1);   // nose down: ~300 m/s, then on past it
-  p.speed = Math.max(18, lerp(p.speed, target * MOD.speed, damp(sp < -0.3 ? 1.7 : boost ? 1.1 : 0.55, dt)));
+  const target = lerp(((boost ? 125 : 64) - (sp > 0 ? sp * (GODM.on ? 30 : boost ? 55 : 75) : sp * 240)) * (1 + 0.12 * perks.swift + IS.swift) * BK * (1 + p.overT * 0.14) * (GODM.spent ? 0.6 : 1), 3, brk);   // nose down: ~300 m/s, then on past it   // (braking: down to a hover)
+  p.speed = Math.max(lerp(18, 1.5, brk), lerp(p.speed, target * MOD.speed, damp(lerp(sp < -0.3 ? 1.7 : boost ? 1.1 : 0.55, 1.5, brk), dt)));
+  if (FLIP.over || sp > 0.8 && pin < 0.2) p.speed = Math.max(14, p.speed - sp * 24 * dt);   // going round (or hanging straight up, the wings still): the way up costs him speed and the way down gives it back
   if (p.riding) p.speed = lerp(p.speed, 310 * RK, damp(1.6 * RK, dt));
-  p.vy = lerp(p.vy, diving ? 0 : lerp(-3.5, -1.1, glide), damp(0.85, dt));
+  const knife = FLIP.over ? 0 : smoothstep(0.8, 0.98, Math.abs(Math.sin(FLIP.a)));   // (on his side the wings hold nothing up: he sinks)
+  p.vy = lerp(p.vy, diving ? 0 : lerp(lerp(-3.5, -1.1, glide) - 9 * knife, 0.4, brk), damp(lerp(0.85, 2.5, brk), dt));
   if (GODM.spent) p.vy = Math.min(p.vy, -4);   // (and they sink: he is coming down, whatever he does)
   dir3.set(-Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(p.yaw) * Math.cos(p.pitch));
   // pull out before the ground does it for him
@@ -11183,7 +11284,7 @@ function updatePhoenix(dt) {
   // left alone he rides up over rising ground, as far as a bird can; folding his wings and diving, the ground is his to judge
   if (!MOD.noclip && !plunge && !diving && ahead + 10 * birdK() + p.speed * 0.12 > p.pos.y + dir3.y * look) {   // (a bigger bird keeps further off the ground: its wings reach further down)
     const need = clamp(Math.atan2(ahead + 14 - p.pos.y, look) + 0.12, 0.4, 0.85);
-    if (p.pitch < need - 0.05) p.pitch = lerp(p.pitch, need, damp(3, dt));
+    if (p.pitch < need - 0.05 && !FLIP.over) p.pitch = lerp(p.pitch, need, damp(3, dt));
     if (need > 0.6 && Math.abs(ax) < 0.2) {   // too steep to climb: he leans away along the slope, toward whichever side is lower
       const gl = terrainAt(p.pos.x + (dir3.x * 0.7 + dir3.z * 0.7) * look, p.pos.z + (dir3.z * 0.7 - dir3.x * 0.7) * look), gr = terrainAt(p.pos.x + (dir3.x * 0.7 - dir3.z * 0.7) * look, p.pos.z + (dir3.z * 0.7 + dir3.x * 0.7) * look);
       p.yaw += (gl < gr ? 1 : -1) * 0.8 * dt; p.bank = lerp(p.bank, (gl < gr ? 1 : -1) * 0.5, damp(2, dt));
@@ -11191,7 +11292,7 @@ function updatePhoenix(dt) {
   }
   // the ground coming up too fast (and not the water he means to go into): the world says so instead of a word on the screen —
   // the colour drains, the edges close in red, the view narrows and shakes, and his heart is heard, faster the closer it is
-  const tHit = diving && !plunge && state === 'play' && dir3.y < -0.2 ? (p.pos.y - ahead) / Math.max(1, -dir3.y * p.speed) : 99, dWant = clamp((1.8 - tHit) / 1.3, 0, 1);
+  const tHit = (diving || FLIP.over) && !plunge && state === 'play' && dir3.y < -0.2 ? (p.pos.y - ahead) / Math.max(1, -dir3.y * p.speed) : 99, dWant = clamp((1.8 - tHit) / 1.3, 0, 1);
   p.danger = lerp(p.danger || 0, dWant, damp(dWant > (p.danger || 0) ? 7 : 2.5, dt));
   if (p.danger > 0.3 && time > (p.beatT || 0)) { p.beatT = time + lerp(0.95, 0.42, p.danger); audio.sfx.heart?.(p.danger); }
   const p0x = p.pos.x, p0y = p.pos.y, p0z = p.pos.z, K0 = birdK(), sv = SMALL.k < 1 ? smallV() : K0 > 1.01 ? 1 + 0.18 * (K0 - 1) : 1;   // (and a big one covers more: the keeper's bird is a third as fast again for its size)   // (a small bird covers less ground: its own lengths a second are what they were)
@@ -11201,7 +11302,7 @@ function updatePhoenix(dt) {
   if (plunge && gHere < WATER - 3 && p.pos.y < WATER + 5.1 * birdK() && state === 'play') { enterSea(-1); return; }
   // the sea overhead is the way back: climb into it and he goes through; graze it and it holds him under
   if (realm === 'under') { const rf = underRoof(p.pos.x, p.pos.z); if (rf < UNDER.ceil - 2 && p.pos.y > rf - 7) {   // (rock overhead, not water: it does not give)
-      p.pos.y = rf - 7; p.vy = Math.min(p.vy, -3); if (p.pitch > 0) p.pitch *= 0.55; if (time - (p.roofT || -9) > 0.5) { p.roofT = time; p.stagger = Math.max(p.stagger || 0, 0.3); p.speed *= 0.9; camShake = Math.max(camShake, 0.3); audio.sfx.land?.(0.4); for (let i = 0; i < 26; i++) emit(p.pos.x + rnd(2), rf - 1, p.pos.z + rnd(2), rnd(9), -2 - Math.random() * 8, rnd(9), 0.5 + Math.random() * 0.5, pick(i % 3 ? EMBER : ASH)); } } }
+      p.pos.y = rf - 7; p.vy = Math.min(p.vy, -3); if (FLIP.over) flipLevel(); if (p.pitch > 0) p.pitch *= 0.55; if (time - (p.roofT || -9) > 0.5) { p.roofT = time; p.stagger = Math.max(p.stagger || 0, 0.3); p.speed *= 0.9; camShake = Math.max(camShake, 0.3); audio.sfx.land?.(0.4); for (let i = 0; i < 26; i++) emit(p.pos.x + rnd(2), rf - 1, p.pos.z + rnd(2), rnd(9), -2 - Math.random() * 8, rnd(9), 0.5 + Math.random() * 0.5, pick(i % 3 ? EMBER : ASH)); } } }
   if (realm === 'under' && p.pos.y > UNDER.ceil - 10) {
     if (dir3.y > 0.12 && state === 'play') { enterSea(1); return; }
     p.pos.y = UNDER.ceil - 10; p.vy = Math.min(p.vy, 0);
@@ -11214,7 +11315,7 @@ function updatePhoenix(dt) {
     const closing = -(dir3.x * p.speed * _n.x + (dir3.y * p.speed + p.vy) * _n.y + dir3.z * p.speed * _n.z);
     // (at a glide he bounces; with his fire up or his wings folded, the ground is the end of him)
     if (!wet && closing > 24 && p.speed > 75 && state === 'play') { crash(Math.hypot(p.pos.x - MOUNT.x, p.pos.z - MOUNT.z) < MOUNT.R ? 'the side of Olympus' : flat ? 'a roof' : 'the ground'); return; }
-    p.pos.y = floor; if (p.pitch < 0) p.pitch *= 0.5; p.vy = Math.max(p.vy, closing * 0.3);
+    p.pos.y = floor; if (FLIP.over) flipLevel(); if (p.pitch < 0) p.pitch *= 0.5; p.vy = Math.max(p.vy, closing * 0.3);
     if (closing > 7 && time > (p.scrapeT || 0)) {   // a scrape: it costs speed and fire, and for a moment he is not flying, he is recovering
       p.scrapeT = time + 0.3;
       p.speed = Math.max(28, p.speed * (1 - Math.min(0.4, closing / 70))); p.flame = Math.max(0.02, p.flame - closing / (wet ? 250 : 500)); p.stagger = Math.max(p.stagger || 0, 0.35);
@@ -11233,14 +11334,14 @@ function updatePhoenix(dt) {
     if (alt > 45) p.armed = true;
     let site = TEMPLE.active && Math.hypot(p.pos.x - TEMPLE.x, p.pos.z - TEMPLE.z) < 90 && p.pos.y > TEMPLE.y;
     for (const g of realm === 'under' ? [hades] : gods) if (g.active && !story.met.has(g.id) && !(g === hades && UNDER.done) && Math.hypot(p.pos.x - g.x, p.pos.z - g.z) < 85 && p.pos.y > g.gy) site = true;
-    if (p.armed && gHere > WATER + 0.5 && (alt < ROLL_ALT * 0.8 && sink < -7 || site && alt < 60)) { openWings(alt < ROLL_ALT); return; }
+    if (p.armed && !FLIP.over && gHere > WATER + 0.5 && (alt < ROLL_ALT * 0.8 && sink < -7 || site && alt < 60)) { openWings(alt < ROLL_ALT); return; }
   }
   p.bank = lerp(p.bank, p.turn * 0.75 + (stag > 0 ? Math.sin(time * 26) * stag * 0.9 : 0) + Math.sin(time * 0.8) * 0.035 * glide, damp(stag > 0 ? 9 : 3, dt));   // (gliding, he rocks a little on the air)
   p.flapCD -= dt;
-  if (pin > 0.2 && p.flapCD <= 0) {
-    p.flapCD = boost ? 0.5 : 0.72; p.flapPhase = 0;
+  if ((pin > 0.2 || brk > 0.5) && p.flapCD <= 0) {   // (braking, he beats on the spot to hang there)
+    p.flapCD = brk > 0.5 ? 0.42 : boost ? 0.5 : 0.72; p.flapPhase = 0;
     if (WR.A < 0.25) WR.th = 0; WR.beat = 1;   // (a beat from still air starts at the top of the stroke)
-    p.speed += 12; p.vy = Math.min(p.vy + 8, 16); p.flame -= 0.005;
+    p.speed += 12 * (1 - brk); p.vy = Math.min(p.vy + 8 * (1 - 0.75 * brk), 16); p.flame -= 0.005;
     audio.sfx.flap(boost ? 1 : 0.75); netFx('flap');
     for (const side of [-1, 1]) {
       _v.set(side * 7.5, 0, 0.8).multiplyScalar(birdK()).applyEuler(phoenix.group.rotation).add(p.pos);
@@ -11264,9 +11365,9 @@ function updatePhoenix(dt) {
 
   // the wings (see flyWings)
   p.flapPhase = Math.min(1, p.flapPhase + dt / 0.55);
-  const dive = smoothstep(-0.2, -0.8, p.pitch);
+  const dive = smoothstep(-0.2, -0.8, Math.asin(clamp(dir3.y, -1, 1))) * (1 - brk);
   stoopStep(dt, diving, dive);
-  flyWings(dt, { boost, dive: dive * (1 - STOOP.pull), climb: clamp(pin, 0, 1), tuck: STOOP.tuck * (1 - STOOP.pull), flutter: STOOP.fast, pull: STOOP.pull });
+  flyWings(dt, { boost, dive: dive * (1 - STOOP.pull), climb: Math.max(clamp(pin, 0, 1), brk), tuck: STOOP.tuck * (1 - STOOP.pull), flutter: STOOP.fast, pull: STOOP.pull });
 
   const n = SH.def ? 0 : boost || dive > 0.5 ? 4 : 2;
   for (let i = 0; i < n; i++) {
@@ -21592,7 +21693,7 @@ function updateHoops(dt) {
   // lined up and close: the air eases him into the middle of it (his own hands always win)
   const [ax, ay] = axes(), mine = 1 - Math.min(1, Math.hypot(ax, ay)) * 0.75;
   const k = smoothstep(0.86, 0.985, cosA) * smoothstep(460, 110, dist) * smoothstep(6, 26, dist) * mine;
-  if (k > 0.001) {
+  if (k > 0.001 && !FLIP.over) {   // (not while he is going round a loop: his pitch is not a heading then)
     const wantYaw = Math.atan2(-tx, -tz), wantPitch = Math.atan2(ty, Math.hypot(tx, tz));
     p.yaw += wrapAngle(wantYaw - p.yaw) * damp(3 * k, dt);
     p.pitch += (clamp(wantPitch, -1.1, 1.1) - p.pitch) * damp(4 * k, dt);
@@ -21735,7 +21836,7 @@ function arenaFly(dt) {
   const tx = r.x - P.x, ty = arenaBob(r, run.i) - P.y, tz = r.z - P.z, dist = Math.hypot(tx, ty, tz) || 1;
   const fx = -Math.sin(p.yaw) * Math.cos(p.pitch), fy = Math.sin(p.pitch), fz = -Math.cos(p.yaw) * Math.cos(p.pitch), cosA = (tx * fx + ty * fy + tz * fz) / dist;
   const [ax, ay] = axes(), k = smoothstep(0.86, 0.985, cosA) * smoothstep(460, 110, dist) * smoothstep(6, 26, dist) * (1 - Math.min(1, Math.hypot(ax, ay)) * 0.75);
-  if (k > 0.001) { p.yaw += wrapAngle(Math.atan2(-tx, -tz) - p.yaw) * damp(3 * k, dt); p.pitch += (clamp(Math.atan2(ty, Math.hypot(tx, tz)), -1.1, 1.1) - p.pitch) * damp(4 * k, dt); }
+  if (k > 0.001 && !FLIP.over) { p.yaw += wrapAngle(Math.atan2(-tx, -tz) - p.yaw) * damp(3 * k, dt); p.pitch += (clamp(Math.atan2(ty, Math.hypot(tx, tz)), -1.1, 1.1) - p.pitch) * damp(4 * k, dt); }
   if (dist < 900 && (ARENA.sparkT -= dt) <= 0) {
     ARENA.sparkT = 0.035; const col = PATRON.id ? pcol(PATRON.id) : [1, 0.82, 0.4];
     for (let i = 0; i < 2; i++) { const u = 0.12 + Math.random() * 0.85; emit(P.x + tx * u + rnd(0.8), P.y + ty * u + rnd(0.8), P.z + tz * u + rnd(0.8), tx / dist * 6, ty / dist * 6, tz / dist * 6, 0.45 + Math.random() * 0.3, col, 0, 0.5); }
@@ -23766,14 +23867,16 @@ function updateCamera(dt) {
     if (flags.wideT > 0) flags.wideT -= dt;
     const wide = smoothstep(0, 4, flags.wideT || 0);   // (the first flight: pulled right back, the whole sky around him, then easing in)
     const camK = birdK() >= 1 ? 1 + (birdK() - 1) * 0.6 : lerp(0.2, 1, clamp((birdK() - SMALL.MIN) / (1 - SMALL.MIN), 0, 1)), rush = smoothstep(95, 290, p.speed), cd = phxDist * (1 - 0.34 * rush) * (camK + 2.6 * wide);   // (a bigger bird: the lens stands further back, but not so far that it is no bigger in the frame)
-    camWant.set(p.pos.x + Math.sin(y) * cd, p.pos.y + cd * lerp(0.42, 0.16, rush) - p.pitch * lerp(12, 5, rush) * camK, p.pos.z + Math.cos(y) * cd);
+    camWant.set(p.pos.x + Math.sin(y) * cd, p.pos.y + cd * lerp(0.42, 0.16, rush) - Math.asin(clamp(Math.sin(p.pitch), -1, 1)) * lerp(12, 5, rush) * camK, p.pos.z + Math.cos(y) * cd);
+    // going over the top (or straight up): behind him along his line of flight instead, a little off his back
+    { const A = p.sub ? 0 : flipCam(dt); if (A > 0.001) { _p.copy(p.pos).addScaledVector(dir3, -cd).addScaledVector(FLIP.cu, cd * lerp(0.3, 0.14, rush)); camWant.lerp(_p, A); } }
     if (!p.sub) {
       camClear(camWant, p.pos, dt, 3, true);
       if (realm === 'under') camWant.y = Math.min(camWant.y, underRoof(camWant.x, camWant.z) - 4);
     }
     camera.position.lerp(camWant, damp(p.sub || SEA.trans ? 8 : 4.5, dt));
     lookAt.copy(p.pos).addScaledVector(dir3, 14 + rush * 26);
-    camera.lookAt(lookAt);
+    camera.up.copy(FLIP.cu); camera.lookAt(lookAt); camera.up.set(0, 1, 0);   // (its up eased round with his over the top: the horizon turns with the loop, it never flips)
     camera.rotateZ(-p.bank * (0.12 + 0.3 * rush));
     camera.fov = lerp(camera.fov, (68 + rush * 32 + wide * 16 - (p.danger || 0) * 12) * fovK(), damp(2.4, dt));   // (the ground rushing up: tunnel vision)
     if (rush > 0.5) { const k = (rush - 0.5) * 0.12; camera.position.x += rnd(k); camera.position.y += rnd(k); }
@@ -24886,7 +24989,8 @@ const EMBER_COLS = [[1, 0.3, 0.08], [1, 0.45, 0.12], [0.95, 0.18, 0.05], [1, 0.6
 //    BACK TO WHERE YOU WERE: the light comes down and sets him on the very spot he left.
 const LIVE = { on: false, t: 0, q: [], mv: null, yaw: 0, pitch: 0, roll: 0, speed: 62, clear: 5, flapT: 1, beats: 0, ph: 0, emberT: 0, shot: null, cp: new THREE.Vector3(), cl: new THREE.Vector3(), cf: 55,
   leave: null, sea: null, home: null, song: false, tk: '', tkN: 0, capT: 0, lap: 0, peersT: 0, lead: null, slot: 0, ringT: -99 };
-const TRICK_K = new Set(['roll', 'roll2', 'loop', 'wingover', 'corkscrew']);
+const TRICK_K = new Set(['roll', 'roll2', 'loop', 'wingover', 'corkscrew', 'immelmann', 'splits', 'barrel', 'knife', 'hammer']);
+const TRICK_NAME = { loop: 'A LOOP', roll: 'A ROLL', roll2: 'TWO ROLLS', corkscrew: 'A CORKSCREW', wingover: 'A WINGOVER', immelmann: 'AN IMMELMANN · UP, OVER, AND THE RIGHT WAY UP', splits: 'A SPLIT-S · OVER AND DOWN THE BACK WAY', barrel: 'A BARREL ROLL', knife: 'KNIFE-EDGE', hammer: 'A STALL TURN' };
 const crownC = () => ({ x: MOUNT.x, z: MOUNT.z + 6, R: 170, top: SUMMIT + 250 });
 const menuFloor = (x, z, y) => Math.max(groundAt(x, z, y + 400), realm === 'under' ? -1e9 : WATER);
 function menuSafe(P, ts = [0, 1.2, 2.4, 3.6]) { const M = LIVE; let f = -1e9; for (const s of ts) { const d = M.speed * s; f = Math.max(f, menuFloor(P.x - Math.sin(M.yaw) * d, P.z - Math.cos(M.yaw) * d, P.y)); } return f; }
@@ -24955,7 +25059,8 @@ function menuPlan() {
 }
 function menuTrickOk(k) {
   const P = player.pos, f = menuSafe(P, [0, 1, 2]), head = menuRoof(P.x, P.z) - P.y, R = 24 * birdK();
-  return P.y - f > (k === 'loop' ? 40 : 34) * birdK() && head > (k === 'loop' ? 2 * R + 30 : 40);
+  const down = k === 'splits' ? 2 * R + 50 * birdK() : k === 'loop' ? 40 * birdK() : k === 'hammer' ? 140 * birdK() : 34 * birdK(), up = k === 'loop' || k === 'immelmann' ? 2 * R + 30 : k === 'hammer' ? 110 * birdK() : 40;   // (a split-S goes down a loop's height; the rest go up)
+  return P.y - f > down && head > up;
 }
 // steer for a point: turn toward it (banking into the turn), climb or sink toward its height, never into the ground
 function menuSteer(dt, tx, ty, tz, maxRate = 0.55, sharp = 1, climb = 0.48) {
@@ -24977,15 +25082,39 @@ function menuMove(mv, dt) {
     case 'loop': { if (!mv.init) { mv.init = true; if (!menuTrickOk('loop')) { mv.done = true; break; } mv.p0 = wrapAngle(M.pitch); mv.R = 24 * K; mv.T = 6.283 * mv.R / Math.max(45, M.speed); M.beats = 3; M.flapT = 9; }
       const u = Math.min(1, mv.t / mv.T); M.pitch = mv.p0 * (1 - u) + 6.283 * u; M.roll = lerp(wrapAngle(M.roll), 0, damp(7, dt)); M.speed = lerp(M.speed, 74 - 16 * Math.sin(u * Math.PI), damp(2, dt));
       if (u >= 1) { M.pitch = 0; mv.done = true; } break; }
-    case 'roll': case 'roll2': { if (!mv.init) { mv.init = true; mv.r0 = wrapAngle(M.roll); mv.n = mv.k === 'roll2' ? 2 : 1; mv.T = 1.05 * mv.n + 0.15; mv.s = Math.random() < 0.5 ? 1 : -1; }
+    case 'roll': case 'roll2': { if (!mv.init) { mv.init = true; mv.r0 = wrapAngle(M.roll); mv.n = mv.k === 'roll2' ? 2 : 1; mv.T = 1.05 * mv.n + 0.15; mv.s ||= Math.random() < 0.5 ? 1 : -1; }
       const u = clamp(mv.t / mv.T, 0, 1), e = u * u * (3 - 2 * u); M.roll = mv.r0 * (1 - e) + mv.s * 6.283 * mv.n * e; M.pitch = lerp(wrapAngle(M.pitch), 0.06, damp(3, dt));
       if (u >= 1) { M.roll = 0; mv.done = true; } break; }
-    case 'corkscrew': { if (!mv.init) { mv.init = true; mv.r0 = wrapAngle(M.roll); mv.y0 = M.yaw; mv.p0 = wrapAngle(M.pitch); mv.T = 2.2; mv.s = Math.random() < 0.5 ? 1 : -1; }
+    case 'corkscrew': { if (!mv.init) { mv.init = true; mv.r0 = wrapAngle(M.roll); mv.y0 = M.yaw; mv.p0 = wrapAngle(M.pitch); mv.T = 2.2; mv.s ||= Math.random() < 0.5 ? 1 : -1; }
       const u = clamp(mv.t / mv.T, 0, 1), e = u * u * (3 - 2 * u); M.roll = mv.r0 * (1 - e) + mv.s * 6.283 * e; M.pitch = mv.p0 * (1 - e) + 0.24 * Math.sin(6.283 * e); M.yaw = mv.y0 + mv.s * 0.2 * (1 - Math.cos(6.283 * e));
       if (u >= 1) { M.roll = 0; mv.done = true; } break; }
-    case 'wingover': { if (!mv.init) { mv.init = true; mv.y0 = M.yaw; mv.p0 = wrapAngle(M.pitch); mv.T = 3.0; mv.s = Math.random() < 0.5 ? 1 : -1; M.beats = 2; }
+    case 'wingover': { if (!mv.init) { mv.init = true; mv.y0 = M.yaw; mv.p0 = wrapAngle(M.pitch); mv.T = 3.0; mv.s ||= Math.random() < 0.5 ? 1 : -1; M.beats = 2; }
       const u = clamp(mv.t / mv.T, 0, 1); M.pitch = mv.p0 * Math.max(0, 1 - u * 3) + 0.95 * Math.sin(Math.PI * u); M.yaw = mv.y0 + mv.s * Math.PI * smoothstep(0.2, 0.8, u);
       M.roll = mv.s * 1.35 * Math.sin(Math.PI * clamp((u - 0.1) / 0.8, 0, 1)); M.speed = lerp(M.speed, 62 - 20 * Math.sin(Math.PI * u), damp(2, dt)); if (u >= 1) mv.done = true; break; }
+    // (the moves that end going back the way they came: written at the end the plain way round, which is the same body —
+    //  heading, pitch and roll (y, ±π, π) are (y + π, 0, 0); and the stall turn's pivot is the one place a heading can be
+    //  changed for nothing, straight up or straight down, where heading and roll are one turn)
+    case 'immelmann': { if (!mv.init) { mv.init = true; if (!menuTrickOk('immelmann')) { mv.done = true; break; } mv.p0 = wrapAngle(M.pitch); mv.T1 = Math.PI * 26 * K / Math.max(45, M.speed); mv.s ||= Math.random() < 0.5 ? 1 : -1; M.beats = 3; M.flapT = 9; }
+      if (mv.t < mv.T1) { const u = mv.t / mv.T1; M.pitch = mv.p0 * (1 - u) + Math.PI * u; M.roll = lerp(wrapAngle(M.roll), 0, damp(7, dt)); M.speed = lerp(M.speed, 72 - 22 * u, damp(2, dt)); }   // up and over, onto his back
+      else { const u = clamp((mv.t - mv.T1) / 0.9, 0, 1), e = u * u * (3 - 2 * u); M.pitch = Math.PI; M.roll = mv.s * Math.PI * e; M.speed = lerp(M.speed, 64, damp(1.5, dt));   // and the right way up, heading back
+        if (u >= 1) { M.yaw += Math.PI; M.pitch = 0; M.roll = 0; mv.done = true; } } break; }
+    case 'splits': { if (!mv.init) { mv.init = true; if (!menuTrickOk('splits')) { mv.done = true; break; } mv.r0 = wrapAngle(M.roll); mv.p0 = wrapAngle(M.pitch); mv.s ||= Math.random() < 0.5 ? 1 : -1; mv.T2 = Math.PI * 26 * K / Math.max(55, M.speed); }
+      if (mv.t < 0.8) { const u = mv.t / 0.8, e = u * u * (3 - 2 * u); M.roll = mv.r0 * (1 - e) + mv.s * Math.PI * e; M.pitch = mv.p0 * (1 - e); }   // over onto his back
+      else { const u = clamp((mv.t - 0.8) / mv.T2, 0, 1); M.roll = mv.s * Math.PI; M.pitch = -Math.PI * u; M.speed = Math.min(M.speed + 30 * Math.sin(Math.PI * u) * dt, 150 * Math.sqrt(K));   // and down the back way, out the way he came
+        if (u >= 1) { M.yaw += Math.PI; M.pitch = 0; M.roll = 0; mv.done = true; } } break; }
+    case 'barrel': { if (!mv.init) { mv.init = true; mv.r0 = wrapAngle(M.roll); mv.y0 = M.yaw; mv.p0 = wrapAngle(M.pitch); mv.T = 2.8; mv.s ||= Math.random() < 0.5 ? 1 : -1; M.beats = 2; }   // round a line, not on it: a corkscrew with room in it
+      const u = clamp(mv.t / mv.T, 0, 1), e = u * u * (3 - 2 * u); M.roll = mv.r0 * (1 - e) + mv.s * 6.283 * e; M.pitch = mv.p0 * (1 - e) + 0.5 * Math.sin(6.283 * e); M.yaw = mv.y0 + mv.s * 0.42 * (1 - Math.cos(6.283 * e));
+      if (u >= 1) { M.roll = 0; mv.done = true; } break; }
+    case 'knife': { if (!mv.init) { mv.init = true; mv.r0 = wrapAngle(M.roll); mv.y0 = M.yaw; mv.T = 3.2; mv.s ||= Math.random() < 0.5 ? 1 : -1; }   // on his side, a wing straight up, cutting the air
+      const u = clamp(mv.t / mv.T, 0, 1), k = smoothstep(0, 0.18, u) - smoothstep(0.82, 1, u); M.roll = lerp(mv.r0 * (1 - smoothstep(0, 0.18, u)), mv.s * Math.PI / 2, k); M.pitch = lerp(wrapAngle(M.pitch), 0.12, damp(3, dt)); M.yaw = mv.y0 + mv.s * 0.3 * smoothstep(0.1, 0.9, u);
+      if (u >= 1) { M.roll = 0; mv.done = true; } break; }
+    case 'hammer': { if (!mv.init) { mv.init = true; if (!menuTrickOk('hammer')) { mv.done = true; break; } mv.p0 = wrapAngle(M.pitch); mv.ph = 0; mv.s ||= Math.random() < 0.5 ? 1 : -1; M.beats = 3; M.flapT = 9; }   // straight up until the air runs out, round on a wingtip, and straight down
+      if (mv.ph === 0) { const u = clamp(mv.t / 1.7, 0, 1), e = u * u * (3 - 2 * u); M.pitch = lerp(mv.p0, Math.PI / 2, e); M.roll = lerp(wrapAngle(M.roll), 0, damp(6, dt)); M.speed = lerp(M.speed, 28, damp(1.6, dt));
+        if (u >= 1) { M.pitch = Math.PI / 2; M.yaw += mv.s * Math.PI / 2; M.roll += mv.s * Math.PI / 2; mv.ph = 1; mv.t1 = mv.t; } }
+      else if (mv.ph === 1) { const u = clamp((mv.t - mv.t1) / 1.3, 0, 1), e = u * u * (3 - 2 * u); M.pitch = Math.PI / 2 - Math.PI * e; M.speed = lerp(M.speed, 22, damp(2, dt));
+        if (u >= 1) { M.pitch = -Math.PI / 2; M.yaw += M.roll; M.roll = 0; mv.ph = 2; mv.t1 = mv.t; } }
+      else { const u = clamp((mv.t - mv.t1) / 2.0, 0, 1), e = u * u * (3 - 2 * u); M.pitch = -Math.PI / 2 * (1 - e); M.speed = Math.min(M.speed + 46 * dt, 130 * Math.sqrt(K)); if (u >= 1) mv.done = true; }
+      break; }
     case 'dive': {   // a stoop at the sea, a pull-out at the last moment, and along the water in a wall of it
       const S = mv.S, dh = Math.hypot(S.x - P.x, S.z - P.z), alt = P.y - WATER; mv.ph ||= 'aim';
       if (mv.ph === 'aim') {   // out toward it, high, until the way down to the water is clear of the land
@@ -25152,7 +25281,7 @@ function menuCam(dt) {
 function menuCaption(dt) {
   const M = LIVE; if ((M.capT -= dt) > 0) return; M.capT = 0.5;
   const mv = M.mv || {}, n = [...NET.peers.values()].filter(P => P.menu && P.s && performance.now() - P.s.t < 5000).length;
-  let what = mv.what || (realm === 'under' ? 'IN THE UNDERWORLD' : TRICK_K.has(mv.k) ? { loop: 'A LOOP', roll: 'A ROLL', roll2: 'A DOUBLE ROLL', corkscrew: 'A CORKSCREW', wingover: 'A WINGOVER' }[mv.k] : 'OVER ' + menuWhere(player.pos, realm));
+  let what = mv.what || (realm === 'under' ? 'IN THE UNDERWORLD' : TRICK_K.has(mv.k) ? (mv.k === 'roll2' ? 'A DOUBLE ROLL' : TRICK_NAME[mv.k]) : 'OVER ' + menuWhere(player.pos, realm));
   if (mv.k === 'dive') what = mv.ph === 'skim' ? 'ALONG THE SEA' : mv.ph === 'stoop' || mv.ph === 'pull' ? 'STOOPING TO THE SEA' : 'OUT TO THE SEA';
   const t = `● LIVE · ${heroName} · ${what}${n ? ` · ${n} MORE IN THE SKY` : ''}`;
   if (M.cap !== t) { M.cap = t; $('liveCap').textContent = t; }
@@ -25641,7 +25770,7 @@ function updateModels(dt) {
     if (ghostP) { phoenix.group.scale.setScalar((gh.ash ? 1 : Math.max(0.001, gk * gk)) * PHX_S * birdK() * (1 + 0.15 * perks.wings)); if (gh.ash) phoenix.group.rotation.set(0, p.yaw ?? phoenix.group.rotation.y, 0); }
     else {
       if (LIVE.on) phoenix.group.rotation.set(LIVE.pitch, LIVE.yaw, LIVE.roll, 'YXZ');   // (on its own in the menu: right over, in a loop or a roll)
-      else phoenix.group.rotation.set(p.pitch * 0.8 - p.wingF * 0.06, p.yaw, p.bank + FLIP.a, 'XYZ');   // (nose up as he climbs, down as he dives; and over on his back if he has rolled there)
+      else { phoenix.group.rotation.set(flipShow(p.pitch) + 0.7 * FLIP.brake, p.yaw, p.bank + FLIP.a, 'YXZ'); phoenix.group.rotateX(-p.wingF * 0.06); }   // (nose up as he climbs, down as he dives, round as he loops; over on his back if he has rolled there; reared up, braking. Heading, then pitch, then roll: at any heading the nose lifts, it never turns into a roll)
       phoenix.group.scale.setScalar(Math.max(0.001, pop * p.scale) * PHX_S * birdK() * (1 + 0.15 * perks.wings));
       phoenix.group.position.y += p.wingF * -0.35;
       phxAlive(dt);
@@ -25752,7 +25881,8 @@ async function xrEnter() {
         XR.rig.add(h); XR.hands[i] = h;
       }
     }
-    sess.addEventListener('select', () => { if (time - XR.pinchT > 0.35) { XR.pinchT = time; if (time - XMAP.busyT < 0.6 || xrMenuPinch() || xmapPinch()) return; xrMove('pinch'); } });
+    sess.addEventListener('select', () => { if (time - (XR.twistedT ?? -9) < 0.6) return; if (time - XR.pinchT > 0.35) {   // (a pinch turned like a key was a roll, not a tap)
+ XR.pinchT = time; if (time - XMAP.busyT < 0.6 || xrMenuPinch() || xmapPinch()) return; xrMove('pinch'); } });
     for (let i = 0; i < 2; i++) { const c = renderer.xr.getController(i); if (!c.userData.gz) { c.userData.gz = true; XR.rig.add(c); c.addEventListener('selectstart', () => { XR.gazeWant = c; }); } }
     sess.addEventListener('end', xrLeave);
     if (!XR.hud) xrHudMake();
@@ -25769,7 +25899,7 @@ function xrLeave() {
   keys.TouchBoost = false; stick.x = stick.y = 0;
   if (XR.hud) XR.hud.visible = false;
   if (XR.tier !== null) applyTier(XR.tier, false, false);
-  human.head.visible = human.cape.visible = true; for (const o of [XR.phxCape, XR.phxBody]) if (o) o.visible = true; xrCull(true); XR.h0 = null; GRASS.R = TOUCH ? 44 : 72; GRASS.key = '';
+  human.head.visible = human.cape.visible = true; for (const o of [XR.phxCape, XR.phxBody, ...(XR.tailMs || [])]) if (o) o.visible = true; if (XR.ringM) XR.ringM.visible = false; if (XR.blinkM) XR.blinkM.visible = false; xrCull(true); XR.h0 = null; GRASS.R = TOUCH ? 44 : 72; GRASS.key = '';
   dispatchEvent(new Event('resize'));
 }
 // a headset draws every frame twice, 90 times a second: the trees and houses of far-off country are left out (the ground
@@ -25793,8 +25923,9 @@ function xrEye(out) {
   if (SH.def && !SH.def.model) { const y = p.form === 'phoenix' ? p.yaw : human.group.rotation.y, S = SH.scale; return out.set(p.pos.x - Math.sin(y) * SH.eye[1] * S, p.pos.y + SH.eye[0] * S, p.pos.z - Math.cos(y) * SH.eye[1] * S); }
   if (p.form === 'human' && human.group.visible && !p.cine) { human.group.updateMatrixWorld(true); return human.head.localToWorld(out.set(0, 0.12, -0.12)); }
   if (p.form === 'human') return out.set(p.pos.x, p.pos.y + 1.55, p.pos.z);
-  if (XR.mode === 'rider') { phoenix.group.updateMatrixWorld(true); return out.set(0, 1.12, -0.08).applyMatrix4(phoenix.group.matrixWorld); }   // (riding: up on its back, behind the neck, its head and wings in front of him)
-  const k = phoenix.group.scale.x || PHX_S;
+  const k = phoenix.group.scale.x || PHX_S, lvl = XR.horizon !== 'free';
+  if (XR.mode === 'rider') { if (lvl) return out.set(-Math.sin(p.yaw) * 0.08 * k, 1.12 * k, -Math.cos(p.yaw) * 0.08 * k).add(p.pos); phoenix.group.updateMatrixWorld(true); return out.set(0, 1.12, -0.08).applyMatrix4(phoenix.group.matrixWorld); }   // (riding: up on its back, behind the neck, its head and wings in front of him — kept level, the bird turning under him, unless the horizon is let go)
+  if (!lvl) { phoenix.group.updateMatrixWorld(true); return out.set(0, 1.0, -0.9).applyMatrix4(phoenix.group.matrixWorld); }
   return out.set(p.pos.x - Math.sin(p.yaw) * 0.9 * k, p.pos.y + 1.0 * k, p.pos.z - Math.cos(p.yaw) * 0.9 * k);
 }
 function xrFrame() {
@@ -25830,26 +25961,69 @@ function xrStep(raw) {
 }
 // the room goes where the game's camera goes, turning with its heading only (never its tilt or roll: that is what makes
 // people sick), so you can look around freely and the horizon stays where your body thinks it is
+// (and over the top it holds still: he is going round, not turning. When he comes out of it facing back the way he came, the
+// room turns once, in a blink — a slow swing of the whole world round you is what makes people sick, a cut is not.
+// XR.horizon 'free', for those who want it: the room pitches and rolls with him, loops and all)
+function xrTurn(want, dt, k) {
+  const d = wrapAngle(want - XR.yaw);
+  if (FLIP.over || player.form === 'phoenix' && Math.abs(Math.sin(player.pitch)) > 0.94) return;   // (straight up or down there is no heading to follow)
+  if (Math.abs(d) > 1.75) { XR.yaw = want; xrBlink(); return; }
+  XR.yaw += d * damp(k, dt);
+}
+function xrBlink() {
+  if (!XR.blinkM) { XR.blinkM = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 8), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: 0, side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false, toneMapped: false })); XR.blinkM.renderOrder = 10001; XR.blinkM.frustumCulled = false; XR.cam.add(XR.blinkM); }
+  XR.blinkT = time;
+}
+const _xq = new THREE.Quaternion(), _xre = new THREE.Euler();
+function xrRigQ(dt, free) {   // the room's turn: his heading only, or (horizon let go) all of him, eased
+  const Q = XR.rigQ || (XR.rigQ = new THREE.Quaternion().setFromAxisAngle(UP, XR.yaw)), p = player;
+  if (free) { _xq.setFromEuler(_xre.set(flipShow(p.pitch), p.yaw, FLIP.a + p.bank * 0.5, 'YXZ')); XR.freeK = 1; } else _xq.setFromAxisAngle(UP, XR.yaw);
+  if (free || XR.freeK) { Q.slerp(_xq, damp(6, dt)); if (!free && Q.angleTo(_xq) < 0.01) XR.freeK = 0; } else Q.copy(_xq);
+  return Q;
+}
+const _xs = new THREE.Vector3();
 function xrFollow(dt) {
-  const p = player;
+  const p = player, bird = p.form === 'phoenix' && !p.perch && !p.cine, free = XR.horizon === 'free' && bird && xrFP() && state === 'play';
   if (xrFP()) {
     // in the air the world turns as he turns; on his feet it stays put and you turn your own head
     const air = p.form === 'phoenix' || (p.wings && !p.grounded);
-    if (air) XR.yaw += wrapAngle(p.yaw - XR.yaw) * damp(4, dt);
+    if (air) xrTurn(p.yaw, dt, 4);
     xrEye(_xp); _xd.subVectors(_xp, p.pos);
     if (!XR.eyeOff || XR.eyeOff.distanceTo(_xd) > 4) XR.eyeOff = (XR.eyeOff || new THREE.Vector3()).copy(_xd); else XR.eyeOff.lerp(_xd, damp(10, dt));
     XR.eye = (XR.eye || new THREE.Vector3()).copy(p.pos).add(XR.eyeOff);
+    // the horizon kept level: on its back, the bird tips about your seat as it climbs, dives and rolls — part of the way (all
+    // the way over, it would be a wall of fire over your head); as the bird, your wings stay where your arms are. Either way
+    // a ring of fire round you shows which way up he really is (see xrRing)
+    if (bird && !free) {
+      const k = phoenix.group.scale.x || PHX_S, q = phoenix.group.quaternion;
+      if (XR.mode === 'rider') { _xq.setFromAxisAngle(UP, p.yaw); const ang = _xq.angleTo(q); if (ang > 0.75) q.copy(_xq.slerp(q, 0.75 / ang)); phoenix.group.position.copy(XR.eye).sub(_xs.set(0, 1.12, -0.08).applyQuaternion(q).multiplyScalar(k)); }
+      else phoenix.group.rotation.set(0, p.yaw, p.bank * 0.5, 'YXZ');
+    }
+    xrRing(dt, bird && !free);
     _xp.copy(XR.eye);
-    if (XR.h0) _xp.sub(_xd.copy(XR.h0).applyAxisAngle(UP, XR.yaw));
+    if (XR.h0) _xp.sub(_xd.copy(XR.h0).applyQuaternion(xrRigQ(dt, free))); else xrRigQ(dt, free);
     XR.rig.position.copy(_xp);
     if (!air && p.form === 'human' && !p.climb) { _xe.setFromQuaternion(XR.cam.quaternion, 'YXZ'); camYaw = XR.yaw + _xe.y; }   // walking: forward is wherever you look
   } else {
     camera.getWorldDirection(_xd);
-    const yaw = Math.atan2(-_xd.x, -_xd.z);
-    XR.yaw += wrapAngle(yaw - XR.yaw) * damp(p.form === 'phoenix' ? 5 : 8, dt);
-    XR.rig.position.copy(camera.position);
+    if (Math.abs(_xd.y) < 0.85) xrTurn(Math.atan2(-_xd.x, -_xd.z), dt, p.form === 'phoenix' ? 5 : 8);
+    XR.rig.position.copy(camera.position); xrRigQ(dt, false); xrRing(dt, false);
   }
-  XR.rig.rotation.set(0, XR.yaw, 0);
+  XR.rig.quaternion.copy(XR.rigQ);
+  if (XR.blinkM) { const o = clamp(1 - (time - (XR.blinkT ?? -9)) / 0.28, 0, 1); XR.blinkM.material.opacity = o; XR.blinkM.visible = o > 0; }
+}
+// being the bird with the horizon level: a thin ring of fire round your chest lying in his wings' plane, a bright bead where
+// his beak points. Level, it is hardly there; as he climbs, loops or rolls it tips and turns round you, so you always know
+function xrRing(dt, on) {
+  if (!XR.ringM && !on) return;
+  if (!XR.ringM) { const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.0, 0.35), transparent: true, opacity: 0, depthWrite: false, fog: false, toneMapped: false }), g = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.006, 6, 72), mat); ring.rotation.x = Math.PI / 2; g.add(ring);
+    const bead = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), mat); bead.position.set(0, 0, -1.1); g.add(bead);
+    g.renderOrder = 9990; g.traverse(o => { o.frustumCulled = false; }); scene.add(g); XR.ringM = g; XR.ringMat = mat; }
+  const p = player, show = on ? clamp(Math.max(Math.abs(Math.sin(p.pitch)) * 1.6 - 0.35, Math.abs(Math.sin((FLIP.a + p.bank) / 2)) * 2.2 - 0.3, Math.cos(p.pitch) < 0 ? 1 : 0), 0, 1) : 0;
+  XR.ringK = lerp(XR.ringK || 0, show, damp(4, dt)); XR.ringMat.opacity = 0.7 * XR.ringK; XR.ringM.visible = XR.ringK > 0.01;
+  if (!XR.ringM.visible || !XR.eye) return;
+  XR.ringM.position.copy(XR.eye); XR.ringM.position.y -= 0.32; XR.ringM.rotation.set(flipShow(p.pitch), p.yaw, FLIP.a + p.bank, 'YXZ');
 }
 // your arms, read as wings: how high each is (from the shoulder, which is about a hand below the eyes) and how far out
 function xrArms() {
@@ -25865,6 +26039,8 @@ function xrBody(dt) {
   XR.phxCape ??= phoenix.group.children.find(o => o.material === capeMat) || null;
   XR.phxBody ??= phoenix.group.children.filter(o => o.isMesh).sort((a, b) => b.geometry.attributes.position.count - a.geometry.attributes.position.count)[0] || null;
   for (const o of [XR.phxCape, XR.phxBody]) if (o) o.visible = !(fp && p.form === 'phoenix' && XR.mode !== 'rider');
+  XR.tailMs ??= phoenix.group.children.filter(o => o.isMesh && o.material !== capeMat && phoenix.tails.some(t => t.geo === o.geometry));
+  { const back = fp && p.form === 'phoenix' && XR.mode !== 'rider' && XR.horizon !== 'free' && (FLIP.over || Math.cos(p.pitch) < 0.2); for (const o of XR.tailMs) o.visible = !back; }   // (going backward over the top as the bird, the room kept level: his own tail would stream out in front of his eyes)
   // riding: the reins to his hands; and, seen from outside, himself up on its back
   if (XR.mode === 'rider' && p.form === 'phoenix' && state !== 'dead' && state !== 'title' && !p.gone) { RIDER.mine ||= reinPair(); const K = (phoenix.group.scale.x || PHX_S) / PHX_S, O = XR.out, hw = (h, i) => h ? XR.rig.localToWorld(_xm[2 + i].set(h.wristW.x, h.wristW.y, h.wristW.z)) : null;
     riderOn(phoenix.group, human.group, K, RIDER.mine, fp && O ? [hw(O.hands.l, 0), hw(O.hands.r, 1)] : null, !fp); XR.rode = true; }
@@ -25930,20 +26106,39 @@ function xrInput(dt) {
       else { if (C.y === null) C.y = p.pos.y; sy = clamp((C.y - p.pos.y) * 0.03 - Math.sin(p.pitch) * 0.7, -0.5, 0.5); }
       stick.x = clamp(sx, -1, 1); stick.y = clamp(sy, -1, 1);
     }
+    xrAero(o, dt, bird, riding);
   }
   else if (fall && o.hands.l && o.hands.r) {
     if (o.pose === 'wings') { stick.x = o.axes[0]; stick.y = clamp(0.55 - o.axes[1] * 0.45, 0, 1); }   // spread out: slower, and the higher the arms the slower
     else { stick.x = 0; stick.y = -1; }   // arms in: an arrow, head-down
   }
   else { stick.x = 0; stick.y = 0; }
+  if (!fly) { FLIP.xrBrake = 0; if (XR.tw) { XR.tw = null; FLIP.xrTo = null; } }
   keys.TouchBoost = state === 'play' && (fly ? (XR.mode === 'rider' && p.form === 'phoenix' ? !!XR.rein?.boost : o.boost) : (o.pose === 'point' || o.pose === 'walk') && o.run);
   XR.flapV = o.flapV || 0; XR.flapRate = o.flapRate || 0;
   if (XR.land) { if (!fly || AP.kind !== 'land' || (XR.land.t += dt) > 90) XR.land = null; else keys.TouchBoost = false; }   // (coming down to land: the game flies him in; a flap takes him back)
   xrMirror(o, hy);
   for (const ev of o.events) xrMove(ev);
 }
+// the moves past steering, whichever way he is flying. Arms raised high and held: up, over the top and down the back, as W
+// held does (see FLIP); the palms turned right over, held: on his back (turned back down: the right way up); a pinch turned
+// like a key: he rolls with the wrist; palms thrown forward, fists held out wide, or both palms up in front: the brake, a
+// hover. (Riding, the bird does the flying: the brake reins it in, and the rest is the same.)
+function xrAero(o, dt, bird, riding) {
+  FLIP.xrBrake = bird && !riding ? o.brake : 0; if (riding && o.brake) BIRD.slow = 0.3;
+  XR.palmT = o.palms === 'up' ? Math.max(0, XR.palmT || 0) + dt : o.palms === 'down' ? Math.min(0, XR.palmT || 0) - dt : 0;
+  if (XR.palmT > 0.35 && Math.cos(FLIP.to) > 0) { flipTo(true); XR.palmInv = true; }
+  else if (XR.palmT < -0.35 && XR.palmInv) { flipTo(false); XR.palmInv = false; }
+  if (o.twisting) { if (!XR.tw) XR.tw = { a0: FLIP.a }; FLIP.xrTo = XR.tw.a0 - 2 * o.twist; if (Math.abs(o.twist) > 0.25) XR.twistedT = time; }   // (clockwise, as you look along your fingers: a roll to the right; a quarter turn is half a roll)
+  else if (XR.tw) { XR.tw = null; FLIP.xrTo = null; FLIP.to = Math.round(FLIP.a / (Math.PI / 2)) * (Math.PI / 2); }
+}
+const FLICK_TRICK = { up: 'loop', down: 'splits', out: 'barrel', in: 'barrel', ahead: 'immelmann', back: 'hammer' };
 // what each move does, where he is
 function xrMove(ev) {
+  if (ev === 'flick') {   // one hand flicked: a trick, the way it was thrown (sideways, a barrel roll that way)
+    const F = XR.out?.flick, p = player; if (!F || state !== 'play' || p.form !== 'phoenix' || p.perch || p.cine) return;
+    XR.move = 'flick'; XR.moveT = time + 1.2; birdTrick(FLICK_TRICK[F.dir] || 'roll', F.x < 0 ? 1 : -1); return;
+  }
   XR.move = ev; XR.moveT = time + 1.2;
   if (ev === 'flap') {
     audio.sfx.flap(0.9);
@@ -26021,8 +26216,20 @@ function xrMirror(o, hy) {
 //    height, so he can look down at the country going by; arms out glides and steers, raised or lowered climbs or sinks
 //    and it keeps whatever height he leaves it at, and beating them drives it on. (Looking can be made to steer again,
 //    for whoever wants that.)
-XR.mode = 'rider'; XR.gazeSteer = false; XR.third = false;
-try { const m = localStorage.getItem('icarus.xrmode'); if (m === 'bird' || m === 'rider') XR.mode = m; XR.gazeSteer = localStorage.getItem('icarus.xrgaze') === '1'; } catch {}
+XR.mode = 'rider'; XR.gazeSteer = false; XR.third = false; XR.horizon = 'level';
+try { const m = localStorage.getItem('icarus.xrmode'); if (m === 'bird' || m === 'rider') XR.mode = m; XR.gazeSteer = localStorage.getItem('icarus.xrgaze') === '1'; if (localStorage.getItem('icarus.xrhorizon') === 'free') XR.horizon = 'free'; } catch {}
+// the horizon: LEVEL (the room only ever turns with his heading; over the top the bird turns about you) or FREE (it goes
+// round with him: real loops, for those whose stomachs are fine with it)
+function xrHorizon(m) {
+  XR.horizon = m === 'free' || m === 'level' ? m : XR.horizon === 'free' ? 'level' : 'free'; try { localStorage.setItem('icarus.xrhorizon', XR.horizon); } catch {}
+  if (XR.on) xrBlink(); XR.eyeOff = null; toast(XR.horizon === 'free' ? 'THE HORIZON GOES ROUND WITH HIM · SAY “LEVEL HORIZON” TO KEEP IT STILL' : 'THE HORIZON STAYS LEVEL · THE BIRD TURNS ABOUT YOU');
+}
+// the moves, written out on the menu's sheet (MOVES)
+const XR_MOVES = [['ARMS OUT', 'glide · tip them like wings to turn'], ['RAISE · LOWER', 'climb · dive'], ['RAISE HIGH, HOLD', 'up, over the top, down the back: a loop'],
+  ['LET GO ON YOUR BACK', 'he rolls upright: an Immelmann'], ['PALMS UP', 'on your back (palms down: upright again)'], ['ON YOUR BACK, LOWER', 'down the back way: a split-S'],
+  ['PINCH AND TWIST', 'roll with the wrist · half way: knife-edge'], ['FLAP', 'a wingbeat · keep flapping: faster'], ['PALMS FORWARD', 'or two fists out wide: brake, hover'],
+  ['FLICK ONE HAND', 'up loop · down split-S · aside barrel roll'], ['', 'forward Immelmann · back toward you stall turn'], ['HANDS TOGETHER', 'reaching forward: stoop · held: land'],
+  ['RIDING', 'the reins steer · flick, palms, twist: the same'], ['SAY', 'any trick by name · level horizon · free horizon']];
 function xrMode(m) {
   if (m !== 'bird' && m !== 'rider') m = XR.mode === 'rider' ? 'bird' : 'rider';
   if (m === XR.mode) return; XR.mode = m; try { localStorage.setItem('icarus.xrmode', m); } catch {}
@@ -26037,6 +26244,8 @@ function xrHear(low) {
   if (has(/\b(let me ride|ride (it|him|her|the bird)|rider mode|saddle up|on (its|his|her) back|take the reins|give me the reins)\b/)) { xrMode('rider'); return true; }
   if (has(/\b(look(ing)? (to )?steers?|steer with my (eyes|head)|follow my (eyes|head|gaze)|go where i look)\b/)) { XR.gazeSteer = true; try { localStorage.setItem('icarus.xrgaze', '1'); } catch {} toast('IT GOES WHERE YOU LOOK'); return true; }
   if (has(/\b(free look|stop following my (eyes|head|gaze)|don'?t follow my (eyes|head)|let me look( around)?|cruise control)\b/)) { XR.gazeSteer = false; try { localStorage.setItem('icarus.xrgaze', '0'); } catch {} toast('LOOK WHERE YOU LIKE · IT HOLDS ITS COURSE'); return true; }
+  if (has(/\b(level horizon|horizon level|keep the horizon (level|still)|comfort( mode)?( on)?|stop the world rolling)\b/)) { xrHorizon('level'); return true; }
+  if (has(/\b(free horizon|horizon free|let the horizon go|full loops|roll the world|comfort( mode)? off)\b/)) { xrHorizon('free'); return true; }
   if (has(/\b(cinematic view|watch (myself|us|me)|third person|from outside|step back|see myself)\b/)) { XR.third = true; XR.hudKey = ''; toast('WATCHING FROM OUTSIDE · SAY “MY EYES” TO GO BACK IN'); return true; }
   if (XR.third && has(/\b(my eyes|first person|back in(side)?|put me back|go back in)\b/)) { XR.third = false; XR.eyeOff = null; toast('BACK BEHIND YOUR OWN EYES'); return true; }
   return false;
@@ -26096,6 +26305,7 @@ function xrMenuItems() {
       { label: ph && ph.mom ? 'GO BACK THERE' : n ? 'NO PLACE' : 'TAKE ONE', keep: !(ph && ph.mom) && !!n, f: () => { if (ph && ph.mom) { XM.page = ''; memoGo(ph); } else if (!n) { XM.page = ''; voiceRun('snap'); } } },
       { label: 'BACK', keep: true, f: () => { XM.page = ''; } }];
   }
+  if (XM.page === 'moves') return [{ label: FLIP.auto ? 'ROLLS UPRIGHT AFTER' : 'STAYS ON ITS BACK', on: FLIP.auto, keep: true, f: () => { FLIP.auto = !FLIP.auto; try { localStorage.setItem('icarus.autolevel', FLIP.auto ? '1' : '0'); } catch {} } }, { label: 'A TRICK', f: () => birdTrick('') }, { label: 'BACK', keep: true, f: () => { XM.page = ''; } }];
   if (XM.page === 'who') {   // who is flying: touch one and be carried to them
     const L = [...NET.peers.values()].filter(P => P.seen && !P.memory).sort((a, b) => a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos)).slice(0, 10);
     return [...L.map(P => ({ label: `${P.name} ${fmtDist(P.pos.distanceTo(p.pos)).toUpperCase()}`, f: () => { XM.page = ''; warpToPeer(P); } })), ...(L.length ? [] : [{ label: 'NOBODY ELSE YET', keep: true, f: () => {} }]), { label: 'BACK', keep: true, f: () => { XM.page = ''; } }];
@@ -26106,6 +26316,8 @@ function xrMenuItems() {
     { label: 'MAP', on: XMAP.on, f: () => xmapShow(!XMAP.on) },
     { label: XR.mode === 'rider' ? 'BE THE BIRD' : 'RIDE IT', f: () => xrMode() },
     ...(fly ? [{ label: BIRD.auto === 'tour' ? 'I’LL FLY' : 'FLY ME ROUND', f: () => { if (BIRD.auto === 'tour') birdAuto(XR.mode === 'rider' ? 'cruise' : ''); else if (birdAuto('tour', 'IT TAKES YOU ROUND')) { LIVE.q.length = 0; LIVE.mv = null; } } }, { label: 'A TRICK', f: () => birdTrick('') }] : []),
+    { label: 'MOVES', keep: true, f: () => { XM.page = 'moves'; } },
+    ...(fly ? [{ label: XR.horizon === 'free' ? 'HORIZON FREE' : 'HORIZON LEVEL', on: XR.horizon !== 'free', keep: true, f: () => xrHorizon() }] : []),
     ...(XR.mode === 'bird' ? [{ label: XR.gazeSteer ? 'LOOK STEERS' : 'FREE LOOK', on: !XR.gazeSteer, keep: true, f: () => { XR.gazeSteer = !XR.gazeSteer; try { localStorage.setItem('icarus.xrgaze', XR.gazeSteer ? '1' : '0'); } catch {} } }] : []),
     { label: XR.third ? 'MY EYES' : 'WATCH US', f: () => { XR.third = !XR.third; XR.eyeOff = null; } },
     { label: fly ? 'LAND' : 'FLY', f: () => { if (fly) { XR.land = { t: 0 }; voiceRun('land'); } else voiceRun('fly'); } },
@@ -26126,13 +26338,14 @@ async function xalbOpen() { XM.page = 'album'; XALB.busy = true; try { XALB.list
 function xalbGo(d) { const n = XALB.list.length; if (!n) return; XALB.i = (XALB.i + d + n) % n; xalbLoad(); }
 async function xalbLoad() { const ph = XALB.list[XALB.i]; if (!ph || XALB.at === XALB.i) return; XALB.at = XALB.i; try { const bm = await createImageBitmap(ph.thumb || ph.full); XALB.img?.close?.(); XALB.img = bm; } catch { XALB.img = null; } XM.key = ''; }
 function xrMenuDraw() {
-  const x = XM.x, W = 1024, H = 560, it = XM.items, cols = XM.cols, rows = Math.ceil(it.length / cols), top0 = XM.page === 'album' ? 436 : 78, tw = (W - 40) / cols, th = (H - 18 - top0) / rows;
+  const x = XM.x, W = 1024, H = 560, it = XM.items, cols = XM.cols, rows = Math.ceil(it.length / cols), top0 = XM.page === 'album' || XM.page === 'moves' ? 436 : 78, tw = (W - 40) / cols, th = (H - 18 - top0) / rows;
   const god = getComputedStyle(document.documentElement).getPropertyValue('--god').trim() || '#ff8a3a';
   x.clearRect(0, 0, W, H); x.fillStyle = 'rgba(5,6,11,.95)'; x.beginPath(); x.roundRect(4, 4, W - 8, H - 8, 26); x.fill();
   x.strokeStyle = god; x.globalAlpha = 0.55; x.lineWidth = 3; x.stroke(); x.globalAlpha = 1;
   x.font = 'bold 30px Menlo, Consolas, monospace'; x.textAlign = 'left'; x.textBaseline = 'middle'; x.fillStyle = god; x.fillText('I C A R U S', 34, 46);
   x.textAlign = 'right'; x.font = '22px Menlo, Consolas, monospace'; x.fillStyle = 'rgba(255,236,208,.55)'; x.fillText('look and pinch · or touch', W - 34, 46);
   x.textAlign = 'center';
+  if (XM.page === 'moves') { x.textAlign = 'left'; XR_MOVES.forEach(([k, t], i) => { const y = 92 + i * 24.5; x.font = 'bold 17px Menlo, Consolas, monospace'; x.fillStyle = god; x.fillText(k, 34, y); x.font = '17px Menlo, Consolas, monospace'; x.fillStyle = '#fff6e6'; x.fillText(t, 300, y); }); x.textAlign = 'center'; }
   if (XM.page === 'album') {   // the picture, as big as the sheet allows, and which one of how many
     const n = XALB.list.length; x.font = '22px Menlo, Consolas, monospace'; x.fillStyle = 'rgba(255,236,208,.6)'; x.textAlign = 'right'; x.fillText(n ? `${XALB.i + 1} of ${n}` : '', W - 34, 46); x.textAlign = 'center';
     if (XALB.img) { const bw = W - 60, bh = 350, k = Math.min(bw / XALB.img.width, bh / XALB.img.height), dw = XALB.img.width * k, dh = XALB.img.height * k; x.drawImage(XALB.img, (W - dw) / 2, 78 + (bh - dh) / 2, dw, dh); }
@@ -26166,7 +26379,7 @@ function xrMenuAt(o, d) {
   if (ld) { if (Math.abs(ld.z) < 1e-4) return -1; const t = -lo.z / ld.z; if (t < 0 || t > 6) return -1; hx = lo.x + ld.x * t; hy = lo.y + ld.y * t; }
   else { if (Math.abs(lo.z) > 0.022) return -1; hx = lo.x; hy = lo.y; }
   const u = hx / XM.W + 0.5, v = 0.5 - hy / XM.H; if (u < 0 || u > 1 || v < 0 || v > 1) return -1;
-  const W = 1024, Hh = 560, cols = XM.cols, rows = Math.ceil(XM.items.length / cols), top0 = XM.page === 'album' ? 436 : 78, px = u * W, py = v * Hh; if (py < top0) return -1;
+  const W = 1024, Hh = 560, cols = XM.cols, rows = Math.ceil(XM.items.length / cols), top0 = XM.page === 'album' || XM.page === 'moves' ? 436 : 78, px = u * W, py = v * Hh; if (py < top0) return -1;
   const c = Math.floor((px - 20) / ((W - 40) / cols)), r = Math.floor((py - top0) / ((Hh - 18 - top0) / rows)), i = r * cols + c;
   return c >= 0 && c < cols && r >= 0 && i < XM.items.length ? i : -1;
 }
@@ -26180,7 +26393,7 @@ function xrMenuPinch() {
 }
 function xrMenuStep() {
   if (!XM.open || !XM.mesh) return;
-  if (time - XM.t0 > (XM.page === 'album' ? 90 : 14) || (state !== 'play' && state !== 'talk')) { xrMenuShow(false); return; }
+  if (time - XM.t0 > (XM.page === 'album' || XM.page === 'moves' ? 90 : 14) || (state !== 'play' && state !== 'talk')) { xrMenuShow(false); return; }
   XM.items = xrMenuItems();
   // a fingertip on a tile presses it
   let hot = XM.hot; if (time - XM.touchT > 0.5) hot = -1;
@@ -26315,8 +26528,8 @@ function xrHint(act) {
   const p = player, k = act?.kind;
   if (p.cine) return '';
   if (XR.land) return 'gliding down to land · flap: fly on';
-  if (p.form === 'phoenix' && XR.mode === 'rider') return BIRD.auto === 'tour' ? 'it is flying you round · say: i’ve got it' : 'reins: over to turn · lift to climb · give them to go · draw them in to slow · stroke its neck · say: fly me around, land there';
-  if (p.form === 'phoenix') return k === 'swoop' ? 'hands together: land · two fists: fall' : XR.gazeSteer ? 'look where you want to go · flap: faster · hands together: land' : 'arms out: glide and steer · raise or lower: climb or sink · flap: faster · rest them: it holds this height';
+  if (p.form === 'phoenix' && XR.mode === 'rider') return BIRD.auto === 'tour' ? 'it is flying you round · say: i’ve got it' : 'reins: over to turn · lift to climb · give them to go · draw them in to slow · flick a hand: a trick · palms up: on its back · say: fly me around, land there';
+  if (p.form === 'phoenix') return k === 'swoop' ? 'hands together: land · two fists close in: fall' : FLIP.over ? 'keep your arms up: over and round · lower them: out of it' : XR.gazeSteer ? 'look where you want to go · look right up and hold: over the top · flap: faster · hands together: land' : 'arms out: glide and steer · raise them high and hold: over the top · palms up: on your back · pinch and twist: roll · palms forward: brake · flick: a trick';
   if (p.wings && !p.grounded) return 'look where you want to go · raise your arms: slow · flap: burn';
   if (p.tumble && !p.grounded) return k === 'rebirth' ? 'arms out: slow · arms in: dive · flap: catch fire' : 'arms out: slow · arms in: dive';
   if (!p.grounded) return k === 'rebirth' ? 'flap: catch fire' : '';
@@ -26324,7 +26537,7 @@ function xrHint(act) {
   if (k === 'ignite') return 'flap your arms: JUMP';
   return 'swing your arms: walk · flap them: jump · open palm: menu';
 }
-const MOVE_WORDS = { walk: 'WALK', land: 'LANDING', join: 'LAND', wings: 'WINGS', flap: 'WINGBEAT', stoop: 'STOOP', clap: 'FIRE', fold: 'FOLD', spread: 'CATCH FIRE', leap: 'LEAP', point: 'WALK', offer: 'OFFER', push: 'STOP', pinch: 'TAP' };
+const MOVE_WORDS = { walk: 'WALK', land: 'LANDING', join: 'LAND', wings: 'WINGS', flap: 'WINGBEAT', stoop: 'STOOP', clap: 'FIRE', fold: 'FOLD', spread: 'CATCH FIRE', leap: 'LEAP', point: 'WALK', offer: 'OFFER', push: 'STOP', pinch: 'TAP', flick: 'A TRICK', hover: 'BRAKE' };
 function xrHud(dt, sc) {
   const m = XR.hud; if (!m) return;
   if (m.parent !== sc) sc.add(m);
@@ -26334,7 +26547,7 @@ function xrHud(dt, sc) {
   XR.rig.updateMatrixWorld(true);
   _xp.set(-Math.sin(XR.hudYaw) * 1.2, -0.42, -Math.cos(XR.hudYaw) * 1.2).add(XR.cam.position);
   m.position.copy(XR.rig.localToWorld(_xp));
-  m.rotation.set(0, XR.yaw + XR.hudYaw, 0, 'YXZ'); m.rotateX(-0.3);
+  m.quaternion.copy(XR.rig.quaternion).multiply(_xq.setFromAxisAngle(UP, XR.hudYaw)); m.rotateX(-0.3);   // (the room's own turn, and then the head's: with the horizon level that is its heading alone)
   if ((XR.hudT -= dt) > 0) return;
   XR.hudT = 0.1;
   const vis = id => { const el = $(id); if (!el) return ''; const cs = getComputedStyle(el); return cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.15 || el.closest('.hidden') ? '' : el.textContent.trim(); };
@@ -26420,7 +26633,7 @@ function tick(dt) {
   else if (state === 'stats') statsStep(dt);
   else if (state === 'warp') updateWarp(dt);
   carryOn();    // (and then to where it has stood off to, if a bird is passing through it)
-  updateTail(dt); updateSmall(dt); updateCourier(dt); xfTick(dt); flipTick(dt); agentsWatch(dt); woodTick(dt); waveTick(dt, false); keeperTick(dt); wreathTick(dt); keeperSizeTick(dt); eyeStep(dt);
+  updateTail(dt); updateSmall(dt); updateCourier(dt); xfTick(dt); padTick(); flipTick(dt); agentsWatch(dt); woodTick(dt); waveTick(dt, false); keeperTick(dt); wreathTick(dt); keeperSizeTick(dt); eyeStep(dt);
   updateGodDirector(dt);
   updateCinemaState(dt);
   if (state === 'title') updateTitle(dt);
@@ -26637,13 +26850,13 @@ function birdDo(moves, say) {
   const M = LIVE; if (M.mv && !M.mv.done && M.mv.k !== 'cruise' && !TRICK_K.has(M.mv.k)) M.q.unshift(M.mv);
   M.q.unshift(...moves); M.mv = null; return true;
 }
-function birdTrick(k) {
+function birdTrick(k, side) {   // side: which way a roll goes (1 left, −1 right), if he showed it
   const T = BIRD.bond.tricks, fav = Object.entries(T).sort((a, b) => b[1] - a[1])[0];
   k = k || (fav && Math.random() < 0.55 ? fav[0] : menuTrick().k);
   if (!birdCan()) { toast('HE HAS TO BE FLYING'); return false; }
   LIVE.speed = Math.max(46, player.speed); LIVE.yaw = BIRD.auto ? LIVE.yaw : player.yaw;
   if (!menuTrickOk(k)) { birdExpress('curious'); toast('NOT ENOUGH AIR UNDER IT FOR THAT'); return false; }
-  if (!birdDo([{ k, t: 0 }], ({ loop: 'A LOOP', roll: 'A ROLL', roll2: 'TWO ROLLS', corkscrew: 'A CORKSCREW', wingover: 'A WINGOVER' })[k])) return false;
+  if (!birdDo([{ k, t: 0, s: side }], TRICK_NAME[k])) return false;
   T[k] = (T[k] || 0) + 1; if (BIRD.mood > 0.4 && BIRD.bond.trust > 0.5 && Math.random() < 0.5) LIVE.q.splice(1, 0, { k: 'roll', t: 0 });   // (pleased with itself: one more, for nothing)
   return true;
 }
@@ -26666,8 +26879,13 @@ function birdHear(low, words) {
   if (has(/\b(fly me around|show me (a)?round|take me (for|on) a (flight|ride|spin|tour|lap)|you fly|fly for me|you take (it|over)|fly yourself|fly on your own|give me a tour|take me flying)\b/)) { if (birdWilling() && birdAuto('tour', 'IT TAKES YOU ROUND')) { LIVE.q.length = 0; LIVE.mv = null; } return true; }
   if (has(/\b(cruise( control)?|hold (this|it|her|him|us|that)( (here|steady|there))?|hold (this |that )?(height|altitude|course|heading)|keep (us |her |him |it )?(level|straight|steady|going)|straight on|auto ?pilot)\b/) && !has(/\b(shot|camera)\b/)) { if (birdAuto('cruise', 'HOLDING THIS · SAY “I’VE GOT IT” TO TAKE IT BACK')) { LIVE.q.length = 0; LIVE.mv = null; BIRD.alt = player.pos.y; } return true; }
   if (has(/\b(do a (trick|flip|stunt)|show off|do something|trick)\b/)) { birdTrick(''); return true; }
-  if (has(/\b(loop( the loop)?|do a loop|somersault)\b/)) { birdTrick('loop'); return true; }
-  if (has(/\b(barrel roll|do a roll|roll over|roll)\b/) && !has(/\b(rolling|camera|film)\b/)) { birdTrick(has(/\b(two|twice|double)\b/) ? 'roll2' : 'roll'); return true; }
+  if (has(/\bsplit[- ]?s\b|\bsplits\b/)) { birdTrick('splits'); return true; }
+  if (has(/\bimm?ell?mann?\b|\bhalf (a )?loop\b/)) { birdTrick('immelmann'); return true; }
+  if (has(/\b(loop( the loop)?|do a loop|somersault|over the top)\b/)) { birdTrick('loop'); return true; }
+  if (has(/\bbarrel roll\b/)) { birdTrick('barrel'); return true; }
+  if (has(/\bknife[- ]?edge\b/)) { birdTrick('knife'); return true; }
+  if (has(/\b(stall turn|hammer ?head)\b/)) { birdTrick('hammer'); return true; }
+  if (has(/\b(do a roll|roll over|roll)\b/) && !has(/\b(rolling|camera|film)\b/)) { birdTrick(has(/\b(two|twice|double)\b/) ? 'roll2' : 'roll'); return true; }
   if (has(/\b(corkscrew|spiral)\b/)) { birdTrick('corkscrew'); return true; }
   if (has(/\b(wing ?over)\b/)) { birdTrick('wingover'); return true; }
   if (has(/\b((go|fly|take (me|us)) (through|thru|into|in) (the |those |these |that )?(rings?|hoops?)|fly the rings|do the rings|run the rings|ring course|(the )?rings\b.*\bplease)\b/)) { birdRings(); return true; }
@@ -26748,7 +26966,7 @@ function updateBird(dt) {
     if (u >= 1) { E.ox = E.oy = E.oz = 0; BIRD.expr = null; }
     H.x += E.ox; H.y += E.oy; H.z += E.oz; E.left = { x: H.x, y: H.y, z: H.z }; }
 }
-function birdSay() { const B = BIRD.bond, n = Math.round(B.trust * 8), m = BIRD.mood; chatLine('', `THE BIRD · TRUST ${'▰'.repeat(n)}${'▱'.repeat(8 - n)} · ${m > 0.5 ? 'GLAD' : m > 0.1 ? 'CONTENT' : m > -0.3 ? 'WATCHFUL' : m > -0.6 ? 'SULKING' : 'IN A TEMPER'} · ${B.flights} FLIGHTS OF ITS OWN · STROKED ${B.pets} TIMES`, 'sys'); chatLine('', 'SAY: FLY ME AROUND · DO A LOOP · THROUGH THE RINGS · FOLLOW HER · LAND THERE · HOLD THIS · GOOD BIRD · I’VE GOT IT', 'sys'); }
+function birdSay() { const B = BIRD.bond, n = Math.round(B.trust * 8), m = BIRD.mood; chatLine('', `THE BIRD · TRUST ${'▰'.repeat(n)}${'▱'.repeat(8 - n)} · ${m > 0.5 ? 'GLAD' : m > 0.1 ? 'CONTENT' : m > -0.3 ? 'WATCHFUL' : m > -0.6 ? 'SULKING' : 'IN A TEMPER'} · ${B.flights} FLIGHTS OF ITS OWN · STROKED ${B.pets} TIMES`, 'sys'); chatLine('', 'SAY: FLY ME AROUND · DO A LOOP · THROUGH THE RINGS · FOLLOW HER · LAND THERE · HOLD THIS · GOOD BIRD · I’VE GOT IT', 'sys'); chatLine('', 'AND: GO OVER THE TOP · IMMELMANN · SPLIT-S · BARREL ROLL · KNIFE EDGE · STALL TURN · UPSIDE DOWN · BRAKE', 'sys'); }
 // ── Flying with a god. Every one of the Twelve has one more shape than they have shown: a phoenix many times the size of
 //    his, in their own colour, with their name written in its feathers. One of them takes that shape when he asks to fly
 //    with them, or to be carried — if they will have him — and up there, with nobody listening, is where they get to know

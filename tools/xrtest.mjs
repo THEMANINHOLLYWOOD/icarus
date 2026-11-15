@@ -83,5 +83,41 @@ r = run(t => { const ph = Math.sin(t * Math.PI * 2 * 1.1) * 0.22; return { L: fa
 check('hand over hand climbs', r.last.pose === 'walk' && r.last.axes[1] > 0.9, r.last.pose);
 r = run(t => { const ph = Math.sin(t * Math.PI * 2 * 1.1) * 0.22; return { L: fakeHand('L', at(-0.25, 0.05 + ph, -0.35), { toward: [0, 0, -1] }), R: fakeHand('R', at(0.25, 0.05 - ph, -0.35), { toward: [0, 0, -1] }) }; }, 2.0, { form: 'human', grounded: true });
 check('hand over hand on the ground is not walking', r.last.pose !== 'walk', r.last.pose);
+
+// ── the aerobatics: palms, the brake, a pinch turned like a key, a flick
+const wingsP = (facing, shape = 'open', yl = -0.25, yr = -0.25) => ({ L: fakeHand('L', at(-0.65, yl, -0.25), { toward: [-1, 0, 0], facing, shape }), R: fakeHand('R', at(0.65, yr, -0.25), { toward: [1, 0, 0], facing, shape }) });
+r = run(() => wingsP('down'), 0.4);
+check('wings: palms down', r.last.pose === 'wings' && r.last.palms === 'down' && !r.last.brake, `${r.last.pose} ${r.last.palms}`);
+r = run(() => wingsP('up'), 0.4);
+check('wings: palms turned up (on his back)', r.last.pose === 'wings' && r.last.palms === 'up' && !r.last.brake, `${r.last.pose} ${r.last.palms}`);
+r = run(() => wingsP('ahead'), 0.4);
+check('wings: palms thrown forward brake', r.last.palms === 'ahead' && r.last.brake === 1, `${r.last.palms} ${r.last.brake}`);
+r = run(() => wingsP('down', 'fist'), 0.8);
+check('fists out wide brake, and are not a fold', r.last.brake === 1 && !r.ev.includes('fold'), `${r.last.brake} ${r.ev.join(',')}`);
+r = run(() => ({ L: fakeHand('L', at(-0.18, -0.12, -0.42), { facing: 'ahead', toward: [0, 1, 0] }), R: fakeHand('R', at(0.18, -0.12, -0.42), { facing: 'ahead', toward: [0, 1, 0] }) }), 0.5);
+check('palms up in front, still: hover', r.last.pose === 'hover' && r.last.brake === 1 && !r.ev.includes('push'), `${r.last.pose} ${r.ev.join(',')}`);
+r = run(() => wings(0.15, 0.15), 0.5);
+check('arms raised high: full climb (over the top, held)', r.last.axes[1] <= -0.99, JSON.stringify(r.last.axes));
+// a pinch, turned clockwise (as you look along the fingers) by a quarter turn over half a second
+const twistHand = (side, ang) => { const c = Math.cos(ang), s = Math.sin(ang); return fakeHand(side, at(side === 'R' ? 0.2 : -0.2, -0.25, -0.35), { shape: 'pinch', toward: [0, 0, -1], facing: [-s, -c, 0] }); };   // (looking ahead: the palm going from down toward the left is clockwise)
+r = run(t => ({ L: null, R: twistHand('R', Math.min(1, t / 0.5) * Math.PI / 2) }), 0.7);
+check('pinch and twist clockwise: a roll right (twist > 0)', r.last.twisting && r.last.twist > 1.2 && r.last.twist < 1.9, `${r.last.twisting} ${r.last.twist.toFixed(2)}`);
+r = run(t => ({ L: twistHand('L', -Math.min(1, t / 0.5) * Math.PI / 2), R: null }), 0.7);
+check('left hand twisted the other way: a roll left (twist < 0)', r.last.twisting && r.last.twist < -1.2, `${r.last.twist.toFixed(2)}`);
+r = run(() => ({ L: null, R: twistHand('R', 0) }), 0.5);
+check('a pinch held still: no twist', r.last.twisting && Math.abs(r.last.twist) < 0.05, r.last.twist.toFixed(3));
+r = run(() => ({ L: null, R: fakeHand('R', at(0.2, -0.25, -0.35), { toward: [0, 0, -1] }) }), 0.3);
+check('no pinch: no twist', !r.last.twisting);
+// a flick: one hand thrown up hard in a tenth of a second, the other still
+const still = () => fakeHand('L', at(-0.3, -0.4, -0.3));
+const runF = (f, secs, ctx = { form: 'phoenix' }) => { const H = makeHands(), ev = []; let fl = null; for (let t = 0; t < secs; t += 1 / 90) { const { L, R } = f(t), o = H.update(1 / 90, head, L, R, ctx); ev.push(...o.events); if (o.flick) fl = o.flick; } return { ev, last: { flick: fl } }; };
+r = runF(t => ({ L: still(), R: fakeHand('R', at(0.3, -0.35 + Math.min(1, Math.max(0, t - 0.2) / 0.12) * 0.4, -0.3)) }), 0.6);
+check('flick up', r.ev.filter(e => e === 'flick').length === 1 && r.last.flick?.dir === 'up', `${r.ev.join(',')} ${JSON.stringify(r.last.flick)}`);
+r = runF(t => ({ L: still(), R: fakeHand('R', at(0.3 + Math.min(1, Math.max(0, t - 0.2) / 0.12) * 0.4, -0.35, -0.3)) }), 0.6);
+check('flick out to the right', r.last.flick?.dir === 'out' && r.last.flick.x > 0, JSON.stringify(r.last.flick));
+r = run(t => ({ L: still(), R: fakeHand('R', at(0.3, -0.35 + Math.min(1, Math.max(0, t - 0.2) / 0.12) * 0.4, -0.3)) }), 0.6, { form: 'human', grounded: true });
+check('no flick tricks on the ground', !r.ev.includes('flick'), r.ev.join(','));
+r = run(t => { const ph = (t % 0.6) / 0.6, y = ph < 0.33 ? -0.1 - (ph / 0.33) * 0.4 : -0.5 + ((ph - 0.33) / 0.67) * 0.4; return wings(y, y); }, 1.8);
+check('a flap is not a flick', !r.ev.includes('flick'), r.ev.join(','));
 console.log(fails ? `${fails} failed` : 'all moves read');
 process.exit(fails ? 1 : 0);
