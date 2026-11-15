@@ -129,9 +129,9 @@ else
   [ -s "$D/pair" ] || { rand > "$D/pair"; date +%s > "$D/pair.at"; }
   s=$(cat "$D/pair"); hex64 "$s" || { rm -f "$D/pair"; say "Icarus: could not make a secret here (needs openssl or /dev/urandom)."; exit 1; }
   p=$(printf %s "$s" | hash); hex64 "$p" || { say "Icarus: could not hash here (needs shasum, sha256sum or openssl)."; exit 1; }
-  link="$URL/connect/#pair=$p"
+  link="$URL/#pair=$p"
   say ""
-  say "  One thing left, and it is yours: open this where you play Icarus, and press ALLOW."
+  say "  One thing left, and it is yours: open this in the browser you play Icarus in, and press ALLOW in the game."
   say ""
   say "    $link"
   say ""
