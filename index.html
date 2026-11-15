@@ -2348,7 +2348,7 @@ function hitTest(x, y, z, m) {
     if (!S) continue;
     for (let i = 0; i < S.length; i++) {
       const s = S[i], ex = x - s.x, ez = z - s.z, rr = s.r + m, d2 = ex * ex + ez * ez;
-      if (d2 > rr * rr || y < s.y0 - m || y > s.y1 + m) continue;
+      if (d2 > rr * rr || y < s.y0 - m || y > s.y1 + m || s.part && PART.fly) continue;   // (a white town opens for a bird in flight, the way the rock does)
       const d = Math.sqrt(d2) || 0.01, top = y - s.y1, bot = s.y0 - y;
       // which face he met: the side, unless he is nearer the top or the underside than the edge
       if (top > -m && top > d - s.r) { _hit.nx = 0; _hit.ny = 1; _hit.nz = 0; }
@@ -12142,7 +12142,7 @@ function showForm(g) {
     m.visible = i === g.formIdx; m.scale.setScalar(m.userData.S); m.material.emissive.setScalar(0); m.rotation.y = 0;
   });
   g.eye = g.shapes[formOf(g)].userData.eye;
-  if (g.forge) g.forge.visible = formOf(g) === 'person';
+  if (g.forge) g.forge.visible = formOf(g) === 'person' && Math.hypot(g.x - FORGE.x, g.z - FORGE.z) > 30;   // (at his own forge he has no need of the one he carries)
 }
 // what each one is made of, in the air where they stand: a column of it, moving the way that thing moves
 //   a, b, c: its dark, its light, and the colour of what flashes through it · rise: how fast it climbs (less than nothing
@@ -12466,7 +12466,7 @@ function updateGodDirector(dt) {
     if (TEMPLE.active && Math.hypot(TEMPLE.x - P.x, TEMPLE.z - P.z) < 1700) return false;
     const spot = findShelf(P.x + hx / hl * 850, P.z + hz / hl * 850, 0, 480);
     if (!spot) return false;
-    placeTemple(spot.x, spot.y, spot.z);
+    placeTemple(spot.x, spot.y, spot.z, false, { god: g.id });
     spawnGod(g, spot.x, spot.z - TEMPLE.hd * 0.45, true, true);
     g.coolUntil = 0; g.yaw = Math.PI; g.place = 'TEMPLE';
     if (!story.met.has(g.id)) g.greeted = false;
@@ -12832,6 +12832,40 @@ const waterfallMat = new THREE.ShaderMaterial({
 });
 const windmills = new Set(), waterfalls = new Set();
 const rotXZ = (dx, dz, r) => [dx * Math.cos(r) + dz * Math.sin(r), -dx * Math.sin(r) + dz * Math.cos(r)];
+// ── The white towns are the gods' as much as the mountain is, and nothing of theirs can be struck by a bird. Every house,
+//    chapel, mill and forge in them is laid up the way the rocks of the monasteries are: fly at one and it opens round
+//    the bird into a lattice of whitewashed chunks, lit blue from inside, and closes behind him. Each square of the world
+//    draws its town as one mesh of its own, in smaller chunks than the rock (a house is small), its long faces cut down so
+//    it comes apart in pieces and not in slivers. A man on foot finds every wall where it always was.
+let HOUSES = null;   // while a chunk is being built: where its town goes
+const townSolid = (...a) => { solid(...a); if (SOLIDS && HOUSES) SOLIDS[SOLIDS.length - 1].part = true; };
+function diceGeo(g, maxE) {   // every face longer than maxE along an edge, halved across that edge until it is not (or four times over); undersides left whole
+  const ks = Object.keys(g.attributes), at = ks.map(k => g.attributes[k]), Pa = g.attributes.position.array, Na = g.attributes.normal.array, m2 = maxE * maxE, n = g.attributes.position.count;
+  const po = at.slice(0, ks.indexOf('position')).reduce((a, b) => a + b.itemSize, 0), big = [], cutV = [];
+  const e2 = (i, j) => (Pa[i * 3] - Pa[j * 3]) ** 2 + (Pa[i * 3 + 1] - Pa[j * 3 + 1]) ** 2 + (Pa[i * 3 + 2] - Pa[j * 3 + 2]) ** 2;
+  for (let i = 0; i < n; i += 3) if (Na[i * 3 + 1] > -0.9 && Math.max(e2(i, i + 1), e2(i + 1, i + 2), e2(i + 2, i)) > m2) big.push(i);
+  if (!big.length) return g;
+  const vert = i => { const v = []; for (const a of at) for (let c = 0; c < a.itemSize; c++) v.push(a.array[i * a.itemSize + c]); return v; };
+  const d2 = (a, b) => (a[po] - b[po]) ** 2 + (a[po + 1] - b[po + 1]) ** 2 + (a[po + 2] - b[po + 2]) ** 2, mid = (a, b) => a.map((x, k) => (x + b[k]) / 2);
+  const cut = (a, b, c, k) => { const ab = d2(a, b), bc = d2(b, c), ca = d2(c, a), L = Math.max(ab, bc, ca);
+    if (L <= m2 || k > 3) { cutV.push(a, b, c); return; }
+    if (L === ab) { const q = mid(a, b); cut(a, q, c, k + 1); cut(q, b, c, k + 1); } else if (L === bc) { const q = mid(b, c); cut(a, b, q, k + 1); cut(a, q, c, k + 1); } else { const q = mid(c, a); cut(a, b, q, k + 1); cut(q, b, c, k + 1); } };
+  for (const i of big) cut(vert(i), vert(i + 1), vert(i + 2), 0);
+  // what was small enough is copied across in runs; what was cut follows it
+  const runs = []; let r0 = 0; for (const i of big) { if (i > r0) runs.push([r0, i]); r0 = i + 3; } if (r0 < n) runs.push([r0, n]);
+  const keepN = n - big.length * 3, ng = new THREE.BufferGeometry(); let off = 0;
+  at.forEach((a, j) => { const s = a.itemSize, arr = new Float32Array((keepN + cutV.length) * s); let o = 0;
+    for (const [b, e] of runs) { arr.set(a.array.subarray(b * s, e * s), o); o += (e - b) * s; }
+    for (const v of cutV) for (let c = 0; c < s; c++) arr[o++] = v[off + c];
+    off += s; ng.setAttribute(ks[j], new THREE.BufferAttribute(arr, s)); });
+  return ng;
+}
+function townMesh(group) {
+  const acc = HOUSES; HOUSES = null; if (!acc || !acc.pos.length) return;
+  ROCKS.matTown ||= rocksMat(true, 3.2, 0.3, 0.5);   // (a house opens about as wide as a bird, not a whole town at a time)
+  const g = shardCen(diceGeo(accToGeo(acc), 4)); g.computeBoundingSphere(); g.boundingSphere.radius += 70;   // (a chunk thrown out of a house is seen from where the house is not)
+  const m = new THREE.Mesh(g, ROCKS.matTown); m.castShadow = m.receiveShadow = true; group.add(m); group.userData.town = m;
+}
 
 // The Cyclades, done properly. A house is a whitewashed cube with a lip of cornice and a parapet round its flat roof,
 // a blue door under a round arch, windows with blue shutters folded open, often a stair up the outside to the roof
@@ -12847,36 +12881,52 @@ function cyBuilder(acc, x, y, z, ry) {
   const B = (w, h, d, dx, dy, dz, c, rx = 0, rz = 0) => { const [px, py, pz] = P(dx, dy, dz); box(acc, w, h, d, px, py, pz, c, rx, ry, rz); };
   const A = (rw, rh, len, dx, dy, dz, c, turn = 0) => { const [px, py, pz] = P(dx, dy, dz); _mat.compose(_p.set(px, py, pz), _q.setFromEuler(_e.set(0, ry + turn, 0)), _s.set(rw, rh, len)); addGeo(acc, G.archTop, _mat, c); };
   const O = (sx, sy, sz, dx, dy, dz, c) => { const [px, py, pz] = P(dx, dy, dz); blob(acc, sx, sy, sz, px, py, pz, c); };
-  return { P, B, A, O };
+  const Q = (sx, sy, sz, dx, dy, dz, c) => { const [px, py, pz] = P(dx, dy, dz); _mat.compose(_p.set(px, py, pz), _q.identity(), _s.set(sx, sy, sz)); addGeo(acc, G.ico0, _mat, c); };   // (the same, in twenty faces: for what there are many of)
+  return { P, B, A, O, Q };
 }
+// (whites that are not all one white, so a town reads as many houses through the letters; and the painted wood, mostly blue)
+const WASH = [[1.0, 0.99, 0.96], [0.97, 0.97, 0.99], [1.0, 0.97, 0.9], [0.95, 0.96, 0.98]], TRIMS = [BLUE, BLUE, BLUE, col('#1d8fb4'), col('#2f7d4f'), col('#a8352b'), col('#3f55c4')];
+const PAVE = col('#8f969c'), GERAN = [col('#e8243c'), col('#ff5a6a'), col('#f2f2f2')];
 function house(acc, rng, x, y, z, big = 1, dome = 0.2) {
+  acc = HOUSES || acc;
   const w = (4.5 + rng() * 4) * big, d = (4.5 + rng() * 4) * big, h = (3.2 + rng() * 2.2) * big, ry = Math.floor(rng() * 4) * Math.PI / 2 + (rng() - 0.5) * 0.3;
-  const { B, A, O, P } = cyBuilder(acc, x, y, z, ry);
-  // the cube, a cornice lip under the roof, and the parapet round it
-  B(w, h + 2, d, 0, h / 2 - 1, 0, WHITE);
-  B(w + 0.22, 0.2, d + 0.22, 0, h - 0.12, 0, WHITE);
-  for (const sd of [-1, 1]) { B(w + 0.2, 0.5, 0.26, 0, h + 0.25, sd * (d / 2), WHITE); B(0.26, 0.5, d + 0.2, sd * (w / 2), h + 0.25, 0, WHITE); }
-  // the door: blue, under a round arch, with a white step
+  const { B, A, Q: O, P } = cyBuilder(acc, x, y, z, ry), W = WASH[Math.floor(rng() * WASH.length)], T = TRIMS[Math.floor(rng() * TRIMS.length)];
+  const Wsh = [W[0] * 0.9, W[1] * 0.9, W[2] * 0.92];   // (the lime at the foot and under the eaves, a shade down)
+  // the yard before the door: grey slabs, their joints picked out in whitewash
+  B(w + 2.2, 0.16, 2.6, 0, 0.03, d / 2 + 1.25, PAVE);
+  for (let k = -2; k <= 2; k++) B(0.1, 0.18, 2.6, k * (w + 2.2) / 5, 0.04, d / 2 + 1.25, W);
+  B(w + 2.2, 0.18, 0.1, 0, 0.04, d / 2 + 1.25, W);
+  // the cube, a skirt of lime at its foot, a cornice lip under the roof, and the parapet round it with its corners rounded off
+  B(w, h + 2, d, 0, h / 2 - 1, 0, W);
+  B(w + 0.14, 0.5, d + 0.14, 0, 0.25, 0, Wsh);
+  B(w + 0.22, 0.2, d + 0.22, 0, h - 0.12, 0, W);
+  for (const sd of [-1, 1]) { B(w + 0.2, 0.5, 0.26, 0, h + 0.25, sd * (d / 2), W); B(0.26, 0.5, d + 0.2, sd * (w / 2), h + 0.25, 0, W); }
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) O(0.24, 0.32, 0.24, sx * w / 2, h + 0.5, sz * d / 2, W);
+  // the door: painted, under a round arch, a lime frame round it, a white step, and a lamp beside it
   const dx0 = (rng() - 0.5) * w * 0.4;
-  B(1.1, 1.95, 0.14, dx0, 0.98, d / 2 + 0.05, BLUE); A(0.55, 0.5, 0.14, dx0, 1.95, d / 2 + 0.05, BLUE);
-  B(1.6, 0.18, 0.6, dx0, 0.09, d / 2 + 0.3, WHITE);
-  // windows: a dark opening, a blue shutter folded back either side
-  for (const sd of [-1, 1]) if (rng() < 0.85) {
-    const wz = (rng() - 0.5) * d * 0.4, wy = h * 0.58;
-    B(0.1, 0.95, 0.75, sd * (w / 2 + 0.03), wy, wz, DARKIN);
-    for (const k of [-1, 1]) B(0.08, 0.95, 0.4, sd * (w / 2 + 0.18), wy, wz + k * 0.6, BLUE, 0, 0);
-  }
-  if (rng() < 0.7) { const wx = (rng() - 0.5) * w * 0.4; B(0.75, 0.9, 0.1, wx, h * 0.58, -d / 2 - 0.03, DARKIN); for (const k of [-1, 1]) B(0.4, 0.9, 0.08, wx + k * 0.6, h * 0.58, -d / 2 - 0.15, BLUE); }
-  // a stair up the outside to the roof, with its low wall
-  if (rng() < 0.55) {
+  B(1.5, 2.25, 0.08, dx0, 1.12, d / 2 + 0.02, Wsh); A(0.75, 0.62, 0.08, dx0, 2.2, d / 2 + 0.02, Wsh);
+  B(1.1, 1.95, 0.14, dx0, 0.98, d / 2 + 0.06, T); A(0.55, 0.5, 0.14, dx0, 1.95, d / 2 + 0.06, T);
+  B(0.06, 1.7, 0.16, dx0, 0.95, d / 2 + 0.08, DARKIN);   // (where the two leaves meet)
+  B(1.6, 0.18, 0.6, dx0, 0.09, d / 2 + 0.3, W);
+  B(0.22, 0.34, 0.22, dx0 + 1.05, 2.15, d / 2 + 0.15, DARKIN); O(0.08, 0.1, 0.08, dx0 + 1.05, 2.15, d / 2 + 0.27, FLAME);
+  // windows: a dark opening, a white sill, shutters folded back either side
+  const win = (sd, wz, wy, side) => {
+    if (side) { B(0.1, 0.95, 0.75, sd * (w / 2 + 0.03), wy, wz, DARKIN); B(0.24, 0.1, 1.0, sd * (w / 2 + 0.06), wy - 0.55, wz, W); for (const k of [-1, 1]) B(0.08, 0.95, 0.4, sd * (w / 2 + 0.18), wy, wz + k * 0.6, T); }
+    else { B(0.75, 0.9, 0.1, wz, wy, sd * (d / 2 + 0.03), DARKIN); B(1.0, 0.1, 0.24, wz, wy - 0.52, sd * (d / 2 + 0.06), W); for (const k of [-1, 1]) B(0.4, 0.9, 0.08, wz + k * 0.6, wy, sd * (d / 2 + 0.15), T); } };
+  for (const sd of [-1, 1]) if (rng() < 0.85) win(sd, (rng() - 0.5) * d * 0.4, h * 0.58, true);
+  if (rng() < 0.7) win(-1, (rng() - 0.5) * w * 0.4, h * 0.58, false);
+  if (w > 5.5 && rng() < 0.7) win(1, dx0 + (dx0 > 0 ? -1 : 1) * Math.min(w * 0.3, 2.2), h * 0.6, false);
+  // a stair up the outside to the roof, its low wall capped, a painted rail at the top
+  if (rng() < 0.6) {
     const sd = rng() < 0.5 ? -1 : 1, n = Math.max(4, Math.round(h / 0.36)), run = Math.min(d - 0.6, n * 0.42), step = run / n;
-    for (let k = 0; k < n; k++) { const sh = (k + 1) * (h / n); B(0.95, sh, step + 0.02, sd * (w / 2 + 0.5), sh / 2, -d / 2 + 0.3 + (k + 0.5) * step, WHITE); }
-    B(0.16, h + 0.6, run, sd * (w / 2 + 0.98), (h + 0.6) / 2 - 0.2, -d / 2 + 0.3 + run / 2, WHITE);
+    for (let k = 0; k < n; k++) { const sh = (k + 1) * (h / n); B(0.95, sh, step + 0.02, sd * (w / 2 + 0.5), sh / 2, -d / 2 + 0.3 + (k + 0.5) * step, k % 2 ? W : Wsh); }
+    B(0.16, h + 0.6, run, sd * (w / 2 + 0.98), (h + 0.6) / 2 - 0.2, -d / 2 + 0.3 + run / 2, W);
+    B(0.06, 0.06, run * 0.5, sd * (w / 2 + 0.98), h + 0.75, -d / 2 + 0.3 + run * 0.75, T);
   }
-  // the chimney, a little white house of its own
-  if (rng() < 0.6) { const cx = (rng() - 0.5) * w * 0.6, cz = (rng() - 0.5) * d * 0.6; B(0.55, 1.1, 0.55, cx, h + 0.55, cz, WHITE); B(0.85, 0.12, 0.85, cx, h + 1.15, cz, WHITE); B(0.4, 0.3, 0.4, cx, h + 1.33, cz, WHITE); }
-  // pots by the door
-  for (const k of [-1, 1]) if (rng() < 0.6) { B(0.42, 0.45, 0.42, dx0 + k * 1.15, 0.23, d / 2 + 0.45, TERRA); O(0.35, 0.4, 0.35, dx0 + k * 1.15, 0.65, d / 2 + 0.45, POTLEAF); }
+  // the chimney, a little white house of its own, pierced like a dovecote
+  if (rng() < 0.6) { const cx = (rng() - 0.5) * w * 0.6, cz = (rng() - 0.5) * d * 0.6; B(0.55, 1.1, 0.55, cx, h + 0.55, cz, W); B(0.85, 0.12, 0.85, cx, h + 1.15, cz, W); B(0.4, 0.3, 0.4, cx, h + 1.33, cz, W); B(0.57, 0.18, 0.18, cx, h + 0.75, cz, DARKIN); }
+  // pots by the door, whitewashed or terracotta, red with geraniums
+  for (const k of [-1, 1]) if (rng() < 0.75) { const pc = rng() < 0.5 ? TERRA : W; B(0.42, 0.45, 0.42, dx0 + k * 1.15, 0.23, d / 2 + 0.45, pc); O(0.35, 0.36, 0.35, dx0 + k * 1.15, 0.62, d / 2 + 0.45, POTLEAF); for (let f = 0; f < 3; f++) O(0.1, 0.1, 0.1, dx0 + k * 1.15 + (rng() - 0.5) * 0.4, 0.86, d / 2 + 0.45 + (rng() - 0.5) * 0.4, GERAN[Math.floor(rng() * 3)]); }
   // a pergola, and the bougainvillea over it
   if (rng() < 0.4) {
     const pz = d / 2 + 1.5, pw = w * 0.8;
@@ -12885,21 +12935,35 @@ function house(acc, rng, x, y, z, big = 1, dome = 0.2) {
     for (let k = 0; k < 4; k++) B(0.12, 0.12, 1.6, -pw / 2 + 0.2 + k * (pw - 0.4) / 3, 2.78, d / 2 + 0.75, BEAM);
     for (let k = 0; k < 9; k++) O(0.55 + rng() * 0.5, 0.4 + rng() * 0.3, 0.55 + rng() * 0.5, (rng() - 0.5) * pw, 2.85 + rng() * 0.3, d / 2 + 0.2 + rng() * 1.4, BOUG[Math.floor(rng() * BOUG.length)]);
     for (let k = 0; k < 4; k++) O(0.35, 0.7, 0.35, (rng() < 0.5 ? -1 : 1) * (pw / 2 - 0.1), 1.9 + rng() * 0.6, pz + (rng() - 0.5) * 0.3, BOUG[Math.floor(rng() * BOUG.length)]);
+  } else if (rng() < 0.55) {   // or it comes over the parapet at a corner and pours down the white wall
+    const sd = rng() < 0.5 ? -1 : 1, cx = sd * (w / 2 - 0.2);
+    for (let k = 0; k < 7; k++) { const t = k / 6; O(0.75 - t * 0.35, 0.55, 0.45, cx - sd * (rng() * 0.8), h + 0.45 - t * h * 0.75, d / 2 + 0.22, BOUG[Math.floor(rng() * BOUG.length)]); }
+    O(0.25, h * 0.4, 0.2, cx, h * 0.45, d / 2 + 0.16, BEAM);
   }
-  solid(x, z, Math.max(w, d) * 0.56, y - 2, y + h + 0.5, 'a house'); CLEAR?.push({ x, z, r: Math.max(w, d) * 0.75 + 4.5 });
-  // a second storey, set back, sometimes crowned with a blue dome
-  if (rng() < 0.45) {
-    const w2 = w * (0.45 + rng() * 0.25), d2 = d * (0.45 + rng() * 0.25), h2 = 2.6 * big, ox = (rng() - 0.5) * (w - w2), oz = (rng() - 0.5) * (d - d2);
-    B(w2, h2, d2, ox, h + h2 / 2, oz, WHITE);
-    B(w2 + 0.4, 0.22, d2 + 0.4, ox, h + h2 - 0.1, oz, WHITE);
-    B(0.8, 1.6, 0.1, ox, h + 0.85, oz + d2 / 2 + 0.03, BLUE); A(0.4, 0.38, 0.1, ox, h + 1.65, oz + d2 / 2 + 0.03, BLUE);
-    if (rng() < dome * 2) { const r = Math.min(w2, d2) * 0.42, [px, py, pz] = P(ox, h + h2 + 0.1, oz); _mat.compose(_p.set(px, py, pz), _q.identity(), _s.set(r, r * 1.1, r)); addGeo(acc, G.dome, _mat, DOMEBLUE); }
-  } else if (rng() < dome) {
-    const r = Math.min(w, d) * 0.36; _mat.compose(_p.set(x, y + h + 0.15, z), _q.identity(), _s.set(r, r * 1.1, r)); addGeo(acc, G.dome, _mat, DOMEBLUE);
+  townSolid(x, z, Math.max(w, d) * 0.56, y - 2, y + h + 0.5, 'a house'); CLEAR?.push({ x, z, r: Math.max(w, d) * 0.75 + 4.5 });
+  // a second storey set back on the roof, often; sometimes a third, smaller still; a blue dome on the top one, now and then
+  let top = { w, d, h, ox: 0, oz: 0 };
+  for (let lv = 0; lv < 2; lv++) {
+    if (rng() > (lv ? 0.35 : 0.62)) break;
+    const w2 = top.w * (0.45 + rng() * 0.25), d2 = top.d * (0.45 + rng() * 0.25), h2 = 2.6 * big, ox = top.ox + (rng() - 0.5) * (top.w - w2), oz = top.oz + (rng() - 0.5) * (top.d - d2), y2 = top.h;
+    B(w2, h2, d2, ox, y2 + h2 / 2, oz, W);
+    B(w2 + 0.4, 0.22, d2 + 0.4, ox, y2 + h2 - 0.1, oz, W);
+    for (const sd of [-1, 1]) { B(w2 + 0.2, 0.42, 0.2, ox, y2 + h2 + 0.2, oz + sd * d2 / 2, W); B(0.2, 0.42, d2 + 0.2, ox + sd * w2 / 2, y2 + h2 + 0.2, oz, W); }
+    B(0.8, 1.6, 0.1, ox, y2 + 0.85, oz + d2 / 2 + 0.03, T); A(0.4, 0.38, 0.1, ox, y2 + 1.65, oz + d2 / 2 + 0.03, T);
+    if (rng() < 0.5) { B(0.6, 0.7, 0.1, ox + w2 * 0.28, y2 + 1.4, oz + d2 / 2 + 0.03, DARKIN); B(0.06, 0.55, 0.9, ox - w2 / 2 - 0.4, y2 + 0.4, oz, T); B(0.8, 0.06, 0.9, ox - w2 / 2 - 0.4, y2 + 0.7, oz, T); }   // (a window, and a painted rail round the terrace)
+    top = { w: w2, d: d2, h: y2 + h2, ox, oz };
+  }
+  if (top.h > h && rng() < dome * 2.2 || rng() < dome * 0.6) {   // the dome: blue, on a white drum, a lantern and a little cross
+    const r = Math.min(top.w, top.d) * 0.4, [px, py, pz] = P(top.ox, top.h + 0.1, top.oz);
+    _mat.compose(_p.set(px, py, pz), _q.identity(), _s.set(r * 1.04, 0.7, r * 1.04)); addGeo(acc, G.islandTop, _mat, W);
+    _mat.compose(_p.set(px, py + 0.35, pz), _q.identity(), _s.set(r, r * 1.1, r)); addGeo(acc, G.dome, _mat, DOMEBLUE);
+    _mat.compose(_p.set(px, py + 0.35 + r * 1.1, pz), _q.identity(), _s.set(0.28, 0.5, 0.28)); addGeo(acc, G.islandTop, _mat, W);
+    B(0.08, 0.7, 0.08, top.ox, top.h + 0.95 + r * 1.1, top.oz, W); B(0.36, 0.08, 0.08, top.ox, top.h + 1.05 + r * 1.1, top.oz, W);
   }
 }
 // A chapel you can walk into. Its door faces +z (turned by ry).
 function chapel(acc, rng, x, y, z, ry, grand = false) {
+  acc = HOUSES || acc;
   const w = grand ? 9.5 : 7, d = grand ? 15 : 10.5, h = grand ? 6.2 : 5, t = 0.45, dw = grand ? 2.4 : 1.9, dh = grand ? 3.3 : 2.7;
   const { B, A, O, P } = cyBuilder(acc, x, y, z, ry);
   // a white plinth it stands on, the floor, a step to the door
@@ -12944,10 +13008,10 @@ function chapel(acc, rng, x, y, z, ry, grand = false) {
   }
   for (let r = 0; r < (grand ? 4 : 3); r++) for (const k of [-1, 1]) B(w * 0.3, 0.45, 0.42, k * (w * 0.22), 0.45, -d / 2 + t + 3.6 + r * 1.6, BEAM);
   // walls you cannot walk through, a doorway you can; and the room, so the camera knows to stay inside it
-  const seg = (ax, az, bx, bz) => { const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(L / 0.7)); for (let i = 0; i <= n; i++) { const [px, , pz] = P(lerp(ax, bx, i / n), 0, lerp(az, bz, i / n)); solid(px, pz, 0.42, y - 1, y + h + 2.5, 'a chapel wall'); } };
+  const seg = (ax, az, bx, bz) => { const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(L / 0.7)); for (let i = 0; i <= n; i++) { const [px, , pz] = P(lerp(ax, bx, i / n), 0, lerp(az, bz, i / n)); townSolid(px, pz, 0.42, y - 1, y + h + 2.5, 'a chapel wall'); } };
   seg(-w / 2 + t / 2, -d / 2, -w / 2 + t / 2, d / 2); seg(w / 2 - t / 2, -d / 2, w / 2 - t / 2, d / 2); seg(-w / 2, -d / 2 + t / 2, w / 2, -d / 2 + t / 2);
   seg(-w / 2, d / 2 - t / 2, -dw / 2 - 0.35, d / 2 - t / 2); seg(dw / 2 + 0.35, d / 2 - t / 2, w / 2, d / 2 - t / 2);
-  solid(x, z, Math.max(w, d) * 0.62, y + h - 0.1, y + h + 4.5, 'a chapel roof');
+  townSolid(x, z, Math.max(w, d) * 0.62, y + h - 0.1, y + h + 4.5, 'a chapel roof');
   CLEAR?.push({ x, z, r: Math.max(w, d) * 0.62 + 8 });
   ROOMS?.push({ x, y, z, ry, hw: w / 2 - t - 0.25, hd: d / 2 - t - 0.25, h: h - 0.3, name: grand ? 'the church' : 'a chapel' });
 }
@@ -12961,16 +13025,163 @@ function roomAt(x, y, z) {
   return null;
 }
 function windmill(acc, group, rng, x, y, z) {
+  acc = HOUSES || acc;
   const ry = rng() * 6.28;
   _mat.compose(_p.set(x, y - 1, z), _q.identity(), _s.set(3.2, 1, 3.2)); addGeo(acc, G.millBody, _mat, WHITE);
   _mat.compose(_p.set(x, y + 9, z), _q.identity(), _s.set(3.8, 3.2, 3.8)); addGeo(acc, G.millRoof, _mat, THATCH);
-  solid(x, z, 3.4, y - 1, y + 12, 'a windmill');
+  townSolid(x, z, 3.4, y - 1, y + 12, 'a windmill');
   const [dx, dz] = rotXZ(0, -3.4, ry);
   box(acc, 1.2, 2.2, 0.2, x + dx * 0.98, y + 1, z + dz * 0.98, BLUE, 0, ry, 0);
   const sails = new THREE.Mesh(sailGeo, decoMat);
   sails.position.set(x + dx * 1.15, y + 9.6, z + dz * 1.15); sails.rotation.order = 'YXZ'; sails.rotation.y = ry;
   sails.userData.phase = rng() * 6.28; sails.castShadow = true;
   group.add(sails); windmills.add(sails); group.userData.sails.push(sails);
+}
+// ── What a Greek column is: a shaft that swells a little a third of the way up and draws in toward the top (entasis),
+//    cut with flutes that catch the light and the shade in turn; an echinus, a cushion that flares out under the square
+//    abacus; and the pediment, a low triangle of stone. (One metre tall and one across at the foot; scaled where used.)
+G.colF = (() => {
+  const N = 24, R = 3, P = [], rad = (i, t) => (1 - 0.2 * t + 0.05 * Math.sin(Math.PI * t * 0.9)) * (i % 2 ? 0.92 : 1);
+  const at = (i, j) => { const t = j / R, a = i / N * Math.PI * 2, r = rad(i, t); return [Math.cos(a) * r, t, Math.sin(a) * r]; };
+  for (let j = 0; j < R; j++) for (let i = 0; i < N; i++) { const a = at(i, j), b = at(i + 1, j), c = at(i + 1, j + 1), d = at(i, j + 1); P.push(...a, ...d, ...c, ...a, ...c, ...b); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.computeVertexNormals(); return g;
+})();
+G.echinus = new THREE.CylinderGeometry(1, 0.72, 1, 16, 1, true).translate(0, 0.5, 0).toNonIndexed();   // (open: the abacus lies on it, the shaft goes into it)
+G.colBase = new THREE.CylinderGeometry(1, 1.1, 1, 14, 1, true).toNonIndexed();
+G.volute = new THREE.CylinderGeometry(1, 1, 1, 10).rotateX(Math.PI / 2).toNonIndexed();   // (an Ionic capital's scroll, seen end on)
+G.gable = (() => {   // a triangle one wide and one high, one deep
+  const a = [-0.5, 0, 0.5], b = [0.5, 0, 0.5], c = [0, 1, 0.5], A = [-0.5, 0, -0.5], Bq = [0.5, 0, -0.5], C = [0, 1, -0.5];
+  const P = [...a, ...b, ...c, ...Bq, ...A, ...C, ...b, ...Bq, ...C, ...b, ...C, ...c, ...A, ...a, ...c, ...A, ...c, ...C, ...a, ...A, ...Bq, ...a, ...Bq, ...b];
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.computeVertexNormals(); return g;
+})();
+// ── Hephaestus's forge, on Hermes's island: a temple that is a smithy. A peristyle of dark stone, its columns fluted, its
+//    capitals and its rims of bronze, on three steps of basalt; a roof tiled in old bronze, green at the seams, a pediment
+//    of the god at his anvil with his helpers. Inside, under the roof: the great hearth with its coals alight and its
+//    hood, a chimney going up through the ridge with smoke and sparks out of the top of it; bellows either side; a
+//    crucible hung on chains; anvils, one with the work still glowing on it; his self-moving tripods on their wheels, and
+//    the golden maidens he made to help him, at the door. Molten bronze runs out of the hearth in two channels down the
+//    floor and down the steps into a basin. He stands in the middle of it, in front of the fire.
+const BASALT = col('#3a3532'), BASALT2 = col('#55504b'), SLATE = col('#2a2522'), BRZ = col('#c08a3e'), BRZD = col('#7a5226'), VERD = col('#4c7f6c'), IRON = col('#44474d');
+const GOLDB = [1.3, 1.0, 0.45], LEATHER = col('#6a3e22');
+const MOLTEN = [[3.2, 1.35, 0.3], [2.6, 0.85, 0.16], [3.4, 1.9, 0.6]], COALS = [[2.4, 0.55, 0.12], [3.0, 1.1, 0.25], [1.1, 0.2, 0.05], [3.3, 1.7, 0.5]];
+const SMITHY = { group: null, fires: [], lava: [], chim: null, hearth: null, sm: 0, sp: 0, T: null };
+function smithy(acc, group, x, y, z, ry) {
+  acc = HOUSES || acc; SMITHY.fires = []; SMITHY.lava = [];
+  const { B, Q: O, P } = cyBuilder(acc, x, y, z, ry), r = mulberry32(9001), cr = Math.cos(ry), sr = Math.sin(ry);
+  const U = (geo, sx, sy, sz, dx, dy, dz, rgb, turn = 0, rx = 0) => { const [px, py, pz] = P(dx, dy, dz); _mat.compose(_p.set(px, py, pz), _q.setFromEuler(_e.set(rx, ry + turn, 0)), _s.set(sx, sy, sz)); addGeo(acc, geo, _mat, rgb); };
+  const W = 15, D = 21, z0 = -4, SW = W + 5, SD = D + 5, FL = 1.2, CH = 8.2, zf = z0 + SD / 2, zb = z0 - SD / 2, zh = z0 - D / 2 + 3.4;
+  const world = (dx, dy, dz) => { const [px, py, pz] = P(dx, dy, dz); return { x: px, y: py, z: pz }; };
+  // three steps of basalt, each with a bronze nosing on its edge, and the footing under them
+  B(SW + 4, 2.4, SD + 4, 0, -1.1, z0, BASALT);
+  for (let k = 0; k < 3; k++) { const e = (2 - k) * 2, w = SW + e, d = SD + e; B(w, 0.4, d, 0, 0.2 + k * 0.4, z0, k % 2 ? BASALT2 : BASALT); B(w + 0.06, 0.07, 0.1, 0, 0.37 + k * 0.4, z0 + d / 2, BRZ); }
+  B(SW - 0.3, 0.06, SD - 0.3, 0, FL + 0.03, z0, SLATE);
+  for (let k = -3; k <= 3; k++) B(0.06, 0.07, SD - 0.6, k * 2.6, FL + 0.04, z0, BASALT2);   // (the floor in great slabs)
+  // the columns: a bronze foot, a dark fluted shaft, a bronze echinus and abacus
+  const cols = [], cx = SW / 2 - 1.1, czf = zf - 1.1, czb = zb + 1.1;
+  for (let i = 0; i < 6; i++) { const lx = -cx + i * cx * 2 / 5; cols.push([lx, czf], [lx, czb]); }
+  for (let i = 1; i < 7; i++) { const lz = czb + i * (czf - czb) / 7; cols.push([-cx, lz], [cx, lz]); }
+  for (const [lx, lz] of cols) {
+    U(G.colBase, 1.0, 0.3, 1.0, lx, FL + 0.15, lz, BRZD); U(G.colBase, 0.86, 0.22, 0.86, lx, FL + 0.4, lz, BRZ);
+    U(G.colF, 0.74, CH - 1.3, 0.74, lx, FL + 0.5, lz, BASALT2);
+    U(G.echinus, 0.95, 0.45, 0.95, lx, FL + CH - 0.8, lz, BRZ); B(2.1, 0.32, 2.1, lx, FL + CH - 0.19, lz, BRZD);
+    const [wx, , wz] = P(lx, 0, lz); townSolid(wx, wz, 0.85, y, y + FL + CH + 1, 'a column of the forge');
+  }
+  // the entablature: architrave, a frieze of bronze triglyphs and metopes with the tools of his trade, the cornice
+  const ey = FL + CH;
+  for (const sd of [-1, 1]) {
+    B(SW - 0.4, 0.9, 1.5, 0, ey + 0.45, sd > 0 ? czf : czb, BASALT); B(1.5, 0.9, SD - 0.4, sd * cx, ey + 0.45, z0, BASALT);
+    B(SW - 0.3, 0.95, 1.4, 0, ey + 1.38, sd > 0 ? czf : czb, BASALT2); B(1.4, 0.95, SD - 0.3, sd * cx, ey + 1.38, z0, BASALT2);
+    B(SW + 0.9, 0.34, 2.1, 0, ey + 2.02, sd > 0 ? czf : czb, BRZD); B(2.1, 0.34, SD + 0.9, sd * cx, ey + 2.02, z0, BRZD);
+    for (let i = 0; i <= 10; i++) { const lx = -cx + i * cx / 5, fz = (sd > 0 ? czf : czb) + sd * 0.72; B(0.5, 0.85, 0.08, lx, ey + 1.38, fz, BRZ); for (const k of [-0.13, 0.13]) B(0.05, 0.8, 0.1, lx + k, ey + 1.38, fz, BRZD);
+      if (i < 10) { const mx = lx + cx / 10; if (i % 2) { B(0.12, 0.5, 0.06, mx, ey + 1.32, fz, BRZ); B(0.42, 0.18, 0.07, mx, ey + 1.6, fz, BRZ); } else { B(0.5, 0.16, 0.06, mx, ey + 1.18, fz, BRZ); B(0.24, 0.2, 0.07, mx, ey + 1.34, fz, BRZ); B(0.08, 0.36, 0.07, mx - 0.18, ey + 1.5, fz, BRZ); } } }   // (hammer; anvil and tongs)
+    for (let i = 0; i <= 13; i++) { const lz = czb + i * (czf - czb) / 13; B(0.08, 0.85, 0.5, sd * (cx + 0.72), ey + 1.38, lz, BRZ); }
+  }
+  // the pediments, front and back: the god at his anvil, a helper at the bellows, one bringing the metal, reclining figures in the corners
+  const rise = 2.7, py = ey + 2.2;
+  for (const sd of [-1, 1]) { const fz = sd > 0 ? czf : czb;
+    U(G.gable, SW + 0.4, rise, 1.6, 0, py, fz, BASALT); U(G.gable, SW - 1.6, rise - 0.6, 0.2, 0, py + 0.12, fz + sd * 0.72, SLATE);
+    for (const e of [-1, 1]) B(SW / 2 / Math.cos(0.264) + 0.5, 0.3, 2.0, e * SW / 4, py + rise / 2 + 0.12, fz, BRZD, 0, -e * 0.264);
+    const fig = (lx, h, lean = 0, c = BRZ) => { const yb = py + 0.3, zz = fz + sd * 0.86; B(0.42, h * 0.55, 0.16, lx, yb + h * 0.28, zz, c, 0, lean); O(0.17, 0.2, 0.1, lx + lean * -h * 0.5, yb + h * 0.64, zz, c); };
+    fig(0, 2.0); B(0.6, 0.12, 0.14, 0.55, py + 1.75, fz + sd * 0.86, BRZ, 0, 0.6);   // the god, his hammer raised
+    B(0.9, 0.3, 0.16, 0.9, py + 0.5, fz + sd * 0.86, BRZ); B(0.4, 0.22, 0.16, 0.9, py + 0.75, fz + sd * 0.86, BRZ);   // the anvil
+    fig(-1.7, 1.6, 0.15); fig(2.3, 1.45, -0.2); fig(-3.6, 1.15, 0.35); fig(4.2, 1.0, -0.3);
+    for (const e of [-1, 1]) { B(1.6, 0.34, 0.16, e * 6.3, py + 0.42, fz + sd * 0.86, BRZ, 0, e * 0.12); O(0.16, 0.18, 0.1, e * 7.0, py + 0.66, fz + sd * 0.86, BRZ); }
+    O(0.55, 0.85, 0.2, 0, py + rise + 0.75, fz, GOLDB); for (const e of [-1, 1]) O(0.4, 0.5, 0.18, e * (SW / 2 + 0.2), py + 0.45, fz, GOLDB);   // akroteria: palmettes in gilt bronze
+  }
+  // the roof, in two slopes of old bronze tiles with their ribs, the ridge capped
+  for (const e of [-1, 1]) { B(SW / 2 / Math.cos(0.264) + 0.7, 0.28, SD + 0.6, e * SW / 4, py + rise / 2 + 0.38, z0, VERD, 0, -e * 0.264);
+    for (let i = 0; i <= 14; i++) B(SW / 2 / Math.cos(0.264) + 0.7, 0.14, 0.16, e * SW / 4, py + rise / 2 + 0.56, zb + 0.3 + i * (SD - 0.6) / 14, BRZD, 0, -e * 0.264); }
+  B(0.5, 0.4, SD + 0.8, 0, py + rise + 0.25, z0, BRZD);
+  // the back wall, and half of each side: the forge's own room. A great bronze wheel on the back wall, its teeth round it
+  B(W, CH, 0.8, 0, FL + CH / 2, z0 - D / 2 + 0.4, BASALT);
+  for (const sd of [-1, 1]) B(0.8, CH, D * 0.45, sd * (W / 2 - 0.4), FL + CH / 2, z0 - D / 2 + D * 0.225, BASALT);
+  U(G.disc, 2.3, 0.18, 2.3, 0, FL + 6.0, z0 - D / 2 + 0.9, BRZ, 0, Math.PI / 2); U(G.disc, 1.4, 0.24, 1.4, 0, FL + 6.0, z0 - D / 2 + 0.95, BRZD, 0, Math.PI / 2); U(G.disc, 0.5, 0.3, 0.5, 0, FL + 6.0, z0 - D / 2 + 1.0, GOLDB, 0, Math.PI / 2);
+  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; B(0.4, 0.4, 0.2, Math.cos(a) * 2.45, FL + 6.0 + Math.sin(a) * 2.45, z0 - D / 2 + 0.9, BRZ); }
+  // tools on the side walls: hammers and tongs hung in rows
+  for (const sd of [-1, 1]) for (let i = 0; i < 5; i++) { const lz = z0 - D / 2 + 1.6 + i * 1.6, lx = sd * (W / 2 - 0.85); B(0.08, 1.1, 0.08, lx, FL + 3.4, lz, BEAM); B(0.12, 0.26, i % 2 ? 0.5 : 0.36, lx, FL + 2.9, lz, IRON); if (i % 2) B(0.06, 1.0, 0.06, lx, FL + 3.4, lz + 0.35, IRON); }
+  { const seg = (ax, az, bx, bz) => { const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(L / 0.8)); for (let i = 0; i <= n; i++) { const [px, , pz] = P(lerp(ax, bx, i / n), 0, lerp(az, bz, i / n)); townSolid(px, pz, 0.5, y, y + FL + CH, 'a wall of the forge'); } };
+    seg(-W / 2, z0 - D / 2 + 0.4, W / 2, z0 - D / 2 + 0.4); for (const sd of [-1, 1]) seg(sd * (W / 2 - 0.4), z0 - D / 2, sd * (W / 2 - 0.4), z0 - D / 2 + D * 0.45); }
+  // the hearth: a block of stone banded in bronze, its bed of coals, the hood over it and the chimney up through the ridge
+  B(6.4, 1.4, 3.6, 0, FL + 0.7, zh, BASALT2); B(6.6, 0.16, 3.8, 0, FL + 1.3, zh, BRZ); B(5.4, 0.12, 2.6, 0, FL + 1.4, zh, COALS[2]);
+  for (let i = 0; i < 46; i++) O(0.2 + r() * 0.28, 0.12 + r() * 0.12, 0.2 + r() * 0.28, (r() - 0.5) * 5, FL + 1.48 + r() * 0.12, zh + (r() - 0.5) * 2.3, COALS[Math.floor(r() * 4)]);
+  for (let i = 0; i < 9; i++) { const lx = (r() - 0.5) * 3.6, lz = zh + (r() - 0.5) * 1.4; O(0.14, 0.4 + r() * 0.4, 0.14, lx, FL + 1.9, lz, FLAME); SMITHY.fires.push(world(lx, FL + 1.8, lz)); }
+  B(0.9, 0.5, 0.18, 0, FL + 0.7, zh + 1.84, COALS[1]);   // (the mouth of the firebox, glowing)
+  for (const sd of [-1, 1]) B(0.45, 3.0, 0.45, sd * 3.0, FL + 2.9, zh + 1.5, BRZD);
+  for (let k = 0; k < 4; k++) { const t = k / 4; B(lerp(6.8, 2.6, t), 0.75, lerp(4.0, 2.4, t), 0, FL + 4.4 + k * 0.75, zh, k % 2 ? BRZ : BRZD); }
+  B(2.3, 11, 2.3, 0, FL + 12.0, zh, BASALT); B(3.0, 0.45, 3.0, 0, FL + 17.6, zh, BRZ); B(2.6, 0.6, 2.6, 0, FL + 18.1, zh, BASALT2);
+  SMITHY.chim = world(0, FL + 18.5, zh); SMITHY.hearth = world(0, FL + 1.6, zh);
+  { const [hx, , hz] = P(-1.6, 0, zh), [kx, , kz] = P(1.6, 0, zh); townSolid(hx, hz, 2.0, y, y + FL + 19, 'the hearth of the forge'); townSolid(kx, kz, 2.0, y, y + FL + 19, 'the hearth of the forge'); }
+  // the bellows, either side, their noses in the fire
+  for (const sd of [-1, 1]) { const lx = sd * 4.5;
+    B(1.4, 0.12, 2.4, lx, FL + 0.8, zh + 0.6, BEAM); B(1.4, 0.12, 2.4, lx, FL + 1.55, zh + 0.6, BEAM, 0.18); O(0.66, 0.36, 1.0, lx, FL + 1.15, zh + 0.6, LEATHER);
+    B(0.12, 0.6, 0.12, lx, FL + 2.0, zh + 1.6, BEAM); B(1.3, 0.2, 0.2, sd * 3.4, FL + 1.1, zh - 0.3, BRZ); }
+  // the crucible on its chains over the fire's edge, and a hook hanging by the door of the room
+  const chain = (lx, lz, y0, y1) => { for (let k = 0, n = Math.round((y0 - y1) / 0.3); k < n; k++) B(k % 2 ? 0.06 : 0.2, 0.32, k % 2 ? 0.2 : 0.06, lx, y0 - k * 0.3, lz, IRON); };
+  for (const lx of [-0.5, 0.5]) chain(2.3 + lx * 0.6, zh + 2.6, ey, FL + 4.0); O(0.6, 0.45, 0.6, 2.3, FL + 3.6, zh + 2.6, BRZD); O(0.46, 0.08, 0.46, 2.3, FL + 3.98, zh + 2.6, MOLTEN[2]);
+  chain(-2.6, zh + 3.2, ey, FL + 3.2); B(0.12, 0.6, 0.12, -2.6, FL + 2.9, zh + 3.2, IRON); B(0.5, 0.12, 0.12, -2.4, FL + 2.6, zh + 3.2, IRON);
+  // anvils on their stumps: his, beside where he stands, with the work on it still glowing; a great one further in
+  const anvil = (lx, lz, k, hot) => { B(1.0 * k, 0.75 * k, 1.0 * k, lx, FL + 0.37 * k, lz, BEAM); B(0.46 * k, 0.32 * k, 0.4 * k, lx, FL + 0.9 * k, lz, IRON); B(1.15 * k, 0.3 * k, 0.5 * k, lx, FL + 1.2 * k, lz, IRON);
+    U(G.shard, 0.22 * k, 0.6 * k, 0.22 * k, lx + 0.57 * k, FL + 1.2 * k, lz, IRON); if (hot) B(0.55, 0.07, 0.1, lx, FL + 1.39 * k, lz, MOLTEN[2]);
+    const [px, , pz] = P(lx, 0, lz); townSolid(px, pz, 0.6 * k, y, y + FL + 1.3 * k, 'an anvil'); };
+  anvil(2.0, -0.6, 1, true); anvil(-3.3, zh + 3.6, 1.35, false); B(0.12, 0.5, 0.12, -3.3, FL + 2.2, zh + 3.6, BEAM); B(0.5, 0.3, 0.32, -3.3, FL + 2.5, zh + 3.6, IRON);
+  // the molten bronze: two channels out of the hearth, down the floor, over the steps, into a basin at the foot
+  const lavaSeg = (a, b) => SMITHY.lava.push([world(...a), world(...b)]);
+  for (const sd of [-1, 1]) { const lx = sd * 3.4, za = zh + 1.9;
+    B(1.2, 0.1, zf - za, lx, FL + 0.08, (za + zf) / 2, BASALT); B(0.65, 0.06, zf - za, lx, FL + 0.12, (za + zf) / 2, MOLTEN[0]); B(0.2, 0.065, zf - za, lx, FL + 0.135, (za + zf) / 2, MOLTEN[2]);
+    lavaSeg([lx, FL + 0.2, za], [lx, FL + 0.2, zf]);
+    for (let k = 0; k < 3; k++) { const yk = FL - 0.4 * k, zk = zf + 1.0 * k; B(0.65, 0.4, 0.06, lx, yk - 0.2, zk + 0.03, MOLTEN[1]); B(0.65, 0.05, 0.96, lx, yk - 0.38, zk + 0.5, MOLTEN[0]); }
+    lavaSeg([lx, FL, zf], [lx, 0.1, zf + 3]);
+    B(2.8, 0.36, 1.8, lx, 0.18, zf + 3.9, BASALT); B(2.3, 0.06, 1.3, lx, 0.38, zf + 3.9, MOLTEN[0]); O(0.6, 0.1, 0.4, lx + 0.3, 0.42, zf + 3.8, MOLTEN[2]);
+    SMITHY.fires.push(world(lx, 0.5, zf + 3.9)); }
+  // his tripods, that go about on their own wheels to wherever they are wanted, each with fire in its bowl
+  for (const [lx, lz] of [[-5.6, z0 - 2.5], [5.6, z0 - 2.5], [-5.6, z0 + 4], [5.6, z0 + 4]]) {
+    for (let k = 0; k < 3; k++) { const a = k * 2.094 + 0.5, fx = Math.cos(a) * 0.55, fz = Math.sin(a) * 0.55; B(0.09, 1.7, 0.09, lx + fx * 0.6, FL + 0.95, lz + fz * 0.6, BRZ, fz * 0.35, -fx * 0.35); U(G.disc, 0.24, 0.06, 0.24, lx + fx, FL + 0.24, lz + fz, BRZD, a, Math.PI / 2); }
+    O(0.62, 0.26, 0.62, lx, FL + 1.85, lz, BRZ); O(0.42, 0.1, 0.42, lx, FL + 2.02, lz, COALS[1]); O(0.12, 0.3, 0.12, lx, FL + 2.25, lz, FLAME);
+    SMITHY.fires.push(world(lx, FL + 2.2, lz)); const [px, , pz] = P(lx, 0, lz); townSolid(px, pz, 0.7, y, y + FL + 2.2, 'one of the tripods of Hephaestus');
+  }
+  // the golden maidens at the door, on their pedestals, a lamp in their hands and light in their eyes
+  for (const sd of [-1, 1]) { const lx = sd * 4.6, lz = czf - 2.2;
+    B(1.1, 0.9, 1.1, lx, FL + 0.45, lz, BASALT2); B(1.2, 0.1, 1.2, lx, FL + 0.92, lz, BRZ);
+    O(0.5, 1.15, 0.42, lx, FL + 2.05, lz, GOLDB); O(0.34, 0.46, 0.28, lx, FL + 3.3, lz, GOLDB); O(0.21, 0.25, 0.21, lx, FL + 3.98, lz, GOLDB); O(0.22, 0.14, 0.24, lx, FL + 4.16, lz - 0.04, BRZD);
+    for (const e of [-0.08, 0.08]) O(0.035, 0.03, 0.03, lx + e, FL + 4.0, lz + 0.19, [3.2, 2.6, 1.4]);
+    B(0.12, 0.62, 0.12, lx - sd * 0.32, FL + 3.0, lz + 0.3, GOLDB, -0.6); O(0.18, 0.1, 0.18, lx - sd * 0.32, FL + 3.25, lz + 0.62, BRZ); O(0.08, 0.16, 0.08, lx - sd * 0.32, FL + 3.42, lz + 0.62, FLAME);
+    SMITHY.fires.push(world(lx - sd * 0.32, FL + 3.4, lz + 0.62)); const [px, , pz] = P(lx, 0, lz); townSolid(px, pz, 0.75, y, y + FL + 4.3, 'one of the golden maidens'); }
+  // the floor and the steps, to stand on
+  const F = (w, d, top) => { const [fx, , fz] = P(0, 0, z0), f = { x: fx, z: fz, c: cr, s: sr, hw: w / 2, hd: d / 2, top: y + top, S: null }; ROCKS.floors.push(f); (group.userData.floors ||= []).push(f); };
+  F(SW + 4, SD + 4, 0.4); F(SW + 2, SD + 2, 0.8); F(SW, SD, FL);
+  CLEAR?.push({ x, z, r: 22 }); SMITHY.group = group;
+  SMITHY.T = { x: SMITHY.hearth.x, y: SMITHY.hearth.y, z: SMITHY.hearth.z, fires: [{ x: 0, y: 0.4, z: 0 }], forge: true };
+}
+// the forge alive: smoke and sparks out of the chimney, the coals breathing sparks, the bronze running in its channels
+function updateSmithy(dt) {
+  const S = SMITHY; if (!S.group || !S.chim || realm !== 'over') return;
+  const c = camera.position, C = S.chim, d = Math.hypot(C.x - c.x, C.z - c.z); if (d > 1500) return;
+  if ((S.sm += dt * 1.4 * SMOKE.lod(d)) > 1) { S.sm -= 1; smokePuff(C.x + rnd(0.8), C.y, C.z + rnd(0.8), 1.2, d, 0); }
+  if (d > 600) return;
+  if (Math.random() < dt * 9) emit(C.x + rnd(0.7), C.y, C.z + rnd(0.7), rnd(2.5), 5 + Math.random() * 7, rnd(2.5), 0.8 + Math.random() * 1.2, pick(EMBER), 2, 0.5);
+  for (const f of S.fires) if (Math.random() < dt * 5) emit(f.x + rnd(0.4), f.y, f.z + rnd(0.4), rnd(0.5), 1.2 + Math.random() * 2.2, rnd(0.5), 0.5 + Math.random() * 0.6, pick(EMBER), 3, 0.8);
+  if ((S.sp -= dt) < 0) { S.sp = 1.2 + Math.random() * 2.5; const H = S.hearth; for (let k = 0; k < 26; k++) emit(H.x + rnd(1.8), H.y + 0.3, H.z + rnd(0.8), rnd(4), 3 + Math.random() * 6, rnd(4), 0.6 + Math.random() * 0.6, [2.6, 1.4 + Math.random() * 0.6, 0.35], -9, 0.55); }
+  for (const [a, b] of S.lava) if (Math.random() < dt * 6) { const t = Math.random(); emit(lerp(a.x, b.x, t), lerp(a.y, b.y, t) + 0.05, lerp(a.z, b.z, t), (b.x - a.x) * 0.12, 0.3 + Math.random() * 0.5, (b.z - a.z) * 0.12, 0.35 + Math.random() * 0.4, [3.0, 1.3 + Math.random() * 0.5, 0.3], 0.5, 0.45); }
 }
 function buildVillage(acc, group, rng, x0, z0) {
   for (let i = 0, n = 8 + Math.floor(rng() * 10); i < n; i++) {
@@ -13003,16 +13214,19 @@ function buildIsland(acc, group, rng, x, z, o = {}) {
     for (let i = 0; i < 16; i++) {
       const a = i / 16 * 6.28 + rng() * 0.25, d = r * (0.46 + rng() * 0.36);
       if (Math.abs(Math.cos(a) * d) < 9 && Math.sin(a) * d < -r * 0.15) continue;   // (the church's ground)
+      if (o.forge && Math.hypot(x + Math.cos(a) * d - FORGE.x, z + Math.sin(a) * d - FORGE.z) < 31) continue;   // (the forge's)
       house(acc, rng, x + Math.cos(a) * d, top, z + Math.sin(a) * d, 0.95, 0.35);
     }
     windmill(acc, group, rng, x + r * 0.76, top, z - r * 0.32); windmill(acc, group, rng, x - r * 0.7, top, z + r * 0.5);
     chapel(acc, rng, x, top, z - r * 0.29, 0, true);   // the church, on the plaza, its door to the square
+    if (o.forge) smithy(acc, group, FORGE.x, top, FORGE.z, Math.atan2(x - FORGE.x, z - FORGE.z));   // Hephaestus's forge, its door to the square too
   } else if (!o.bare) for (let i = 0, n = 1 + Math.floor(rng() * 4); i < n; i++) {
     const a = rng() * 6.28, d = rng() * r * 0.55;
     house(acc, rng, x + Math.cos(a) * d, top, z + Math.sin(a) * d, 0.85, 0.5);
   }
   for (let i = 0, n = 2 + Math.floor(rng() * 6); i < n; i++) {
     const a = rng() * 6.28, d = r * (0.35 + rng() * 0.5);
+    if (o.forge && Math.hypot(x + Math.cos(a) * d - FORGE.x, z + Math.sin(a) * d - FORGE.z) < 22) continue;
     plantTree(acc, x + Math.cos(a) * d, top, z + Math.sin(a) * d, rng, 0.9);
   }
   // streams run to the lip and pour off into the sky
@@ -13036,8 +13250,10 @@ function buildIsland(acc, group, rng, x, z, o = {}) {
 // called by buildChunk: decides what else lives in this square of the world
 function buildFeatures(cx, cz, rng, acc, group) {
   group.userData = { sails: [], falls: [], islands: [] };
+  HOUSES = newAcc(); HOUSES.sway = [];
   if (cx === Math.floor(MYKONOS.x / CHUNK) && cz === Math.floor(MYKONOS.z / CHUNK)) {
-    buildIsland(acc, group, rng, MYKONOS.x, MYKONOS.z, { r: MYKONOS.r, top: MYKONOS.top, village: true, falls: 3 });
+    buildIsland(acc, group, rng, MYKONOS.x, MYKONOS.z, { r: MYKONOS.r, top: MYKONOS.top, village: true, falls: 3, forge: true });
+    townMesh(group);
     return;
   }
   const x = (cx + 0.5) * CHUNK + (rng() - 0.5) * 200, z = (cz + 0.5) * CHUNK + (rng() - 0.5) * 200;
@@ -13056,10 +13272,13 @@ function buildFeatures(cx, cz, rng, acc, group) {
       solid(_p.x, _p.z, s * 1.4, _p.y - s, _p.y + s, 'a stone hanging in the air');
     }
   }
+  townMesh(group);
   biomeFloat(cx, cz, acc);
 }
 function disposeFeatures(group) {
   const u = group.userData;
+  if (u.floors) { ROCKS.floors = ROCKS.floors.filter(f => !u.floors.includes(f)); u.floors = null; }
+  if (SMITHY.group === group) SMITHY.group = null;
   if (u.cfalls) u.cfalls.forEach(f => { waterfalls.delete(f); f.geometry.dispose(); });
   if (u.drift) { for (const b of u.drift) driftRemove(b); u.drift = null; }
   if (u.pyres) { u.islands?.forEach(i => { const k = skyIslands.indexOf(i); if (k >= 0) skyIslands.splice(k, 1); }); u.pyres.forEach(f => pyres.delete(f)); u.pillars.forEach(pl => { const k = pillars.indexOf(pl); if (k >= 0) pillars.splice(k, 1); }); return; }
@@ -13120,7 +13339,7 @@ function updateFalls(dt) {
   if (F.steam > 0) { F.steam -= dt; if (player.form !== 'human' && Math.random() < F.steam * 1.4) emit(P.x + rnd(1.5), P.y + rnd(1), P.z + rnd(1.5), rnd(1.5), 2 + Math.random() * 3, rnd(1.5), 1 + Math.random() * 0.8, [0.82, 0.84, 0.88], 3.5, 1.4 + Math.random() * 1.6); }
 }
 function updateWorldLife(dt) {
-  waterfallMat.uniforms.uTime.value = time; updateFalls(dt); updatePerchMark(dt);
+  waterfallMat.uniforms.uTime.value = time; updateFalls(dt); updatePerchMark(dt); updateSmithy(dt);
   for (const s of windmills) s.rotation.z = time * 0.7 + s.userData.phase;
   for (const f of waterfalls) {
     const L = f.userData.lip;
@@ -14634,7 +14853,7 @@ function updateStorm(dt) {
 function zeusHome() {
   if (realm !== 'over') return;
   let T = temples.find(T => T.name === 'zeus');
-  if (!T) T = placeTemple(MOUNT.x, SUMMIT + 0.5, MOUNT.z + 43, false, { keep: true, seed: 1203, style: 0, hw: 11, hd: 15, H: 11, grand: true, rot: true, bare: true, name: 'zeus',
+  if (!T) T = placeTemple(MOUNT.x, SUMMIT + 0.5, MOUNT.z + 43, false, { keep: true, seed: 1203, style: 0, hw: 11, hd: 15, H: 11, grand: true, rot: true, bare: true, name: 'zeus', god: 'zeus',
     pal: { marble: '#f4f1ea', shade: '#d6d0c2', roof: '#c8a040', trim: '#ffd86a' } });
   const z = godById.zeus, tz = T.z + T.hd - 6.2;
   Object.assign(z, { x: T.x, z: tz, tx: T.x, tz, gy: T.y, yaw: 0, active: true, pinned: true, home: true, bolt: true, revealed: true, onTop: true, marked: false, place: '' });
@@ -16672,8 +16891,8 @@ function carryOn() {
   p.pos.x += _cs.x; p.pos.z += _cs.z; CARRY.x = _cs.x; CARRY.z = _cs.z; CARRY.k = _cs.k;
   if (_cs.k > 0.25 && !CARRY.told) { CARRY.told = true; audio.sfx.grab?.(false); toast(p.climb ? 'THE ROCK BREAKS OPEN FOR A BIRD · YOU GO WITH YOUR PIECE OF IT' : 'THE ROCK BREAKS OPEN FOR A BIRD · IT CARRIES YOU'); }
 }
-function rocksMat(part = false) {
-  const m = new THREE.MeshLambertMaterial({ vertexColors: true });
+function rocksMat(part = false, cell = 6, lift = 0, reach = 1) {   // (cell: how big the chunks it breaks into are; lift: light of its own, so whitewash reads white in the shade; reach: how wide it opens, and how far its chunks are thrown)
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true }), C = cell.toFixed(2);
   m.onBeforeCompile = sh => { sh.uniforms.uYield = YIELDS.u.uYield; sh.uniforms.uYieldR = YIELDS.u.uYieldR; sh.uniforms.uYT = YIELDS.u.uYT;
     if (part) { sh.uniforms.uPart = PART.u.uPart; sh.uniforms.uPartV = PART.u.uPartV;
       sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
@@ -16683,10 +16902,10 @@ float shH(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.y
 mat3 shAx(vec3 a, float t) { float s = sin(t), c = cos(t), o = 1.0 - c; return mat3(o*a.x*a.x + c, o*a.x*a.y + a.z*s, o*a.z*a.x - a.y*s, o*a.x*a.y - a.z*s, o*a.y*a.y + c, o*a.y*a.z + a.x*s, o*a.z*a.x + a.y*s, o*a.y*a.z - a.x*s, o*a.z*a.z + c); }`)
         .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
       vec3 shOff = vec3(0.0), shP = cen; mat3 shRot = mat3(1.0); float shK = 0.0;
-      { vec3 cell = floor(SHB * cen / 6.0); shP = SHT * ((cell + 0.5) * 6.0);   // (each face belongs to the chunk its middle is in: cells of a lattice turned on its point, so they read as diamonds)
+      { vec3 cell = floor(SHB * cen / ${C}); shP = SHT * ((cell + 0.5) * ${C});   // (each face belongs to the chunk its middle is in: cells of a lattice turned on its point, so they read as diamonds)
         float h = shH(cell), h2 = shH(cell + 17.3), h3 = shH(cell + 41.9);
         for (int i = 0; i < 3; i++) { vec4 F = uPart[i], V = uPartV[i]; if (V.w <= 0.0) continue;
-          vec3 d = shP - F.xyz; float along = dot(d, V.xyz), R = F.w; vec3 rad = d - V.xyz * along;
+          vec3 d = shP - F.xyz; float along = dot(d, V.xyz), R = F.w * ${reach.toFixed(2)}; vec3 rad = d - V.xyz * along;
           vec2 sd = vec2(-V.z, V.x); float sl = length(sd); sd = sl > 0.05 ? sd / sl : vec2(1.0, 0.0);
           float dia = abs(dot(rad.xz, sd)) + abs(rad.y) * 1.2;   // (the way through is a diamond: wide across, pointed above and below)
           float open = smoothstep(V.w, V.w * 0.3, along) * smoothstep(-R * 2.6, -R * 0.7, along) * (1.0 - smoothstep(R * 1.9, R * 3.8, dia));
@@ -16699,7 +16918,7 @@ mat3 shAx(vec3 a, float t) { float s = sin(t), c = cos(t), o = 1.0 - c; return m
       if (shK > 0.0) transformed = shP + shRot * ((transformed - shP) * (1.0 - 0.24 * shK)) + shOff;   // (turned a little, drawn in on itself so the seams between chunks open, and carried out of the way)
       vOpenK = shK;`);
       sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'varying float vOpenK;\nvoid main() {')
-        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vec3(0.42, 0.62, 1.0) * vOpenK * 0.5;   // (lit from inside while it is open)'); }
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vec3(0.42, 0.62, 1.0) * vOpenK * 0.5;   // (lit from inside while it is open)' + (lift ? `\n  totalEmissiveRadiance += diffuseColor.rgb * ${lift.toFixed(2)} * smoothstep(0.55, 0.9, min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b))) + max(diffuseColor.rgb - 1.0, 0.0) * 0.6;` : '')); }
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float sway; uniform vec4 uYield[4]; uniform vec4 uYieldR; uniform float uYT;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
       if (sway > 0.0) {
@@ -16709,7 +16928,7 @@ mat3 shAx(vec3 a, float t) { float s = sin(t), c = cos(t), o = 1.0 - c; return m
           float f = Y.w * smoothstep(R, R * 0.12, h) * smoothstep(-R, -2.0, d.y) * smoothstep(R * 0.8, -2.0, d.y);
           vec2 dir = d.xz / max(h, 0.5); transformed.xz += dir * f * sway * 3.2; transformed.y -= f * sway * 0.9; }
       }`); };
-  m.customProgramCacheKey = () => part ? 'rocks-yield-part' : 'rocks-yield';
+  m.customProgramCacheKey = () => part ? `rocks-yield-part-${C}-${lift}-${reach}` : 'rocks-yield';
   return m;
 }
 function updateYields(dt) {
@@ -20541,7 +20760,7 @@ function voiceCommand(cmd) {
     if (c && c.active && !c.home) { toast('TEMPLE'); const T = temples.find(T => Math.hypot(T.x - c.x, T.z - c.z) < 40); return teleport(c.x, c.z + (T ? T.hd * 0.45 + T.hd - 3 : 9), T ? T.y : c.gy, () => { c.greeted = false; c.coolUntil = 0; human.group.rotation.y = 0; camYaw = 0; camPitch = 0.12; }); } }
   const unmet = gods.filter(g => !story.met.has(g.id) && !g.pinned), g = nextUnmet() || pick(unmet.length ? unmet : gods.filter(g => !g.home));
   toast('TEMPLE');
-  const T = placeTemple(best.x, best.y, best.z);
+  const T = placeTemple(best.x, best.y, best.z, false, { god: g?.id });
   teleport(best.x, best.z + T.hd - 3, best.y, () => {
     spawnGod(g, best.x, best.z - T.hd * 0.45, false, true);
     g.greeted = false; g.coolUntil = 0; g.yaw = Math.PI; g.place = 'TEMPLE';   // facing out through the columns, toward him
@@ -20565,6 +20784,22 @@ const TPAL = [
   { marble: '#dcdfe6', shade: '#b9bfca', roof: '#8a3a5a', trim: '#e8e0d0' },   // grey marble and porphyry
 ];
 const TDARK = { marble: '#454a68', shade: '#2a2e48', roof: '#1c2c70', trim: [0.4, 0.9, 2.6] };
+// Each god's own house is in their own stone and painted in their own colours (the Greeks painted their temples: the
+// frieze, the hollow of the pediment, the tiles), with their sign alight in the middle of the pediment over the door.
+const GOD_TPAL = {
+  zeus: { marble: '#f4f1ea', shade: '#d6d0c2', roof: '#c8a040', trim: '#ffd86a' },
+  hera: { marble: '#f0ece6', shade: '#cfc8bc', roof: '#3d5bd8', trim: '#e6c25a' },
+  poseidon: { marble: '#e2eef0', shade: '#b4c8cd', roof: '#1d8d9e', trim: '#e9f6f8' },
+  demeter: { marble: '#efe2c4', shade: '#c9b994', roof: '#b98a2a', trim: '#8aa83e' },
+  athena: { marble: '#e3e5ea', shade: '#b6bbc6', roof: '#4e5f86', trim: '#d8c070' },
+  apollo: { marble: '#f7f0da', shade: '#d8ceb0', roof: '#d39a1c', trim: '#fff0a0' },
+  artemis: { marble: '#eef1f5', shade: '#c4cad6', roof: '#5e8676', trim: '#dfe8ef' },
+  ares: { marble: '#d9c6be', shade: '#a68b82', roof: '#8a2020', trim: '#c8a040' },
+  aphrodite: { marble: '#f6e8e4', shade: '#d8bfbb', roof: '#c4557a', trim: '#f4d0a0' },
+  hephaestus: { marble: '#5c544e', shade: '#3a3430', roof: '#7a5226', trim: [2.4, 1.1, 0.3] },
+  hermes: { marble: '#eef2ee', shade: '#c4ccc4', roof: '#2f9cae', trim: '#e8d070' },
+  dionysus: { marble: '#efe6ea', shade: '#cbbdc4', roof: '#64286a', trim: '#7aa040' },
+};
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 // a straight beam from one point to another
 function beam(acc, ax, ay, az, bx, by, bz, w, rgb) {
@@ -20573,10 +20808,12 @@ function beam(acc, ax, ay, az, bx, by, bz, w, rgb) {
   addGeo(acc, G.unitBox, _mat, rgb);
 }
 function makeTemple(seed, dark, style, o = {}) {
-  const r = mulberry32(seed), P0 = o.pal || (dark ? TDARK : TPAL[Math.floor(r() * TPAL.length)]);
+  const r = mulberry32(seed), P0 = o.pal || (dark ? TDARK : GOD_TPAL[o.god] || TPAL[Math.floor(r() * TPAL.length)]);
+  const glowC = !dark && PATRONS[o.god] ? (k => [k.r * 2.4, k.g * 2.4, k.b * 2.4])(new THREE.Color(PATRONS[o.god][0])) : null;
   const marble = col(P0.marble), shade = col(P0.shade), roof = col(P0.roof), trim = Array.isArray(P0.trim) ? P0.trim : col(P0.trim);
   const acc = newAcc(), cols = [], fires = []; acc.sway = [];
-  style = style ?? (dark ? 0 : r() < 0.5 ? 3 : Math.floor(r() * 3));   // (half of them are the grown kind)
+  style = style ?? (dark ? 0 : r() < (o.god ? 0.55 : 0.4) ? 0 : r() < 0.55 ? 3 : 1 + Math.floor(r() * 2));   // (a god's own is most often the Greek house proper; the rest grown, round, or a court)
+  const ionic = !dark && style !== 3 && r() < 0.45;   // (Ionic, its capitals scrolled; else Doric, a plain cushion under a square)
   // what grows on this one: one kind of leaf for the whole temple, so each has its own season
   const leafPal = dark ? [UCOL.willow, UCOL.dead, UCOL.asphodel] : [WOOD.oak, WOOD.olive, BIO.blossom, COL.autumn, WOOD.birch, WOOD.cedar][Math.floor(r() * 6)], vineC = dark ? UCOL.dead : col('#3f7a2c'), bark = dark ? UCOL.obsidian : WOOD.barkDark;
   const leafC = () => jitter(leafPal[Math.floor(r() * leafPal.length)], r), kinds = dark ? ['snag'] : ['olive', 'cypress', 'umbrella', 'birch', 'cedar', 'autumn'], kindOf = () => kinds[Math.floor(r() * kinds.length)];
@@ -20605,9 +20842,16 @@ function makeTemple(seed, dark, style, o = {}) {
     cols.push({ x, z, r: r0 * 1.15 });
   };
   let hw, hd, H, round = false;
+  // a column: a square plinth and a round base, the fluted shaft with its swell, a gilt ring at the neck, the capital
   const column = (x, z, h, rad = 0.62) => {
-    _mat.compose(_p.set(x, 0.3, z), _q.identity(), _s.set(rad, h - 0.6, rad)); addGeo(acc, G.colU, _mat, marble);
-    box(acc, rad * 2.7, 0.3, rad * 2.7, x, 0.15, z, shade); box(acc, rad * 2.9, 0.32, rad * 2.9, x, h - 0.16, z, marble); box(acc, rad * 2.3, 0.2, rad * 2.3, x, h - 0.42, z, shade);
+    box(acc, rad * 2.7, 0.3, rad * 2.7, x, 0.15, z, shade);
+    _mat.compose(_p.set(x, 0.39, z), _q.identity(), _s.set(rad * 1.2, 0.18, rad * 1.2)); addGeo(acc, G.colBase, _mat, marble);
+    _mat.compose(_p.set(x, 0.48, z), _q.identity(), _s.set(rad, h - 1.25, rad)); addGeo(acc, G.colF, _mat, marble);
+    _mat.compose(_p.set(x, h - 0.9, z), _q.identity(), _s.set(rad * 0.86, 0.1, rad * 0.86)); addGeo(acc, G.colBase, _mat, trim);
+    if (ionic) { _mat.compose(_p.set(x, h - 0.62, z), _q.identity(), _s.set(rad * 1.0, 0.3, rad * 1.0)); addGeo(acc, G.echinus, _mat, marble);
+      for (const e of [-1, 1]) { _mat.compose(_p.set(x + e * rad * 1.05, h - 0.52, z), _q.identity(), _s.set(rad * 0.42, rad * 0.42, rad * 2.3)); addGeo(acc, G.volute, _mat, shade); } }
+    else { _mat.compose(_p.set(x, h - 0.8, z), _q.identity(), _s.set(rad * 1.25, 0.46, rad * 1.25)); addGeo(acc, G.echinus, _mat, marble); }
+    box(acc, rad * 2.9, 0.34, rad * 2.9, x, h - 0.17, z, marble);
     cols.push({ x, z, r: rad + 0.25 });
   };
   const disc = (rad, h, y, rgb) => { _mat.compose(_p.set(0, y, 0), _q.identity(), _s.set(rad, h, rad)); addGeo(acc, G.disc, _mat, rgb); };
@@ -20707,10 +20951,36 @@ function makeTemple(seed, dark, style, o = {}) {
     const nx = Math.round(hw * 2 / 3.3), nz = Math.round(hd * 2 / 3.3), ex = hw - 1.1, ez = hd - 1.1, rise = 2.2 + hw * 0.12;
     for (let i = 0; i <= nz; i++) { const z = -ez + i * ez * 2 / nz; column(-ex, z, H); column(ex, z, H); if (o.grand && i > 0 && i < nz) { column(-ex + 3, z, H * 0.8, 0.5); column(ex - 3, z, H * 0.8, 0.5); } }
     for (let i = 1; i < nx; i++) { const x = -ex + i * ex * 2 / nx; column(x, -ez, H); if (Math.abs(x) > 2) column(x, ez, H); }   // the front is open in the middle: the door
-    for (const s of [-1, 1]) { box(acc, 1.5, 0.9, hd * 2, s * ex, H + 0.45, 0, marble); box(acc, 1.6, 0.3, hd * 2 + 0.2, s * ex, H + 1.05, 0, roof); box(acc, hw * 2, 0.9, 1.5, 0, H + 0.45, s * ez, marble); box(acc, hw * 2 + 0.2, 0.3, 1.6, 0, H + 1.05, s * ez, roof); }
-    for (let i = 0; i <= nz * 2; i++) { const z = -ez + i * ez / nz; for (const s of [-1, 1]) beam(acc, s * ex, H + 1.2, z, 0, H + 1.2 + rise, z, 0.17, shade); }
-    box(acc, 0.32, 0.32, hd * 2, 0, H + 1.2 + rise, 0, marble);
-    for (const s of [-1, 1]) { for (let k = 0; k < 6; k++) { const t = k / 6; box(acc, (hw * 2 - 1) * (1 - t), rise / 5.6, 0.5, 0, H + 1.4 + t * rise, s * ez, k % 2 ? marble : shade); } blob(acc, 0.42, 0.7, 0.42, 0, H + 1.9 + rise, s * ez, trim); for (const e of [-1, 1]) blob(acc, 0.32, 0.5, 0.32, e * (hw - 0.4), H + 1.7, s * ez, trim); }
+    // what the columns carry: the architrave, plain; the frieze, painted, its triglyphs in the stone's own colour and a figure
+    // in relief in every metope between them; the cornice over all, with gilt spouts along the sides for the rain
+    const E = H + 1.86, nf = Math.max(4, Math.round(hw * 2 / 1.6)), ns = Math.max(6, Math.round(hd * 2 / 1.6));
+    for (const s of [-1, 1]) {
+      box(acc, 1.5, 0.72, hd * 2, s * ex, H + 0.36, 0, marble); box(acc, hw * 2, 0.72, 1.5, 0, H + 0.36, s * ez, marble);
+      box(acc, 1.62, 0.12, hd * 2 + 0.1, s * ex, H + 0.78, 0, shade); box(acc, hw * 2 + 0.1, 0.12, 1.62, 0, H + 0.78, s * ez, shade);
+      box(acc, 1.36, 0.78, hd * 2 - 0.2, s * ex, H + 1.23, 0, roof); box(acc, hw * 2 - 0.2, 0.78, 1.36, 0, H + 1.23, s * ez, roof);
+      for (let i = 0; i <= nf; i++) { const x = -hw + 0.3 + i * (hw * 2 - 0.6) / nf; box(acc, 0.42, 0.78, 0.14, x, H + 1.23, s * (ez + 0.66), marble);
+        if (i < nf) { const mx = x + (hw - 0.3) / nf, lean = (i % 3 - 1) * 0.25; box(acc, 0.2, 0.44, 0.08, mx, H + 1.16, s * (ez + 0.69), marble, 0, 0, lean); box(acc, 0.14, 0.14, 0.08, mx - lean * 0.3, H + 1.46, s * (ez + 0.69), marble); } }
+      for (let i = 0; i <= ns; i++) { const z = -hd + 0.3 + i * (hd * 2 - 0.6) / ns; box(acc, 0.14, 0.78, 0.42, s * (ex + 0.66), H + 1.23, z, marble); box(acc, 0.2, 0.14, 0.2, s * (ex + 1.02), H + 1.72, z, trim); }
+      box(acc, 2.0, 0.3, hd * 2 + 0.8, s * ex, H + 1.72, 0, marble); box(acc, hw * 2 + 0.8, 0.3, 2.0, 0, H + 1.72, s * ez, marble);
+    }
+    // the roof: tiled over the colonnade all round, its ribs picked out, and open over the middle to the sky, crossed by rafters
+    const ang = Math.atan2(rise, ex), cw = 3.6;
+    for (let i = 0; i <= nz * 2; i++) { const z = -ez + i * ez / nz; for (const s of [-1, 1]) beam(acc, s * ex, E, z, 0, E + rise, z, 0.17, shade); }
+    box(acc, 0.32, 0.32, hd * 2, 0, E + rise, 0, marble);
+    for (const s of [-1, 1]) { const xc = s * (ex + 1.0 - cw / 2 * Math.cos(ang)), yc = E + 0.16 + (ex - Math.abs(xc)) * rise / ex;
+      box(acc, cw, 0.22, hd * 2 + 0.8, xc, yc, 0, roof, 0, 0, -s * ang);
+      for (let i = 0; i <= ns * 2; i++) box(acc, cw, 0.12, 0.14, xc, yc + 0.15, -hd - 0.3 + i * (hd * 2 + 0.6) / (ns * 2), shade, 0, 0, -s * ang); }
+    // the pediments: the hollow of each painted, the god standing in the middle under their sign, the others round them standing,
+    // bending, kneeling and lying down as the corners close in; the raking cornices; gilt akroteria on the apex and the corners
+    for (const s of [-1, 1]) { const fz = s * (ez + 0.86);
+      _mat.compose(_p.set(0, E, s * ez), _q.identity(), _s.set(hw * 2 + 0.8, rise, 1.6)); addGeo(acc, G.gable, _mat, marble);
+      _mat.compose(_p.set(0, E + 0.3, s * (ez + 0.72)), _q.identity(), _s.set(hw * 2 - 1.4, rise - 0.75, 0.2)); addGeo(acc, G.gable, _mat, roof);
+      for (let i = -4; i <= 4; i++) { if (!i) continue; const x = i * (hw - 1) / 4.6, hh = (rise - 0.9) * (1 - Math.abs(x) / (hw - 0.2)); if (hh < 0.3) continue;
+        box(acc, 0.42, hh * 0.72, 0.18, x, E + 0.35 + hh * 0.36, fz, marble, 0, 0, -Math.sign(i) * (0.08 + Math.abs(i) * 0.09)); box(acc, 0.24, 0.24, 0.16, x - Math.sign(i) * hh * 0.08, E + 0.35 + hh * 0.84, fz, marble); }
+      box(acc, 0.62, rise - 1.35, 0.22, 0, E + 0.35 + (rise - 1.35) / 2, fz, marble); box(acc, 0.32, 0.32, 0.2, 0, E + rise - 0.78, fz, marble);
+      if (glowC) { _mat.compose(_p.set(0, E + rise * 0.7, fz + s * 0.1), _q.setFromAxisAngle(UP, 0.785), _s.set(0.34, 0.42, 0.34)); addGeo(acc, G.oct, _mat, glowC); }
+      for (const e of [-1, 1]) box(acc, Math.hypot(hw + 0.4, rise) + 0.3, 0.3, 1.9, e * (hw + 0.4) / 2, E + rise / 2 + 0.12, s * ez, marble, 0, 0, -e * Math.atan2(rise, hw + 0.4));
+      blob(acc, 0.42, 0.7, 0.42, 0, E + rise + 0.6, s * ez, trim); for (const e of [-1, 1]) blob(acc, 0.32, 0.5, 0.32, e * (hw + 0.2), E + 0.5, s * ez, trim); }
     box(acc, hw * 2 - 5, 0.06, hd * 2 - 5, 0, 0.03, 0, shade); box(acc, hw * 2 - 6.4, 0.07, hd * 2 - 6.4, 0, 0.04, 0, marble);
     box(acc, 2.4, 1.1, 1.5, 0, 0.55, -hd * 0.72, shade); blob(acc, 0.8, 0.32, 0.8, 0, 1.32, -hd * 0.72, trim); fires.push({ x: 0, y: 1.6, z: -hd * 0.72 }); cols.push({ x: 0, z: -hd * 0.72, r: 1.3 });
     brazier(-2.8, hd + 0.5); brazier(2.8, hd + 0.5);
@@ -20756,11 +21026,11 @@ function placeTemple(x, y, z, dark = false, o = {}) {
   return T;
 }
 function updateTemple() {
-  const P = player.pos, near = [...temples].sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z));
+  const P = player.pos, near = [...temples, ...(SMITHY.group && SMITHY.T && realm === 'over' ? [SMITHY.T] : [])].sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z));   // (and the forge's hearth, which shares their lamps)
   templeLights.forEach((l, i) => {
     const T = near[i];
     if (!T || Math.hypot(T.x - P.x, T.z - P.z) > 600) { l.intensity = 0; return; }
-    const f = T.fires[0]; l.position.set(T.x + f.x, T.y + f.y + 1, T.z + f.z); l.color.setHex(T.dark ? 0x4a8cff : 0xffb060); l.intensity = 5.5 + Math.sin(time * 13 + i) * 0.6;
+    const f = T.fires[0]; l.position.set(T.x + f.x, T.y + f.y + 1, T.z + f.z); l.color.setHex(T.dark ? 0x4a8cff : T.forge ? 0xff6a24 : 0xffb060); l.intensity = T.forge ? 9 + Math.sin(time * 9 + i) * 1.4 + Math.sin(time * 23) * 0.8 : 5.5 + Math.sin(time * 13 + i) * 0.6;
   });
   for (const T of near) {
     if (Math.hypot(T.x - P.x, T.z - P.z) > 500) break;
@@ -21374,8 +21644,8 @@ function updateCurrents(dt) {
   const away = Math.atan2(home.x - MOUNT.x, home.z - MOUNT.z) + rnd(1.3), d = 3000 + Math.random() * 1500;
   const spot = findShelf(home.x + Math.sin(away) * d, home.z + Math.cos(away) * d, 0, 650);
   if (!spot) return;
-  const T = placeTemple(spot.x, spot.y, spot.z);
   const host = templeHost(home);
+  const T = placeTemple(spot.x, spot.y, spot.z, false, { god: host?.id });
   if (host) { spawnGod(host, spot.x, spot.z - T.hd * 0.45, true, true); host.coolUntil = 0; host.yaw = Math.PI; host.place = 'TEMPLE'; if (!story.met.has(host.id)) host.greeted = false; }
   setJet(home, T);
 }
@@ -21582,7 +21852,7 @@ function placeChain() {
   if (g.home) CHAIN_TO.x = g.x, CHAIN_TO.y = g.gy, CHAIN_TO.z = g.z;
   else {
     if (!(g.active && g.pinned)) {
-      const T = placeTemple(c.x, c.y, c.z);
+      const T = placeTemple(c.x, c.y, c.z, false, { god: g.id });
       spawnGod(g, c.x, c.z - T.hd * 0.45, true, true);
       g.pinned = true; g.greeted = false; g.coolUntil = 0; g.yaw = Math.PI;
     }
