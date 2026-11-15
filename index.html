@@ -30502,6 +30502,7 @@ const matchYields = m => MATCH.phase === 'count' && Date.now() < MATCH.lock - 25
 function matchYield(m) {   // the one on this screen gives way to one asked for sooner (and if it was his, it waits for that one)
   const M = MATCH, q = M.host && M.last && !M.sim ? { ...M.last, at: matchKey(M.go) } : null;
   chatLine('', `TWO FIGHTS WERE CALLED AT ONCE · ONE AT A TIME · ${cleanName(m.n)}’S GOES ON`, 'sys');
+  if (NPCS.fight?.id === M.id) NPCS.fight = null;   // (the regulars called into the one given up go back to their own flying)
   matchLeave(); M.cool = 0; M.againUntil = 0; if (!M.inv) $('matchAsk').classList.remove('on'); M.seen = null; M.yq = q;
 }
 function matchWait(B, call) {
@@ -30747,9 +30748,10 @@ function gotMatch(m) {
     if (Q) pwTake(Q, who, false, l); else { const r = MATCH.roster.get(who); if (r) { r.lives = l ?? (r.lives || 0) + 1; r.glass = performance.now() + PW.GLASS * 1000; } } return; }
   if (m.k === 'gl' && MATCH.phase === 'live' && Array.isArray(m.p) && m.p.length === 3) { const [x, y, z] = m.p.map(v => +v || 0); pwShatter(x, y, z, false); return; }
   if (m.k === 'join' && MATCH.kind === 'war' && MATCH.phase === 'count' && Date.now() < MATCH.lock) { const list = m.cpu && Array.isArray(m.cpu) ? m.cpu.slice(0, 16) : [[m.i, nm]];
+    if (Array.isArray(m.rg) && m.i === MATCH.hostId) npcsFight(m.rg.slice(0, 8), []);   // (regulars he has called in: flown in it, not in the world)
     for (const [id, name] of list) if (typeof id === 'string' && id.length < 40 && MATCH.roster.size < 24 && !MATCH.roster.has(id)) MATCH.roster.set(id, { id, name: cleanName(name), alive: true, cpu: !!m.cpu }); return; }
   if (m.k === 'out') { const who = typeof m.who === 'string' && MATCH.roster.get(m.who)?.cpu ? m.who : m.i, r = MATCH.roster.get(who);   // (a bird that flies itself is told out by whoever is flying it)
-    if (MATCH.phase === 'count') { if (r) { r.alive = false; r.left = !!m.left; } return; }   // (left before it began)
+    if (MATCH.phase === 'count') { if (r && r.cpu && m.left && m.i === MATCH.hostId) MATCH.roster.delete(who); else if (r) { r.alive = false; r.left = !!m.left; } if (typeof m.npc === 'string' && m.i === MATCH.hostId) npcsFight([], [m.npc]); return; }   // (left before it began; a regular sent away flies on in the world)
     return matchSetOut(who, String(m.by || '').slice(0, 24), false, { soft: !!m.left, v: Number.isFinite(+m.v) ? clamp(+m.v, 0, 3000) : undefined }); }
   if (m.k === 're' && MATCH.phase === 'live') { const who = typeof m.who === 'string' && MATCH.roster.get(m.who)?.cpu && m.i === MATCH.hostId ? m.who : m.i, r = MATCH.roster.get(who); if (!r || !r.alive) return;   // (a practice hit, in the warm-up: the fire, and the wall it had drawn goes out)
     if (Number.isFinite(+m.l)) r.lives = clamp(m.l | 0, 0, 9);   // (an extra life spent: the fire, and back on their line)
@@ -30769,7 +30771,8 @@ function cpusCmd(arg) {
   const off = /^(off|none|0|remove|away|no)$/.test(String(arg || '').trim()), say = t => chatLine('', t, 'sys');
   if (MATCH.phase === 'count' && (MATCH.host || MOD.admin)) {
     if (off && [...MATCH.roster.values()].filter(r => !r.cpu).length < 2) return say('ONLY YOU ARE IN IT · WITHOUT THEM THERE IS NOBODY TO FIGHT · KEEP THEM, OR /fly end');
-    if (off) { const ids = MATCH.cpus.map(c => c.id); for (const id of ids) { matchSend({ k: 'out', id: MATCH.id, who: id, left: true }); MATCH.roster.delete(id); } MATCH.cpus.length = 0;
+    if (off) { const ids = MATCH.cpus.map(c => c.id); for (const C of MATCH.cpus) { matchSend({ k: 'out', id: MATCH.id, who: C.id, left: true, npc: C.npc }); MATCH.roster.delete(C.id); cpuShow(C, false); const P = NET.peers.get(C.id); if (P) { P.seen = false; dropPeer(C.id, P); NET.peers.delete(C.id); } tronDrop(C.id); }   // (gone from here as matchLeave lets them go)
+      npcsFight([], MATCH.cpus.map(c => c.npc).filter(Boolean)); MATCH.cpus.length = 0;   // (the regulars among them go back to their own flying)
       return say(ids.length ? `${ids.length} ${ids.length === 1 ? 'BIRD' : 'BIRDS'} THAT FLY THEMSELVES SENT AWAY · /cpus on BRINGS THE USUAL ONES BACK` : 'NO BIRDS THAT FLY THEMSELVES IN THIS ONE'); }
     const rg = NPCS.list.filter(C => C && C.on && C.px != null).slice(0, 8).map(C => C.id); if (rg.length) matchRegulars(rg); else matchCpu(3);
     return; }
@@ -30792,7 +30795,14 @@ function matchRegulars(ids) {
   for (const id of ids) { const R = NPCS.list.find(C => C && C.id === id); if (!R || MATCH.roster.size >= 24 || MATCH.cpus.some(c => c.npc === id)) continue;
     const cid = 'cpu' + Math.random().toString(36).slice(2, 8), pat = PATRONS[R.pat] ? R.pat : Object.keys(PATRONS)[MATCH.cpus.length % 12];
     MATCH.roster.set(cid, { id: cid, name: R.name, alive: true, cpu: true }); MATCH.cpus.push({ id: cid, name: R.name, npc: id, pat, pos: new THREE.Vector3(R.px, R.py, R.pz), prev: new THREE.Vector3(), yaw: 0, pitch: 0, bank: 0, speed: 66 + Math.random() * 14, v0: 0, tgt: new THREE.Vector3(), tgtT: 0, probeT: Math.random() * 0.15, turn: 0, climb: 0, sendT: Math.random() * 0.5, skill: 0.55 + Math.random() * 0.45, alive: true }); list.push([cid, R.name]); }
-  if (!list.length) return; matchSend({ k: 'join', id: MATCH.id, cpu: list }); chatLine('', `THE REGULARS FLY IT TOO · ${list.map(x => x[1]).join(' · ')}`, 'sys');
+  if (!list.length) return; const rg = MATCH.cpus.filter(c => list.some(x => x[0] === c.id)).map(c => c.npc); npcsFight(rg, []);
+  matchSend({ k: 'join', id: MATCH.id, cpu: list, rg }); chatLine('', `THE REGULARS FLY IT TOO · ${list.map(x => x[1]).join(' · ')}`, 'sys');
+}
+// which of the regulars are in it (so they are flown in it, and not in the world as well, on every screen: see updateNpcs)
+function npcsFight(add, rm, id = MATCH.id) {
+  if (NPCS.fight?.id !== id) { if (!add.length) return; const c = warCfg(MATCH.go?.cfg); NPCS.fight = { id, ids: new Set(), until: MATCH.t0 + (c.warm + c.close * 1.6 + 240) * 1000 }; }
+  for (const x of add) if (typeof x === 'string' && x.length < 40 && NPCS.fight.ids.size < 24) NPCS.fight.ids.add(x);
+  for (const x of rm) NPCS.fight.ids.delete(x);
 }
 // where each one starts: on a wide circle round the middle, evenly, each facing a little to the left of it
 function matchSlot(id) { const ids = [...MATCH.roster.keys()].sort((a, b) => teamOf(a) - teamOf(b) || (a < b ? -1 : a > b ? 1 : 0)),   // (a side together, one after another round it)
