@@ -119,7 +119,11 @@ export function createAudio() {
   const EM = { all: new Map(), n: 0 };
   const things = { loops: new Set(), cache: new Map(), n: 0 };
 
-  const cap = () => quality === 'low' ? 44 : 96;
+  // Lean: when the machine is struggling (frames slow for a while), the sound is made cheaper before it can stutter —
+  // a stuttering audio thread is heard as crackle and static. Plain left-right placing instead of the shape of a head,
+  // and fewer voices at once. It comes back once frames have been quick for a good while.
+  const LEAN = { on: false, slow: 0, quick: 0 };
+  const cap = () => quality === 'low' || LEAN.on ? 44 : 96;
   const low = () => quality === 'low';
 
   // set a parameter's target only when it actually moved (keeps the automation timeline short)
@@ -1795,7 +1799,7 @@ export function createAudio() {
   }
   function emitVoice(E) {
     const K = EMK[E.kind], g = gain(0), pn = ctx.createPanner(), V = { K, g, pn, a: null, b: null, o: null, h: null, last: 0, quiet: 0 };
-    pn.panningModel = low() || surround || offline ? 'equalpower' : 'HRTF'; pn.distanceModel = 'linear'; pn.rolloffFactor = 0;   // (how loud it is at this distance is worked out here, not by the panner)
+    pn.panningModel = low() || surround || offline || LEAN.on ? 'equalpower' : 'HRTF'; pn.distanceModel = 'linear'; pn.rolloffFactor = 0;   // (how loud it is at this distance is worked out here, not by the panner)
     if (pn.positionX) { pn.positionX.value = E.x; pn.positionY.value = E.y; pn.positionZ.value = E.z; } else pn.setPosition(E.x, E.y, E.z);
     chain(g, pn, worldBus);
     const layer = L => { const s = loop(BUF[L[0]] || pink, L[5]), f = biq(L[1], L[2], L[3]); chain(s, f, gain(L[4]), g); return { s, f }; };
@@ -1865,6 +1869,10 @@ export function createAudio() {
   // ───────── per-frame ─────────
   function update(dt, s = {}) {
     if (!ctx) return;
+    { const w = typeof performance !== 'undefined' ? performance.now() / 1000 : 0, raw = LEAN.w ? Math.min(1, w - LEAN.w) : 0; LEAN.w = w;   // (how the frames are really going, by the wall clock: see LEAN)
+      if (raw > 0.05) { LEAN.slow += raw; LEAN.quick = 0; } else { LEAN.quick += raw; if (LEAN.quick > 1) LEAN.slow = Math.max(0, LEAN.slow - raw); }
+      if (!LEAN.on && LEAN.slow > 2.5 && !offline) { LEAN.on = true; for (const E of EM.all.values()) if (E.V) try { E.V.pn.panningModel = 'equalpower'; } catch {} }
+      else if (LEAN.on && LEAN.quick > 30) { LEAN.on = false; LEAN.slow = 0; } }
     dt = clamp(+dt || 0, 0, 0.25); clock += dt; tAcc += dt;
     const now = ctx.currentTime, st = s.state || 'play', form = s.form || 'human';
     const speed = Math.max(0, +s.speed || 0), vy = +s.vy || 0, flame = clamp(s.flame ?? 1), air = !s.grounded;
@@ -2282,7 +2290,8 @@ export function createAudio() {
       else {
         const Ctor = globalThis.AudioContext || globalThis.webkitAudioContext;
         if (!Ctor) return api;
-        try { ctx = new Ctor({ latencyHint: 'interactive' }); } catch { try { ctx = new Ctor(); } catch { ctx = null; return api; } }
+        // ('balanced': a little more buffer than 'interactive', so a busy machine gets through a long frame without a gap you can hear)
+        try { ctx = new Ctor({ latencyHint: 'balanced' }); } catch { try { ctx = new Ctor(); } catch { ctx = null; return api; } }
       }
       try { build(); } catch (e) { console.warn('audio: could not build', e); ctx = null; return api; }
       resume(); if (o && o.samples === false) readyDone(false); else loadSamples();
@@ -2349,7 +2358,7 @@ export function createAudio() {
       const dx = x - ear.x, dy = y - ear.y, dz = z - ear.z, d = Math.hypot(dx, dy, dz) || 0.001, att = ref / (ref + roll * (clamp(d, ref, max) - ref));
       const vl = (ear.vx * dx + ear.vy * dy + ear.vz * dz) / d, vs = [o.vx, o.vy, o.vz].every(Number.isFinite) ? -(o.vx * dx + o.vy * dy + o.vz * dz) / d : 0;
       const g = gain(v), pn = ctx.createPanner(), gw = gain(0.8), send = gain(0.56 * Math.min(1, v) * att);
-      pn.panningModel = quality === 'low' || surround || offline ? 'equalpower' : 'HRTF'; pn.distanceModel = 'inverse';   // (for two ears: the shape of a head. For a room of speakers: plain left and right, and the rear ones for what is behind)
+      pn.panningModel = quality === 'low' || surround || offline || LEAN.on ? 'equalpower' : 'HRTF'; pn.distanceModel = 'inverse';   // (for two ears: the shape of a head. For a room of speakers: plain left and right, and the rear ones for what is behind)
       pn.refDistance = ref; pn.maxDistance = max; pn.rolloffFactor = roll;
       if (pn.positionX) { pn.positionX.value = x; pn.positionY.value = y; pn.positionZ.value = z; } else pn.setPosition(x, y, z);
       const real = [sfxBus, sfxWet, bigBus, subBus], was = scope, wasDop = dop;
@@ -2407,7 +2416,7 @@ export function createAudio() {
       make(V.call, { t: t + d * 0.92 });
       return V;
     },
-    stats: () => ({ live, made, intensity, mode, step: stepN, samples: Object.keys(samples), loops: Object.keys(loops), claims: [...claims.keys()], duck: duckV.slice(), turb: fl.turb, turn: fl.turn, brush: BR.amt || 0, emitters: EM.all.size, voices: EM.n, things: things.loops.size }),
+    stats: () => ({ lean: LEAN.on, live, made, intensity, mode, step: stepN, samples: Object.keys(samples), loops: Object.keys(loops), claims: [...claims.keys()], duck: duckV.slice(), turb: fl.turb, turn: fl.turn, brush: BR.amt || 0, emitters: EM.all.size, voices: EM.n, things: things.loops.size }),
   };
   return api;
 }
