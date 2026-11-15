@@ -206,12 +206,16 @@
   #who h4 { margin:0 0 10px; font-weight:400; font-size:10px; letter-spacing:.4em; color:var(--dim); text-align:center; }
   #who .r s { text-decoration:none; font-size:9px; letter-spacing:.12em; color:var(--dim); padding:5px 7px; border:1px solid rgba(244,234,210,.14); border-radius:3px; cursor:pointer; }
   #who .r s:empty { visibility:hidden; padding:0; border:0; } #who.on .r s, #who.on .r span[data-n] { pointer-events:auto; } #who .r span[data-n] { cursor:pointer; } #who .r span[data-n]:hover { text-decoration:underline; } #who .r s[data-k=go] { color:#bfe6c8; border-color:rgba(190,255,220,.35); } #who .r p { margin:0; display:flex; gap:5px; justify-content:flex-end; } #who .r s.on[data-k=track], #who .r s.on[data-k=follow] { color:#bfe6ff; border-color:rgba(191,230,255,.6); } #who .r s.on[data-k=friend] { color:#ffd68a; border-color:rgba(255,214,138,.6); }
-  .touch #who .r s[data-g] { font-size:0; padding:12px 12px; } .touch #who .r s[data-g]::before { content:attr(data-g); font-size:14px; } .touch #who .r { grid-template-columns:14px 1fr auto 52px 14px auto; gap:6px; } .touch #who .r u { display:none; }
+  .touch #who .r s[data-g] { font-size:0; padding:12px 12px; } .touch #who .r s[data-g]::before { content:attr(data-g); font-size:14px; } .touch #who .r { grid-template-columns:14px 1fr auto 52px 14px; gap:4px 8px; } .touch #who .r u { display:none; }
   .touch #who .r { padding:3px 0; } .touch #who .r span[data-n] { padding:12px 0; } #who .r s.on { color:#ff8a7a; border-color:rgba(255,138,122,.5); }
   .cl.voice { font-style:italic; } .cl.voice b::before { content:'◉ '; opacity:.55; font-style:normal; }
   #who .kp { margin-top:10px; padding-top:6px; border-top:1px solid rgba(255,214,138,.25); white-space:normal; } #who .kp h4 { color:#ffd27a; } #who .kp p { margin:6px 0; color:#9c958b; font-size:11px; letter-spacing:.08em; }
   #who .kp s { display:inline-block; margin:2px 3px; padding:6px 9px; border:1px solid rgba(255,214,138,.35); color:#ffe6b0; text-decoration:none; cursor:pointer; } #who.on .kp s { pointer-events:auto; } #who .kp s:hover { border-color:#fff; color:#fff; } .touch #who .kp s { padding:10px 12px; }
-  #who .r { display:grid; grid-template-columns:16px 1fr auto 64px 18px auto; gap:10px; align-items:center; padding:4px 0; border-top:1px solid rgba(255,255,255,.05); white-space:nowrap; }
+  #who .r { display:grid; grid-template-columns:16px 1fr auto 64px 18px; gap:4px 12px; align-items:center; padding:4px 0; white-space:nowrap; }
+  #who .r.me { margin-bottom:10px; } #who .r p { grid-column:1 / -1; margin:2px 0 4px; display:flex; flex-wrap:wrap; gap:6px; padding-left:28px; } #who .r.sel span { text-decoration:underline; }
+  body.asciiui #who .r { padding:0; min-height:var(--ch, 14px); } body.asciiui #who .r.me { margin-bottom:var(--ch, 14px); } body.asciiui #who .r p { margin:0 0 var(--ch, 14px); padding-left:calc(var(--cw, 9px) * 3); gap:var(--cw, 9px); }
+  body.asciiui #who .r s { padding:0 !important; border:0 !important; } body.asciiui #who h4 { margin:0 0 var(--ch, 14px); } body.asciiui #who .none { padding:var(--ch, 14px) 0 0; }
+  body.asciiui:has(#who.on) :is(#prompt, #tut) { visibility:hidden; }   /* (the hint at the foot keeps out of the list) */
   #who .r:first-of-type { border-top:none; }
   #who .r i { font-style:normal; text-align:right; color:var(--dim); } #who .r u { text-decoration:none; color:var(--dim); font-size:10px; } #who .r em { font-style:normal; text-align:center; }
   #who .none { text-align:center; color:var(--dim); padding:6px 0 2px; }
@@ -300,6 +304,10 @@
   #areaBar span button:hover, #areaBar span button:focus-visible { border-color:#fff1dc; background:rgba(60,34,12,.6); outline:none; }
   .touch #areaBar span button { font-size:11px; padding:9px 16px 9px 19px; }
   .photo #areaBar, .pro #areaBar, body:has(#menu.open) #areaBar, .moding #areaBar { display:none; }
+  /* (in the letters, the place's name is typed by auiArea: the page keeps the same rows, a letter high each, unseen, so its buttons are where their keys are typed) */
+  body.asciiui #areaBar, body.asciiui #areaBar * { color:transparent !important; text-shadow:none !important; background:transparent !important; border-color:transparent !important; letter-spacing:0 !important; font-family:Menlo, Consolas, monospace !important; font-size:calc(var(--cw, 9px) / 0.6) !important; line-height:var(--ch, 14px) !important; }
+  body.asciiui #areaBar b, body.asciiui #areaBar i { margin:0; padding:0; height:var(--ch, 14px); }
+  body.asciiui #areaBar span { margin-top:var(--ch, 14px); } body.asciiui #areaBar span button { padding:0 calc(var(--cw, 9px) * 2); height:var(--ch, 14px); }
   /* what he is in: god mode, a duel, the warzone. One line and a smaller one, top and centre, there for as long as it lasts */
   #modeBar { position:fixed; left:50%; top:calc(var(--st, 0px) + 10px); transform:translate(-50%, -8px); z-index:7; pointer-events:none; text-align:center; opacity:0; transition:opacity .5s, transform .5s; white-space:nowrap; text-shadow:0 0 8px #000, 0 0 2px #000; }
   #modeBar.on { opacity:1; transform:translate(-50%, 0); }
@@ -481,7 +489,12 @@
   #chat { position:fixed; left:calc(var(--sl, 0px) + 14px); bottom:calc(var(--sb, 0px) + 100px); z-index:8; width:min(440px, calc(100vw - 28px)); pointer-events:none;
     font-size:12px; line-height:1.35; letter-spacing:.03em; text-shadow:0 0 4px #000, 0 0 1px #000; }
   #chatLog { display:flex; flex-direction:column; align-items:flex-start; gap:1px; max-height:calc(10 * 1.35em + 30px); overflow:hidden; }
-  #chatLog .cl { background:rgba(0,0,0,.34); padding:2px 7px; max-width:100%; box-sizing:border-box; overflow-wrap:anywhere; animation:clFade 11s forwards; }
+  #chatLog .cl { background:rgba(0,0,0,.34); padding:2px 7px; max-width:100%; box-sizing:border-box; overflow-wrap:anywhere; animation:clFade 9s forwards; }
+  #chat:not(.open) #chatLog .cl.old { display:none; }  #chat:not(.open) { width:min(360px, calc(100vw - 28px)); }   /* (shut: the newest few lines only) */
+  #chatTabs { display:none; gap:6px; margin-bottom:6px; } #chat.open #chatTabs { display:flex; pointer-events:auto; }
+  #chatTabs button { font:inherit; font-size:10px; letter-spacing:.14em; color:var(--dim); background:rgba(0,0,0,.4); border:1px solid rgba(255,255,255,.12); border-radius:3px; padding:3px 8px; cursor:pointer; } #chatTabs button.on { color:#ffd9a8; border-color:rgba(255,217,168,.5); }
+  body.asciiui #chatTabs button { padding:0 var(--cw, 9px) !important; border:0 !important; background:none !important; } body.asciiui #chatTabs { margin-bottom:var(--ch, 14px); gap:var(--cw, 9px); }
+  #chat.open[data-f=ply] #chatLog .cl:not(.k-ply), #chat.open[data-f=god] #chatLog .cl:not(.k-god), #chat.open[data-f=pm] #chatLog .cl:not(.k-pm), #chat.open[data-f=sys] #chatLog .cl:not(.k-sys) { display:none; }
   #chatLog .cl b { font-weight:400; color:var(--ember); letter-spacing:.12em; margin-right:6px; }
   #chatLog .cl.me b { color:#ffd9a8; }
   #chatLog .cl.sys { color:#e9d27a; letter-spacing:.14em; font-size:10.5px; }
@@ -902,7 +915,7 @@
 <div id="proTalk" aria-live="polite"><b id="ptWho"></b><p id="ptSay"></p><div id="ptOpts" role="group" aria-label="What you say"></div><form id="ptOwn" autocomplete="off"><input id="ptIn" maxlength="90" autocomplete="off" autocapitalize="sentences" spellcheck="false" enterkeyhint="send" aria-label="Say it your own way"><button type="submit">say it</button></form><button id="ptJump" type="button">say nothing · jump</button></div>
 <div id="fsHint"><b>↑</b><span>SWIPE UP · OR TAP · FULL SCREEN</span><i>for no browser at all: Share → Add to Home Screen</i><u id="fsKeep">keep the bar</u></div>
 <div id="primer"><b>YOU WILL SPEAK FOR HIM</b><span id="primerSay">his father, the gods and the world can hear you</span><div id="primerRow"><button id="primerVoice" type="button">USE MY VOICE</button><button id="primerQuiet" type="button">PLAY WITHOUT VOICE</button></div><i id="primerNote"></i></div><div id="tut"><kbd></kbd><span></span></div>
-<div id="chat" class="hidden"><div id="chatLog"></div><div id="chatRow"><span>›</span><input id="chatInput" maxlength="200" autocomplete="off" spellcheck="false" enterkeyhint="send" placeholder="say something to everyone"></div></div>
+<div id="chat" class="hidden" data-f="all"><div id="chatTabs"><button type="button" data-f="all" class="on">all</button><button type="button" data-f="ply">players</button><button type="button" data-f="god">gods</button><button type="button" data-f="pm">private</button><button type="button" data-f="sys">game</button></div><div id="chatLog"></div><div id="chatRow"><span>›</span><input id="chatInput" maxlength="200" autocomplete="off" spellcheck="false" enterkeyhint="send" placeholder="say something to everyone"></div></div>
 <div id="photoGrid" class="on"><i></i><i></i><i></i><i></i><b></b></div><div id="photoLens"></div>
 <div id="photoBar"><button type="button" data-a="exit" aria-label="Leave the camera">✕</button><button type="button" data-a="prev" aria-label="Previous view">◂</button><button type="button" data-a="next" aria-label="Next view">▸</button><button type="button" data-a="grid" aria-label="Grid">▦</button><button type="button" data-a="run" aria-label="Hold to let time run">▶</button><button type="button" data-a="live" aria-label="Hover while the world goes on">≈</button><button type="button" data-a="rec" aria-label="Record">●</button><button type="button" data-a="album" aria-label="Your photographs">▤</button></div>
 <button id="recChip" type="button" aria-label="Stop recording"><i></i><span></span></button>
@@ -5151,7 +5164,7 @@ const UIB = { nx: 0, ny: 0, buf: null, tex: null, used: false, was: false };
 // (a box on the page, remembered for a moment: reading one forces the browser to lay the page out, and these hardly move)
 const RECT = new WeakMap(); let rectGen = 0; addEventListener('resize', () => rectGen++);
 function rectOf(el, ms = 400) { const now = performance.now(), c = RECT.get(el); if (c && c.g === rectGen && now - c.t < ms) return c.r; const r = el.getBoundingClientRect(); RECT.set(el, { r, t: now, g: rectGen }); return r; }   // (the big sheet: one of its cells is four of the other's)
-function uibText(c, r, str, ci = 0, b = 255) { const B = UIB.buf, nx = UIB.nx; if (r < 0 || r >= UIB.ny) return; for (let k = 0; k < str.length; k++) { const x = c + k; if (x < 0 || x >= nx) continue; const cc = str.charCodeAt(k), i = (r * nx + x) * 4; B[i] = cc > 32 && cc < 127 ? cc : cc === 8217 || cc === 8216 ? 39 : cc === 8220 || cc === 8221 ? 34 : cc === 8212 || cc === 8211 ? 45 : cc === 8230 ? 46 : 32; B[i + 1] = ci; B[i + 2] = b; } UIB.used = true; }
+function uibText(c, r, str, ci = 0, b = 255) { const B = UIB.buf, nx = UIB.nx; if (r < 0 || r >= UIB.ny) return; for (let k = 0; k < str.length; k++) { const x = c + k; if (x < 0 || x >= nx) continue; const cc = str.charCodeAt(k), i = (r * nx + x) * 4; B[i] = cc > 32 && cc < 128 ? cc : cc === 183 || cc === 8226 ? 127 : cc === 8217 || cc === 8216 ? 39 : cc === 8220 || cc === 8221 ? 34 : cc === 8212 || cc === 8211 ? 45 : cc === 8230 ? 46 : 32; B[i + 1] = ci; B[i + 2] = b; } UIB.used = true; }
 function uibPut(c, r, code, ci = 0, b = 255, a = -1) { if (c < 0 || r < 0 || c >= UIB.nx || r >= UIB.ny) return; const i = (r * UIB.nx + c) * 4, B = UIB.buf; B[i] = code; B[i + 1] = ci; B[i + 2] = b; if (a >= 0 && a > B[i + 3]) B[i + 3] = a; UIB.used = true; }
 function uibPlate(c0, r0, c1, r1, a) { const B = UIB.buf, nx = UIB.nx; c0 = Math.max(0, c0); c1 = Math.min(nx - 1, c1); r0 = Math.max(0, r0); r1 = Math.min(UIB.ny - 1, r1); for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const i = (r * nx + c) * 4 + 3; if (a > B[i]) B[i] = a; } if (c1 >= c0 && r1 >= r0) UIB.used = true; }
 function uilSize(nx, ny, cw, ch) {
@@ -5163,14 +5176,14 @@ function uilSize(nx, ny, cw, ch) {
 }
 { const cw = 32, ch = 52, c = document.createElement('canvas'); c.width = cw * 96; c.height = ch; const x = c.getContext('2d');   // every printable character, once
   x.fillStyle = '#000'; x.fillRect(0, 0, c.width, ch); x.fillStyle = '#fff'; x.font = 'bold 40px Menlo, Consolas, "DejaVu Sans Mono", monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  for (let i = 0; i < 96; i++) x.fillText(String.fromCharCode(32 + i), i * cw + cw / 2, ch / 2 + 2);
+  for (let i = 0; i < 96; i++) x.fillText(i === 95 ? '·' : String.fromCharCode(32 + i), i * cw + cw / 2, ch / 2 + 2);   // (the last slot, unused by the keyboard, is the dot that parts one thing from the next)
   const t = new THREE.CanvasTexture(c); t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; postMat.uniforms.tChars.value = t; }
 const uilCol = x => Math.floor(x / UIL.cw), uilRow = y => Math.floor((innerHeight - y) / UIL.ch);   // (a place on the page → its cell)
 function uilPut(c, r, code, ci = 0, b = 255, a = -1) {
   if (c < 0 || r < 0 || c >= UIL.nx || r >= UIL.ny) return;
   const i = (r * UIL.nx + c) * 4, B = UIL.buf; B[i] = code; B[i + 1] = ci; B[i + 2] = b; if (a >= 0 && a > B[i + 3]) B[i + 3] = a; UIL.used = true;
 }
-function uilText(c, r, str, ci = 0, b = 255, a = -1) { for (let k = 0; k < str.length; k++) { const cc = str.charCodeAt(k); uilPut(c + k, r, cc > 32 && cc < 127 ? cc : cc === 183 || cc === 8226 ? 42 : 32, ci, b, a); } }
+function uilText(c, r, str, ci = 0, b = 255, a = -1) { for (let k = 0; k < str.length; k++) { const cc = str.charCodeAt(k); uilPut(c + k, r, cc > 32 && cc < 128 ? cc : cc === 183 || cc === 8226 ? 127 : 32, ci, b, a); } }
 function uilClear(c0, r0, c1, r1) { const B = UIL.buf, nx = UIL.nx; c0 = Math.max(0, c0); c1 = Math.min(nx - 1, c1); r0 = Math.max(0, r0); r1 = Math.min(UIL.ny - 1, r1); for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) B[(r * nx + c) * 4] = 0; }
 function uilPlate(c0, r0, c1, r1, a) { const B = UIL.buf, nx = UIL.nx; c0 = Math.max(0, c0); c1 = Math.min(nx - 1, c1); r0 = Math.max(0, r0); r1 = Math.min(UIL.ny - 1, r1); for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const i = (r * nx + c) * 4 + 3; if (a > B[i]) B[i] = a; } if (c1 >= c0 && r1 >= r0) UIL.used = true; }
 // fire, in the grid: the same old field of heat, a cell to a cell
@@ -7733,7 +7746,7 @@ function placeWaypoint(P, d, said, bird) {
   if (el._txt !== txt) { el._txt = txt; el.lastChild.textContent = txt; }
 }
 // Hold Tab: everyone who is here right now, in their colours, with how far away they are and which way to turn.
-const who = { open: false, t: 0, pinned: false };
+const who = { open: false, t: 0, pinned: false, sel: '' };   // (sel: the row pointed at, or tapped: only it shows what can be done)
 function whoList() {
   const now = performance.now(), me = realm === 'under' ? 1 : 0;
   return [...NET.peers.values()].filter(P => P.s && now - P.s.t < 15000).map(P => {
@@ -7757,12 +7770,14 @@ function updateWho(dt) {
   const wbtn = (n, k, g, text, on, title) => `<s data-n="${esc(n)}" data-k="${k}" data-g="${g}" title="${title}" class="${on ? 'on' : ''}">${text}</s>`;
   const ctl = P => { const n = P.name; return wbtn(n, 'go', '➤', 'go', false, 'Be carried to them') + wbtn(n, 'track', '◎', 'track', TRACK.id === P.id, 'Keep their mark on screen, however far they go') + wbtn(n, 'follow', '⇢', 'follow', following(P), 'Fly after them')
     + wbtn(n, 'friend', '♦', 'friend', FRIENDS.has(n), 'Add them as a friend: they are told, and can add you back') + wbtn(n, 'mute', '◌', 'mute', SHUN.mute.has(n), 'Stop hearing them') + wbtn(n, 'block', '⊘', 'block', SHUN.block.has(n), 'Stop seeing them') + wbtn(n, 'xf', '✉', 'send', false, 'Send them a voice note or a file') + (P.npc && MOD.admin ? wbtn(n, 'npcx', '✕', 'send away', false, 'Send this regular away') : ''); };
-  const row = (col, name, form, dist, arrow, c = '', go = '') => `<div class="r"><b style="color:${col}">◆</b><span style="color:${col}"${go ? ` data-n="${esc(go)}" data-k="go"` : ''}>${esc(name)}</span><u>${form}</u><i>${dist}</i><em>${arrow}</em><p>${c}</p></div>`;
-  const formOf = P => (performance.now() - (P.ring?.t || -1e9) < 9000 ? 'in the rings' : P.form === 'p' ? 'phoenix' : 'on foot') + (P.patron ? ` · ${godById[P.patron]?.name || ''}` : '');
-  let h = `<h4>IN THE SKY · ${list.length + 1}</h4>` + row(PATRONS[PATRON.id]?.[0] || '#ff1206', `${heroName} (you)`, (player.form === 'phoenix' ? 'phoenix' : 'on foot') + (PATRON.id ? ` · ${godById[PATRON.id]?.name}` : ''), realm === 'under' ? 'below' : '', '·');
-  for (const w of list) h += row(w.P.css || '#bfe6ff', (FRIENDS.has(w.P.name) ? '♦ ' : '') + w.P.name, formOf(w.P), w.there ? fmtDist(w.d) : (w.P.realm ? 'below' : 'above'), w.there ? w.arrow : '', ctl(w.P), w.P.name);
+  // (a row: their mark and name in their house's colour, their god, how far, which way; what can be done shows under the one row pointed at)
+  const row = (col, name, form, dist, arrow, c = '', go = '') => `<div class="r${go && go === who.sel ? ' sel' : ''}${go ? '' : ' me'}"${go ? ` data-who="${esc(go)}"` : ''}><b style="color:${col}">${go ? '·' : '>'}</b><span style="color:${col}"${go ? ` data-n="${esc(go)}" data-k="go"` : ''}>${esc(name)}</span><u>${form}</u><i>${dist}</i><em>${arrow}</em>${c ? `<p>${c}</p>` : ''}</div>`;
+  const formOf = P => [performance.now() - (P.ring?.t || -1e9) < 9000 ? 'in the rings' : P.form === 'p' ? '' : 'on foot', P.patron ? godById[P.patron]?.name || '' : ''].filter(Boolean).join(' · ');
+  if (who.sel && !list.some(w => w.P.name === who.sel)) who.sel = '';
+  let h = `<h4>IN THE SKY · ${list.length + 1}</h4>` + row(PATRONS[PATRON.id]?.[0] || '#ff1206', `${heroName}`, [player.form === 'phoenix' ? '' : 'on foot', PATRON.id ? godById[PATRON.id]?.name : ''].filter(Boolean).join(' · '), realm === 'under' ? 'below' : 'you', '');
+  for (const w of list) h += row(w.P.css || '#bfe6ff', (FRIENDS.has(w.P.name) ? '♦ ' : '') + w.P.name, formOf(w.P), w.there ? fmtDist(w.d) : (w.P.realm ? 'below' : 'above'), w.there ? w.arrow : '', w.P.name === who.sel ? ctl(w.P) : '', w.P.name);
   if (!list.length) h += `<div class="none">${NET.on || NET.ch ? 'nobody else is flying right now' : 'not connected'}</div>`;
-  else if (flags.morphed) h += `<div class="none">${TOUCH ? 'tap a name to be carried to them · ➤ go · ◎ track · ⇢ follow · ♦ friend' : 'click a name and the gods will carry you to them'}</div>`;
+  else if (flags.morphed) h += `<div class="none">${TOUCH ? 'tap someone for more · tap their name again to fly there' : 'click a name to fly there · point at someone for more'}</div>`;
   if (MOD.admin) { const kb = (k, t, title) => `<s data-n="__k" data-k="${k}" title="${title}">${t}</s>`, off = Date.now() < DECREE.until && DECREE.npcs === '00000000';
     h += `<div class="kp"><h4>THE KEEPER</h4><p>regulars ${kb(off ? 'npcon' : 'npcoff', off ? 'bring them back' : 'send all away', 'The game\'s own fliers')} ${kb('npcadd', '+ one more', 'Call up another regular')} ${kb('npcon', 'as they like', 'Let them come and go by themselves')}</p>`
       + `<p>olympus ${['clear', 'storm', 'rain', 'mist', 'day', 'night'].map(w => kb('wx:' + w, w, 'Over Olympus, for everyone')).join(' ')}</p><p>everyone ${kb('go:me', 'to me', 'Carry everyone flying to you')} ${kb('go:oly', 'to the summit', 'Carry everyone to the top of Olympus')} ${kb('go:crete', 'to crete', 'Carry everyone to Crete')}</p>`
@@ -7770,7 +7785,10 @@ function updateWho(dt) {
   el.innerHTML = h;
 }
 $('whoBtn').addEventListener('click', e => { e.stopPropagation(); who.pinned = !who.pinned; who.t = 0; });
-$('who').addEventListener('pointerdown', e => { const b = e.target.closest('[data-n]'); if (!b) return; e.stopPropagation(); e.preventDefault(); const k = b.dataset.k;
+$('who').addEventListener('pointerover', e => { if (TOUCH) return; const r = e.target.closest('.r[data-who]'); if (r && r.dataset.who !== who.sel) { who.sel = r.dataset.who; who.t = 0; } });   // (pointing at someone: what can be done with them, under their name)
+$('who').addEventListener('pointerdown', e => { const r = e.target.closest('.r[data-who]'), b = e.target.closest('[data-n]');
+  if (r && TOUCH && r.dataset.who !== who.sel && (!b || b.dataset.k === 'go')) { e.stopPropagation(); e.preventDefault(); who.sel = r.dataset.who; who.t = 0; return; }   // (on a phone the first tap on someone opens their row; the next one on their name carries him to them)
+  if (!b) return; e.stopPropagation(); e.preventDefault(); const k = b.dataset.k;
   if (b.dataset.n === '__k') { keeperAct(k); return; }   // (the keeper's own buttons)
   if (k === 'npcx') { const C = NPCS.list.find(c => c && c.name === b.dataset.n); if (C) keeperAct('npcx:' + C.i); return; }
   if (k === 'xf') { const P = peerNamed(b.dataset.n); if (P) xfChoose(P); else toast('THEY HAVE GONE'); return; }   // (it only opens the card: its buttons are pressed with a click, which a phone lets ask for the microphone)
@@ -8401,23 +8419,30 @@ function auiTalkKeys() {
 // mark and whose it is in the colour of the house, what to do in plain words broken where the words break, how far along
 // he is — and under it, quieter, what the story wants of him. The quest's own button lies under it, unseen, to be pressed.
 function auiQuest() {
-  const big = UIB.nx >= 34, K = big ? 2 : 1, nx = big ? UIB.nx : UIL.nx, put = big ? uibText : uilText, plate = big ? uibPlate : uilPlate;
-  let max = Math.max(16, Math.min(48, Math.floor(nx * (TOUCH ? 0.64 : 0.5)) - 2));
-  { const hp = $('health'); if (hp && hp.classList.contains('on')) { const r = rectOf($('healthPill'), 500); if (r.width > 2 && r.top < UIL.ch * 4) max = Math.max(12, Math.min(max, Math.floor(r.left / (UIL.cw * K)) - 4)); } }   // (and never under the FPS pill)
+  // (one quiet block at the top left: whose errand it is, small and in their colour; what to do, in the big letters; how far
+  //  and how to get there, small and dim; and what the story wants of him, small. One backing under all of it, not a box a line.)
+  const nx = UIL.nx, bigOK = UIB.nx >= 34, H = innerHeight, ch = UIL.ch, c0 = 2;
+  let max = Math.max(20, Math.min(60, Math.floor(nx * (TOUCH ? 0.6 : 0.42))));
+  { const hp = $('health'); if (hp && hp.classList.contains('on')) { const r = rectOf($('healthPill'), 500); if (r.width > 2 && r.top < UIL.ch * 6) max = Math.max(14, Math.min(max, Math.floor(r.left / UIL.cw) - 4)); } }   // (and never under the FPS pill)
   const wrap = (t, n) => { const L = ['']; for (const w of t.split(/\s+/)) { if (!w) continue; const i = L.length - 1, u = L[i] ? L[i] + ' ' + w : w; if (L[i] && u.length > n) L.push(w.slice(0, n)); else L[i] = u.slice(0, n); } return L.filter(Boolean); };
-  const lines = [], o = uiAsc($('obj').textContent).replace(/^\s*<>\s*/, '').trim();
-  if (QL.line) { const k = QL.line.indexOf(' · '), head = uiAsc(k > 0 ? QL.line.slice(0, k) : QL.line).toUpperCase(), goal = uiAsc(k > 0 ? QL.line.slice(k + 3) : '');
-    lines.push({ t: head.slice(0, max - 2), ink: 1, b: 255, mark: true, q: true });
-    for (const l of wrap(goal.charAt(0).toUpperCase() + goal.slice(1), max).slice(0, 3)) lines.push({ t: l, ink: 0, b: 250, q: true });
-    if (QL.line2) for (const l of wrap(uiAsc(QL.line2), max).slice(0, 2)) lines.push({ t: l, ink: 2, b: 190, q: true }); }
-  if (o) for (const l of wrap(o.toUpperCase(), max).slice(0, 2)) lines.push({ t: l, ink: 0, b: QL.line ? 175 : 235, gap: !!QL.line && l === wrap(o.toUpperCase(), max)[0] });
-  let row = Math.floor(innerHeight / (UIL.ch * K)) - 1 - (big ? 0 : 1), qTop = -1, qN = 0, qW = 0;
-  for (const L of lines) { if (L.gap) row--; const w = L.t.length + (L.mark ? 2 : 0);
-    plate(1, row, w + 3, row, L.q ? 225 : 185);
-    if (L.mark) { put(2, row, '>', 1, 255); put(4, row, L.t, L.ink, L.b); } else put(L.mark === false ? 2 : 2, row, L.t, L.ink, L.b);
-    if (L.q) { if (qTop < 0) qTop = row; qN++; qW = Math.max(qW, w + 3); } row--; }
-  const qt = $('qtrack'); if (qt && qN) { const ch = UIL.ch * K, cw = UIL.cw * K, top = innerHeight - (qTop + 1) * ch, g = `${top}|${qN}|${qW}|${cw}`; if (qt._g !== g) { qt._g = g; qt.style.left = cw + 'px'; qt.style.top = top + 'px'; qt.style.width = qW * cw + 'px'; qt.style.height = qN * ch + 'px'; } }
-  QL.rows = lines.length ? (lines.length + (QL.line && o ? 1 : 0)) * K + 1 : 0;
+  const T = QL.track, lines = [];
+  let o = uiAsc($('obj').textContent).replace(/^\s*<>\s*/, '').trim(); if (T && T.key === 'axe') o = o.replace(/^for the axe:\s*/i, '');
+  if (QL.line) { const k = QL.line.indexOf(' · '), head = uiAsc(k > 0 ? QL.line.slice(0, k) : QL.line).toUpperCase(), goal = uiAsc(k > 0 ? QL.line.slice(k + 3) : ''), Goal = goal.charAt(0).toUpperCase() + goal.slice(1);
+    const gc = QL.god && PATRONS[QL.god] ? mkInk(PATRONS[QL.god][0]) : 1;
+    lines.push({ t: head.slice(0, max), ink: gc, b: 235, q: true });
+    if (Goal) { if (bigOK) for (const l of wrap(Goal, max >> 1).slice(0, 2)) lines.push({ t: l, ink: 0, b: 250, q: true, big: true });
+      else for (const l of wrap(Goal, max).slice(0, 3)) lines.push({ t: l, ink: 0, b: 250, q: true }); }
+    if (QL.line2) for (const l of wrap(uiAsc(QL.line2), max).slice(0, 2)) lines.push({ t: l, ink: 0, b: 160, q: true }); }
+  if (o) wrap(o, max).slice(0, 2).forEach((l, i) => lines.push({ t: l, ink: 2, b: 215, gap: !!QL.line && i === 0 }));
+  if (!lines.length) { QL.rows = 0; return; }
+  const top = Math.floor(H / ch) - 2; let row = top, qEnd = top, W = 0;
+  for (const L of lines) { if (L.gap) row--;
+    if (L.big) { const rb = Math.floor((row - 1) / 2); uibText(c0 >> 1, rb, L.t, L.ink, L.b); row = 2 * rb - 1; W = Math.max(W, L.t.length * 2); }
+    else { uilText(c0, row, L.t, L.ink, L.b); row--; W = Math.max(W, L.t.length); }
+    if (L.q) qEnd = row + 1; }
+  const cEnd = (c0 + W + 1) | 1; uilPlate(0, row, cEnd, top + 1, 165);   // (a row of air above and below the words, inside the backing)
+  const qt = $('qtrack'); if (qt && QL.line) { const cw = UIL.cw, t = H - (top + 1) * ch, g = `${t}|${qEnd}|${cEnd}|${cw}`; if (qt._g !== g) { qt._g = g; qt.style.left = '0px'; qt.style.top = t + 'px'; qt.style.width = (cEnd + 1) * cw + 'px'; qt.style.height = (top + 1 - qEnd) * ch + 'px'; } }
+  QL.rows = top + 2 - row;
 }
 function auiSay() {
   if ((state === 'play' || state === 'map' && !M3.on) && !MENU.open && !who.open && !QL.open && !GUIDE.open) auiQuest(); else QL.rows = 0;   // (not over the standing map: it has its own heading; nor over the strip)
@@ -8456,7 +8481,7 @@ function drawAsciiUi(dt) {
     if (state === 'stats' || STV.map) auiStats(dt);
     if (state === 'map' && mapV.open) auiMapChrome();
     if (state === 'play' && !cl.contains('pro')) auiMarks();
-    if (state !== 'title' && state !== 'stats' && !cl.contains('pro') && !cl.contains('photo')) auiDom();
+    if (state !== 'title' && state !== 'stats' && !cl.contains('pro') && !cl.contains('photo')) { auiDom(); auiArea(dt); }
     if (shown && !REC.on && !STV.on) auiMark();
     if (state !== 'title' && !REC.on) { auiMenu(); auiToast(); }
     if (state !== 'title' && !cl.contains('pro') && !cl.contains('photo')) { if (state === 'talk') auiTalk(); else auiSay(); }   // (also while he is dying, or the film is running: what is said is always there to be read)
@@ -8708,9 +8733,9 @@ addEventListener('keydown', e => {
 // typed into the grid too. The page keeps every one of them, laid out as before but in letters the size of the grid's
 // (so where a word is on the page is where it is typed), unseen; a press still lands on the real thing. A panel is
 // looked at afresh when something in it changes, or every quarter of a second, and typed in again every frame from that.
-const AUID = { ids: ['chat', 'who', 'prompt', 'warn', 'mic', 'areaBar', 'modeBar', 'newcomer', 'friendAsk', 'xfCard', 'xfList', 'waveBtn', 'flipBtn', 'diveBtn', 'bag', 'bldBar', 'matchBig', 'fightCard', 'matchAsk', 'dpBar', 'dpExit', 'recChip', 'guide', 'qlog', 'healthPill', 'looks', 'patron', 'tut'],
+const AUID = { ids: ['chat', 'who', 'prompt', 'warn', 'mic', 'modeBar', 'newcomer', 'friendAsk', 'xfCard', 'xfList', 'waveBtn', 'flipBtn', 'diveBtn', 'bag', 'bldBar', 'matchBig', 'fightCard', 'matchAsk', 'dpBar', 'dpExit', 'recChip', 'guide', 'qlog', 'healthPill', 'looks', 'patron', 'tut'],
   panels: new Set(['who', 'xfCard', 'xfList', 'bag', 'bldBar', 'guide', 'qlog', 'looks', 'patron', 'fightCard']), roots: [], mo: null };
-const UIASC = { '⟲': '@', '✕': 'X', '×': 'x', '◂': '<', '▸': '>', '‹': '<', '›': '>', '«': '<<', '»': '>>', '→': '->', '←': '<-', '↑': '^', '↓': 'v', '●': '*', '◉': '@', '◎': '@', '◆': '<>', '◇': '<>', '✦': '*', '✧': '+', '⌂': 'n', '♣': '&', '△': '^', '▲': '^', '▶': '>', '▦': '#', '▣': '#', '†': '+', '—': '-', '–': '-', '…': '...', '’': "'", '‘': "'", '“': '"', '”': '"', '·': '*', '•': '*', '²': '2', '³': '3', '°': 'o', '✓': 'v', '★': '*', '☆': '*', '♥': '<3', '✎': '>_', '⚑': 'P', '⏵': '>', '⏸': '||' };
+const UIASC = { '⟲': '@', '✕': 'X', '×': 'x', '◂': '<', '▸': '>', '‹': '<', '›': '>', '«': '<<', '»': '>>', '→': '->', '←': '<-', '↑': '^', '↓': 'v', '●': '*', '◉': '@', '◎': '@', '◆': '<>', '◇': '<>', '✦': '*', '✧': '+', '⌂': 'n', '♣': '&', '△': '^', '▲': '^', '▶': '>', '▦': '#', '▣': '#', '†': '+', '—': '-', '–': '-', '…': '...', '’': "'", '‘': "'", '“': '"', '”': '"', '·': '\x7f', '•': '\x7f', '\x7f': '\x7f', '²': '2', '³': '3', '°': 'o', '✓': 'v', '★': '*', '☆': '*', '♥': '<3', '✎': '>_', '⚑': 'P', '⏵': '>', '⏸': '||' };
 const uiAsc = s => String(s || '').replace(/[^\x20-\x7e]/g, ch => UIASC[ch] ?? (/[À-ÿ]/.test(ch) ? ch.normalize('NFD')[0] : ''));
 function auidInit() {
   postMat.uniforms.uMk.value[5].setRGB(0.66, 0.86, 1);   // (the last of the marks' inks is the cool blue the page uses for the post and the sea)
@@ -8770,9 +8795,26 @@ function auiDom() {
       const hot = it.btn && (it.btn.matches(':hover') || document.activeElement === it.btn), on = it.btn && it.btn.classList.contains('on') && it.btn.id !== 'flipBtn' && it.btn.id !== 'waveBtn', ba = 255 * it.a | 0;
       if (it.brk) { const [c0, c1] = it.brk; uilPlate(c0, it.r, c1, it.r, (hot ? 235 : 200) * it.a | 0); uilPut(c0, it.r, 91, hot || on ? 2 : 1, ba); uilPut(c1, it.r, 93, hot || on ? 2 : 1, ba); if (hot) { uilPut(c0 - 1, it.r, 62, 2, 230); uilPut(c1 + 1, it.r, 60, 2, 230); } continue; }
       uilPlate(it.c - 1, it.r, it.c + it.s.length, it.r, (hot ? 235 : it.btn ? 215 : 195) * it.a | 0);
-      uilText(it.c, it.r, it.s, hot ? 4 : it.btn ? (on ? 2 : it.ink === 0 ? 2 : it.ink) : it.ink, hot ? 255 : it.btn ? Math.max(it.b, 225 * it.a | 0) : it.b);
+      const quiet = it.btn && !on && !hot && it.btn.parentElement?.id === 'chatTabs';   // (a choice not taken: there, but quiet)
+      uilText(it.c, it.r, it.s, hot ? 4 : quiet ? 0 : it.btn ? (on ? 2 : it.ink === 0 ? 2 : it.ink) : it.ink, hot ? 255 : quiet ? 140 : it.btn ? Math.max(it.b, 225 * it.a | 0) : it.b);
     }
   }
+}
+// ── The place he is in, at the top in the middle: its name, and under it (quieter, in plain letters) who found it or named
+//    it; any buttons it has as keys under that. Typed here rather than read off the page, so it is always whole and centred.
+function auiArea(dt) {
+  const el = $('areaBar'); if (!el) return;
+  const on = el.classList.contains('on') && state === 'play'; AREA.barA = Math.abs((on ? 1 : 0) - (AREA.barA || 0)) < 0.01 ? (on ? 1 : 0) : lerp(AREA.barA || 0, on ? 1 : 0, damp(on ? 5 : 2.2, dt));
+  const A = AREA.barA; if (A < 0.02) return;
+  const nx = UIL.nx, b = el.querySelector('b'), r = rectOf(b, 250); if (r.width < 1) return;
+  const title = uiAsc(b.textContent).toUpperCase().slice(0, nx - 6), sub = uiAsc(el.querySelector('i').textContent).slice(0, nx - 6), row = uilRow(r.top + r.height / 2), cx = nx >> 1;
+  const w = Math.max(title.length, sub.length), c0 = cx - (w >> 1) - 2, c1 = cx + ((w + 1) >> 1) + 1, btns = el.classList.contains('acts') ? [...el.querySelectorAll('span button')] : [];
+  let bottom = sub ? row - 1 : row; const keys = btns.map(B => { const q = rectOf(B, 250), lab = uiAsc(B.textContent).toUpperCase(); if (q.width < 1) return null; const kr = uilRow(q.top + q.height / 2); bottom = Math.min(bottom, kr); return { B, q, lab, kr }; }).filter(Boolean);
+  uilPlate(c0, row, c1, row, 175 * A | 0); if (sub) uilPlate(c0, row - 1, c1, row - 1, 175 * A | 0);
+  uilText(cx - (title.length >> 1), row, title, 2, 250 * A | 0);
+  if (sub) uilText(cx - (sub.length >> 1), row - 1, sub, 0, 175 * A | 0);
+  for (const K of keys) { const hot = K.B.matches(':hover') || document.activeElement === K.B, t = K.lab, kc = uilCol(K.q.left + K.q.width / 2) - ((t.length + 4) >> 1);
+    uilPlate(kc, K.kr, kc + t.length + 3, K.kr, (hot ? 230 : 185) * A | 0); uilPut(kc, K.kr, 91, hot ? 2 : 1, 255 * A | 0); uilPut(kc + t.length + 3, K.kr, 93, hot ? 2 : 1, 255 * A | 0); uilText(kc + 2, K.kr, t, hot ? 2 : 0, (hot ? 255 : 215) * A | 0); }
 }
 // ── The marks in the world — another flier, the errand, the places he keeps — are not laid over the picture either: the
 //    cells round the place itself come alive. An errand or a kept place has a ring of sparks going round it and brackets
@@ -9095,7 +9137,8 @@ function gotEvent(m) {
   if (story.events.length > 40) story.events.shift();
 }
 // ── chat (T): low on the left, everyone flying sees it wherever they are, and it hangs over the speaker's head nearby
-const CHAT = { open: false, last: 0, joinedAt: 0, alone: false };
+const CHAT = { open: false, last: 0, joinedAt: 0, alone: false, f: 'all' };   // (f: which lines the open log shows: all, players, gods, private, the game's own)
+const CHAT_SHUT = 4;   // (shut, the log keeps only its newest few lines, and those fade)
 function chatCol(name) {   // the house (patron god) of whoever a chat line names: theirs, or his own
   const base = String(name).replace(/ → .*$/, '').replace(/^→ /, '').replace(/ · .*$/, '').trim(), pc = id => id && PATRONS[id] ? PATRONS[id][0] : '';
   if (base === heroName) return pc(PATRON.id);
@@ -9108,9 +9151,16 @@ function chatLine(name, text, kind) {
   if (name) { const b = document.createElement('b'); b.textContent = name; el.append(b);
     if (!/\b(sys|god|eye)\b/.test(kind || '')) { let c = ''; try { c = chatCol(name); } catch {} if (c) b.style.color = c; } }   // (a name in the colour of their house)
   el.append(document.createTextNode(text));
-  box.append(el); while (box.children.length > 80) box.firstChild.remove();
+  const k = kind || '', cat = /\bsys\b/.test(k) ? 'sys' : /\bgod\b/.test(k) ? 'god' : /\b(dm|fac)\b/.test(k) ? 'pm' : 'ply'; el.classList.add('k-' + cat);
+  box.append(el); while (box.children.length > 120) box.firstChild.remove();
+  { const L = box.children; for (let i = Math.max(0, L.length - CHAT_SHUT - 1); i < L.length - CHAT_SHUT; i++) L[i].classList.add('old'); }   // (shut, only the newest few stay up)
   box.scrollTop = box.scrollHeight;
 }
+function chatFilter(f) {   // which kind of line the open log shows
+  CHAT.f = f; $('chat').dataset.f = f; for (const b of $('chatTabs').children) b.classList.toggle('on', b.dataset.f === f);
+  $('chatLog').scrollTop = 1e6; if (CHAT.open) $('chatInput').focus({ preventScroll: true });
+}
+$('chatTabs').addEventListener('pointerdown', e => { const b = e.target.closest('button[data-f]'); if (!b) return; e.preventDefault(); e.stopPropagation(); chatFilter(b.dataset.f); audio.sfx.ui?.(); });
 function openChat(pre = '') {
   if (CHAT.open) return;
   CHAT.open = true; for (const k in keys) keys[k] = false;
@@ -10578,8 +10628,8 @@ function ringsAfterAxe() {   // the axe made: Hermes's word comes on the wind, a
   toast('HERMES · FLY HIS RINGS ROUND HIS ISLAND'); saveSoon();
 }
 function axeObj() {   // what the line at the top says while the errand is on
-  if (INV.q === 1) return `◇ FOR THE AXE · ${INV.branch ? '✓' : '·'} A BRANCH (${TOUCH ? 'TAP' : 'SPACE'} AT A TREE) · ${INV.flint ? '✓' : '·'} A FLINT (${TOUCH ? 'TAP' : 'SPACE'} ON THE SHORE)`;
-  if (INV.q === 2) { const h = godById.hephaestus, d = h && h.active ? Math.hypot(player.pos.x - h.x, player.pos.z - h.z) : 0; return `◇ TAKE THE BRANCH AND THE FLINT TO HEPHAESTUS${d ? ' · ' + fmtDist(d) : ''}`; }
+  if (INV.q === 1) { const k = TOUCH ? 'tap' : 'Space', need = !INV.branch ? ` · ${k} at a tree` : !INV.flint ? ` · ${k} on the shore` : ''; return `◇ For the axe: ${INV.branch ? '[x]' : '[ ]'} branch  ${INV.flint ? '[x]' : '[ ]'} flint${need}`; }
+  if (INV.q === 2) { const h = godById.hephaestus, d = h && h.active ? Math.hypot(player.pos.x - h.x, player.pos.z - h.z) : 0; return `◇ Take the branch and the flint to Hephaestus${d ? ' · ' + fmtDist(d) : ''}`; }
   if (INV.q === 0 && !story.met.has('hephaestus') && !questOf('hermes')) { if (GFLY.tour) return '◇ FLY WITH HERMES · SAY SKIP TO SKIP'; if (!flags.toured && flags.morphed) return '◇ HERMES IS COMING UP TO MEET YOU'; const d = Math.hypot(player.pos.x - FORGE.x, player.pos.z - FORGE.z); return `◇ GO AND SEE HEPHAESTUS · HIS FORGE ON HERMES’S ISLAND · ${fmtDist(d)}`; }
   if (INV.q === 9 && ringsOwed()) { const d = Math.hypot(player.pos.x - MYKONOS.x, player.pos.z - MYKONOS.z); return `◇ FLY HERMES’S RINGS ROUND HIS ISLAND${d > 300 ? ' · ' + fmtDist(d) : ''}`; }
   return '';
@@ -22565,7 +22615,7 @@ function qlActive() {
   for (const q of quests) if (!q.done) { const sg = q.sg && story.saga && story.saga.god === q.id ? story.saga : null;
     L.push({ key: 'q:' + q.id, god: q.id, name: q.name, goal: goalOf(q), title: sg ? sg.title : '', step: sg ? `${sg.i + 1} of ${sg.steps.length}` : '', v: RANGE[q.kind] ? clamp(q.v, 0, 1) : q.kind === 'climb' && q.v ? 0.5 : -1, n: RANGE[q.kind] ? q.n : 0, kind: q.kind, to: questTarget(q), reward: PERKS[q.reward]?.[0] || '' }); }
   if (GREAT.line) L.push({ key: 'great', god: '', name: 'A LABOUR', goal: GREAT.line, v: -1, to: GREAT.T ? { x: GREAT.T.x, z: GREAT.T.z } : null });
-  if (INV.q === 1 || INV.q === 2) { const h = godById.hephaestus; L.push({ key: 'axe', god: 'hephaestus', name: 'HEPHAESTUS', goal: INV.q === 2 ? 'bring him the branch and the flint' : `a branch from a tree${INV.branch ? ' (got it)' : ''} and a flint from the shore${INV.flint ? ' (got it)' : ''}`, v: -1, kind: 'axe', to: INV.q === 2 ? (h && h.active ? { x: h.x, z: h.z } : { x: FORGE.x, z: FORGE.z }) : null }); }
+  if (INV.q === 1 || INV.q === 2) { const h = godById.hephaestus; L.push({ key: 'axe', god: 'hephaestus', name: 'HEPHAESTUS', goal: INV.q === 2 ? 'bring him the branch and the flint' : 'get a branch and a flint for the axe', v: -1, kind: 'axe', to: INV.q === 2 ? (h && h.active ? { x: h.x, z: h.z } : { x: FORGE.x, z: FORGE.z }) : null }); }
   { const c = chainInfo(); if (c) L.push({ key: 'chain', god: c.g.id, name: `${(godById[story.chain?.from]?.name || 'SOMEONE')} SENDS YOU`, goal: `find ${c.g.revealed ? c.g.name : c.g.disguise}`, v: -1, to: { x: c.g.x, z: c.g.z } }); }
   return L;
 }
@@ -22602,7 +22652,7 @@ function qlUpdate() {
   if (!T) { QL.line = QL.line2 = ''; if (el && el.textContent) el.textContent = ''; } else {
     const head = `${T.name.toUpperCase()}${T.step ? ' ' + T.step : ''}`;
     QL.line = `${head} · ${T.goal}`; QL.god = T.god;
-    QL.line2 = [T.v >= 0 ? `${qlBar(T.v)} ${T.n >= 1 && T.n <= 30 ? `${Math.floor(T.v * T.n + 1e-6)}/${T.n}` : Math.round(T.v * 100) + '%'}` : '', qlDist(T.to || qlWhere(T)), flags.morphed ? (TOUCH ? 'TAP HERE TO GO THERE' : 'SHIFT+J TO GO THERE') : ''].filter(Boolean).join(' · ');
+    QL.line2 = [T.v >= 0 ? `${qlBar(T.v)} ${T.n >= 1 && T.n <= 30 ? `${Math.floor(T.v * T.n + 1e-6)}/${T.n}` : Math.round(T.v * 100) + '%'}` : '', qlDist(T.to || qlWhere(T)), flags.morphed ? (TOUCH ? 'tap here to go there' : 'Shift+J to go there') : ''].filter(Boolean).join(' · ');
     if (el) { const h = `<b style="color:${PATRONS[T.god]?.[0] || '#ffd9a8'}">◆ ${head}</b> · ${T.goal}${QL.line2 ? `<br><i>${QL.line2}</i>` : ''}`; if (el._h !== h) { el._h = h; el.innerHTML = h; } }
   }
   if (!QL.mk) { const m = QL.mk = document.createElement('div'); m.className = 'mk wp'; m.innerHTML = '<b>◆</b><span></span>'; m.style.display = 'none'; $('markers').appendChild(m); }
@@ -29510,7 +29560,7 @@ function areaEnter(key, a) {
   const been = AREA.seen.has(key);
   if (!been) { AREA.seen.add(key); STATS.d.areas++; try { localStorage.setItem('icarus.areas', JSON.stringify([...AREA.seen].slice(-800))); } catch {} }
   const mine = a.fresh && cleanName(a.by) === cleanName(heroName), own = areaOwn(a);
-  areaBar(been ? a.name : `entering · ${a.name}`, mine ? (a.g ? `found by you · ${ownS(a.gn || FAC.name)} to name` : 'you found it · yours to name') : a.rn && a.nb ? `named by ${a.nb}` : !been && a.by ? `first found by ${a.by}${a.gn ? ' · ' + a.gn : ''}` : own ? 'yours to name' : '', own || mine ? [['rename', () => openChat('/name-place ')]] : null);
+  areaBar(a.name, mine ? (a.g ? `found by you · ${ownS(a.gn || FAC.name)} to name` : 'you found it · yours to name') : a.rn && a.nb ? `named by ${a.nb}` : !been && a.by ? `first found by ${a.by}${a.gn ? ' · ' + a.gn : ''}` : own ? 'yours to name' : '', own || mine ? [['rename', () => openChat('/name-place ')]] : null);
   if (!been || cinema.on) worldTitle(a.name, been ? '' : mine ? 'NAMED THIS MOMENT · YOURS' : '', 2600, null, { style: a.style | 0, D: cinema.on ? 150 : 96 });
   if (mine) { wreathFound(key, a);   // (and a wreath of torches for it, right in front of him)
     if (!AREA_V.told) { AREA_V.told = true; setTimeout(() => sysLine(`THIS PLACE IS YOURS TO NAME · /name-place NEW NAME${a.g ? ` · ${a.gn || FAC.name} VOTES ON IT` : ''}`), 3200); } }
@@ -29518,7 +29568,7 @@ function areaEnter(key, a) {
 // the line at the top: where he is, who named it, and (in a place of his, or while his faction votes) a button or two
 function areaBar(text, sub, acts = null, ms = 4200) {
   const el = $('areaBar'); if (!el) return;
-  el.querySelector('b').textContent = String(text).toUpperCase(); el.querySelector('i').textContent = String(sub || '').toUpperCase();
+  el.querySelector('b').textContent = String(text).toUpperCase(); el.querySelector('i').textContent = String(sub || '');
   const row = el.querySelector('span'); row.textContent = '';
   for (const [label, fn] of acts || []) { const B = document.createElement('button'); B.type = 'button'; B.textContent = label;
     B.addEventListener('pointerdown', e => e.stopPropagation()); B.addEventListener('click', e => { e.stopPropagation(); B.blur(); fn(); }); row.appendChild(B); }
@@ -30790,7 +30840,7 @@ setTimeout(() => {
   warmPrograms();
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
-  if (window.__icarus) Object.assign(window.__icarus, { STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
+  if (window.__icarus) Object.assign(window.__icarus, { areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { NEWB, newbHear, newbHeard, newbTyped, newbTalk, newbFallback, newbArrive });
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
   if (window.__icarus) Object.assign(window.__icarus, { boomHouse, HB, hbHouse, matchHouse, gotBoom, crash, setTimeK: v => { timeK = v; }, gameTime: () => time, pAlive: () => { let n = 0; for (let i = 0; i < PMAX; i++) if (pLife[i] > 0) n++; return n; } });
