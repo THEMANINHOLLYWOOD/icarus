@@ -2464,11 +2464,9 @@ function phoenixHit(h, dt) {
 function crash(what) {
   if (player.shade) return false;   // (a ghost watching a fight goes through: see matchGhost)
   const p = player, kmh = Math.round(p.speed * 3.6), x = p.pos.x, y = p.pos.y, z = p.pos.z;
-  for (let i = 0; i < 320; i++) {
-    _v.set(rnd(), rnd(), rnd()).normalize().multiplyScalar(6 + Math.random() * 34);
-    emit(x + rnd(2), y + rnd(2), z + rnd(2), _v.x + dir3.x * p.speed * 0.2, _v.y + 6, _v.z + dir3.z * p.speed * 0.2, 0.7 + Math.random() * 1.5, pick(i % 4 ? EMBER : ASH), i % 4 ? 2.5 : -6);
-  }
-  shock(x, y, z, 0xffb060, 60, 0.9, true); shock(x, y, z, 0xffe0a0, 34, 0.6);
+  if (!(MATCH.phase === 'live' && MATCH.me.alive)) {   // (he goes up the way his god would have it: see boomHouse. In a fight the fight does it: see matchBoom)
+    boomHouse(x, y, z, PATRON.id || (realm === 'under' ? 'hades' : ''), birdK() * clamp(p.speed / 75, 0.55, 2.1), _v.copy(dir3).multiplyScalar(p.speed), matchCol(NET.id)); boomSend(x, y, z, p.speed);
+    shock(x, y, z, 0xffb060, 60, 0.9, true); }
   flash = 0.9; postMat.uniforms.uFlashCol.value.setRGB(1, 0.75, 0.45);
   p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.sub = null; p.stagger = 0; fireLight.intensity = 0; phoenix.tails.forEach(t => t.ok = false);
   // what is left of him comes down where it hit, if that is near the ground; otherwise there is only the ash
@@ -3224,7 +3222,7 @@ function updatePalette(dt) {
 // Sparks, embers, spray, steam, leaves of fire. Each one has its own size, cools as it dies (white, then gold, then red, then
 // gone), is drawn out into a streak along the way it is going, and is shoved about by the air; the pale ones — steam, mist,
 // breath — swell and thin instead of shrinking.
-const PMAX = TOUCH ? 2600 : 5200;
+const PWORLD = TOUCH ? 2600 : 5200, PMAX = PWORLD + (TOUCH ? 1400 : 3200);   // (the last of them kept for fireworks, so his own fire never eats them: see boomHouse)
 const pPos = new Float32Array(PMAX * 3).fill(-99999), pCol = new Float32Array(PMAX * 3), pSize = new Float32Array(PMAX);
 const pVel = new Float32Array(PMAX * 3), pLife = new Float32Array(PMAX), pMax = new Float32Array(PMAX), pBase = new Float32Array(PMAX * 3), pBuoy = new Float32Array(PMAX);
 const pS0 = new Float32Array(PMAX), pKind = new Uint8Array(PMAX);   // size it was born with; 1 = fire (cools), 2 = vapour (swells), 0 = anything else
@@ -3261,7 +3259,7 @@ scene.add(particles);
 let pHead = 0;
 const EMBER = [col('#ffd27a'), col('#ff9a3a'), col('#ff5a1f'), col('#fff1c0')];
 function emit(x, y, z, vx, vy, vz, life, c, buoy = 2.5, size = 0) {
-  const i = pHead; pHead = (pHead + 1) % PMAX; pBuoy[i] = buoy;
+  const i = pHead; pHead = (pHead + 1) % PWORLD; pBuoy[i] = buoy;
   pPos[i * 3] = x; pPos[i * 3 + 1] = y; pPos[i * 3 + 2] = z;
   pVel[i * 3] = vx; pVel[i * 3 + 1] = vy; pVel[i * 3 + 2] = vz;
   pLife[i] = pMax[i] = life;
@@ -3310,7 +3308,7 @@ function updateParticles(dt) {
 }
 const _v2 = new THREE.Vector2();
 // rings of light that race outward from anything sudden: a rebirth, a god unmasking, a body hitting the sea
-const rings = Array.from({ length: 6 }, () => {
+const rings = Array.from({ length: 10 }, () => {
   const m = new THREE.Mesh(new THREE.TorusGeometry(1, 0.03, 6, 56), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   m.visible = false; scene.add(m);
   return { m, t: 1, T: 1, r1: 10 };
@@ -3330,6 +3328,281 @@ function updateRings(dt) {
     r.m.scale.setScalar(lerp(0.4, r.r1, 1 - Math.pow(1 - u, 3)));
     r.m.material.opacity = (1 - u) * (1 - u) * 0.9;
   }
+}
+// ── Fireworks of the gods. A bird that explodes goes up the way its god would have it: the sea's turns to water and comes
+//    down as spray, the hunt's looses a sky of arrows, the vine's fizzes and throws out vines that end in grapes. Each is a
+//    firework more than a blast — a white core, a first burst in the house's own colours, and a second a moment later that
+//    droops, crackles or blooms — and none of it is new: it is the one pool of sparks (see emit), the rings of light (see
+//    shock), and a few dozen shells kept here that fly on and go off late. K is how big (how big the bird, how hard it hit);
+//    dir, if given, is the way it was going (m/s), and the first burst is carried a little along it. No house: a
+//    chrysanthemum in the bird's own fire.
+const HB = { s: [], live: 0, pal: null, R: new THREE.Vector3(), U: new THREE.Vector3(), F: new THREE.Vector3(), d: new THREE.Vector3(), q: new THREE.Vector3(), c: new THREE.Color(), seed: 1, mx: 0, my: 0, mz: 0, fk: 1, zs: 1, cur: PWORLD };
+for (let i = 0; i < 128; i++) HB.s.push({ on: false, k: 0, t: 0, T: 1, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, g: 0, dr: 1, h: '', K: 1, a: 0, em: 0, ax: 0, ay: 0, az: 1, zs: 1 });
+const HB_HEX = {   // (each house's own: its colour first, then what goes with it)
+  zeus: ['#ffe066', '#fff8d8', '#a8ccff', '#ffffff'], hera: ['#5b7cff', '#22d8b4', '#ffcf40', '#3a2ad0'], poseidon: ['#19d0d8', '#d8fcff', '#2a78ff', '#0a4a9a'],
+  demeter: ['#e2c35a', '#fff2a8', '#7fd04a', '#c98a2a'], athena: ['#c9d6e8', '#ffffff', '#ffc84a', '#8a9ac0'], apollo: ['#ffb31a', '#fff4c0', '#ff7a1a', '#ffffff'],
+  artemis: ['#7fe8a6', '#eef6ff', '#b8c4ff', '#3a9a6a'], ares: ['#ff3a2a', '#ffc0a0', '#6c6462', '#a01008'], aphrodite: ['#ff6fb5', '#ffd6ea', '#ff2a6a', '#ffffff'],
+  hephaestus: ['#ff7a1a', '#fff0b8', '#ff3a0a', '#ffd040'], hermes: ['#74e0ff', '#ffffff', '#ffe27a', '#3a9aff'], dionysus: ['#b05cff', '#ff5ad8', '#5ccf4a', '#7a2ae0'],
+  hades: ['#3a7aff', '#a8d8ff', '#6a6a86', '#1a2aa8'] };
+const HB_BALL = { '': 1, hephaestus: 0.75, ares: 0.6, hades: 0.7 };   // (the houses whose fire still swells into a ball of it: see boomBall)
+const HB_POP = 1, HB_CRACK = 2, HB_BOLT = 3, HB_DROP = 4, HB_COMET = 5, HB_CURL = 6;
+const HB_WHITE = [3, 2.9, 2.6];
+const HB_GRAPE = [[-1.5, 0], [-0.5, 0], [0.5, 0], [1.5, 0], [-1, -0.9], [0, -0.9], [1, -0.9], [-0.5, -1.8], [0.5, -1.8], [0, -2.7]];
+function hbPal() {
+  HB.pal = {}; for (const h in HB_HEX) HB.pal[h] = HB_HEX[h].map(x => { HB.c.set(x); return [HB.c.r * 2.6 + 0.1, HB.c.g * 2.6 + 0.1, HB.c.b * 2.6 + 0.1]; });
+  HB.pal[''] = [[2.6, 1.2, 0.4], [2.8, 2.2, 1.1], [2.6, 1.0, 0.25], [3, 2.8, 2.3]];   // (no house: the first is the bird's own fire, filled in each time)
+}
+const hbRand = () => (HB.seed = HB.seed * 16807 % 2147483647) / 2147483647;   // (the same fork of lightning every time it flickers)
+const hbAt = (v, t) => v * (1 - Math.pow(0.35, t)) / 1.05;   // (how far a spark thrown at v has gone after t: see the drag in updateParticles)
+function hbEmit(x, y, z, vx, vy, vz, life, c, buoy, size, kind = 0) {   // (into the fireworks' own end of the pool, see PWORLD; kind 0 keeps its colour as it fades, 1 cools like fire)
+  const i = HB.cur, h = pHead; pHead = i; emit(x, y, z, vx + HB.mx, vy + HB.my, vz + HB.mz, life * 1.3, c, buoy, size * HB.zs); pHead = h; pKind[i] = kind; HB.cur = i + 1 < PMAX ? i + 1 : PWORLD;
+}
+const hbP = (u, v, w = 0) => HB.d.copy(HB.R).multiplyScalar(u).addScaledVector(HB.U, v).addScaledVector(HB.F, w);   // (a way drawn on the sky as he sees it)
+const hbFib = (i, n, a) => { const y = 1 - 2 * (i + 0.5) / n, r = Math.sqrt(1 - y * y), t = i * 2.39996 + a; return HB.d.set(Math.cos(t) * r, y, Math.sin(t) * r); };   // (evenly round a ball)
+function hbBasis(x, y, z) {   // (and how much bigger every spark is drawn, the further off it is, so that it is still a letter or two wide)
+  HB.zs = clamp(Math.sqrt((camera.position.x - x) ** 2 + (camera.position.y - y) ** 2 + (camera.position.z - z) ** 2) * 3.5 / Math.max(partFx.uScale.value, 1), 0.35, 5);   // (and smaller right up close, so it is sparks and not blots)
+  const e = camera.matrixWorld.elements; HB.R.set(e[0], e[1], e[2]).normalize(); HB.U.set(e[4], e[5], e[6]).normalize(); HB.F.set(-e[8], -e[9], -e[10]).normalize(); }
+function hbShell(k, T, x, y, z, vx, vy, vz, g, dr, h, K, a = 0) {
+  let S = null; for (let i = 0; i < HB.s.length; i++) if (!HB.s[i].on) { S = HB.s[i]; break; } if (!S) return null;
+  S.on = true; S.k = k; S.t = 0; S.T = T; S.x = x; S.y = y; S.z = z; S.vx = vx; S.vy = vy; S.vz = vz; S.g = g; S.dr = dr; S.h = h; S.K = K; S.a = a; S.em = 0; S.ax = HB.F.x; S.ay = HB.F.y; S.az = HB.F.z; S.zs = HB.zs; HB.live = 1; return S;
+}
+const hbN = K => (TOUCH ? 0.5 : 1) * clamp(0.7 + 0.3 * K, 0.7, 1.5);
+const hbPop = (T, x, y, z, h, K, a = 0) => hbShell(HB_POP, T, x, y, z, HB.mx, HB.my, HB.mz, 0, 0.35, h, K, a);   // (the second burst, carried with the first)
+function hbCore(x, y, z, K, P) {   // the white heart of it, and a flare of the colour round it
+  for (let i = 0; i < 22; i++) { const d = hbFib(i, 22, 0), s = Math.random() * 7 * K; hbEmit(x, y, z, d.x * s, d.y * s, d.z * s, 0.16 + Math.random() * 0.2, HB_WHITE, 0, (3 + Math.random() * 2.5) * K); }
+  for (let i = 0; i < 12; i++) { const d = hbFib(i, 12, 1), s = (4 + Math.random() * 8) * K; hbEmit(x, y, z, d.x * s, d.y * s, d.z * s, 0.35 + Math.random() * 0.2, P[0], 0, (2.2 + Math.random() * 1.5) * K); }
+}
+function hbCrackle(x, y, z, K, c) { for (let i = 0; i < 5; i++) hbEmit(x, y, z, rnd(7 * K), rnd(7 * K), rnd(7 * K), 0.1 + Math.random() * 0.14, i ? c : HB_WHITE, -2, (0.9 + Math.random() * 0.6) * K); }
+function hbCrackles(x, y, z, K, R, N, h, ci, t0, t1) {   // little white pops all over where the stars have got to (ci: which of the house's colours; -1 white)
+  const a = Math.random() * 6.28;
+  for (let i = 0; i < N; i++) { const d = hbFib(i, N, a), q = R * (0.7 + Math.random() * 0.35); hbShell(HB_CRACK, t0 + Math.random() * (t1 - t0), x + d.x * q, y + d.y * q - 1.5 * K, z + d.z * q, 0, 0, 0, 0, 1, h, K, ci); }
+}
+function hbArrows(x, y, z, K, N, P, flat) {   // arrows: a bright head, a shaft behind it, and the fletching
+  const a = Math.random() * 6.28, F = HB.F;
+  for (let i = 0; i < N; i++) {
+    const d = flat ? HB.d.set(Math.cos(a + i / N * 6.283), rnd(0.1), Math.sin(a + i / N * 6.283)) : hbFib(i, N, a), dx = d.x, dy = d.y + 0.12, dz = d.z, s = (flat ? 62 : 52) * K * (0.9 + Math.random() * 0.3);
+    let px = dy * F.z - dz * F.y, py = dz * F.x - dx * F.z, pz = dx * F.y - dy * F.x; const pl = Math.hypot(px, py, pz) || 1; px /= pl; py /= pl; pz /= pl;
+    hbEmit(x, y, z, dx * s, dy * s, dz * s, 1.35, P[1], -9, 1.25 * K);
+    for (let j = 1; j <= 3; j++) { const f = 1 - j * 0.035; hbEmit(x, y, z, dx * s * f, dy * s * f, dz * s * f, 1.3, P[2], -9, 0.7 * K); }
+    for (let w = -1; w <= 1; w += 2) { const f = 0.86, o = s * 0.03 * w; hbEmit(x, y, z, dx * s * f + px * o, dy * s * f + py * o, dz * s * f + pz * o, 1.25, P[0], -9, 0.95 * K); }
+  }
+}
+function hbBolts(x, y, z, K, seed, N, n) {   // forked lightning out from the middle
+  HB.seed = seed; const Z = HB.pal.zeus;
+  for (let b = 0; b < N; b++) { const t = hbRand() * 6.283; hbP(Math.cos(t), Math.sin(t), (hbRand() - 0.5) * 0.6); hbFork(x, y, z, HB.d.x, HB.d.y, HB.d.z, 7, 7 * K, K, 0, n > 0.6 ? 3 : 2, Z); }
+}
+function hbFork(x, y, z, dx, dy, dz, steps, len, K, depth, m, Z) {
+  for (let i = 0; i < steps; i++) {
+    dx += (hbRand() - 0.5) * 0.6; dy += (hbRand() - 0.5) * 0.6; dz += (hbRand() - 0.5) * 0.6; const l = Math.hypot(dx, dy, dz) || 1; dx /= l; dy /= l; dz /= l;   // (it never goes straight)
+    const nx = x + dx * len, ny = y + dy * len, nz = z + dz * len;
+    for (let j = 0; j < m; j++) { const f = (j + 0.5) / m; hbEmit(x + (nx - x) * f, y + (ny - y) * f, z + (nz - z) * f, dx * 4, dy * 4, dz * 4, 0.12 + hbRand() * 0.1, depth ? Z[2] : j === 1 ? Z[3] : Z[0], 0, (depth ? 1.4 : 2.2) * K); }   // (white at the heart of a fork, his gold round it, the branches blue)
+    x = nx; y = ny; z = nz;
+    if (depth < 2 && hbRand() < 0.3) hbFork(x, y, z, dx + (hbRand() - 0.5) * 1.6, dy + (hbRand() - 0.5) * 1.6, dz + (hbRand() - 0.5) * 1.6, Math.max(2, steps - i - 2), len * 0.7, K, depth + 1, m, Z);
+  }
+}
+// the first burst, house by house
+const HB_ONE = {
+  ''(x, y, z, K, n, P) {   // a chrysanthemum: stars trailing their own fire, then a willow of gold that droops, and the crackle
+    const S = 38 * K, N = Math.round(110 * n), a = Math.random() * 6.28;
+    for (let i = 0; i < N; i++) { const d = hbFib(i, N, a), dx = d.x, dy = d.y, dz = d.z;
+      for (let j = 0; j < 3; j++) { const s = S * (1 - j * 0.09) * (0.95 + Math.random() * 0.1); hbEmit(x, y, z, dx * s, dy * s, dz * s, (1.5 - j * 0.2) * (0.9 + Math.random() * 0.2), j ? P[0] : P[1], -5, (1.9 - j * 0.4) * K, j ? HB.fk : 0); } }
+    hbPop(0.38, x, y, z, '', K); hbCrackles(x, y, z, K, hbAt(S, 0.85), Math.round(24 * n), '', 3, 0.7, 1.1);
+  },
+  poseidon(x, y, z, K, n, P) {   // the sea: a ball of water that hangs and breaks and comes down as a ring of spray; on the sea, a wave
+    const S = 38 * K, N = Math.round(150 * n), a = Math.random() * 6.28;
+    for (let i = 0; i < N; i++) { const d = hbFib(i, N, a), s = S * 0.55 * (0.96 + Math.random() * 0.08); hbEmit(x, y, z, d.x * s, d.y * s, d.z * s, 1.7 * (0.85 + Math.random() * 0.3), i % 3 ? P[0] : P[1], -15, (1.5 + Math.random() * 0.6) * K); }
+    for (let i = 0, M = Math.round(50 * n); i < M; i++) { const d = hbFib(i, M, a + 1), s = S * 0.3; hbEmit(x, y, z, d.x * s, d.y * s, d.z * s, 1.3, P[2], -9, 2.2 * K); }
+    for (let i = 0, M = Math.round(80 * n); i < M; i++) { const t = i / M * 6.283 + rnd(0.04), s = S * (0.62 + Math.random() * 0.12); hbEmit(x, y, z, Math.cos(t) * s, S * 0.28 + rnd(3 * K), Math.sin(t) * s, 1.9, i % 2 ? P[1] : P[0], -24, 1.1 * K); }
+    if (y - WATER < 70 * K && groundAt(x, z, y) < WATER) {   // (low over the sea: it throws up a column of the sea itself, and a ring runs out along it)
+      const w = WATER + 0.3; ripple(x, z, 2.2 * K); shock(x, w, z, 0x7ff0ff, 90 * K, 1.8, false);
+      for (let i = 0, M = Math.round(90 * n); i < M; i++) { const t = Math.random() * 6.283, r = Math.random() * 3 * K, up = (25 + Math.random() * 45) * K * (1 - r / (4 * K)); hbEmit(x + Math.cos(t) * r, w, z + Math.sin(t) * r, Math.cos(t) * 4 * K, up, Math.sin(t) * 4 * K, 1.6 + Math.random() * 0.8, i % 3 ? P[1] : P[0], -30, (1.2 + Math.random()) * K); }
+      for (let i = 0, M = Math.round(70 * n); i < M; i++) { const t = i / M * 6.283, s = 30 * K; hbEmit(x + Math.cos(t) * 4 * K, w, z + Math.sin(t) * 4 * K, Math.cos(t) * s, 9 * K, Math.sin(t) * s, 1.4, P[1], -16, 1.3 * K); }
+    }
+    hbPop(0.55, x, y, z, 'poseidon', K);
+  },
+  demeter(x, y, z, K, n, P) {   // the harvest: a flower of gold opening, six petals, with a green heart
+    const S = 40 * K, N = Math.round(150 * n), a0 = Math.random() * 6.28;
+    for (let i = 0; i < N; i++) { const t = i / N * 6.283, r = 0.22 + 0.78 * Math.abs(Math.cos(3 * t)), d = hbP(Math.cos(t + a0) * r, Math.sin(t + a0) * r, rnd(0.06)), s = S * (0.97 + Math.random() * 0.06); hbEmit(x, y, z, d.x * s, d.y * s, d.z * s, 1.7, r > 0.8 ? P[1] : P[0], -2.5, (1.3 + r * 0.6) * K); }
+    for (let i = 0, M = Math.round(50 * n); i < M; i++) { const t = Math.random() * 6.283, r = (0.22 + 0.78 * Math.abs(Math.cos(3 * t))) * Math.random(), d = hbP(Math.cos(t + a0) * r, Math.sin(t + a0) * r, rnd(0.06)); hbEmit(x, y, z, d.x * S, d.y * S, d.z * S, 1.4, P[3], -2.5, 1.1 * K); }
+    for (let i = 0, M = Math.round(24 * n); i < M; i++) { const t = i / M * 6.283, d = hbP(Math.cos(t) * 0.16, Math.sin(t) * 0.16); hbEmit(x, y, z, d.x * S, d.y * S, d.z * S, 1.5, P[2], -2.5, 1.4 * K); }
+    hbPop(0.45, x, y, z, 'demeter', K, a0);
+  },
+  aphrodite(x, y, z, K, n, P) {   // love: a heart drawn on the sky, and a white one inside it
+    const S = 30 * K, N = Math.round(150 * n), tl = rnd(0.25), ct = Math.cos(tl), st = Math.sin(tl);
+    for (let i = 0; i < N; i++) { const t = i / N * 6.283, hx = 16 * Math.sin(t) ** 3 / 17, hy = (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) / 17 + 0.15;
+      const d = hbP(hx * ct - hy * st, hx * st + hy * ct, rnd(0.04)), dx = d.x, dy = d.y, dz = d.z, s = S * (0.97 + Math.random() * 0.06);
+      hbEmit(x, y, z, dx * s, dy * s, dz * s, 1.9, i % 4 ? P[0] : P[2], -1.2, 1.6 * K);
+      if (i % 2 === 0) hbEmit(x, y, z, dx * s * 0.5, dy * s * 0.5, dz * s * 0.5, 1.6, P[1], -1.2, 1.2 * K); }
+    hbPop(0.6, x, y, z, 'aphrodite', K, tl);
+  },
+  apollo(x, y, z, K, n, P) {   // the sun: rays of light flung straight out, long and short in turn, round a rim of gold
+    const S = 46 * K, a0 = Math.random() * 6.28, M = Math.round(9 * n + 1);
+    for (let i = 0; i < 20; i++) { const t = a0 + i / 20 * 6.283, L = i % 2 ? 0.7 : 1.25, d = hbP(Math.cos(t), Math.sin(t), rnd(0.05)), dx = d.x, dy = d.y, dz = d.z;
+      for (let j = 0; j < M; j++) { const f = (j + 1) / M, s = S * L * (0.18 + 0.82 * f); hbEmit(x, y, z, dx * s, dy * s, dz * s, 1.05 + f * 0.25, f > 0.85 ? P[3] : f > 0.4 ? P[1] : P[0], 0, (0.8 + f * 0.9) * K); } }
+    for (let i = 0, R = Math.round(40 * n); i < R; i++) { const t = i / R * 6.283, d = hbP(Math.cos(t), Math.sin(t)); hbEmit(x, y, z, d.x * S * 0.22, d.y * S * 0.22, d.z * S * 0.22, 1.0, P[3], 0, 1.7 * K); }
+    hbPop(0.32, x, y, z, 'apollo', K, a0);
+  },
+  artemis(x, y, z, K, n, P) {   // the hunt: a sky of arrows loosed every way at once, round a silver crescent moon
+    hbArrows(x, y, z, K, Math.round(64 * n), P, false);
+    for (let i = 0, M = Math.round(70 * n); i < M; i++) { const f = i / M, out = f < 0.55, g = out ? f / 0.55 : (f - 0.55) / 0.45, t = out ? 1.016 + g * 4.251 : 1.538 + g * 3.207;
+      const u = out ? Math.cos(t) : 0.5 + 0.85 * Math.cos(t), v = out ? Math.sin(t) : 0.85 * Math.sin(t), d = hbP(u * 0.38, v * 0.38); hbEmit(x, y, z, d.x * 40 * K, d.y * 40 * K, d.z * 40 * K, 1.7, P[1], -1, 1.5 * K); }
+    hbPop(0.42, x, y, z, 'artemis', K);
+  },
+  zeus(x, y, z, K, n, P) {   // the sky: forked lightning out of the middle, flickering — the same fork, three times — and a ball of blue light
+    const seed = 1 + Math.floor(Math.random() * 2e9); hbBolts(x, y, z, K, seed, 5, n);
+    for (let i = 0; i < 3; i++) hbShell(HB_BOLT, 0.08 + i * 0.12, x, y, z, 0, 0, 0, 0, 1, 'zeus', K, seed);
+    for (let i = 0, M = Math.round(70 * n); i < M; i++) { const d = hbFib(i, M, seed), s = 38 * K * (0.4 + Math.random() * 0.2); hbEmit(x, y, z, d.x * s, d.y * s, d.z * s, 1.3 + Math.random() * 0.4, i % 3 ? P[2] : P[3], 0, 1.4 * K); }   // (a ball of blue light that stays after the forks are gone)
+    for (let i = 0, M = Math.round(40 * n); i < M; i++) { const d = hbFib(i, M, seed + 1), s = 38 * K * (0.6 + Math.random() * 0.4); hbEmit(x, y, z, d.x * s, d.y * s, d.z * s, 1.2, P[0], -4, 1.0 * K); }
+    shock(x, y, z, 0xffffff, 70 * K, 0.5, true); hbPop(0.45, x, y, z, 'zeus', K);
+  },
+  hades(x, y, z, K, n, P) {   // the dead: a ball of blue fire that climbs as it burns, a ring of it running out, and smoke
+    const S = 36 * K, N = Math.round(150 * n), a = Math.random() * 6.28;
+    for (let i = 0; i < N; i++) { const d = hbFib(i, N, a), s = S * (0.3 + Math.random() * 0.35); hbEmit(x, y, z, d.x * s, d.y * s + 4 * K, d.z * s, 1.1 + Math.random() * 0.8, pick(BLUEFIRE), 7, (1.6 + Math.random() * 1.4) * K); }
+    for (let i = 0, M = Math.round(70 * n); i < M; i++) { const t = i / M * 6.283, s = S * 0.75; hbEmit(x, y, z, Math.cos(t) * s, 0, Math.sin(t) * s, 1.0, i % 2 ? P[0] : P[1], 5, 1.4 * K); }
+    for (let i = 0, M = Math.round(50 * n); i < M; i++) { const d = hbFib(i, M, a + 2), s = S * 0.18; hbEmit(x, y, z, d.x * s, d.y * s, d.z * s, 2.6 + Math.random(), P[2], 3, (2.5 + Math.random() * 1.5) * K, 2); }
+    hbPop(0.5, x, y, z, 'hades', K);
+  },
+  hephaestus(x, y, z, K, n, P) {   // the forge: a shower of sparks thrown hard and falling fast, and drops of molten metal trailing fire
+    const S = 40 * K, a = Math.random() * 6.28;
+    for (let i = 0, N = Math.round(200 * n); i < N; i++) { const d = hbFib(i, N, a), s = S * (0.5 + Math.random() * 0.9); hbEmit(x, y, z, d.x * s, d.y * s + 10 * K, d.z * s, 0.7 + Math.random() * 0.9, i % 3 ? P[1] : P[3], -20, (0.6 + Math.random() * 0.5) * K, 1); }
+    for (let i = 0, N = Math.round(10 * n + 2); i < N; i++) { const d = hbFib(i, N, a + 1), s = S * (0.55 + Math.random() * 0.4); hbShell(HB_DROP, 1.2 + Math.random() * 0.9, x, y, z, d.x * s + HB.mx, d.y * s + 12 * K + HB.my, d.z * s + HB.mz, -26, 0.45, 'hephaestus', K); }
+    hbPop(0.4, x, y, z, 'hephaestus', K);
+  },
+  ares(x, y, z, K, n, P) {   // war: shrapnel, dark and red-hot, and a hard red ring going out
+    const S = 44 * K, a = Math.random() * 6.28;
+    for (let i = 0, N = Math.round(130 * n); i < N; i++) { const d = hbFib(i, N, a), s = S * (0.6 + Math.random() * 1.0), hot = i % 5 > 1; hbEmit(x, y, z, d.x * s, d.y * s, d.z * s, 0.8 + Math.random() * 0.8, hot ? P[0] : P[2], -12, (hot ? 0.8 + Math.random() * 0.8 : 1.2 + Math.random() * 1.2) * K, hot ? 1 : 0); }
+    for (let i = 0, N = Math.round(110 * n); i < N; i++) { const t = i / N * 6.283, d = hbP(Math.cos(t), Math.sin(t)), s = S * 1.15; hbEmit(x, y, z, d.x * s, d.y * s, d.z * s, 0.75, i % 3 ? P[0] : P[1], 0, 1.4 * K); }
+    shock(x, y, z, 0xff3a2a, 120 * K, 0.8, true); hbPop(0.28, x, y, z, 'ares', K);
+  },
+  athena(x, y, z, K, n, P) {   // wisdom: an owl's two gold eyes open, and its feathers wheel out round them in a spiral
+    const S = 40 * K;
+    for (let e = -1; e <= 1; e += 2) { for (let i = 0, M = Math.round(30 * n); i < M; i++) { const t = i / M * 6.283, d = hbP(e * 0.2 + Math.cos(t) * 0.12, 0.06 + Math.sin(t) * 0.12); hbEmit(x, y, z, d.x * S, d.y * S, d.z * S, 1.4, P[2], -0.8, 1.3 * K); }
+      const d = hbP(e * 0.2, 0.06); hbEmit(x, y, z, d.x * S, d.y * S, d.z * S, 1.4, HB_WHITE, -0.8, 3 * K); }
+    for (let i = 0, M = Math.round(3 * n + 3), a0 = Math.random() * 6.28; i < M; i++) { const t = a0 + i / M * 6.283, d = hbP(Math.cos(t), Math.sin(t), rnd(0.1)), s = S * 1.25; hbShell(HB_CURL, 1.05, x, y, z, d.x * s + HB.mx, d.y * s + HB.my, d.z * s + HB.mz, -1, 0.5, 'athena', K, 2.1); }
+    hbPop(0.6, x, y, z, 'athena', K);
+  },
+  hermes(x, y, z, K, n, P) {   // the road: a pair of wings opens, and winged streaks shoot out from it every way
+    const S = 40 * K;
+    for (let w = -1; w <= 1; w += 2) for (let f = 0; f < 6; f++) { const t = 0.25 + f * 0.2, L = 1 - f * 0.12, cx = w * Math.cos(t), cy = Math.sin(t) * 0.8 + 0.1;
+      for (let j = 0, M = Math.round(6 * n + 2); j < M; j++) { const u = (j + 1) / M, d = hbP(cx * L * u, cy * L * u, 0); hbEmit(x, y, z, d.x * S, d.y * S, d.z * S, 1.2, u > 0.75 ? P[1] : P[0], -1, (0.8 + u * 0.6) * K); } }
+    for (let i = 0, N = Math.round(6 * n + 3), a = Math.random() * 6.28; i < N; i++) { const d = hbFib(i, N, a), s = S * 1.7; hbShell(HB_COMET, 0.8 + Math.random() * 0.5, x, y, z, d.x * s + HB.mx, d.y * s * 0.6 + HB.my, d.z * s + HB.mz, -4, 0.6, 'hermes', K); }
+    hbPop(0.5, x, y, z, 'hermes', K);
+  },
+  dionysus(x, y, z, K, n, P) {   // the vine: a fizz of purple that rises like wine poured too fast, and vines curling out of it that end in grapes
+    const S = 36 * K, a = Math.random() * 6.28;
+    for (let i = 0, N = Math.round(170 * n); i < N; i++) { const d = hbFib(i, N, a), s = S * Math.random() * 0.5; hbEmit(x + d.x * 2 * K, y + d.y * 2 * K, z + d.z * 2 * K, d.x * s, d.y * s + 6 * K, d.z * s, 1.2 + Math.random() * 1.3, i % 3 === 0 ? P[1] : i % 3 === 1 ? P[0] : P[3], 6, (0.5 + Math.random() * 0.6) * K); }
+    for (let i = 0, N = Math.round(5 * n + 2); i < N; i++) { const t = a + i / N * 6.283 + rnd(0.3), d = hbP(Math.cos(t), Math.sin(t), rnd(0.2)), s = S * 1.1; hbShell(HB_CURL, 1.25 + Math.random() * 0.3, x, y, z, d.x * s + HB.mx, d.y * s + HB.my, d.z * s + HB.mz, -2, 0.5, 'dionysus', K, i % 2 ? 1.3 : -1.3); }
+    hbPop(0.5, x, y, z, 'dionysus', K);
+  },
+  hera(x, y, z, K, n, P) {   // the queen: a peacock's tail fanned all the way round, every feather ending in an eye
+    const S = 44 * K, E = Math.round(12 * Math.min(1, n + 0.2)), a0 = Math.random() * 6.28;
+    for (let e = 0; e < E; e++) { const t = a0 + e / E * 6.283, cx = Math.cos(t), cy = Math.sin(t);
+      for (let j = 0; j < 5; j++) { const f = 0.2 + j * 0.13, d = hbP(cx * f, cy * f); hbEmit(x, y, z, d.x * S, d.y * S, d.z * S, 1.6, P[1], -1.2, 0.8 * K); }   // (the shaft, green)
+      for (let r = 0; r < 3; r++) { const rr = 0.05 + r * 0.055, M = 5 + r * 4, c = r === 0 ? P[3] : r === 1 ? P[1] : P[2];   // (the eye: indigo, then green, then gold)
+        for (let i = 0; i < M; i++) { const u = i / M * 6.283, d = hbP(cx * 0.95 + Math.cos(u) * rr, cy * 0.95 + Math.sin(u) * rr); hbEmit(x, y, z, d.x * S, d.y * S, d.z * S, 1.7, c, -1.2, (r ? 1.1 : 1.5) * K); } }
+      const d = hbP(cx * 0.95, cy * 0.95); hbEmit(x, y, z, d.x * S, d.y * S, d.z * S, 1.7, P[0], -1.2, 2.2 * K); }
+    hbPop(0.55, x, y, z, 'hera', K, a0);
+  },
+};
+// the second burst, a moment after the first
+const HB_TWO = {
+  ''(x, y, z, K, n, P) { for (let i = 0, N = Math.round(70 * n), a = Math.random() * 6.28; i < N; i++) { const d = hbFib(i, N, a), s = 21 * K * (0.9 + Math.random() * 0.2); hbEmit(x, y, z, d.x * s, d.y * s + 3 * K, d.z * s, 2.6 * (0.85 + Math.random() * 0.3), P[1], -9, 1.1 * K, 1); } },   // (the willow)
+  poseidon(x, y, z, K, n, P) { const R = hbAt(38 * K * 0.55, 0.55);   // (it rains out of the ball)
+    for (let i = 0, M = Math.round(70 * n), a = Math.random() * 6.28; i < M; i++) { const d = hbFib(i, M, a), q = R * (0.8 + Math.random() * 0.3); hbEmit(x + d.x * q, y + d.y * q, z + d.z * q, d.x * 3, -6 - Math.random() * 6, d.z * 3, 1.3, i % 2 ? P[1] : P[0], -26, 0.9 * K); }
+    shock(x, y, z, 0x19d0d8, 70 * K, 1.1, true); },
+  demeter(x, y, z, K, n, P, a0) { const S = 58 * K;   // (a ring of twelve petals round the first flower, and the grain coming down out of it)
+    for (let i = 0, N = Math.round(170 * n); i < N; i++) { const t = i / N * 6.283, r = 0.55 + 0.45 * Math.abs(Math.cos(6 * t)), d = hbP(Math.cos(t + a0 + 0.26) * r, Math.sin(t + a0 + 0.26) * r, rnd(0.05)); hbEmit(x, y, z, d.x * S, d.y * S, d.z * S, 1.6, r > 0.9 ? P[1] : P[2], -3, 1.2 * K); }
+    for (let i = 0, M = Math.round(60 * n); i < M; i++) { const d = hbFib(i, M, a0), q = hbAt(40 * K, 0.45) * Math.random(); hbEmit(x + d.x * q, y + d.y * q, z + d.z * q, rnd(2), -2, rnd(2), 2.4, P[0], -7, 0.9 * K); } },
+  aphrodite(x, y, z, K, n, P) { const R = hbAt(30 * K, 0.6), S = 22 * K;   // (rose petals drifting down out of the heart, and little roses opening round it)
+    for (let i = 0, M = Math.round(80 * n); i < M; i++) { const t = Math.random() * 6.283, r = Math.sqrt(Math.random()) * 0.8, d = hbP(Math.cos(t) * r, Math.sin(t) * r * 0.9, rnd(0.3)); hbEmit(x + d.x * R, y + d.y * R, z + d.z * R, rnd(3 * K), 1 + Math.random() * 2, rnd(3 * K), 2.4 + Math.random() * 1.2, i % 3 === 0 ? P[2] : i % 3 === 1 ? P[0] : P[1], -2.2, (1.5 + Math.random()) * K); }
+    for (let b = 0; b < 6; b++) { const c = b / 6 * 6.283 + 0.5, cx = Math.cos(c) * 1.25, cy = Math.sin(c) * 1.25;
+      for (let i = 0, M = Math.round(22 * n + 6); i < M; i++) { const t = i / M * 6.283, r = 0.25 * Math.abs(Math.cos(2.5 * t)) + 0.04, d = hbP(cx + Math.cos(t) * r, cy + Math.sin(t) * r); hbEmit(x, y, z, d.x * S, d.y * S, d.z * S, 1.5, b % 2 ? P[0] : P[1], -1.5, 1.1 * K); } } },
+  apollo(x, y, z, K, n, P, a0) { const S = 30 * K;   // (the corona: short rays between the long ones, and rays out of the plane of it too)
+    for (let i = 0; i < 20; i++) { const t = a0 + (i + 0.5) / 20 * 6.283, d = hbP(Math.cos(t), Math.sin(t)), dx = d.x, dy = d.y, dz = d.z; for (let j = 0; j < 4; j++) { const s = S * (0.3 + j * 0.22); hbEmit(x, y, z, dx * s, dy * s, dz * s, 0.9, j === 3 ? P[1] : P[2], 0, 1.1 * K); } }
+    for (let i = 0, M = Math.round(24 * n); i < M; i++) { const d = hbFib(i, M, a0), dx = d.x, dy = d.y, dz = d.z; for (let j = 0; j < 4; j++) { const s = S * 1.3 * (0.3 + j * 0.22); hbEmit(x, y, z, dx * s, dy * s, dz * s, 0.8, j === 3 ? P[3] : P[0], 0, 1.0 * K); } }
+    shock(x, y, z, 0xffd060, 80 * K, 0.9, true); },
+  artemis(x, y, z, K, n, P) { hbArrows(x, y, z, K, Math.round(36 * n), P, true); },   // (a second volley, a ring of them flat out)
+  zeus(x, y, z, K, n, P) { const seed = 1 + Math.floor(Math.random() * 2e9); hbBolts(x, y, z, K * 0.8, seed, 3, n); hbShell(HB_BOLT, 0.3, x, y, z, 0, 0, 0, 0, 1, 'zeus', K * 0.8, -seed);   // (and it strikes again, smaller)
+    hbCrackles(x, y, z, K, hbAt(38 * K, 0.6), Math.round(16 * n), 'zeus', 0, 0.05, 0.4); },
+  hades(x, y, z, K, n, P) { const R = hbAt(36 * K * 0.5, 0.5);   // (tongues of it licking up where the ball was)
+    for (let i = 0, M = Math.round(60 * n); i < M; i++) { const t = Math.random() * 6.283, r = Math.sqrt(Math.random()) * R; hbEmit(x + Math.cos(t) * r, y + rnd(R * 0.5), z + Math.sin(t) * r, rnd(2), (10 + Math.random() * 12) * K, rnd(2), 0.8 + Math.random() * 0.6, pick(BLUEFIRE), 9, (1.2 + Math.random()) * K); } },
+  hephaestus(x, y, z, K, n, P) { const S = 46 * K;   // (sparks off the anvil: a flat ring of them)
+    for (let i = 0, M = Math.round(90 * n); i < M; i++) { const t = i / M * 6.283 + rnd(0.05), s = S * (0.8 + Math.random() * 0.4); hbEmit(x, y, z, Math.cos(t) * s, rnd(4 * K), Math.sin(t) * s, 0.8 + Math.random() * 0.5, i % 2 ? P[1] : P[0], -14, 0.8 * K, 1); }
+    shock(x, y, z, 0xff7a1a, 90 * K, 0.7, false); },
+  ares(x, y, z, K, n, P) { const S = 50 * K;   // (a second ring, flat, and more of the metal)
+    for (let i = 0, M = Math.round(100 * n); i < M; i++) { const t = i / M * 6.283, s = S * 1.2; hbEmit(x, y, z, Math.cos(t) * s, rnd(2 * K), Math.sin(t) * s, 0.7, i % 3 ? P[0] : P[1], 0, 1.3 * K); }
+    for (let i = 0, M = Math.round(50 * n), a = Math.random() * 6.28; i < M; i++) { const d = hbFib(i, M, a), s = S * (0.4 + Math.random() * 0.6); hbEmit(x, y, z, d.x * s, d.y * s, d.z * s, 0.9, P[3], -12, 1.1 * K, 1); }
+    shock(x, y, z, 0xff3a2a, 150 * K, 0.7, false); },
+  athena(x, y, z, K, n, P) { const R = hbAt(40 * K, 0.6) * 0.9;   // (loose feathers, drifting)
+    for (let i = 0, M = Math.round(30 * n + 6), a = Math.random() * 6.28; i < M; i++) { const d = hbFib(i, M, a), q = R * (0.4 + Math.random() * 0.6), px = x + d.x * q, py = y + d.y * q, pz = z + d.z * q, vx = rnd(2), vz = rnd(2);
+      for (let j = 0; j < 3; j++) { const e = hbP(0.35 * j, -0.2 * j); hbEmit(px + e.x * K, py + e.y * K, pz + e.z * K, vx, 0.5, vz, 2.4, j ? P[0] : P[1], -1.2, 1.2 * K); } } },
+  hermes(x, y, z, K, n, P) { const S = 34 * K;   // (a ring of gold, and little pops of white)
+    for (let i = 0, M = Math.round(60 * n); i < M; i++) { const t = i / M * 6.283, d = hbP(Math.cos(t), Math.sin(t)); hbEmit(x, y, z, d.x * S, d.y * S, d.z * S, 1.0, P[2], -1, 1.2 * K); }
+    hbCrackles(x, y, z, K, hbAt(40 * K, 0.6), Math.round(10 * n), '', -1, 0.05, 0.35); },
+  dionysus(x, y, z, K, n, P) { hbCrackles(x, y, z, K, hbAt(36 * K, 0.6), Math.round(16 * n), 'dionysus', 1, 0.0, 0.6); },   // (the fizz goes on popping)
+  hera(x, y, z, K, n, P, a0) { const S = 26 * K;   // (a fan of gold and green inside the tail, and gold glitter)
+    for (let i = 0; i < 24; i++) { const t = a0 + (i + 0.5) / 24 * 6.283, d = hbP(Math.cos(t), Math.sin(t)), dx = d.x, dy = d.y, dz = d.z; for (let j = 0; j < 3; j++) { const s = S * (0.35 + j * 0.3); hbEmit(x, y, z, dx * s, dy * s, dz * s, 1.1, j === 2 ? P[2] : P[1], -1, 1.0 * K); } }
+    hbCrackles(x, y, z, K, hbAt(44 * K, 0.6), Math.round(14 * n), 'hera', 2, 0.1, 0.5); shock(x, y, z, 0x5b7cff, 90 * K, 1.0, true); },
+};
+function hbTurn(S, w) {   // (a vine's way turns as it grows: round the line he was looking along when it went up)
+  const c = Math.cos(w), s = Math.sin(w), kx = S.ax, ky = S.ay, kz = S.az, vx = S.vx, vy = S.vy, vz = S.vz, d = (kx * vx + ky * vy + kz * vz) * (1 - c);
+  S.vx = vx * c + (ky * vz - kz * vy) * s + kx * d; S.vy = vy * c + (kz * vx - kx * vz) * s + ky * d; S.vz = vz * c + (kx * vy - ky * vx) * s + kz * d;
+}
+function hbTrail(S, x, y, z) {   // what a shell leaves behind it as it goes
+  const P = HB.pal[S.h] || HB.pal[''], K = S.K;
+  if (S.k === HB_DROP) { hbEmit(x, y, z, rnd(1), rnd(1), rnd(1), 0.45 + Math.random() * 0.4, Math.random() < 0.3 ? P[1] : P[0], -3, 1.5 * K, 1); return; }
+  let px = S.vy * S.az - S.vz * S.ay, py = S.vz * S.ax - S.vx * S.az, pz = S.vx * S.ay - S.vy * S.ax; const pl = Math.hypot(px, py, pz) || 1; px /= pl; py /= pl; pz /= pl;   // (across the way it goes, on the sky)
+  const side = (S.em * 7 | 0) % 2 ? 1 : -1;
+  if (S.k === HB_COMET) { hbEmit(x, y, z, 0, 0, 0, 0.45, P[1], 0, 1.1 * K); hbEmit(x, y, z, px * side * 7 * K - S.vx * 0.05, py * side * 7 * K - S.vy * 0.05, pz * side * 7 * K - S.vz * 0.05, 0.5, P[0], 0, 0.9 * K); return; }   // (a streak with a wing to either side)
+  if (S.h === 'athena') { hbEmit(x, y, z, 0, 0, 0, 1.3, P[1], -0.8, 1.0 * K); hbEmit(x, y, z, px * side * 4 * K, py * side * 4 * K, pz * side * 4 * K, 1.1, P[0], -0.8, 0.8 * K); return; }   // (the barbs of a feather)
+  const leaf = Math.random() < 0.15; hbEmit(x, y, z, leaf ? px * side * 3 * K : 0, leaf ? py * side * 3 * K : 0, leaf ? pz * side * 3 * K : 0, 1.5, P[2], -0.6, (leaf ? 1.7 : 1.0) * K);   // (the vine, and a leaf now and then)
+}
+function hbEnd(S) {
+  const P = HB.pal[S.h] || HB.pal[''], K = S.K, x = S.x, y = S.y, z = S.z; HB.zs = S.zs;
+  if (S.k === HB_POP) { hbBasis(x, y, z); (HB_TWO[S.h] || HB_TWO[''])(x, y, z, K, hbN(K / 1.5), P, S.a); return; }
+  if (S.k === HB_CRACK) { hbCrackle(x, y, z, K, S.a < 0 ? HB_WHITE : P[S.a]); return; }
+  if (S.k === HB_BOLT) { hbBolts(x, y, z, K, Math.abs(S.a), S.a > 0 ? 5 : 3, hbN(K)); return; }   // (a: the seed of the fork; less than nothing for the smaller second strike)
+  if (S.k === HB_DROP) { for (let i = 0; i < 7; i++) hbEmit(x, y, z, rnd(9 * K), 4 + Math.random() * 8 * K, rnd(9 * K), 0.5, P[1], -18, 0.7 * K, 1); return; }   // (it lands on nothing and spits)
+  if (S.k === HB_COMET) { hbCrackle(x, y, z, K, P[1]); return; }
+  if (S.h === 'athena') { for (let i = 0; i < 6; i++) hbEmit(x, y, z, rnd(4 * K), rnd(4 * K), rnd(4 * K), 1.6, i % 2 ? P[1] : P[0], -1, 1.2 * K); return; }
+  for (let i = 0; i < HB_GRAPE.length; i++) { const g = HB_GRAPE[i], d = hbP(g[0] * 1.1 * K, g[1] * 1.1 * K); hbEmit(x + d.x, y + d.y, z + d.z, S.vx * 0.1, S.vy * 0.1, S.vz * 0.1, 1.8, i % 3 ? P[3] : P[0], -3, 2.2 * K); }   // (and the vine ends in a bunch of grapes)
+}
+function updateHouseBooms(dt) {
+  if (!HB.live) return; HB.live = 0;
+  for (let i = 0; i < HB.s.length; i++) { const S = HB.s[i]; if (!S.on) continue; HB.live = 1; S.t += dt;
+    const dr = Math.pow(S.dr, dt), px = S.x, py = S.y, pz = S.z;
+    if (S.k === HB_CURL) hbTurn(S, S.a * dt * (S.h === 'dionysus' ? 1 + S.t * 2.2 : 1));   // (a tendril curls tighter as it goes)
+    S.vx *= dr; S.vy = S.vy * dr + S.g * dt; S.vz *= dr; S.x += S.vx * dt; S.y += S.vy * dt; S.z += S.vz * dt;
+    if (S.k >= HB_DROP) { S.em += dt * (S.k === HB_DROP ? 30 : S.k === HB_COMET ? 32 : 38); HB.zs = S.zs; while (S.em >= 1) { S.em -= 1; const f = Math.random(); hbTrail(S, px + (S.x - px) * f, py + (S.y - py) * f, pz + (S.z - pz) * f); } }
+    if (S.t >= S.T) { S.on = false; hbEnd(S); } }
+}
+const HB_SFX = { '': () => audio.sfx.crackle?.(1), poseidon: () => audio.sfx.splash?.(true), zeus: () => audio.sfx.crack?.(), hephaestus: () => audio.sfx.hammer?.(), ares: () => audio.sfx.boom?.(0.7),
+  apollo: () => audio.sfx.halo?.(), artemis: () => audio.sfx.whoosh?.(true), hermes: () => audio.sfx.dash?.(), dionysus: () => audio.sfx.bubble?.(1), aphrodite: () => audio.sfx.heart?.(0.8),
+  demeter: () => audio.sfx.leaves?.(), athena: () => audio.sfx.wingsOpen?.(), hera: () => audio.sfx.chime?.(), hades: () => audio.sfx.hiss?.() };
+// the house a colour belongs to, for a caller that only has the colour
+function hbHouse(house, col) { if (house != null) return HB_HEX[house] ? house : ''; const c = String(col || '').toLowerCase(); for (const id in PATRONS) if (PATRONS[id][0] === c) return id; return ''; }
+function boomHouse(x, y, z, house = '', K = 1, dir = null, col = '') {
+  if (!HB.pal) hbPal();
+  const h = HB_HEX[house] ? house : '', P = HB.pal[h]; K = clamp(Number.isFinite(K) ? K : 1, 0.35, 4);
+  if (!h) { HB.c.set(col || '#ff8a3a'); const f = P[0]; f[0] = HB.c.r * 2.4 + 0.15; f[1] = HB.c.g * 2.4 + 0.15; f[2] = HB.c.b * 2.4 + 0.15; HB.fk = f[0] > f[2] * 1.25 ? 1 : 0; }   // (warm fire cools as fire does; any other keeps its colour)
+  if (dir) { const l = dir.length(), k = l > 0 ? Math.min(l * 0.15, 22) / l : 0; HB.mx = dir.x * k; HB.my = dir.y * k; HB.mz = dir.z * k; }
+  const n = hbN(K); K *= 1.5;   // (a firework is wide: it is thrown hard, and hangs)
+  hbBasis(x, y, z); hbCore(x, y, z, K, P); HB_ONE[h](x, y, z, K, n, P);
+  HB.mx = HB.my = HB.mz = 0;
+  if (audio.at3) audio.at3(x, y, z, HB_SFX[h], { vol: 0.8, ref: 40 * K, max: 1800 * K });
+}
+// a bird that explodes away from a fight is told to whoever is near enough to see it (in a fight the fight tells them: see matchOut)
+function boomSend(x, y, z, v) { if (!NET.on || !NET.ch) return; NET.ch.send({ type: 'broadcast', event: 'fx', payload: { i: NET.id, k: 'boom', x: Math.round(x), y: Math.round(y), z: Math.round(z), v: Math.round(v || 0), K: Math.round(birdK() * 100) / 100 } }); }
+function gotBoom(m) {
+  if (!ok(m.i) || state === 'title') return; const P = NET.peers.get(m.i); if (!P || flood(P) || P.realm !== (realm === 'under' ? 1 : 0)) return;
+  const x = num(m.x, -1e6, 1e6), y = num(m.y, -2000, 20000), z = num(m.z, -1e6, 1e6), K = (num(m.K, 0.3, 4) || 1) * clamp((num(m.v, 0, 3000) || 70) / 75, 0.55, 2.1), d = camera.position.distanceTo(HB.q.set(x, y, z));
+  if (d > 1800 * Math.max(1, K)) return;
+  const h = PATRONS[P.patron] ? P.patron : P.realm ? 'hades' : '';
+  boomHouse(x, y, z, h, K, null, P.css || '#ffb060');
+  if (HB_BALL[h]) boomBall(x, y, z, P.css || '#ffb060', K * HB_BALL[h] * 0.8);
+  shock(x, y, z, new THREE.Color(P.css || '#ffb060').getHex(), 60 * K, 0.9, true);
+  flash = Math.max(flash, 0.25 * smoothstep(700, 40, d)); camShake = Math.max(camShake, 0.8 * smoothstep(500, 30, d));
+  if (audio.at3) audio.at3(x, y, z, () => audio.sfx.impact?.(), { ref: 40, max: 1600 });
 }
 // camera-facing ribbons with a live head and a trail: the visible wind, and the fire off the phoenix's wingtips
 function makeRibbons(K, SEG) {
@@ -8760,6 +9033,7 @@ function netFx(k) {
   NET.ch.send({ type: 'broadcast', event: 'fx', payload: { i: NET.id, k, x: Math.round(player.pos.x), y: Math.round(player.pos.y), z: Math.round(player.pos.z) } });
 }
 function gotFx(m) {
+  if (m?.k === 'boom') return gotBoom(m);   // (not a sound: a bird going up. See boomHouse)
   if (!m || !ok(m.i) || !FX_KINDS[m.k] || !AC) return;
   const P = NET.peers.get(m.i); if (!P || flood(P) || P.realm !== (realm === 'under' ? 1 : 0) || state === 'title') return;
   const x = num(m.x, -1e6, 1e6), y = num(m.y, -2000, 20000), z = num(m.z, -1e6, 1e6), d = Math.hypot(x - player.pos.x, y - player.pos.y, z - player.pos.z);
@@ -26648,7 +26922,7 @@ function tick(dt) {
   updatePalette(dt);
   updateClouds(dt);
   updateSea(dt); updateSkim(dt); updateCaves(dt); updateFish(dt); updateDeep(dt); statsTick(dt); updateAreas(dt); updateGod(dt); globalThis.DAIMON?.update(dt); updateTron(dt); updateMatch(dt); updateGfly(dt); updateShore(); updateRivers(dt); updateStone(dt); updatePlaces(dt); updateDrift(dt); updateTear(dt); updatePools(dt);
-  updateRings(dt);
+  updateRings(dt); updateHouseBooms(dt);
   updateWorldLife(dt); updateLeaves(dt); updateLava(dt); updateEruptions(dt); updateCraters(dt); updateArena(dt); updateGrass(dt); updateFlowers(dt); updateWeather(dt); updateTwisters(dt); updateFire(dt); updateFlies(dt); updateFriends(dt); updatePantheon(dt); updateGusts(dt); updateHigh(dt);
   updateTemple(); updateCurrents(dt); updateDay(dt); updateStorm(dt); updateAir(dt); updateOthers(dt);
   if (realm === 'over') { updateBeacons(dt); updateAnimals(dt); updateBirds(dt); updateGods(dt); }
@@ -28089,6 +28363,7 @@ const CPU_NAMES = ['THESEUS', 'ATALANTA', 'PERSEUS', 'MEDEA', 'AJAX', 'CIRCE', '
 const matchSend = m => { if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'match', payload: { i: NET.id, n: heroName, ...m } }); };
 const matchAlive = () => { let n = 0; for (const r of MATCH.roster.values()) if (r.alive) n++; return n; };
 const matchName = id => id === NET.id ? heroName : MATCH.roster.get(id)?.name || NET.peers.get(id)?.name || 'SOMEONE';
+const matchHouse = id => id === NET.id ? PATRON.id || '' : MATCH.cpus.find(c => c.id === id)?.pat || NET.peers.get(id)?.patron || '';   // (whose god they fly for: see boomHouse)
 const matchCol = id => { if (id === NET.id) return PATRON.id ? PATRONS[PATRON.id][0] : '#ff8a3a'; const P = NET.peers.get(id); return P?.css || '#ffb060'; };
 const matchFree = () => !MATCH.phase && state === 'play' && realm === 'over' && flags.morphed && !player.cine && !player.sub;
 function matchBig(t, ms = 950, col = null) {   // (typed into the picture, built of its own letters: see INKW; the page's own, for the plain picture)
@@ -28190,7 +28465,7 @@ function gotMatch(m) {
     return matchSetOut(who, String(m.by || '').slice(0, 24), false, { soft: !!m.left, v: Number.isFinite(+m.v) ? clamp(+m.v, 0, 3000) : undefined }); }
   if (m.k === 're' && MATCH.phase === 'live') { const who = typeof m.who === 'string' && MATCH.roster.get(m.who)?.cpu && m.i === MATCH.hostId ? m.who : m.i, r = MATCH.roster.get(who); if (!r || !r.alive) return;   // (a practice hit, in the warm-up: the fire, and the wall it had drawn goes out)
     if (Number.isFinite(+m.l)) r.lives = clamp(m.l | 0, 0, 9);   // (an extra life spent: the fire, and back on their line)
-    const Q = NET.peers.get(who); if (Q?.s) matchBoom(Q.pos.x, Q.pos.y, Q.pos.z, matchCol(who), bigName(r.name) * 0.8, Number.isFinite(+m.v) ? clamp(+m.v, 0, 3000) : 70);
+    const Q = NET.peers.get(who); if (Q?.s) matchBoom(Q.pos.x, Q.pos.y, Q.pos.z, matchCol(who), bigName(r.name) * 0.8, Number.isFinite(+m.v) ? clamp(+m.v, 0, 3000) : 70, true, matchHouse(who));
     const T = TRON.trails.get(who); if (T) tronClear(T); return; }
   if (m.k === 'stop' && m.i === MATCH.hostId) return matchStopped(nm);
   if (m.k === 'ring' && MATCH.game === 'rings' && MATCH.phase === 'live') { const who = typeof m.who === 'string' && MATCH.roster.get(m.who)?.cpu && m.i === MATCH.hostId ? m.who : m.i; if (!MATCH.roster.has(who)) return;
@@ -28691,16 +28966,16 @@ function matchBoard(now) {   // everyone who flew, from the winner down: the las
 INKW.hooks.push(now => { if (typeof MATCH !== 'undefined') matchInk(now); });
 // out: a ball of fire and ash the colour of their house, where they were — as big as how fast they hit (v, m/s), and with
 // a wave of wind going out from it (see BLAST)
-function matchBoom(x, y, z, col, K = 1, v = 70, blast = true) {
+function matchBoom(x, y, z, col, K = 1, v = 70, blast = true, house) {
   const vk = clamp((Number.isFinite(v) ? v : 70) / 75, 0.55, 2.1), KK = K * vk, m = clamp(vk, 0.7, 1.35);
   if (blast) matchBlast(x, y, z, KK);
-  const c = new THREE.Color(col), hot = [c.r * 2.6 + 0.3, c.g * 2.6 + 0.3, c.b * 2.6 + 0.3], mid = [c.r * 1.7, c.g * 1.7, c.b * 1.7], far = (state === 'watch' || MATCH.ghost ? 2600 : 1500) * Math.max(1, vk), near = camera.position.distanceToSquared(_v.set(x, y, z)) < far * far, n = (TOUCH ? 0.5 : 1) * m;
+  const c = new THREE.Color(col), far = (state === 'watch' || MATCH.ghost ? 2600 : 1500) * Math.max(1, vk), near = camera.position.distanceToSquared(_v.set(x, y, z)) < far * far, n = (TOUCH ? 0.5 : 1) * m;
   if (!near) return;
-  boomBall(x, y, z, col, KK);
-  burst(x, y, z, Math.round(300 * n), 46 * KK, 1.9);
-  for (let i = 0, N = Math.round(360 * n); i < N; i++) { _v.set(rnd(), rnd(), rnd()).normalize().multiplyScalar((8 + Math.random() * 46) * KK); emit(x + rnd(2), y + rnd(2), z + rnd(2), _v.x, _v.y + 6, _v.z, 0.9 + Math.random() * 1.6, i % 4 === 0 ? [3, 2.8, 2.2] : i % 2 ? hot : mid, 3, (1.2 + Math.random() * 1.6) * KK); }
-  for (let i = 0, N = Math.round(260 * n); i < N; i++) { _v.set(rnd(), rnd() * 0.6, rnd()).normalize().multiplyScalar((3 + Math.random() * 16) * KK); emit(x + rnd(5 * KK), y + rnd(4 * KK), z + rnd(5 * KK), _v.x, _v.y, _v.z, 2.2 + Math.random() * 2.4, i % 3 ? [0.34, 0.3, 0.28] : [c.r * 0.5, c.g * 0.5, c.b * 0.5], -1.2, (0.9 + Math.random() * 1.3) * KK); }   // (the ash: slow, grey, a little of their colour in it, sinking)
-  shock(x, y, z, c.getHex(), 95 * KK, 1.3, true); shock(x, y, z, 0xffffff, 40 * KK, 0.6); shock(x, y, z, c.getHex(), 60 * KK, 1.0);
+  const h = hbHouse(house, col);   // (what the fire is depends on their house: see boomHouse)
+  if (HB_BALL[h]) boomBall(x, y, z, col, KK * HB_BALL[h]);
+  boomHouse(x, y, z, h, KK, null, col);
+  if (HB_BALL[h]) for (let i = 0, N = Math.round(90 * n); i < N; i++) { _v.set(rnd(), rnd() * 0.6, rnd()).normalize().multiplyScalar((3 + Math.random() * 16) * KK); emit(x + rnd(5 * KK), y + rnd(4 * KK), z + rnd(5 * KK), _v.x, _v.y, _v.z, 2.2 + Math.random() * 2.4, i % 3 ? [0.34, 0.3, 0.28] : [c.r * 0.5, c.g * 0.5, c.b * 0.5], -1.2, (0.9 + Math.random() * 1.3) * KK); }   // (the ash: slow, grey, a little of their colour in it, sinking)
+  shock(x, y, z, c.getHex(), 95 * KK, 1.3, true);
   if (blast) shock(x, y, z, 0xdff2ff, 170 * KK, 0.8, false);   // (the air going out from it: the wave the wind rides)
   const d = Math.sqrt(camera.position.distanceToSquared(_v.set(x, y, z))); flash = Math.max(flash, 0.3 * Math.min(vk, 1.5) * smoothstep(900 * vk, 60, d)); camShake = Math.max(camShake, 1.4 * Math.min(vk, 1.6) * smoothstep(700 * vk, 40, d));
   audio.at3 ? audio.at3(x, y, z, () => { audio.sfx.impact?.(); audio.sfx.rebirth?.(); }, { vol: 1.3 * clamp(vk, 0.6, 1.5), ref: 60 * Math.max(1, vk), max: 2400 * Math.max(1, vk) }) : audio.sfx.impact?.();
@@ -28729,8 +29004,8 @@ function matchSetOut(id, by, mine, o = {}) {
   { const km = /^(.+)’s fire$/.exec(by || ''); if (km) for (const q of MATCH.roster.values()) if (q.name === km[1] && q.id !== id) { q.kills = (q.kills || 0) + 1; break; } }   // (whose fire it was: theirs is a kill)
   const me = id === NET.id, P = me ? null : NET.peers.get(id), at = me ? player.pos : P?.pos, C = MATCH.cpus.find(c => c.id === id);
   const v = o.v ?? (me ? player.speed : C ? C.speed : P?.s ? Math.hypot(P.s.vx, P.s.vy, P.s.vz) : 70);
-  if (!o.soft) { if (at && !o.quiet) { matchBoom(at.x, at.y, at.z, matchCol(id), bigName(r.name), v); if (matchSees()) inkSay(`${r.name} IS OUT`, { x: at.x, y: at.y, z: at.z }, matchCol(id), 2, 2800, { sub: by ? by.toUpperCase() : '', dy: 3, rev: 200 }); }   // (one who left goes quietly: no fire)
-    MATCH.lastOut = { x: at ? at.x : MATCH.cx, y: at ? at.y : MATCH.base + 200, z: at ? at.z : MATCH.cz, name: r.name, by, col: matchCol(id), K: bigName(r.name), v }; }
+  if (!o.soft) { if (at && !o.quiet) { matchBoom(at.x, at.y, at.z, matchCol(id), bigName(r.name), v, true, matchHouse(id)); if (matchSees()) inkSay(`${r.name} IS OUT`, { x: at.x, y: at.y, z: at.z }, matchCol(id), 2, 2800, { sub: by ? by.toUpperCase() : '', dy: 3, rev: 200 }); }   // (one who left goes quietly: no fire)
+    MATCH.lastOut = { x: at ? at.x : MATCH.cx, y: at ? at.y : MATCH.base + 200, z: at ? at.z : MATCH.cz, name: r.name, by, col: matchCol(id), h: matchHouse(id), K: bigName(r.name), v }; }
   if (!me && MATCH.me.in && by === `${heroName}’s fire`) { MATCH.kills++; warStat().kills++; toast(`${r.name} FLEW INTO YOUR FIRE`); }
   const line = o.soft ? `${r.name} HAS LEFT THE FIGHT · ${matchAlive()} STILL FLYING` : `${r.name} IS OUT${by ? ' · ' + by.toUpperCase() : ''} · ${matchAlive()} LEFT`;
   if (matchSees() && !o.quiet && !(me && o.soft)) { chatLine('', line, 'sys'); if (!me) toast(line); }
@@ -28756,7 +29031,7 @@ function matchOut(by = '') {
 function matchPractice(by, life = false) {
   const M = MATCH, p = player; if (M.reAt) return; const v = Math.round(p.speed || 60);
   if (life) { M.lives--; const r = M.roster.get(NET.id); if (r) r.lives = M.lives; }
-  matchBoom(p.pos.x, p.pos.y, p.pos.z, matchCol(NET.id), birdK() * 0.8, v); matchSend({ k: 're', id: M.id, v, l: life ? M.lives : undefined });
+  matchBoom(p.pos.x, p.pos.y, p.pos.z, matchCol(NET.id), birdK() * 0.8, v, true, PATRON.id || ''); matchSend({ k: 're', id: M.id, v, l: life ? M.lives : undefined });
   const T = TRON.trails.get(NET.id); if (T) tronClear(T);
   M.reAt = performance.now() + (life ? 800 : 1500); M.deadAt = performance.now(); M.deadPos = (M.deadPos || new THREE.Vector3()).copy(p.pos); M.deadYaw = p.yaw; M.outT = 0; M.glide = null;
   state = 'watch'; p.gone = true; p.cine = null; p.vel.set(0, 0, 0); for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
@@ -28804,7 +29079,7 @@ function matchEnd(win) {
   const rg = M.game === 'rings', nm = win ? matchName(win) : '', L = rg ? null : M.lastOut, secs = (performance.now() - M.liveAt) / 1000, duel = M.kind === 'duel', mine = win === NET.id;
   M.fin = { t: performance.now(), L, win }; M.overFor = win ? 15500 : 6500; if (win && !mine) M.watch = win;
   for (const id of M.roster.keys()) { const T = TRON.trails.get(id); if (T) { tronClear(T); T.sign = id === win; } }   // (every wall goes out; the winner's sky is clean)
-  if (L) { matchBoom(L.x, L.y, L.z, L.col, 1.6 * (L.K || 1), L.v, false); chatLine('', `THE LAST ONE OUT · ${L.name}${L.by ? ' · ' + L.by.toUpperCase() : ''}`, 'sys'); }
+  if (L) { matchBoom(L.x, L.y, L.z, L.col, 1.6 * (L.K || 1), L.v, false, L.h); chatLine('', `THE LAST ONE OUT · ${L.name}${L.by ? ' · ' + L.by.toUpperCase() : ''}`, 'sys'); }
   M.seen = null; if (matchSees()) { timeK = 0.3; const t0 = performance.now(), id = M.id, back = () => { const u = (performance.now() - t0) / 2300; if (u >= 1 || MATCH.id !== id) { timeK = 1; return; } timeK = 0.3 + 0.7 * u * u; requestAnimationFrame(back); }; requestAnimationFrame(back); }
   matchBig(L ? 'THE LAST FIRE' : nm ? `${nm} WINS` : 'NOBODY WINS', L ? 1700 : 4200, L ? L.col : win ? matchCol(win) : null); pwClear();
   if (L) setTimeout(() => { if (MATCH.id === M.id && MATCH.phase === 'over') { matchBig(nm ? `${nm} WINS` : 'NOBODY WINS', 4200, win ? matchCol(win) : null); audio.sfx.halo?.(); } }, 1800);
@@ -28928,7 +29203,7 @@ function cpuFly(C, dt) {
     NET.ch.send({ type: 'broadcast', event: 's', payload: { i: C.id, n: C.name, p: [r1(P.x), r1(P.y), r1(P.z)], v: [r1(P.vx), r1(P.vy), r1(P.vz)], y: Math.round(C.yaw * 100) / 100, pi: Math.round(C.pitch * 100) / 100, b: Math.round(C.bank * 100) / 100, f: 'p', r: 0, g: 0, w: 0, gm: 1, ma: M.id, pt: C.pat, ts: g0, tp } }); }
 }
 function cpuPractice(C) {
-  const M = MATCH; matchBoom(C.pos.x, C.pos.y, C.pos.z, matchCol(C.id), 0.8, C.speed); matchSend({ k: 're', id: M.id, who: C.id, v: Math.round(C.speed), l: M.warm ? undefined : C.lives || 0 });
+  const M = MATCH; matchBoom(C.pos.x, C.pos.y, C.pos.z, matchCol(C.id), 0.8, C.speed, true, C.pat || ''); matchSend({ k: 're', id: M.id, who: C.id, v: Math.round(C.speed), l: M.warm ? undefined : C.lives || 0 });
   const T = TRON.trails.get(C.id); if (T) tronClear(T); C.reAt = time + 1.4; cpuShow(C, false);
 }
 function cpuBack(C) { const S = matchSlotIn(C.slot || matchSlot(C.id)); C.reAt = 0; C.pos.set(S.x, S.y, S.z); C.prev.copy(C.pos); C.yaw = S.yaw; C.pitch = 0; C.bank = 0; C.tgtT = 0; C.immune = time + 2.5; }
@@ -30518,6 +30793,7 @@ setTimeout(() => {
   if (window.__icarus) Object.assign(window.__icarus, { STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { NEWB, newbHear, newbHeard, newbTyped, newbTalk, newbFallback, newbArrive });
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
+  if (window.__icarus) Object.assign(window.__icarus, { boomHouse, HB, hbHouse, matchHouse, gotBoom, crash, setTimeK: v => { timeK = v; }, gameTime: () => time, pAlive: () => { let n = 0; for (let i = 0; i < PMAX; i++) if (pLife[i] > 0) n++; return n; } });
   if (window.__icarus) Object.assign(window.__icarus, { crash, cpuShow, matchGhost, matchQuit, matchView, matchWhere, matchParty, matchRegulars, matchGlide, matchPractice, matchGoLive, matchSlot, BLAST, matchBlast, GHOST_U, NPCS, OLY_R, PARTY_R, chatCommand, cpuFly });
   if (window.__icarus) Object.assign(window.__icarus, { STU, stuOpen, stuClose, stuTab, stuMissions, stuProSeek, stuPlay, stuWatch, stuFetch, stuTest, stuBack, stuGo, stuStep, stuPP, stuRate, sceneClean, stuDone });
   if (window.__icarus) Object.assign(window.__icarus, { MD, PW, INKW, inkSay, inkNow, mdReady, mdHeard, mdShotAt, mdCamOn, mdSkip, matchBusy, matchWait, matchFire, matchUnqueue, matchFirst, matchRAt, matchWhere, matchParty, pwTake, pwShatter, matchBar, aresScript, miPose, MODEBAR, queueOf: () => MATCH.queue });   // (tests: the fight's opening, its words, one at a time)
