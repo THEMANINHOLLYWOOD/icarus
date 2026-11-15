@@ -1612,6 +1612,7 @@ function underColor(x, z, h, ny, out, o) {
 // thin alpine grass below the snow, blue in the drifts, bare ice where it is too steep for snow to lie, and near the top the
 // white marble the gods' houses are cut from, with gold in it
 const ROCKC = { lime: col('#b9b3a2'), sand: col('#a98d69'), schist: col('#55535c'), scree: col('#9c958b'), lichen: col('#8f9a55'), alp: col('#a9a45a'), drift: col('#a9bcd8'), crust: col('#eef3fa'), ice: col('#97c3e2'), marble: col('#e8e2d5'), gold: col('#e6bd5c') };
+const SEAC = { wet: col('#a3916e'), grass: col('#4f7038'), grass2: col('#6c7a3a'), rubble: col('#b0a596'), pink: col('#c49a92'), deep: col('#5b6670') };
 function terrainColor(x, z, h, ny, out, o) {
   if (realm === 'under') return underColor(x, z, h, ny, out, o);
   const n1 = noise2(x / 300 + 5, z / 300 - 3) * 0.5 + 0.5;
@@ -1642,6 +1643,14 @@ function terrainColor(x, z, h, ny, out, o) {
   }
   if (realm === 'over') { const S = caveSite(Math.floor(x / CAVE.C), Math.floor(z / CAVE.C)); if (S && (x - S.x) ** 2 + (z - S.z) ** 2 < (S.R * 2.6) ** 2) { mix(COL.rock, smoothstep(S.g + 6, S.g - 14, h)); mix([0.03, 0.035, 0.05], smoothstep(S.g - 18, S.g - S.depth * 0.7, h)); } }   // (a throat: rock at the lip, then nothing)
   mix(COL.sand, smoothstep(WATER + 5, WATER + 1, h));
+  if (h < WATER - 0.6) {   // the floor of the sea: wet sand going grey with depth, meadows of sea-grass, and broken pale rubble round the reefs
+    const wd = WATER - h, rk = reefK(x, z, wd), n = noise2(x / 47 + 3.3, z / 47 - 8.1);
+    mix(SEAC.wet, smoothstep(0.6, 5, wd) * 0.55);
+    const gr = smoothstep(0.2, 0.5, noise2(x / 95 - 4.4, z / 95 + 6.6)) * smoothstep(2, 5, wd) * smoothstep(26, 14, wd) * (1 - rk);
+    if (gr > 0) mix(n > 0.3 ? SEAC.grass2 : SEAC.grass, gr * 0.75);
+    if (rk > 0) mix(n > 0 ? SEAC.rubble : SEAC.pink, rk * 0.5);
+    mix(SEAC.deep, smoothstep(16, 60, wd) * 0.65);
+  }
   { const dk = duneK(x, z); if (dk > 0) {   // the sand sea: warm sand, paler on the long backs, darker down the slip faces and in the hollows between
     const n = noise2(x / 90 + 4.4, z / 90 - 1.9) * 0.5 + 0.5; mix(DUNEC.sand, dk); mix(DUNEC.pale, dk * smoothstep(0.93, 0.995, ny) * (0.3 + 0.4 * n)); mix(DUNEC.lee, dk * smoothstep(0.93, 0.8, ny) * 0.8); mix(DUNEC.floor, dk * smoothstep(DUNE.base + 4, DUNE.base - 18, h) * 0.6); } }
   for (const v of VOLCANOES) {   // black rock and grey ash on the volcanoes, yellow sulphur crusting the lake's rim
@@ -2126,6 +2135,7 @@ const nearSite = (x, z, r) => BEACONS.some(b => (x - b.x) ** 2 + (z - b.z) ** 2 
 const WIND = new THREE.Vector3(0.93, 0, 0.37);
 // shared by every piece of ground: cloud shadows sliding over the hills, and a waterline that breathes
 const worldFx = { uTime: { value: 0 }, uShade: { value: 1 }, uUnder: { value: 0 }, uWater: { value: WATER }, uBird: { value: new THREE.Vector4() }, uGale: { value: 0 }, uSunD: { value: new THREE.Vector3(0.4, 0.8, 0.3) }, uSlope: { value: 1 }, uWet: { value: 0 }, uSky: { value: new THREE.Color(0.6, 0.75, 0.9) }, uSoot: { value: new THREE.Vector4(0, 0, 1, 0) } };   // (uWet, uSky: the ground after rain, and what its puddles show; see WC. uSoot: where black rain fell: x, z, radius, how dark)
+worldFx.uCaus = { value: new THREE.Color(0, 0, 0) }; worldFx.uSeaBed = { value: new THREE.Color(0.05, 0.2, 0.35) };   // (the light the waves throw on the bed of the sea, and the colour of the water it is seen through: see updateSeaLook)
 function patchWorld(mat, shore, sways) {
   mat.customProgramCacheKey = () => 'world' + (shore ? 'S' : '') + (sways ? 'W' : '') + '|a3';   // (the flags change the shader: each kind compiled for itself)
   mat.onBeforeCompile = sh => {
@@ -2148,7 +2158,7 @@ function patchWorld(mat, shore, sways) {
           vLeaf = lf;
         } else vLeaf = 0.0;` : ''));
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vWp; uniform float uTime, uShade, uUnder, uWater, uSlope, uWet; uniform vec3 uSunD, uSky; uniform vec4 uSoot;${sways ? ' varying float vLeaf;' : ''}
+      varying vec3 vWp; uniform float uTime, uShade, uUnder, uWater, uSlope, uWet; uniform vec3 uSunD, uSky${shore ? ', uCaus, uSeaBed' : ''}; uniform vec4 uSoot;${sways ? ' varying float vLeaf;' : ''}
       float wHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float wNoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(wHash(i), wHash(i + vec2(1.0, 0.0)), f.x), mix(wHash(i + vec2(0.0, 1.0)), wHash(i + vec2(1.0, 1.0)), f.x), f.y); }`)
@@ -2194,7 +2204,18 @@ function patchWorld(mat, shore, sways) {
         float d = vWp.y - (uWater + wv);
         gl_FragColor.rgb *= 1.0 - smoothstep(1.8, 0.0, d) * 0.38;
         float foam = smoothstep(0.45, 0.0, abs(d - 0.15)) * (0.5 + 0.5 * wNoise(vWp.xz * 0.9 + uTime * 0.4));
-        gl_FragColor.rgb += mix(vec3(1.0), vec3(0.12, 0.4, 1.5), uUnder) * foam * 0.6;` : ''}
+        gl_FragColor.rgb += mix(vec3(1.0), vec3(0.12, 0.4, 1.5), uUnder) * foam * 0.6;
+        if (d < -0.3 && uUnder < 0.5) {
+          // the bed of the sea: the water's own colour coming over it with every metre, and the light the waves overhead
+          // focus wandering across it in a moving net, brightest in the shallows
+          float wd = -d;
+          vec2 cq = vWp.xz * 1.35; float ct = uTime * 0.55;
+          float c1 = abs(sin(cq.x + sin(cq.y * 1.31 + ct) * 1.3 + ct * 0.6) + sin(cq.y * 0.93 + sin(cq.x * 1.17 - ct * 0.8) * 1.3 - ct * 0.45));
+          float c2 = abs(sin(cq.x * 1.9 - cq.y * 0.7 + ct * 1.1 + sin(cq.y * 2.1 - ct) * 0.9) + sin(cq.y * 1.7 + cq.x * 0.5 - ct * 0.9));
+          float caus = (pow(1.0 - clamp(c1 * 0.5, 0.0, 1.0), 9.0) + pow(1.0 - clamp(c2 * 0.5, 0.0, 1.0), 9.0) * 0.6) * 0.55;
+          gl_FragColor.rgb = mix(gl_FragColor.rgb * vec3(0.78, 0.95, 1.02), uSeaBed, smoothstep(0.0, 60.0, wd) * 0.5);
+          gl_FragColor.rgb += uCaus * caus * smoothstep(26.0, 0.8, wd) * smoothstep(0.0, 0.8, wd) * smoothstep(220.0, 30.0, length(cameraPosition - vWp));
+        }` : ''}
       }
       #include <tonemapping_fragment>`);
   };
@@ -2659,16 +2680,20 @@ const WAVES = [[-1.15, 330, 1.3, 1], [-0.92, 215, 0.78, 1], [0, 150, 0.95], [0.5
 const WAVE_SUM = WAVES.reduce((s, w) => s + w.A, 0), CREST_N = 2.28;
 const GUSTS = [[0, 0.0037, 0.035, 0, 0.5], [1.05, 0.0081, -0.052, 1.7, 0.33], [-0.7, 0.0019, 0.017, 4.1, 0.22]].map(([a, f, s, ph, A]) => ({ x: Math.cos(WAVE_DIR + a) * f, z: Math.sin(WAVE_DIR + a) * f, s, ph, A }));
 const CURRS = [[0.6, 900, 0.011, 0.4, 1.7], [2.1, 420, -0.017, 2.6, 1.0], [-1.2, 2300, 0.006, 5.0, 1.3]].map(([a, L, s, ph, v]) => ({ ex: Math.cos(a) * 6.2832 / L, ez: Math.sin(a) * 6.2832 / L, ux: Math.sin(a) * v, uz: -Math.cos(a) * v, s, ph }));
-const seaMood = () => 1 + 0.25 * Math.sin(time * 0.023) + 0.12 * Math.sin(time * 0.0071 + 2);   // (the whole sea, getting up and lying down)
+// (and the weather on top of that: a storm or Poseidon's rising sea stands the whole of it up, a still dawn lays it flat;
+//  SEAK is eased toward what the sky is doing in updateSeaLook, and the shader is handed the same two numbers)
+const SEAK = { v: 1, sw: 1 };
+const seaMood = () => (1 + 0.25 * Math.sin(time * 0.023) + 0.12 * Math.sin(time * 0.0071 + 2)) * SEAK.v;   // (the whole sea, getting up and lying down)
 function seaGust(x, z) { if (realm === 'under') return 0.55; let g = 1; for (const G of GUSTS) g += G.A * Math.sin(G.x * x + G.z * z - time * G.s + G.ph); return clamp(g, 0.25, 1.75) * seaMood(); }
-const swellNow = () => (realm === 'under' ? 0.3 : 1) * (1 + 0.28 * Math.sin(time * 0.011 + 1));
+const swellNow = () => (realm === 'under' ? 0.3 : SEAK.sw) * (1 + 0.28 * Math.sin(time * 0.011 + 1));
 // which way the water itself is going here, and how fast (m/s): what floats, drifts
 function currentAt(x, z, out) { let cx = Math.cos(WAVE_DIR) * 0.4, cz = Math.sin(WAVE_DIR) * 0.4; for (const C of CURRS) { const c = Math.cos(C.ex * x + C.ez * z + time * C.s + C.ph); cx += C.ux * c; cz += C.uz * c; } out.x = cx; out.z = cz; return out; }
 const GLF = v => Number(v).toExponential(7);   // (a number written out in full for the shader: the water drawn and the water things float on must agree, far from home too)
 const SWELL_GLSL = `
+  uniform float uSeaK, uSwellK;
   float gustAt(vec2 p){ float g = 1.0${GUSTS.map(G => ` + ${GLF(G.A)} * sin(dot(p, vec2(${GLF(G.x)}, ${GLF(G.z)})) - uTime * ${GLF(G.s)} + ${GLF(G.ph)})`).join('')};
-    return mix(clamp(g, 0.25, 1.75) * (1.0 + 0.25 * sin(uTime * 0.023) + 0.12 * sin(uTime * 0.0071 + 2.0)), 0.55, uUnder); }
-  float swellNow(){ return mix(1.0, 0.3, uUnder) * (1.0 + 0.28 * sin(uTime * 0.011 + 1.0)); }
+    return mix(clamp(g, 0.25, 1.75) * (1.0 + 0.25 * sin(uTime * 0.023) + 0.12 * sin(uTime * 0.0071 + 2.0)) * uSeaK, 0.55, uUnder); }
+  float swellNow(){ return mix(uSwellK, 0.3, uUnder) * (1.0 + 0.28 * sin(uTime * 0.011 + 1.0)); }
   vec2 curAt(vec2 p){ vec2 c = vec2(${GLF(Math.cos(WAVE_DIR) * 0.4)}, ${GLF(Math.sin(WAVE_DIR) * 0.4)});
     ${CURRS.map(C => `c += vec2(${GLF(C.ux)}, ${GLF(C.uz)}) * cos(dot(p, vec2(${GLF(C.ex)}, ${GLF(C.ez)})) + uTime * ${GLF(C.s)} + ${GLF(C.ph)});`).join(' ')}
     return c; }`;
@@ -2684,6 +2709,18 @@ const SHORE = { N: TOUCH ? 112 : 160, cell: 25, x0: 1e9, z0: 1e9, realm: '', row
 SHORE.data = new Uint8Array(SHORE.N * SHORE.N).fill(255); SHORE.back = new Uint8Array(SHORE.N * SHORE.N);
 SHORE.tex = new THREE.DataTexture(SHORE.data, SHORE.N, SHORE.N, THREE.RedFormat, THREE.UnsignedByteType);
 SHORE.tex.magFilter = SHORE.tex.minFilter = THREE.LinearFilter; SHORE.tex.needsUpdate = true;
+// and beside it a second chart, of the reefs: the water over them goes emerald (see reefK, and REEF for the reefs themselves)
+SHORE.reef = new Uint8Array(SHORE.N * SHORE.N); SHORE.reefBack = new Uint8Array(SHORE.N * SHORE.N);
+SHORE.reefTex = new THREE.DataTexture(SHORE.reef, SHORE.N, SHORE.N, THREE.RedFormat, THREE.UnsignedByteType);
+SHORE.reefTex.magFilter = SHORE.reefTex.minFilter = THREE.LinearFilter; SHORE.reefTex.needsUpdate = true;
+// Where the reefs are: in the shallows round every shore, wherever the bed is between a couple of metres and twenty-odd
+// under, in patches a few hundred metres across with sand and sea-grass between them. Worked out from the place alone, so
+// every player finds the same reef in the same place. (wd: how deep the bed is there.)
+function reefK(x, z, wd) {
+  if (wd < 1.2 || wd > 30) return 0;
+  const n = noise2(x / 260 + 17.3, z / 260 - 41.9) * 0.65 + noise2(x / 85 - 5.1, z / 85 + 2.2) * 0.35;
+  return smoothstep(0.0, 0.3, n) * smoothstep(1.2, 4, wd) * smoothstep(30, 18, wd);
+}
 function updateShore() {
   const S = SHORE, N = S.N, size = N * S.cell, c = camera.position;
   if (S.row < 0) {
@@ -2696,10 +2733,10 @@ function updateShore() {
   if (S.nrealm !== realm) { S.row = -1; return; }
   for (let n = S.fast ? 40 : 8; n-- > 0 && S.row < N; S.row++) {
     const z = S.nz + (S.row + 0.5) * S.cell, o = S.row * N;
-    for (let i = 0; i < N; i++) S.back[o + i] = clamp((WATER - height(S.nx + (i + 0.5) * S.cell, z) + 8) / 40, 0, 1) * 255;
+    for (let i = 0; i < N; i++) { const x = S.nx + (i + 0.5) * S.cell, wd = WATER - height(x, z); S.back[o + i] = clamp((wd + 8) / 40, 0, 1) * 255; S.reefBack[o + i] = realm === 'over' ? reefK(x, z, wd) * 255 : 0; }
   }
   if (S.row >= N) {
-    S.data.set(S.back); S.tex.needsUpdate = true; S.x0 = S.nx; S.z0 = S.nz; S.realm = realm; S.row = -1; S.fast = false;
+    S.data.set(S.back); S.tex.needsUpdate = true; S.reef.set(S.reefBack); S.reefTex.needsUpdate = true; S.x0 = S.nx; S.z0 = S.nz; S.realm = realm; S.row = -1; S.fast = false;
     waterMat.uniforms.uShoreO.value.set(S.x0, S.z0, 1 / size);
   }
 }
@@ -2707,11 +2744,15 @@ const RIPPLES = 8, WAKE_N = TOUCH ? 20 : 36, WAKE_LIFE = 5, TSU_N = 6, TSU_LIFE 
 const v4s = n => Array.from({ length: n }, () => new THREE.Vector4(0, 0, -99, 0));
 // everything that is not the wind: shared by the vertex shader (to raise the surface) and the fragment shader (to light it)
 const SEA_GLSL = `
-  uniform float uTime, uUnder; uniform sampler2D uShore; uniform vec3 uShoreO, uWakeB;
+  uniform float uTime, uUnder; uniform sampler2D uShore, uReefT; uniform vec3 uShoreO, uWakeB;
   uniform vec4 uRip[${RIPPLES}], uWake[${WAKE_N}], uTsu[${TSU_N}];
   float depthAt(vec2 p){
     vec2 uv = (p - uShoreO.xy) * uShoreO.z, e = min(uv, 1.0 - uv);
     return mix(30.0, texture2D(uShore, uv).r * 40.0 - 8.0, smoothstep(0.0, 0.04, min(e.x, e.y)));
+  }
+  float reefAt(vec2 p){   // (how much reef lies under this water: charted with the depth, see SHORE)
+    vec2 uv = (p - uShoreO.xy) * uShoreO.z, e = min(uv, 1.0 - uv);
+    return texture2D(uReefT, uv).r * smoothstep(0.0, 0.04, min(e.x, e.y));
   }
   // returns (dh/dx, dh/dz, h, foam)
   vec4 disturbed(vec2 p, float depth){
@@ -2763,7 +2804,9 @@ const waterMat = new THREE.ShaderMaterial({
     uTime: { value: 0 }, uUnder: { value: 0 }, uDeep: { value: new THREE.Color(0x10407c) }, uShallow: { value: new THREE.Color(0x2f8ac8) },
     uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uSunCol: { value: new THREE.Color() }, uSunDir: { value: new THREE.Vector3(0, 1, 0) },
     uAur: { value: 0 }, uShore: { value: null }, uShoreO: { value: new THREE.Vector3(0, 0, 0) }, uWakeB: { value: new THREE.Vector3(0, 0, 0) }, uFire: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uRip: { value: v4s(RIPPLES) }, uWake: { value: v4s(WAKE_N) }, uTsu: { value: v4s(TSU_N) }, uStyx: { value: new THREE.Vector4(0, 0, 0, 0) } }]),
+    uRip: { value: v4s(RIPPLES) }, uWake: { value: v4s(WAKE_N) }, uTsu: { value: v4s(TSU_N) }, uStyx: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uReefT: { value: null }, uSeaK: { value: 1 }, uSwellK: { value: 1 }, uWarm: { value: 0 }, uStorm: { value: 0 },   // (the sea's colours by place, and the weather on it: see updateSeaLook)
+    uTurq: { value: new THREE.Color(0x2fb8b0) }, uAzure: { value: new THREE.Color(0x1f74b8) }, uIndigo: { value: new THREE.Color(0x0b1e5a) }, uEmer: { value: new THREE.Color(0x1f9a6a) } }]),
   vertexShader: `varying vec3 vWp; uniform vec4 uStyx;
     #include <fog_pars_vertex>
     ${SEA_GLSL}
@@ -2782,7 +2825,7 @@ const waterMat = new THREE.ShaderMaterial({
       vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
       #include <fog_vertex>
     }`,
-  fragmentShader: `uniform vec3 uDeep, uShallow, uZen, uHor, uSunCol, uSunDir; uniform vec4 uFire; uniform float uAur; varying vec3 vWp;
+  fragmentShader: `uniform vec3 uDeep, uShallow, uZen, uHor, uSunCol, uSunDir, uTurq, uAzure, uIndigo, uEmer; uniform vec4 uFire; uniform float uAur, uWarm, uStorm; varying vec3 vWp;
     #include <fog_pars_fragment>
     ${SEA_GLSL}
     ${SWELL_GLSL}
@@ -2815,10 +2858,20 @@ const waterMat = new THREE.ShaderMaterial({
       vec3 N = normalize(vec3(-w.x, 1.0, -w.y));
       vec3 V = normalize(cameraPosition - vWp);
       float grain = n1(p * 0.8 + vec2(uTime * 0.5, -uTime * 0.3));
+      // The colour of the water itself, by what lies under it: turquoise over pale sand, azure further out, indigo where the
+      // bed falls away, emerald over the reefs; and no two seas quite the same blue (greener here, more violet there, in
+      // patches kilometres across). The sun going down warms it; a storm drains it to slate.
+      float reef = reefAt(p), reg = n1(p * 0.00042 + vec2(3.7, -1.9)), reg2 = n1(p * 0.0013 + vec2(-5.3, 2.2));
+      vec3 sb = mix(uTurq * mix(vec3(0.85, 1.04, 1.12), vec3(1.08, 1.0, 0.86), reg2), uAzure * mix(vec3(0.78, 1.14, 0.98), vec3(1.12, 0.92, 1.1), reg), smoothstep(1.0, 11.0, depth));
+      sb = mix(sb, uIndigo * mix(vec3(1.0), vec3(1.3, 0.82, 1.12), reg2), smoothstep(12.0, 30.0, depth));
+      sb = mix(sb, uEmer * mix(vec3(0.9, 1.05, 0.95), vec3(1.05, 1.0, 1.15), reg), reef * smoothstep(0.3, 2.5, depth) * 0.82);
+      sb = mix(sb, sb * vec3(1.38, 0.9, 0.7) + uSunCol * vec3(0.09, 0.045, 0.015), uWarm);
+      sb = mix(sb, vec3(dot(sb, vec3(0.3, 0.5, 0.2))) * vec3(0.8, 0.88, 0.92) * 0.78, uStorm * 0.6);
       if (V.y < 0.0) {
         // from underneath: a bright window straight overhead where the day comes through, and the dark all round it
         float up = -V.y + (N.x + N.z) * 0.25;
-        vec3 c = mix(uDeep * 0.5, uShallow * 1.5 + uSunCol * 0.35, smoothstep(0.35, 0.95, up)) + uSunCol * smoothstep(0.75, 1.0, grain) * smoothstep(0.5, 1.0, up) * 0.6;
+        vec3 dk = mix(sb * 0.45, uDeep * 0.5, uUnder), lt = mix(sb * 1.7 + uSunCol * 0.35, uShallow * 1.5 + uSunCol * 0.35, uUnder);
+        vec3 c = mix(dk, lt, smoothstep(0.35, 0.95, up)) + uSunCol * smoothstep(0.75, 1.0, grain) * smoothstep(0.5, 1.0, up) * 0.6;
         gl_FragColor = vec4(c, 1.0);
       } else {
         float fres = 0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
@@ -2829,10 +2882,13 @@ const waterMat = new THREE.ShaderMaterial({
         vec3 sunD = normalize(uSunDir);
         float sd = max(dot(R, sunD), 0.0);
         vec3 spec = uSunCol * (pow(sd, 380.0) * 9.0 + pow(sd, 28.0) * 0.35);
-        // the colour of the water itself: pale and green over sand, darkening with every metre, and lit from inside along the crests
+        // glitter: the sun (or the moon) caught in a thousand small faces at once, each one there for an instant
+        { vec2 gc = floor(p * 1.6); float gl = h1(gc + floor(uTime * 6.0 + h1(gc) * 6.0) * 0.37);
+          spec += uSunCol * step(0.955, gl) * pow(sd, 9.0) * smoothstep(260.0, 25.0, dist) * 3.2 * (1.0 - uStorm * 0.8) * (1.0 - uUnder); }
+        // lit from inside along the crests (the old colour, pale over sand and dark with every metre, is the Underworld's)
         vec3 shal = uShallow * 1.35 + vec3(0.0, 0.1, 0.06) * (1.0 - uUnder);
-        vec3 body = mix(shal, uDeep, smoothstep(0.0, 20.0, depth));
-        body = mix(body, uShallow * 1.2, smoothstep(0.05, 0.6, crest) * 0.6);
+        vec3 body = mix(mix(shal, uDeep, smoothstep(0.0, 20.0, depth)), sb, 1.0 - uUnder);
+        body = mix(body, mix(uShallow * 1.2, sb * 1.45 + uSunCol * 0.05, 1.0 - uUnder), smoothstep(0.05, 0.6, crest) * 0.6);
         body += uSunCol * uShallow * pow(max(dot(V.xz, -sunD.xz), 0.0), 3.0) * smoothstep(0.1, 0.7, crest) * 0.35 * (1.0 - uUnder);
         // the wind on it: darker where a gust has roughened it, pale and glassy in the slicks between; and a paler lane where a current runs
         body *= mix(1.12, 0.84, smoothstep(0.5, 1.7, G));
@@ -2841,11 +2897,11 @@ const waterMat = new THREE.ShaderMaterial({
         vec2 cp = p * 0.07 + vec2(sin(p.y * 0.021 + uTime * 0.2), cos(p.x * 0.019 - uTime * 0.17)) * 1.3;
         float ca = sin(cp.x + uTime * 0.3) * sin(cp.y - uTime * 0.23) + sin((cp.x + cp.y) * 0.7 + uTime * 0.19) * 0.6;
         float caust = smoothstep(0.1, 0.0, abs(ca - 0.2)) * mix(smoothstep(700.0, 60.0, dist), 0.35 + 0.65 * smoothstep(2500.0, 200.0, dist), uUnder);
-        body += uShallow * caust * (0.25 + 0.4 * smoothstep(8.0, 1.0, depth)) * (1.0 - uUnder) + vec3(0.1, 0.42, 1.7) * caust * uUnder * 1.4;
+        body += mix(uShallow, sb * 1.3, 0.6) * caust * (0.25 + 0.4 * smoothstep(8.0, 1.0, depth) + 0.25 * reef) * (1.0 - uUnder) * (1.0 - uStorm * 0.6) + vec3(0.1, 0.42, 1.7) * caust * uUnder * 1.4;
         vec3 c = mix(body, skyC, fres) + spec;
         c += aur * 0.3 * (1.0 - fres);   // (and dark water gives the lights back even where it gives back little else)
         // foam: where the crests break, where the swell runs up a beach in bands, and wherever the water has been torn
-        float caps = smoothstep(0.44, 0.7, crest + (n1(p * 0.21 + uTime * 0.2) - 0.5) * 0.34) * smoothstep(0.55, 0.95, calm) * smoothstep(0.25, 0.8, grain);
+        float caps = smoothstep(0.44 - uStorm * 0.14, 0.7 - uStorm * 0.12, crest + (n1(p * 0.21 + uTime * 0.2) - 0.5) * 0.34) * smoothstep(0.55, 0.95, calm) * smoothstep(0.25, 0.8, grain);   // (in a blow the tops come off sooner)
         float run = depth * 1.25 + uTime * 1.25 + n1(p * 0.07) * 5.0;
         float surf = smoothstep(0.55, 1.0, sin(run)) * smoothstep(7.0, 0.6, depth) * smoothstep(-0.6, 0.3, depth) * (0.35 + 0.65 * grain)
                    + smoothstep(0.9, 0.0, depth) * smoothstep(-1.5, 0.0, depth) * (0.55 + 0.45 * grain);
@@ -2861,13 +2917,15 @@ const waterMat = new THREE.ShaderMaterial({
         // something burning low over it
         vec2 fv = p - uFire.xy; float fr = 5.0 + uFire.z * 0.55;
         c += vec3(1.5, 0.52, 0.1) * uFire.w * exp(-dot(fv, fv) / (fr * fr)) * (0.25 + 0.6 * grain + 3.0 * abs(chop.x + chop.y));
-        gl_FragColor = vec4(c, clamp(max(mix(0.42, 0.9, smoothstep(0.0, 3.5, depth)), fres * 1.6 + foam), 0.0, 1.0));
+        // and clear: over sand and reef the bed shows through a long way down, unless the weather has stirred it up
+        float clearK = mix(smoothstep(0.0, 3.5, depth), smoothstep(0.0, 10.0 + 20.0 * reef, depth), (1.0 - uUnder) * (1.0 - uStorm * 0.7));
+        gl_FragColor = vec4(c, clamp(max(mix(mix(0.42, 0.22, 1.0 - uUnder), 0.92, clearK), fres * 1.6 + foam), 0.0, 1.0));
       }
       #include <fog_fragment>
     }`,
   transparent: true, fog: true, side: THREE.DoubleSide,
 });
-waterMat.uniforms.uShore.value = SHORE.tex;
+waterMat.uniforms.uShore.value = SHORE.tex; waterMat.uniforms.uReefT.value = SHORE.reefTex;
 const water = new THREE.Mesh((() => {
   // a disc that travels with the camera: fine near the lens, where waves have to move, and reaching the horizon
   const R = TOUCH ? 72 : 110, A = TOUCH ? 128 : 192, pos = [], idx = [];
@@ -4539,14 +4597,14 @@ const postMat = new THREE.ShaderMaterial({
     tPrev: { value: null }, uPersist: { value: 0 }, tTitle: { value: null }, uTitleT: { value: -1 }, uSunUV: { value: new THREE.Vector2(0.5, 0.8) }, uRays: { value: 0 },
     tName: { value: null }, uNameNs: { value: new Float32Array(9).fill(7) }, uNameW: { value: 2 },
     uNear: { value: 0.3 }, uFar: { value: 14000 }, uEdge: { value: 1 }, uLineFar: { value: 1e5 }, uFlash: { value: 0 }, uFlashCol: { value: new THREE.Color(1, 0.75, 0.45) }, uHeat: { value: 0 }, uGlow: { value: 0 },
-    uTint: { value: new THREE.Color(1, 1, 1) }, uFade: { value: 1 }, uWarp: { value: 0 }, uLight: { value: 0 }, uSpeed: { value: 0 }, uDanger: { value: 0 }, uDof: { value: 0 }, uSea: { value: 0 }, uVib: { value: 1 }, tBlur: { value: null }, uTime: worldFx.uTime,
+    uTint: { value: new THREE.Color(1, 1, 1) }, uFade: { value: 1 }, uWarp: { value: 0 }, uLight: { value: 0 }, uSpeed: { value: 0 }, uDanger: { value: 0 }, uDof: { value: 0 }, uSea: { value: 0 }, uSeaNear: { value: 0 }, uSeaLo: { value: new THREE.Color(0.02, 0.17, 0.4) }, uSeaHi: { value: new THREE.Color(0.22, 0.8, 0.98) }, uSeaMul: { value: new THREE.Color(0.4, 0.86, 1.22) }, uVib: { value: 1 }, tBlur: { value: null }, uTime: worldFx.uTime,
     tCells: { value: null }, tCells2: { value: null }, uCells: { value: new THREE.Vector2(1, 1) }, uRelief: { value: 6 },
     uGlitch: { value: 0 }, uStTint: { value: new THREE.Color(1, 1, 1) }, uStA: { value: new THREE.Vector4(0, 1, 1, 1) }, uStB: { value: new THREE.Vector4(1, 1, 0, 0) }, tUI: { value: null }, tChars: { value: null }, uUiOn: { value: 0 }, uUiK: { value: 1 }, uUiN: { value: new THREE.Vector2(1, 1) }, tUI2: { value: null }, uUi2On: { value: 0 }, uUi2N: { value: new THREE.Vector2(1, 1) }, uWt: { value: [new THREE.Color(1, 0.9, 0.7), new THREE.Color(1, 0.7, 0.35), new THREE.Color(0.4, 0.2, 0.08)] }, uSayCol: { value: new THREE.Color(1, 0.7, 0.35) }, uUiCol: { value: [new THREE.Color(1, 0.54, 0.23), new THREE.Color(1, 0.85, 0.66), new THREE.Color(0.42, 0.15, 0.03)] }, uMk: { value: Array.from({ length: 6 }, () => new THREE.Color(0.75, 0.9, 1)) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tScene, tDepth, tGlyph, tName, tPrev; uniform vec2 uRes, uCell; uniform vec3 uTint, uFlashCol; uniform float uNameNs[9]; uniform float uNameW;
     uniform float uAscii, uTotal, uNear, uFar, uEdge, uFlash, uHeat, uGlow, uFade, uWarp, uLight, uSpeed, uDanger, uTime, uPersist, uTitleT, uRays; uniform vec2 uSunUV; uniform sampler2D tTitle;
-    uniform sampler2D tCells, tCells2, tBlur; uniform vec2 uCells; uniform float uDof, uSea, uVib;
+    uniform sampler2D tCells, tCells2, tBlur; uniform vec2 uCells; uniform float uDof, uSea, uVib, uSeaNear; uniform vec3 uSeaLo, uSeaHi, uSeaMul;
     uniform vec3 uStTint; uniform vec4 uStA, uStB; uniform sampler2D tUI, tUI2, tChars; uniform float uUiOn, uUi2On, uGlitch, uUiK; uniform vec2 uUi2N; uniform vec3 uWt[3], uSayCol; uniform vec2 uUiN; uniform vec3 uUiCol[3]; uniform vec3 uMk[6];
     uniform vec3 uInk[16];   // (16 to 31: inks lent out to whatever has words of its own to put in the picture — see INKW)
     // ── the name, on fire. A texture of the word stretched to fill the screen; flames are the word's own shape pulled upward
@@ -4665,7 +4723,8 @@ const postMat = new THREE.ShaderMaterial({
       }
       if (uSea > 0.0) {   // under the sea
         float l = dot(col, vec3(0.3, 0.55, 0.15));
-        vec3 w = mix(col * vec3(0.4, 0.86, 1.22), mix(vec3(0.02, 0.17, 0.4), vec3(0.22, 0.8, 0.98), smoothstep(0.0, 0.85, l)), 0.42);
+        vec3 w = mix(col * uSeaMul, mix(uSeaLo, uSeaHi, smoothstep(0.0, 0.85, l)), 0.42);   // (in the water's own colour where he is: see updateSeaLook)
+        if (uSeaNear > 0.0) w = mix(w, col * mix(vec3(1.0), uSeaMul, 0.25), (1.0 - smoothstep(5.0, 42.0, 1.0 / invZ(vUv))) * uSeaNear * 0.85);   // (and what is right in front of him keeps its own colours)
         float ca = sin(vUv.x * 34.0 + uTime * 1.3 + sin(vUv.y * 9.0 + uTime * 0.7) * 2.0) * sin(vUv.x * 13.0 - uTime * 0.9 + vUv.y * 21.0);
         w += vec3(0.1, 0.36, 0.5) * smoothstep(0.5, 1.0, ca) * (0.2 + 0.8 * vUv.y) * 0.55;                                      // the light the waves let through, moving
         w += vec3(0.12, 0.32, 0.4) * pow(max(0.0, sin(vUv.x * 7.0 + vUv.y * 2.4 + uTime * 0.25)), 6.0) * smoothstep(0.15, 1.0, vUv.y) * 0.4;   // and coming down in bars
@@ -6228,9 +6287,11 @@ function humanDive() {
   const p = player;
   if (p.form !== 'human' || !p.swim || p.dive || state !== 'play' || realm !== 'over' || p.cine) return false;
   const bed = overHeight(p.pos.x, p.pos.z);
-  if (bed > WATER - 14) { toast('TOO SHALLOW TO DIVE HERE · SWIM OUT'); return false; }
-  p.dive = { t: 0, bed, deep: Math.min(30, WATER - bed - 3), told: false, mom: new THREE.Vector3(-Math.sin(human.group.rotation.y) * 3, -11, -Math.cos(human.group.rotation.y) * 3) }; p.grounded = false; p.swim = false; p.vel.set(0, 0, 0); SEA.trans = true;   // (he ducks under: a few metres down before he does anything else)   // (the sea closes over the lens too)
-  ripple(p.pos.x, p.pos.z, 1); audio.sfx.plunge?.(); toast(TOUCH ? 'UNDER · PUSH: SWIM · PULL BACK: DIVE, FAST · TAP: UP AND OUT, BURNING' : 'UNDER · W SWIMS · S DIVES, FAST · SPACE: UP AND OUT, BURNING');
+  if (bed > WATER - 3.2) { toast('TOO SHALLOW TO DIVE HERE · SWIM OUT'); return false; }
+  // (over a reef, or any water too shallow to go on through: he can still go down and look, and the bed stops him)
+  const reef = bed > WATER - 14;
+  p.dive = { t: 0, bed, deep: reef ? 1e9 : Math.min(30, WATER - bed - 3), reef, told: false, mom: new THREE.Vector3(-Math.sin(human.group.rotation.y) * 3, reef ? -6 : -11, -Math.cos(human.group.rotation.y) * 3) }; p.grounded = false; p.swim = false; p.vel.set(0, 0, 0); SEA.trans = true;   // (he ducks under: a few metres down before he does anything else; the sea closes over the lens too)
+  ripple(p.pos.x, p.pos.z, 1); audio.sfx.plunge?.(); toast(reef ? (TOUCH ? 'UNDER · PUSH: SWIM · PULL BACK: DOWN · TAP: UP AND OUT' : 'UNDER · W SWIMS · S GOES DOWN · SPACE: UP AND OUT') : TOUCH ? 'UNDER · PUSH: SWIM · PULL BACK: DIVE, FAST · TAP: UP AND OUT, BURNING' : 'UNDER · W SWIMS · S DIVES, FAST · SPACE: UP AND OUT, BURNING');
   return true;
 }
 function updateHumanDive(dt) {
@@ -6250,7 +6311,9 @@ function updateHumanDive(dt) {
   { const tk = p.tailK || 0, kf = 1 + 1.7 * tk + (boosting() ? 0.8 * tk : 0);
     if (D.rise) p.vel.set(-Math.sin(fy) * 2.5, 22 + 16 * tk, -Math.cos(fy) * 2.5);   // (up and out: nothing else until he is through the top of it)
     else p.vel.set(-Math.sin(fy) * fwd * kf, vy, -Math.cos(fy) * fwd * kf); } p.pos.addScaledVector(p.vel, dt); p.fallTop = p.pos.y;
-  const bed = overHeight(p.pos.x, p.pos.z); if (p.pos.y < bed + 1.2) { p.pos.y = bed + 1.2; if (D.mom && !D.through) { D.mom = null; for (let i = 0; i < 24; i++) emit(p.pos.x + rnd(1.5), bed + 0.4, p.pos.z + rnd(1.5), rnd(2), 0.5 + Math.random() * 1.5, rnd(2), 1.2 + Math.random(), [0.5, 0.46, 0.38], 0.4, 1.4); } }   // (the bed: a cloud of it goes up)
+  const bed = overHeight(p.pos.x, p.pos.z);
+  if (D.reef && bed < WATER - 18) { D.reef = false; D.deep = Math.max(Math.min(30, WATER - bed - 3), WATER - p.pos.y + 4); }   // (out over the drop-off from a reef: the deep is the deep again, and S takes him on through)
+  if (p.pos.y < bed + 1.2) { p.pos.y = bed + 1.2; if (D.mom && !D.through) { D.mom = null; for (let i = 0; i < 24; i++) emit(p.pos.x + rnd(1.5), bed + 0.4, p.pos.z + rnd(1.5), rnd(2), 0.5 + Math.random() * 1.5, rnd(2), 1.2 + Math.random(), [0.5, 0.46, 0.38], 0.4, 1.4); } }   // (the bed: a cloud of it goes up)
   // the stroke: arms sweep from stretched ahead out and back to his sides, and glide; the legs beat
   const glide = clamp(ms / 18, 0, 1);   // (still carried by the plunge: one line, arms ahead, no stroke yet)
   const st = D.t * 4, pull = Math.max(0, Math.sin(st)) * (1 - glide), kick = Math.sin(D.t * 9) * (1 - glide * 0.7), tilt = D.rise ? -1.25 : glide > 0.05 && M ? clamp(-M.y / (ms || 1), -0.35, 1.25) : vy < -0.5 ? 1 : vy > 0.5 ? -0.35 : 0.12;
@@ -14504,15 +14567,21 @@ function updateSub(dt) {
 // what the lens sees of it: under either surface the world closes to a hundred metres of blue, brighter toward the day
 function updateSea(dt) {
   const c = camera.position, under = realm === 'under';
-  if (!under) SEA.top.copy(pal.water).lerp(SEA.bright, 0.4 * clamp(pal.sunI / 2.2, 0, 1)).lerp(WHITE_C, 0.1);   // (by day the top of the sea is bright and blue-green from below)
+  updateSeaLook(dt);
+  if (!under) SEA.top.copy(SEALOOK.body).multiplyScalar(1.5).lerp(SEA.bright, 0.22 * clamp(pal.sunI / 2.2, 0, 1)).lerp(WHITE_C, 0.06);   // (by day the top of the sea is bright from below, in the colour of the water he is in)
   const camWet = SEA.trans && (under ? c.y > UNDER.ceil : c.y < WATER + 0.2);
   if (SEA.trans && !player.sub && !player.dive && !camWet) SEA.trans = false;
   SEA.murk = camWet ? 1 : lerp(SEA.murk, 0, damp(under ? 2.4 : 10, dt));
   if (SEA.murk < 0.003) SEA.murk = 0;
   ceilMesh.visible = under && c.y < UNDER.ceil;
-  const hide = camWet && !under;   // the bed he went through is not there to be looked at
-  if (hide || SEA.hid) for (const [, g] of chunks) g.visible = !hide;
-  SEA.hid = hide;
+  const hide = camWet && !under && (!!player.sub || !!player.dive?.through || c.y < overHeight(c.x, c.z) - 1.5);   // the bed he went through is not there to be looked at (but a bed he is swimming over is)
+  const sight = camWet && !under && !hide;   // (and swimming over it, only the bed within sight is drawn: the murk hides the rest)
+  if (hide || SEA.hid || sight || SEA.sight) for (const [k, g] of chunks) {
+    if (!sight) { g.visible = !hide; continue; }
+    const i = k.indexOf(','), dx = Math.max(0, Math.abs((+k.slice(0, i) + 0.5) * CHUNK - c.x) - CHUNK / 2), dz = Math.max(0, Math.abs((+k.slice(i + 1) + 0.5) * CHUNK - c.z) - CHUNK / 2);
+    g.visible = dx * dx + dz * dz < 240 * 240;
+  }
+  SEA.hid = hide; SEA.sight = sight;
   if (SEA.murk > 0) {
     const m = SEA.murk, k = clamp(under ? (UNDER.ceil + SEA.col - c.y) / SEA.col : (WATER - c.y) / SEA.col, 0, 1);
     SEA.fog.copy(SEA.top).lerp(SEA.deep, Math.pow(k, 0.7));
@@ -14522,6 +14591,452 @@ function updateSea(dt) {
   }
   postMat.uniforms.uTint.value.lerp(tintWant, damp(2.5, dt));
   postMat.uniforms.uSea.value = SEA.murk;
+  seaTintPost(under);
+  updateReefs(dt, camWet && !under);
+  // under the sea as a man, the lens is carried a little by the water too: a slow lean one way and back, never still
+  if (camWet && !under && player.dive && !XR.on && !player.cine) { const t = time; camera.rotateZ(Math.sin(t * 0.61) * 0.016 + Math.sin(t * 1.37 + 1.1) * 0.005); camera.rotateX(Math.sin(t * 0.47 + 0.4) * 0.009); }
+}
+
+// ── The sea, looked at. What colour the water is here (turquoise over sand, azure, indigo over the deep, emerald over a
+//    reef; warm when the sun is going down, slate in a storm), how rough the weather has made it, and what of all that
+//    reaches the eye of someone under it. The surface works its colours out for itself from the charts (see waterMat);
+//    this is the same reckoning for the one place the lens is, for the murk and the bed and the light coming down.
+const SEALOOK = { body: new THREE.Color(0x1f74b8), tmp: new THREE.Color(), t: 0, warm: 0, storm: 0, reef: 0, depth: 20,
+  turq: new THREE.Color('#3ccfc0'), azure: new THREE.Color('#1f7ccc'), indigo: new THREE.Color('#0d2068'), emer: new THREE.Color('#1fb478'),
+  lo: new THREE.Color(), hi: new THREE.Color(), mul: new THREE.Color(), U_LO: new THREE.Color(0.02, 0.17, 0.4), U_HI: new THREE.Color(0.22, 0.8, 0.98), U_MUL: new THREE.Color(0.4, 0.86, 1.22) };
+const lumOf = c => c.r * 0.3 + c.g * 0.55 + c.b * 0.15, _hsCol = new THREE.Color(), _re = new THREE.Euler();
+function updateSeaLook(dt) {
+  const u = waterMat.uniforms, over = realm === 'over', c = camera.position, w = WX.want || {};
+  // the weather on the water: livelier through the day, flat in the still of dawn and night, stood right up by a storm or by Poseidon
+  const day = smoothstep(-0.05, 0.45, sunDir.y), gale = clamp(storm, 0, 1);
+  const st = over ? clamp(Math.max(WX.storm, gale * 0.85, WX.squall * 0.7, (w.waves || 0) * 0.8), 0, 1) : 0;
+  const kv = over ? clamp((0.8 + 0.28 * day) * (1 + 0.85 * WX.storm + 1.1 * (w.waves || 0) + 0.4 * WX.squall + 0.5 * gale), 0.6, 2.6) : 1;
+  const ks = over ? clamp(0.85 + 0.2 * day + 0.9 * WX.storm + 1.3 * (w.waves || 0) + 0.4 * gale, 0.7, 2.8) : 1;
+  SEAK.v = lerp(SEAK.v, kv, damp(0.12, dt)); SEAK.sw = lerp(SEAK.sw, ks, damp(0.08, dt));
+  u.uSeaK.value = SEAK.v; u.uSwellK.value = SEAK.sw;
+  SEALOOK.storm = lerp(SEALOOK.storm, st, damp(0.5, dt)); u.uStorm.value = SEALOOK.storm;
+  const warm = over ? clamp(smoothstep(0.4, 0.06, sunDir.y) * smoothstep(-0.12, 0.02, sunDir.y) + (WX.goldK || 0) * 0.6, 0, 1) * (1 - SEALOOK.storm * 0.7) : 0;
+  SEALOOK.warm = lerp(SEALOOK.warm, warm, damp(1, dt)); u.uWarm.value = SEALOOK.warm * 0.85;
+  // the four colours, at the brightness the hour has given the sea (pal.water): only the hue and the depth of it belong to the place
+  const L = Math.max(0.002, lumOf(pal.water)), set = (dst, src, k) => dst.copy(src).multiplyScalar(L * k / lumOf(src));
+  set(u.uTurq.value, SEALOOK.turq, 1.55); set(u.uAzure.value, SEALOOK.azure, 0.85); set(u.uIndigo.value, SEALOOK.indigo, 0.36); set(u.uEmer.value, SEALOOK.emer, 1.05);
+  // what the water is like right where the lens is
+  if ((SEALOOK.t -= dt) <= 0) { SEALOOK.t = 0.25; const wd = over ? WATER - overHeight(c.x, c.z) : 30; SEALOOK.depth = wd; SEALOOK.reef = over ? reefK(c.x, c.z, wd) : 0; }
+  const wd = SEALOOK.depth, B = SEALOOK.tmp;
+  B.copy(u.uTurq.value).lerp(u.uAzure.value, smoothstep(1, 11, wd)).lerp(u.uIndigo.value, smoothstep(12, 30, wd)).lerp(u.uEmer.value, SEALOOK.reef * 0.82);
+  B.lerp(_hsCol.setRGB(B.r * 1.38, B.g * 0.9, B.b * 0.7), u.uWarm.value); { const g = lumOf(B) * 0.78; B.lerp(_hsCol.setRGB(g * 0.8, g * 0.88, g * 0.92), SEALOOK.storm * 0.6); }
+  SEALOOK.body.lerp(B, damp(1.5, dt));
+  // the bed, seen down through it: the colour it goes with depth, and the net of light thrown on it by the waves (not by night, not in a storm)
+  worldFx.uSeaBed.value.copy(u.uAzure.value).lerp(u.uIndigo.value, 0.45).lerp(u.uEmer.value, SEALOOK.reef * 0.4);
+  worldFx.uCaus.value.copy(pal.sun).multiplyScalar(over ? pal.sunI / 2.3 * 0.5 * smoothstep(0.0, 0.25, sunDir.y) * (1 - SEALOOK.storm * 0.75) * (WX.light || 1) : 0);
+}
+// under the water the picture is coloured by the water he is in: emerald over a reef, indigo out over the deep
+function seaTintPost(under) {
+  const U = postMat.uniforms;
+  if (under || !SEA.murk) { U.uSeaLo.value.copy(SEALOOK.U_LO); U.uSeaHi.value.copy(SEALOOK.U_HI); U.uSeaMul.value.copy(SEALOOK.U_MUL); U.uSeaNear.value = 0; return; }
+  const f = _hsCol.copy(SEA.fog).convertLinearToSRGB(), l = Math.max(0.02, lumOf(f));
+  SEALOOK.lo.setRGB(f.r / l * 0.16, f.g / l * 0.16, f.b / l * 0.16); SEALOOK.hi.setRGB(Math.min(1.2, f.r / l * 0.66), Math.min(1.2, f.g / l * 0.66), Math.min(1.2, f.b / l * 0.66));
+  SEALOOK.mul.setRGB(clamp(f.r / l * 0.85, 0.3, 1.4), clamp(f.g / l * 0.85, 0.3, 1.4), clamp(f.b / l * 0.85, 0.3, 1.4));
+  U.uSeaLo.value.copy(SEALOOK.U_LO).lerp(SEALOOK.lo, 0.8); U.uSeaHi.value.copy(SEALOOK.U_HI).lerp(SEALOOK.hi, 0.8); U.uSeaMul.value.copy(SEALOOK.U_MUL).lerp(SEALOOK.mul, 0.75);
+  U.uSeaNear.value = 1;
+}
+
+// ── Reefs. In the shallows round the shores (where reefK says), patches of coral: staghorn branching up in fingers, round
+//    brain coral, flat tables on a stalk, fans that lean with the water, clusters of tubes, soft coral like bunches of
+//    flowers, growing on heaps of rock; sea-grass in the sand between, and out where it is deeper the long kelp standing up
+//    toward the light. Little bright fish go round and round each heap in schools. All of it is laid out from the place
+//    alone (mulberry32 seeded by the cell), so every player swims over the same reef; it is built only near the lens, a
+//    piece at a time, and let go again behind him. And here and there on the floor of the sea, among the reefs and further
+//    out, what the sea took: statues, a temple's columns, the cargo of a ship that went down, the head of a god.
+const REEF = { C: 72, R: TOUCH ? 150 : 210, cells: new Map(), sites: new Map(), SC: 560, SR: TOUCH ? 330 : 420, M: null, mat: null, on: false, dropT: 0, schoolT: 0, bubT: 0,
+  fish: null, fishN: TOUCH ? 84 : 168, PER: 14, schools: [], rays: null, found: null, n: 0, verts: 0 };
+G.rTube = new THREE.CylinderGeometry(1, 1, 1, 5, 1, true).toNonIndexed();          // (a finger of coral, a stalk: one long, one across, centred)
+G.rTaper = new THREE.CylinderGeometry(0.5, 1, 1, 5, 1, true).toNonIndexed();       // (the same, thinning toward its far end)
+G.rCyl = new THREE.CylinderGeometry(1, 1, 1, 7).toNonIndexed();                    // (closed: a tube sponge, a table's top, a jar's lip)
+G.rCol = new THREE.CylinderGeometry(1, 1, 1, 12).toNonIndexed();                   // (a column drum, its flutes showing as facets)
+G.rCone = new THREE.ConeGeometry(1, 1, 6).toNonIndexed();
+const CORAL_C = ['#ff6f61', '#ff9f45', '#ffd166', '#c77dff', '#ef476f', '#06d6a0', '#4cc9f0', '#f15bb5', '#9b5de5', '#fee440', '#ff8fab', '#80ffdb', '#ffb3c6', '#e85d04'].map(h => col(h).map(v => v * 1.08));
+const REEF_ROCK = ['#6e665c', '#7d7468', '#5f5a55', '#857a6a'].map(col), REEF_GRASS = ['#4f8a3a', '#6aa04a', '#3f7a4a', '#7ea24a'].map(col), REEF_KELP = ['#6b7a2e', '#7d6b2a', '#5e7034'].map(col);
+const rPick = (r, a) => a[Math.floor(r() * a.length)];
+// a piece, placed (and, while a ruin is being built, carried into the ruin's place and turned with it: REEF.M)
+function rPut(acc, geo, x, y, z, sx, sy, sz, rx, ry, rz, rgb) { _mat.compose(_p.set(x, y, z), _q.setFromEuler(_re.set(rx, ry, rz, 'XYZ')), _s.set(sx, sy, sz)); if (REEF.M) _mat.premultiply(REEF.M); addGeo(acc, geo, _mat, rgb); }
+function rSeg(acc, ax, ay, az, bx, by, bz, r, rgb, geo = G.rTaper) {
+  _ua.set(bx - ax, by - ay, bz - az); const L = _ua.length() || 1e-4; _ua.multiplyScalar(1 / L);
+  _mat.compose(_p.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2), _q.setFromUnitVectors(UP, _ua), _s.set(r, L, r)); if (REEF.M) _mat.premultiply(REEF.M); addGeo(acc, geo, _mat, rgb);
+}
+const tipOf = c => [Math.min(1.6, c[0] * 1.25 + 0.08), Math.min(1.6, c[1] * 1.25 + 0.08), Math.min(1.6, c[2] * 1.25 + 0.08)];
+// one coral, its foot at (x, y, z), s its size: the kind chosen by the dice
+function coral(acc, r, x, y, z, s, kind) {
+  const c = rPick(r, CORAL_C); s *= 1.6;   // (s 1: a head of coral a metre and a half across)
+  switch (kind) {
+    case 0: {   // staghorn: fingers up and out, forking once
+      const n = 4 + Math.floor(r() * 4), tip = tipOf(c);
+      for (let i = 0; i < n; i++) {
+        const a = r() * 6.283, t = 0.25 + r() * 0.6, L = (0.6 + r() * 0.6) * s, ox = Math.cos(a) * 0.15 * s, oz = Math.sin(a) * 0.15 * s;
+        const bx = x + ox + Math.cos(a) * Math.sin(t) * L, by = y + Math.cos(t) * L, bz = z + oz + Math.sin(a) * Math.sin(t) * L;
+        rSeg(acc, x + ox, y - 0.1, z + oz, bx, by, bz, 0.11 * s, c);
+        for (let k = 0, m = 1 + (r() < 0.6 ? 1 : 0); k < m; k++) { const a2 = a + (r() - 0.5) * 1.6, t2 = t * 0.6 + r() * 0.3, L2 = L * (0.45 + r() * 0.3); rSeg(acc, bx, by, bz, bx + Math.cos(a2) * Math.sin(t2) * L2, by + Math.cos(t2) * L2, bz + Math.sin(a2) * Math.sin(t2) * L2, 0.075 * s, tip); }
+      } break; }
+    case 1:   // brain coral: a round boulder of it, half sunk
+      rPut(acc, G.ico, x, y + 0.1 * s, z, (0.45 + r() * 0.35) * s, (0.3 + r() * 0.2) * s, (0.45 + r() * 0.35) * s, 0, r() * 6.28, 0, c); break;
+    case 2: {   // a table: a flat top on a short stalk, tipped a little toward the light
+      const h = (0.4 + r() * 0.5) * s; rSeg(acc, x, y - 0.1, z, x, y + h, z, 0.13 * s, c, G.rTube);
+      rPut(acc, G.rCyl, x, y + h, z, (0.55 + r() * 0.5) * s, 0.09 * s, (0.55 + r() * 0.5) * s, (r() - 0.5) * 0.3, r() * 6.28, (r() - 0.5) * 0.3, tipOf(c)); break; }
+    case 3: {   // a fan: a flat lattice standing across the current, leaning with it
+      const h = (0.8 + r() * 0.7) * s, wdt = (0.7 + r() * 0.6) * s, ry = r() * 3.14; SWAY = [y, 0.16];
+      rPut(acc, G.unitBox, x, y + h * 0.55, z, wdt, h * 0.9, 0.04, 0, ry, 0, c);
+      rPut(acc, G.unitBox, x, y + h * 0.5, z, wdt * 0.6, h * 0.75, 0.05, 0, ry + 0.25, 0, tipOf(c));
+      SWAY = null; rSeg(acc, x, y - 0.1, z, x, y + h * 0.18, z, 0.05 * s, c, G.rTube); break; }
+    case 4: {   // tube sponges, in a cluster
+      for (let i = 0, n = 3 + Math.floor(r() * 3); i < n; i++) { const a = r() * 6.28, d = r() * 0.35 * s, h = (0.5 + r() * 1.0) * s, rr = (0.1 + r() * 0.08) * s;
+        rPut(acc, G.rTube, x + Math.cos(a) * d, y + h * 0.5 - 0.05, z + Math.sin(a) * d, rr, h, rr, (r() - 0.5) * 0.3, 0, (r() - 0.5) * 0.3, i % 2 ? c : tipOf(c)); }
+      break; }
+    default: {   // soft coral: a bunch of soft heads on short stalks, nodding in the water
+      SWAY = [y, 0.3];
+      for (let i = 0, n = 3 + Math.floor(r() * 4); i < n; i++) { const a = r() * 6.28, d = r() * 0.35 * s, h = (0.2 + r() * 0.4) * s, k = (0.15 + r() * 0.16) * s;
+        rPut(acc, G.ico0, x + Math.cos(a) * d, y + h, z + Math.sin(a) * d, k, k * 0.8, k, 0, 0, 0, i % 3 ? c : tipOf(c)); }
+      SWAY = null; }
+  }
+}
+function seaGrass(acc, r, x, y, z) {
+  const c = rPick(r, REEF_GRASS);
+  for (let i = 0, n = 4 + Math.floor(r() * 5); i < n; i++) { const h = 0.5 + r() * 0.9, a = r() * 6.28, d = r() * 0.35; SWAY = [y, 0.55];
+    rPut(acc, G.unitBox, x + Math.cos(a) * d, y + h * 0.5, z + Math.sin(a) * d, 0.07, h, 0.015, (r() - 0.5) * 0.4, r() * 3.14, (r() - 0.5) * 0.4, i % 2 ? c : tipOf(c)); }
+  SWAY = null;
+}
+function kelp(acc, r, x, y, z, H) {   // a stem up toward the light, leaves off it on alternate sides, and the whole of it leaning with the water
+  const c = rPick(r, REEF_KELP), n = Math.max(2, Math.round(H / 1.5)), lean = r() * 6.28; let px = x, py = y, pz = z;
+  SWAY = [y, 0.22];
+  for (let i = 0; i < n; i++) {
+    const nx = px + Math.cos(lean) * 0.18 + (r() - 0.5) * 0.15, ny = py + H / n, nz = pz + Math.sin(lean) * 0.18 + (r() - 0.5) * 0.15;
+    rSeg(acc, px, py, pz, nx, ny, nz, 0.05, c, G.rTube);
+    rPut(acc, G.unitBox, nx, ny - 0.35, nz, 0.32, 1.1, 0.02, 0.35 * (i % 2 ? 1 : -1), lean + 1.57, 0, i % 2 ? c : tipOf(c));
+    px = nx; py = ny; pz = nz;
+  }
+  rPut(acc, G.ico0, px, py + 0.1, pz, 0.12, 0.16, 0.12, 0, 0, 0, tipOf(c));
+  SWAY = null;
+}
+// The material for all of it: lit like the rest of the world, swaying where a piece was built to sway (the water moving
+// over the reef in slow surges, along the current), with the moving net of light on whatever faces up toward the surface.
+REEF.mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+REEF.uni = { uTime: worldFx.uTime, uCaus: worldFx.uCaus, uWaterY: { value: WATER }, uCur: { value: new THREE.Vector2(0.4, 0.1) } };
+REEF.mat.customProgramCacheKey = () => 'reef1';
+REEF.mat.onBeforeCompile = sh => {
+  Object.assign(sh.uniforms, REEF.uni);
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float sway; uniform float uTime; uniform vec2 uCur; varying vec3 vRw; varying float vUp;')
+    .replace('#include <begin_vertex>', `#include <begin_vertex>
+      if (sway > 0.0) {
+        vec4 sw0 = modelMatrix * vec4(position, 1.0); float ph = sw0.x * 0.21 + sw0.z * 0.17;
+        vec2 push = vec2(sin(uTime * 0.8 + ph) + 0.4 * sin(uTime * 2.1 + ph * 1.7), cos(uTime * 0.63 + ph * 1.3) * 0.7) * 0.5 + uCur * 0.35;
+        transformed.xz += push * sway; transformed.y -= dot(push, push) * sway * 0.12;
+      }
+      vRw = (modelMatrix * vec4(transformed, 1.0)).xyz; vUp = normal.y;`);
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uTime, uWaterY; uniform vec3 uCaus; varying vec3 vRw; varying float vUp;')
+    .replace('#include <tonemapping_fragment>', `{
+      float wd = uWaterY - vRw.y; vec2 cq = vRw.xz * 1.35; float ct = uTime * 0.55;
+      float c1 = abs(sin(cq.x + sin(cq.y * 1.31 + ct) * 1.3 + ct * 0.6) + sin(cq.y * 0.93 + sin(cq.x * 1.17 - ct * 0.8) * 1.3 - ct * 0.45));
+      float caus = pow(1.0 - clamp(c1 * 0.5, 0.0, 1.0), 9.0) * 0.6;
+      gl_FragColor.rgb += uCaus * caus * smoothstep(24.0, 0.8, wd) * (0.35 + 0.65 * max(vUp, 0.0)) * 1.3;
+      gl_FragColor.rgb += vColor.rgb * 0.12;   // (a little of their own light: down there colour is the first thing to go, and these keep some)
+    }
+    #include <tonemapping_fragment>`);
+};
+// a cell of reef: everything in it, merged into one mesh (or nothing, if the cell is land or open sea)
+function reefBuildCell(cx, cz) {
+  const C = REEF.C, x0 = cx * C, z0 = cz * C;
+  let any = false; for (let j = 0; j <= 2 && !any; j++) for (let i = 0; i <= 2 && !any; i++) { const x = x0 + i * C / 2, z = z0 + j * C / 2, wd = WATER - terrainAt(x, z); if (wd > 1 && wd < 34) any = true; }
+  if (!any) return null;
+  const r = mulberry32(((cx * 73856093) ^ (cz * 19349663) ^ 0x2c1b3c6d) >>> 0), acc = fastAcc(), anchors = [];
+  REEF.M = null; SWAY = null;
+  for (let k = 0, n = TOUCH ? 12 : 22; k < n; k++) {   // the reef grows in clumps: a heap of rock with coral on it, and coral crowded all round its foot
+    const x = x0 + r() * C, z = z0 + r() * C, y = terrainAt(x, z), wd = WATER - y, rk = reefK(x, z, wd);
+    if (r() > rk * 1.25) continue;
+    for (let i = 0, m = Math.round((4 + rk * 9) * (TOUCH ? 0.6 : 1)); i < m; i++) { const a = r() * 6.28, d = 0.8 + r() * 3.8, gx = x + Math.cos(a) * d, gz = z + Math.sin(a) * d, gy = terrainAt(gx, gz), gs = Math.min(0.5 + r() * 0.6, (WATER - gy - 0.6) / 2.9);
+      if (gs > 0.3) coral(acc, r, gx, gy, gz, gs, Math.floor(r() * 6)); }
+  }
+  for (let k = 0, n = TOUCH ? 10 : 18; k < n; k++) {   // heaps of rock with coral on them, and coral on its own in the sand
+    const x = x0 + r() * C, z = z0 + r() * C, y = terrainAt(x, z), wd = WATER - y, rk = reefK(x, z, wd), roll = r();
+    if (roll > rk * 1.15) continue;
+    const s = Math.min(0.6 + r() * 0.5 + rk * 0.3, (wd - 0.6) / 2.9); if (s < 0.3) continue;
+    if (r() < 0.55 && wd > 3) {   // a bommie: a heap of rock, and the reef on top of it
+      const R0 = (1.3 + r() * 1.2) * s, hh = Math.min(R0 * 0.75, (wd - 2.6 * s) * 0.6), cy = y + hh * 0.25;
+      rPut(acc, G.rock, x, cy, z, R0 / 1.6, Math.max(0.2, hh) / 1.6, R0 / 1.6, (r() - 0.5) * 0.2, r() * 6.28, (r() - 0.5) * 0.2, rPick(r, REEF_ROCK));
+      const ty = cy + Math.max(0.2, hh) * 0.8;
+      for (let i = 0, m = 2 + Math.floor(r() * 4); i < m; i++) { const a = r() * 6.28, d = r() * R0 * 0.75; coral(acc, r, x + Math.cos(a) * d, cy + Math.max(0.2, hh) * Math.sqrt(1 - (d / R0) ** 2) * 0.85, z + Math.sin(a) * d, s * (0.55 + r() * 0.4), Math.floor(r() * 6)); }
+      anchors.push({ x, y: ty, z, wd });
+    } else coral(acc, r, x, y, z, s, Math.floor(r() * 6));
+    if (r() < 0.3) for (let i = 0; i < 3; i++) { const a = r() * 6.28, d = 1.5 + r() * 2.5, gx = x + Math.cos(a) * d, gz = z + Math.sin(a) * d; coral(acc, r, gx, terrainAt(gx, gz), gz, s * 0.5, 5); }   // (soft coral strewn round it)
+  }
+  for (let k = 0, n = TOUCH ? 14 : 24; k < n; k++) {   // the sand between: sea-grass where it is shallow and sheltered, kelp where it is deeper
+    const x = x0 + r() * C, z = z0 + r() * C, y = terrainAt(x, z), wd = WATER - y; if (wd < 1.8 || wd > 30) continue;
+    const meadow = smoothstep(0.2, 0.5, noise2(x / 95 - 4.4, z / 95 + 6.6)), rk = reefK(x, z, wd), roll = r();
+    if (wd > 7 && roll < 0.22 + 0.25 * rk) kelp(acc, r, x, y, z, Math.min(wd - 1.2, 3.5 + r() * 9));
+    else if (roll < 0.3 + meadow * 0.6 + rk * 0.3) seaGrass(acc, r, x, y, z);
+  }
+  if (!acc.n) return null;
+  const geo = accToGeo(acc); geo.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geo, REEF.mat); mesh.matrixAutoUpdate = false; mesh.updateMatrix(); scene.add(mesh);
+  REEF.verts += acc.n;
+  return { mesh, anchors, n: acc.n, x: x0 + C / 2, z: z0 + C / 2 };
+}
+
+// ── What the sea took. One place in each square of the sea floor half a kilometre across may hold something: in the
+//    shallows among the reefs, or further out on the bare floor. When he first comes down to one it is named for him.
+const RUIN_NAMES = {
+  statue: [['THE DROWNED KOUROS', 'A YOUTH OF MARBLE', 'THE STONE ATHLETE'], 'SUNK WITH THE SHIP THAT CARRIED IT'],
+  bronze: [['THE BRONZE GOD', 'THE GREEN BRONZE', 'THE THROWER IN THE DEEP'], 'NOBODY KNOWS WHICH GOD. HE DOES NOT SAY'],
+  fallen: [['THE FALLEN KOUROS', 'THE SLEEPER ON THE SAND'], 'KNOCKED FROM HIS PLINTH, AND STILL SMILING'],
+  columns: [['THE FALLEN COLUMNS', 'A TEMPLE THE SEA TOOK', 'THE DROWNED STOA', 'COLUMNS OF POSEIDON'], 'THE SEA CAME UP AND TOOK THE TEMPLE'],
+  amphorae: [['THE AMPHORA FIELD', 'A WRECK OF WINE JARS', 'THE JARS OF A LOST SHIP'], 'THE SHIP IS GONE. ITS CARGO IS NOT'],
+  head: [['THE HEAD OF POSEIDON', 'THE HEAD OF A GOD', 'THE FACE IN THE SAND', 'THE SLEEPING GIANT'], 'THE REST OF HIM IS UNDER THE SAND'],
+};
+const RUIN_COL = { statue: '#e8e2d5', bronze: '#5fc8a8', fallen: '#e8e2d5', columns: '#f0e6d0', amphorae: '#e08a52', head: '#7fd8c8' };
+try { REEF.found = new Set(JSON.parse(localStorage.getItem('icarus.sea.found') || '[]')); } catch { REEF.found = new Set(); }
+function reefSite(sx, sz) {   // what (if anything) lies in this square, and where: from the place alone
+  const r = mulberry32(((sx * 83492791) ^ (sz * 2971215073) ^ 0x7a11c3) >>> 0), SC = REEF.SC;
+  if (r() > 0.6) return null;
+  for (let k = 0; k < 12; k++) {
+    const x = sx * SC + 50 + r() * (SC - 100), z = sz * SC + 50 + r() * (SC - 100), bed = terrainAt(x, z), wd = WATER - bed;
+    if (wd < 5 || wd > 70 || Math.hypot(x - CRETE.x, z - CRETE.z) < 2600) continue;
+    const roll = r(), kind = wd < 24 ? (roll < 0.3 ? 'statue' : roll < 0.52 ? 'columns' : roll < 0.78 ? 'amphorae' : roll < 0.9 ? 'fallen' : 'head') : (roll < 0.34 ? 'head' : roll < 0.58 ? 'columns' : roll < 0.8 ? 'bronze' : 'amphorae');
+    const N = RUIN_NAMES[kind];
+    return { id: `${sx}_${sz}`, x, z, bed, wd, kind, name: N[0][Math.floor(r() * N[0].length)], sub: N[1], yaw: r() * 6.283, seed: (r() * 1e9) >>> 0, mesh: null };
+  }
+  return null;
+}
+const _rm = new THREE.Matrix4(), _rm2 = new THREE.Matrix4(), _rq = new THREE.Quaternion();
+function siteMatrix(S, lx, ly, lz, rx = 0, ry = 0, rz = 0) {   // the ruin's own place and turn, then a piece's within it
+  _rm.compose(_p.set(S.x, S.bed, S.z), _rq.setFromAxisAngle(UP, S.yaw), _s.set(1, 1, 1));
+  _rm2.compose(_p.set(lx, ly, lz), _q.setFromEuler(_re.set(rx, ry, rz, 'XYZ')), _s.set(1, 1, 1));
+  return _rm.multiply(_rm2);
+}
+function siteGround(S, lx, lz) { const c = Math.cos(S.yaw), s = Math.sin(S.yaw); return terrainAt(S.x + lx * c + lz * s, S.z - lx * s + lz * c) - S.bed; }   // (the bed under a point of the ruin, from the ruin's own level)
+const R_MARBLE = [0.86, 0.84, 0.78], R_ALGAE = [0.44, 0.58, 0.38], R_BRONZE = [0.3, 0.6, 0.52];
+// a kouros: the standing youth, one foot forward, arms at his sides (one of them gone below the elbow); or a bronze god, arms out, about to throw
+function ruinFigure(acc, r, bronze) {
+  const S = 1.5, M = bronze ? R_BRONZE : R_MARBLE, P = k => mixc(M, R_ALGAE, k * (bronze ? 0.4 : 1));
+  const f = (x, y, z) => [x * S, y * S, z * S];
+  const seg2 = (a, b, rad, c) => { const A = f(...a), B = f(...b); rSeg(acc, A[0], A[1], A[2], B[0], B[1], B[2], rad * S, c); };
+  const lump = (x, y, z, sx, sy, sz, c, geo = G.ico) => { const A = f(x, y, z); rPut(acc, geo, A[0], A[1], A[2], sx * S, sy * S, sz * S, 0, 0, 0, c); };
+  seg2([-0.17, 1.5, 0], [-0.18, 0.8, -0.12], 0.13, P(0.25)); seg2([-0.18, 0.8, -0.12], [-0.18, 0.08, -0.2], 0.09, P(0.45));
+  seg2([0.17, 1.5, 0], [0.18, 0.8, 0.05], 0.13, P(0.25)); seg2([0.18, 0.8, 0.05], [0.18, 0.08, 0.08], 0.09, P(0.45));
+  lump(-0.18, 0.04, -0.3, 0.07, 0.04, 0.16, P(0.6), G.ico0); lump(0.18, 0.04, -0.03, 0.07, 0.04, 0.16, P(0.6), G.ico0);
+  lump(0, 1.55, 0, 0.3, 0.22, 0.2, P(0.2)); lump(0, 2.0, 0, 0.3, 0.42, 0.19, P(0.1)); lump(0, 2.25, -0.02, 0.36, 0.2, 0.22, P(0.05));
+  seg2([0, 2.42, 0], [0, 2.62, -0.01], 0.08, P(0.1), G.rTube); lump(0, 2.76, -0.02, 0.15, 0.19, 0.17, P(0.05)); lump(0, 2.84, 0.03, 0.165, 0.13, 0.17, P(0.4));
+  lump(0, 2.73, -0.19, 0.03, 0.05, 0.04, P(0.1), G.ico0);   // (the nose, worn smooth)
+  if (bronze) { seg2([-0.38, 2.35, 0], [-0.95, 2.42, -0.15], 0.075, P(0.2)); seg2([-0.95, 2.42, -0.15], [-1.45, 2.5, -0.3], 0.06, P(0.3));
+    seg2([0.38, 2.35, 0], [0.95, 2.45, 0.12], 0.075, P(0.2)); seg2([0.95, 2.45, 0.12], [1.42, 2.55, 0.28], 0.06, P(0.3)); }
+  else { seg2([-0.38, 2.35, 0], [-0.43, 1.85, 0], 0.075, P(0.2)); seg2([-0.43, 1.85, 0], [-0.43, 1.42, -0.05], 0.06, P(0.35)); seg2([0.38, 2.35, 0], [0.42, 1.9, 0.02], 0.075, P(0.3)); }
+}
+function ruinPlinth(acc, r) { rPut(acc, G.unitBox, 0, 0.2, 0, 2.0, 0.9, 2.0, 0, 0, 0, mixc(R_MARBLE, R_ALGAE, 0.55)); rPut(acc, G.unitBox, 0, 0.72, 0, 1.6, 0.18, 1.6, 0, 0, 0, mixc(R_MARBLE, R_ALGAE, 0.3)); }
+function ruinColumns(acc, S, r) {
+  const SM = siteMatrix(S, 0, 0, 0).clone(), tilt = (r() - 0.5) * 0.08, G0 = mixc(R_MARBLE, R_ALGAE, 0.5);
+  REEF.M = siteMatrix(S, 0, -0.35, 0, tilt, 0, (r() - 0.5) * 0.1).clone();   // the floor of it, three steps, settled crooked into the sand
+  for (let i = 0; i < 3; i++) rPut(acc, G.unitBox, 0, i * 0.45, 0, 13 - i * 1.2, 0.45, 7 - i * 1.0, 0, 0, 0, mixc(R_MARBLE, R_ALGAE, 0.6 - i * 0.12));
+  const top = 1.35, R0 = 0.55;
+  for (const [i, lx] of [-4.5, -1.5, 1.5, 4.5].entries()) for (const lz of [-2.1, 2.1]) {
+    const h = r() < 0.25 ? 0 : r() < 0.35 ? 7 : 0.8 + r() * 3.8, c = mixc(R_MARBLE, R_ALGAE, 0.15 + r() * 0.3);
+    if (!h) continue;
+    rPut(acc, G.rCol, lx, top + 0.12, lz, R0 * 1.25, 0.24, R0 * 1.25, 0, 0, 0, G0);
+    rPut(acc, G.rCol, lx, top + 0.24 + h / 2, lz, R0, h, R0, 0, i * 0.4, 0, c);
+    if (h > 6) { rPut(acc, G.rCyl, lx, top + 0.24 + h + 0.15, lz, R0 * 1.3, 0.3, R0 * 1.3, 0, 0, 0, c); rPut(acc, G.unitBox, lx, top + 0.24 + h + 0.42, lz, 1.5, 0.26, 1.5, 0, 0, 0, c); }
+    else if (r() < 0.5) for (let k = 0; k < 3; k++) { const a = r() * 6.28; coral(acc, r, lx + Math.cos(a) * 0.2, top + 0.24 + h, lz + Math.sin(a) * 0.2, 0.5, 5); }   // (soft coral on the broken tops)
+  }
+  REEF.M = SM;   // a column that fell, its drums lying in a line where they came down, and its capital at the end
+  const fa = r() * 6.28, fx = -1.5 + Math.cos(fa) * 2, fz = (r() < 0.5 ? -1 : 1) * 4.5;
+  for (let k = 0; k < 5; k++) { const d = k * 1.35, x = fx + Math.cos(fa) * d + (r() - 0.5) * 0.3, z = fz + Math.sin(fa) * d + (r() - 0.5) * 0.3, y = siteGround(S, x, z) + R0 * 0.75;
+    rPut(acc, G.rCol, x, y, z, R0, 1.2, R0, 0, -fa, Math.PI / 2 + (r() - 0.5) * 0.15, mixc(R_MARBLE, R_ALGAE, 0.3 + r() * 0.3)); }
+  { const d = 5 * 1.35 + 0.6, x = fx + Math.cos(fa) * d, z = fz + Math.sin(fa) * d, y = siteGround(S, x, z); rPut(acc, G.unitBox, x, y + 0.3, z, 1.5, 0.3, 1.5, 0.3, fa, 0.2, R_MARBLE); rPut(acc, G.rCyl, x, y + 0.6, z, 0.75, 0.32, 0.75, 0.3, fa, 0.2, mixc(R_MARBLE, R_ALGAE, 0.4)); }
+  { const x = 3 + r() * 3, z = (r() - 0.5) * 9, y = siteGround(S, x, z); rPut(acc, G.unitBox, x, y + 0.35, z, 4.2, 0.8, 0.9, 0.08, r() * 3, -0.12, mixc(R_MARBLE, R_ALGAE, 0.45)); }   // (a beam that lay across the tops of them)
+}
+function ruinAmphorae(acc, S, r) {
+  const SM = siteMatrix(S, 0, 0, 0).clone(), TC = ['#b4643a', '#a85a34', '#c07a4a', '#8f4a2c', '#b8704a'].map(col), WOOD = col('#3e3226');
+  REEF.M = SM;   // what is left of her: the keel, and the ribs standing up out of the sand
+  { const L = 13, yk = 0.15; rSeg(acc, -L / 2, yk + siteGround(S, -L / 2, 0), 0, L / 2, yk + siteGround(S, L / 2, 0), 0, 0.2, WOOD, G.rTube);
+    for (let i = 0; i < 8; i++) { if (r() < 0.25) continue; const x = -L / 2 + 1 + i * (L - 2) / 7, g = siteGround(S, x, 0), h = 0.6 + r() * 1.4;
+      for (const sd of [-1, 1]) { if (r() < 0.3) continue; rSeg(acc, x, g, 0, x + (r() - 0.5) * 0.3, g + h * 0.6, sd * 1.5, 0.11, WOOD, G.rTube); rSeg(acc, x, g + h * 0.6, sd * 1.5, x, g + h, sd * 1.9, 0.09, WOOD, G.rTube); } } }
+  for (let i = 0, n = 18 + Math.floor(r() * 16); i < n; i++) {
+    const a = r() * 6.28, d = Math.sqrt(r()), x = Math.cos(a) * d * 8.5, z = Math.sin(a) * d * 4.5, g = siteGround(S, x, z), c = mixc(rPick(r, TC), R_ALGAE, r() * 0.35);
+    const pose = r(), up = pose < 0.22, broken = r() < 0.2, s = 0.85 + r() * 0.4;
+    _rm.compose(_p.set(x, up ? g - 0.25 : g + 0.24 * s, z), _q.setFromEuler(_re.set(up ? (r() - 0.5) * 0.4 : Math.PI / 2 + (r() - 0.5) * 0.3, r() * 6.28, up ? (r() - 0.5) * 0.3 : (r() - 0.5) * 0.4, 'YXZ')), _s.set(s, s, s));
+    REEF.M = SM.clone().multiply(_rm); const ly = up ? 0 : -0.55;   // (lying down, it lies along its own middle)
+    rPut(acc, G.rCone, 0, ly + 0.08, 0, 0.08, 0.16, 0.08, Math.PI, 0, 0, c);
+    rPut(acc, G.ico, 0, ly + 0.55, 0, 0.24, 0.42, 0.24, 0, 0, 0, c);
+    if (!broken) { rPut(acc, G.ico0, 0, ly + 0.9, 0, 0.19, 0.11, 0.19, 0, 0, 0, c); rSeg(acc, 0, ly + 0.92, 0, 0, ly + 1.25, 0, 0.065, c, G.rTube); rPut(acc, G.rCyl, 0, ly + 1.27, 0, 0.1, 0.05, 0.1, 0, 0, 0, c);
+      rPut(acc, G.unitBox, 0.13, ly + 1.07, 0, 0.03, 0.28, 0.05, 0, 0, -0.3, c); rPut(acc, G.unitBox, -0.13, ly + 1.07, 0, 0.03, 0.28, 0.05, 0, 0, 0.3, c); }
+  }
+  REEF.M = SM;
+}
+function ruinHead(acc, S, r) {
+  const bronze = r() < 0.35, M = bronze ? R_BRONZE : R_MARBLE, P = k => mixc(M, R_ALGAE, k), dark = mixc(M, [0.05, 0.06, 0.06], 0.85);
+  REEF.M = siteMatrix(S, 0, 1.2, 0, -0.28, 0, (r() < 0.5 ? -1 : 1) * (0.3 + r() * 0.2)).clone().multiply(_rm2.makeScale(1.35, 1.35, 1.35));   // half sunk, tipped onto one cheek, the face turned up toward the light
+  rPut(acc, G.ico, 0, 0, 0, 2.0, 2.4, 2.2, 0, 0, 0, P(0.35));
+  rPut(acc, G.ico, 0, 0.78, -1.75, 1.55, 0.34, 0.55, 0, 0, 0, P(0.3));
+  for (const sx of [-1, 1]) { rPut(acc, G.ico0, sx * 0.62, 0.42, -1.95, 0.36, 0.2, 0.22, 0, 0, 0, dark); rPut(acc, G.ico0, sx * 0.62, 0.42, -2.03, 0.26, 0.16, 0.12, 0, 0, 0, P(0.15)); rPut(acc, G.ico, sx * 0.95, -0.15, -1.55, 0.68, 0.6, 0.6, 0, 0, 0, P(0.3)); }
+  rPut(acc, G.unitBox, 0, 0.0, -2.15, 0.42, 1.05, 0.55, -0.18, 0, 0, P(0.2)); rPut(acc, G.ico, 0, -0.42, -2.3, 0.3, 0.2, 0.25, 0, 0, 0, P(0.2));
+  rPut(acc, G.ico, 0, -0.62, -2.0, 0.55, 0.13, 0.2, 0, 0, 0, P(0.3)); rPut(acc, G.ico, 0, -0.82, -1.95, 0.48, 0.11, 0.18, 0, 0, 0, P(0.3));
+  for (let i = 0; i < 26; i++) { const u = (i / 25 - 0.5) * 2.6, v = r(), k = 0.26 + r() * 0.14;   // the beard, in curls
+    rPut(acc, G.ico0, Math.sin(u) * (1.25 - v * 0.3), -0.85 - v * 1.3 - (1 - Math.abs(u) / 1.3) * 0.4, -Math.cos(u) * (1.6 - v * 0.6), k, k, k, 0, 0, 0, P(0.3 + r() * 0.4)); }
+  for (let i = 0; i < 22; i++) { const a = r() * 6.28, b = 0.2 + r() * 0.9, k = 0.32 + r() * 0.14;   // and the hair
+    rPut(acc, G.ico0, Math.cos(a) * Math.sin(b) * 2.0, Math.cos(b) * 2.3 + 0.1, Math.sin(a) * Math.sin(b) * 2.15 + 0.2, k, k, k, 0, 0, 0, P(0.4 + r() * 0.4)); }
+  for (let i = 0; i < 7; i++) { const a = -2.4 + i * 0.8, cx = Math.sin(a) * 1.75, cz = -Math.cos(a) * 1.85; rSeg(acc, cx, 1.35, cz, cx * 1.25, 2.6, cz * 1.25, 0.16, mixc(R_BRONZE, [0.9, 0.75, 0.3], 0.3)); }   // a crown of points
+  REEF.M = siteMatrix(S, 0, 0, 0).clone();   // and his trident, driven into the sand beside him
+  { const bx = 4.2, bz = 1.2, g = siteGround(S, bx, bz), tx = bx + 1.1, ty = g + 8.2, tz = bz + 1.4, Bc = R_BRONZE;
+    rSeg(acc, bx, g - 0.8, bz, tx, ty, tz, 0.09, Bc, G.rTube); rSeg(acc, tx - 0.75, ty, tz, tx + 0.75, ty, tz, 0.07, Bc, G.rTube);
+    for (const o of [-0.72, 0, 0.72]) rSeg(acc, tx + o, ty - 0.05, tz, tx + o * 1.05, ty + (o ? 1.2 : 1.6), tz, 0.08, Bc); }
+}
+function reefBuildSite(S) {
+  const r = mulberry32(S.seed), acc = fastAcc(); SWAY = null;
+  const SM = siteMatrix(S, 0, 0, 0).clone();
+  if (S.kind === 'statue' || S.kind === 'bronze') {
+    REEF.M = siteMatrix(S, 0, -0.3, 0, (r() - 0.5) * 0.22, 0, (r() - 0.5) * 0.22).clone(); ruinPlinth(acc, r);
+    REEF.M.multiply(_rm2.makeTranslation(0, 0.8, 0)); ruinFigure(acc, r, S.kind === 'bronze');
+  } else if (S.kind === 'fallen') {
+    REEF.M = siteMatrix(S, 0, -0.35, 0, 0.1, 0, 0.06).clone(); ruinPlinth(acc, r);
+    REEF.M = siteMatrix(S, 3.2, 0.4, -2.5, Math.PI / 2 - 0.1, 0.4, 0.12).clone(); ruinFigure(acc, r, false);   // (on his back in the sand, beside where he stood, looking up)
+  } else if (S.kind === 'columns') ruinColumns(acc, S, r);
+  else if (S.kind === 'amphorae') ruinAmphorae(acc, S, r);
+  else ruinHead(acc, S, r);
+  REEF.M = SM;   // and the reef has started on it: corals round its foot
+  for (let i = 0, n = S.wd < 24 ? 7 : 3; i < n; i++) { const a = r() * 6.28, d = (S.kind === 'columns' || S.kind === 'amphorae' ? 10 : 7) + r() * 7, x = Math.cos(a) * d, z = Math.sin(a) * d; coral(acc, r, x, siteGround(S, x, z), z, 0.7 + r() * 0.5, Math.floor(r() * 6)); }
+  REEF.M = null; SWAY = null;
+  const geo = accToGeo(acc); geo.computeBoundingSphere();
+  S.mesh = new THREE.Mesh(geo, REEF.mat); S.mesh.matrixAutoUpdate = false; S.mesh.updateMatrix(); scene.add(S.mesh);
+}
+function reefFound(S) {   // he has come down to it: it is named, once, and the gods hear of it
+  S.found = true; REEF.found.add(S.id);
+  try { localStorage.setItem('icarus.sea.found', JSON.stringify([...REEF.found].slice(-400))); } catch {}
+  const n = REEF.found.size;
+  worldTitle(S.name, `${S.sub} · ${n === 1 ? 'THE SEA KEEPS MORE' : n + ' FOUND UNDER THE SEA'}`, 2800, RUIN_COL[S.kind], { D: 52 });
+  witness(n === 1 ? `swam down and found ${S.name.toLowerCase()} on the floor of the sea` : `found ${S.name.toLowerCase()} under the sea (${n} found now)`);
+  const p = player.pos;
+  for (let i = 0; i < 40; i++) emit(p.x + rnd(1.5), p.y + 0.5 + rnd(1), p.z + rnd(1.5), rnd(1), 1.5 + Math.random() * 3, rnd(1), 1 + Math.random() * 1.2, [0.7, 0.9, 1.0], 5, 0.3 + Math.random() * 0.3);
+}
+// the little reef fish: one mesh for all of them, a body and a tail
+function reefFishBuild() {
+  const a = newAcc(), W = [1, 1, 1], F = [0.85, 0.85, 0.85], E = [0.05, 0.05, 0.06];
+  _mat.compose(_p.set(0, 0, 0), _q.identity(), _s.set(0.12, 0.17, 0.36)); addGeo(a, G.ico0, _mat, W); box(a, 0.02, 0.2, 0.14, 0, 0, 0.4, F, 0.3); box(a, 0.02, 0.1, 0.18, 0, 0.13, 0.02, F, -0.3);
+  box(a, 0.03, 0.03, 0.03, 0.08, 0.04, -0.24, E); box(a, 0.03, 0.03, 0.03, -0.08, 0.04, -0.24, E);
+  const m = new THREE.InstancedMesh(accToGeo(a), new THREE.MeshLambertMaterial({ vertexColors: true }), REEF.fishN);
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; m.count = 0; scene.add(m);
+  const cols = ['#ffd23a', '#ff7b1e', '#2fa3ff', '#ff4a7a', '#7affd6', '#c08bff', '#fff1a0', '#ff5e3a', '#3fe0ff'].map(h => new THREE.Color(h)), c = new THREE.Color();
+  for (let s = 0; s < REEF.fishN / REEF.PER; s++) { const base = cols[s % cols.length], alt = cols[(s * 5 + 3) % cols.length];
+    for (let i = 0; i < REEF.PER; i++) m.setColorAt(s * REEF.PER + i, c.copy(i % 5 === 4 ? alt : base).offsetHSL(0, 0, (((s * 31 + i * 17) % 10) / 10 - 0.5) * 0.1)); }
+  m.instanceColor.needsUpdate = true;
+  REEF.fish = m;
+  for (let s = 0; s < REEF.fishN / REEF.PER; s++) REEF.schools.push({ A: null, ph: s * 1.7, w: 0.35 + (s % 4) * 0.08, r: 2.5 + (s % 3) * 1.2, dir: s % 2 ? 1 : -1, k: 0, size: 0.9 + (s % 3) * 0.25 });
+}
+// shafts of light coming down from the surface, when he is under: a few long soft planes standing round the lens, swaying
+function reefRaysBuild() {
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uTime: worldFx.uTime, uK: { value: 0 }, uCol: { value: new THREE.Color(0.5, 0.8, 0.9) } },
+    vertexShader: `varying vec2 vUv; varying float vSeed; attribute float aSeed; void main(){ vUv = uv; vSeed = aSeed; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform float uTime, uK; uniform vec3 uCol; varying vec2 vUv; varying float vSeed;
+      void main(){
+        float edge = smoothstep(0.0, 0.35, vUv.x) * smoothstep(1.0, 0.65, vUv.x), down = pow(vUv.y, 1.6) * smoothstep(0.0, 0.05, 1.0 - vUv.y);
+        float flick = 0.55 + 0.45 * sin(uTime * (0.7 + vSeed * 0.5) + vSeed * 9.0) * sin(uTime * 0.31 + vSeed * 4.0);
+        float k = edge * down * flick * uK;
+        gl_FragColor = vec4(uCol * k, 0.0);   // (no alpha: added to the picture, the hero's mark untouched, as the sparks are)
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, premultipliedAlpha: true, fog: false, side: THREE.DoubleSide });
+  const g = new THREE.Group(), N = TOUCH ? 6 : 11, geo = new THREE.PlaneGeometry(1, 1).translate(0, -0.5, 0);
+  for (let i = 0; i < N; i++) { const gi = geo.clone(); gi.setAttribute('aSeed', new THREE.Float32BufferAttribute(new Array(4).fill(i * 0.37 % 1 + i * 0.11), 1)); const m = new THREE.Mesh(gi, mat); m.frustumCulled = false; m.userData = { x: 0, z: 0, w: 2, L: 40, ok: false }; g.add(m); }
+  g.visible = false; scene.add(g); REEF.rays = g; REEF.rayMat = mat;
+}
+const _ry = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+function updateReefRays(dt, wet) {
+  const g = REEF.rays, c = camera.position, sunUp = smoothstep(-0.02, 0.2, sunDir.y);
+  const k = wet ? sunUp * (1 - SEALOOK.storm * 0.8) * smoothstep(70, 4, WATER - c.y) * clamp(pal.sunI / 1.6, 0.25, 1.2) : 0;
+  REEF.rayMat.uniforms.uK.value = lerp(REEF.rayMat.uniforms.uK.value, k * 0.32, damp(2, dt));
+  g.visible = REEF.rayMat.uniforms.uK.value > 0.004; if (!g.visible) return;
+  REEF.rayMat.uniforms.uCol.value.copy(SEA.top).lerp(pal.sun, 0.35);
+  // light bends going in: the shafts lean the way the sun is, but steeper
+  const lx = -sunDir.x * 0.35, lz = -sunDir.z * 0.35;
+  for (const m of g.children) {
+    const U = m.userData, dx = U.x - c.x, dz = U.z - c.z;
+    if (!U.ok || dx * dx + dz * dz > 46 * 46) { const a = Math.random() * 6.283, d = 6 + Math.random() * 38; U.x = c.x + Math.cos(a) * d; U.z = c.z + Math.sin(a) * d; U.w = 1.2 + Math.random() * 3.5; U.L = 25 + Math.random() * 40; U.ok = true; }
+    U.x += (Math.sin(time * 0.13 + U.L) * 0.4 + lx * 0.1) * dt; U.z += (Math.cos(time * 0.11 + U.w) * 0.4 + lz * 0.1) * dt;
+    m.position.set(U.x, WATER, U.z);
+    // stand it up along its lean, then turn it about that line to face the lens
+    const D = _ry[0].set(lx, -1, lz).normalize(), Nn = _ry[1].set(c.x - U.x, 0, c.z - U.z); if (Nn.lengthSq() < 1e-4) Nn.set(0, 0, 1); Nn.normalize();
+    const right = _ry[2].crossVectors(D, Nn).normalize(), fwd = _ry[3].crossVectors(D, right).normalize();
+    _mat.makeBasis(right, _ry[4].copy(D).negate(), fwd); m.quaternion.setFromRotationMatrix(_mat); m.scale.set(U.w, U.L, 1);
+  }
+}
+function updateReefs(dt, wet) {
+  const c = camera.position, over = realm === 'over' && state !== 'loading' && state !== 'prologue';
+  if (!REEF.rays) reefRaysBuild();
+  updateReefRays(dt, wet && over);
+  const near = over && c.y < WATER + 260;
+  if (!over && (REEF.cells.size || REEF.sites.size)) {   // (gone to the other country: let all of it go)
+    for (const [, Cl] of REEF.cells) if (Cl) { scene.remove(Cl.mesh); Cl.mesh.geometry.dispose(); }
+    for (const [, S] of REEF.sites) if (S && S.mesh) { scene.remove(S.mesh); S.mesh.geometry.dispose(); }
+    REEF.cells.clear(); REEF.sites.clear(); REEF.verts = 0;
+  }
+  if (REEF.fish) REEF.fish.count = 0;
+  if (!near) { for (const [, Cl] of REEF.cells) if (Cl) Cl.mesh.visible = false; for (const [, S] of REEF.sites) if (S && S.mesh) S.mesh.visible = false; REEF.on = false; return; }
+  if (!REEF.on || wet || REEF.wet) { REEF.on = true; const far = wet ? (scene.fog.far + 50) ** 2 : 1e12;   // (under, only what the murk lets him see)
+    for (const [, Cl] of REEF.cells) if (Cl) Cl.mesh.visible = (Cl.x - c.x) ** 2 + (Cl.z - c.z) ** 2 < far;
+    for (const [, S] of REEF.sites) if (S && S.mesh) S.mesh.visible = (S.x - c.x) ** 2 + (S.z - c.z) ** 2 < far; }
+  REEF.wet = wet;
+  REEF.uni.uCur.value.set(Math.cos(WAVE_DIR) * 0.5, Math.sin(WAVE_DIR) * 0.5);
+  // the nearest piece of reef not yet built, and (when there is none) the nearest square that might hold a ruin
+  const C = REEF.C, R = REEF.R, ccx = Math.floor(c.x / C), ccz = Math.floor(c.z / C), rc = Math.ceil(R / C);
+  let best = null, bd = 1e18;
+  for (let j = -rc; j <= rc; j++) for (let i = -rc; i <= rc; i++) {
+    const cx = ccx + i, cz = ccz + j, dx = (cx + 0.5) * C - c.x, dz = (cz + 0.5) * C - c.z, d2 = dx * dx + dz * dz;
+    if (d2 > R * R || d2 >= bd) continue; const key = cx * 100003 + cz; if (REEF.cells.has(key)) continue; bd = d2; best = [cx, cz, key];
+  }
+  if (best) { const t0 = performance.now(); REEF.cells.set(best[2], reefBuildCell(best[0], best[1])); REEF.bms = Math.max(REEF.bms || 0, performance.now() - t0); }   // (bms: the longest a piece has taken to build, for the tests)
+  else {
+    const SC = REEF.SC, scx = Math.floor(c.x / SC), scz = Math.floor(c.z / SC);
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const key = (scx + i) * 100003 + (scz + j); if (!REEF.sites.has(key)) { REEF.sites.set(key, reefSite(scx + i, scz + j)); j = i = 2; } }
+    for (const [, S] of REEF.sites) if (S && !S.mesh && (S.x - c.x) ** 2 + (S.z - c.z) ** 2 < REEF.SR * REEF.SR) { reefBuildSite(S); S.found = REEF.found.has(S.id); break; }
+  }
+  if ((REEF.dropT -= dt) < 0) {   // and let go of what is well behind
+    REEF.dropT = 0.5; const far = (R + C * 1.5) ** 2;
+    for (const [k, Cl] of REEF.cells) { const cx = Math.floor(k / 100003 + 0.5), cz = k - cx * 100003, dx = (cx + 0.5) * C - c.x, dz = (cz + 0.5) * C - c.z;
+      if (dx * dx + dz * dz > far) { if (Cl) { scene.remove(Cl.mesh); Cl.mesh.geometry.dispose(); REEF.verts -= Cl.n; } REEF.cells.delete(k); } }
+    for (const [k, S] of REEF.sites) { const sx = Math.floor(k / 100003 + 0.5), sz = k - sx * 100003, dx = (sx + 0.5) * REEF.SC - c.x, dz = (sz + 0.5) * REEF.SC - c.z;
+      if (dx * dx + dz * dz > (REEF.SC * 1.9) ** 2) { if (S && S.mesh) { scene.remove(S.mesh); S.mesh.geometry.dispose(); } REEF.sites.delete(k); }
+      else if (S && S.mesh && (S.x - c.x) ** 2 + (S.z - c.z) ** 2 > (REEF.SR + 180) ** 2) { scene.remove(S.mesh); S.mesh.geometry.dispose(); S.mesh = null; } }
+  }
+  // has he come down to one of them?
+  const p = player, P = p.pos, inSea = (p.dive || p.swim || p.sub || wet) && state === 'play';
+  if (inSea) for (const [, S] of REEF.sites) if (S && S.mesh && !S.found && (S.x - P.x) ** 2 + (S.z - P.z) ** 2 < 26 * 26 && P.y < WATER + 1 && P.y - S.bed < 24) reefFound(S);
+  // the fish: each school keeps to a heap of reef near him, going round it
+  if (c.y > WATER + 60) return;
+  if (!REEF.fish) reefFishBuild();
+  if ((REEF.schoolT -= dt) < 0) {
+    REEF.schoolT = 1; const list = [];
+    for (const [, Cl] of REEF.cells) if (Cl) for (const A of Cl.anchors) { const d = (A.x - c.x) ** 2 + (A.z - c.z) ** 2; if (d < 110 * 110) list.push([d, A]); }
+    list.sort((a, b) => a[0] - b[0]);
+    const want = list.slice(0, REEF.schools.length).map(e => e[1]);
+    for (const Sc of REEF.schools) if (Sc.A && !want.includes(Sc.A)) Sc.A = null;
+    for (const A of want) if (!REEF.schools.some(Sc => Sc.A === A)) { const Sc = REEF.schools.find(Sc => !Sc.A); if (Sc) { Sc.A = A; Sc.k = 0; } }
+  }
+  const F = REEF.fish; let n = 0;
+  for (let s = 0; s < REEF.schools.length; s++) {
+    const Sc = REEF.schools[s], A = Sc.A; if (!A) continue;
+    Sc.k = Math.min(1, Sc.k + dt * 0.5);
+    const dP = Math.hypot(A.x - P.x, A.z - P.z), shy = smoothstep(9, 3, dP) * (p.dive || p.swim ? 1 : 0), rad = Sc.r * (1 + shy * 1.2), hy = Math.min(1.2 + Sc.r * 0.3, Math.max(0.6, A.wd - 1.5));
+    for (let i = 0; i < REEF.PER; i++) {
+      const t = time * Sc.w * Sc.dir + Sc.ph - i * 0.09, li = (i * 0.618) % 1, o = (li - 0.5) * 1.6;
+      const x = A.x + Math.cos(t) * (rad + o * 0.5) + Math.sin(time * 1.3 + i) * 0.15, z = A.z + Math.sin(t) * (rad + o * 0.5) * 0.8 + Math.cos(time * 1.1 + i * 2) * 0.15;
+      const y = Math.min(WATER - 0.4, A.y + hy * 0.5 + Math.sin(t * 0.7 + i) * 0.5 + ((i * 0.37) % 1 - 0.5) * hy);
+      const vx = -Math.sin(t) * Sc.dir, vz = Math.cos(t) * 0.8 * Sc.dir, yaw = Math.atan2(-vx, -vz) + Math.sin(time * 9 + i * 3) * 0.12;
+      const k = Sc.size * Sc.k * (0.8 + li * 0.4);
+      _mat.compose(_p.set(x, y, z), _q.setFromAxisAngle(UP, yaw), _s.set(k, k, k)); F.setMatrixAt(s * REEF.PER + i, _mat); n = Math.max(n, s * REEF.PER + i + 1);
+    }
+  }
+  for (let s = 0; s < REEF.schools.length; s++) if (!REEF.schools[s].A) for (let i = 0; i < REEF.PER; i++) { _mat.makeScale(0, 0, 0); F.setMatrixAt(s * REEF.PER + i, _mat); }
+  F.count = n; F.instanceMatrix.needsUpdate = true;
+  // and from the reef, now and then, a string of bubbles going up
+  if (wet && (REEF.bubT -= dt) < 0) {
+    REEF.bubT = 0.12;
+    const S = REEF.schools[Math.floor(Math.random() * REEF.schools.length)];
+    if (S && S.A && (S.A.x - c.x) ** 2 + (S.A.z - c.z) ** 2 < 60 * 60) for (let i = 0; i < 2; i++) emit(S.A.x + rnd(1.2), S.A.y + 0.3, S.A.z + rnd(1.2), rnd(0.3), 1.2 + Math.random() * 1.8, rnd(0.3), 1.6 + Math.random() * 1.6, [0.55, 0.78, 0.95], 4, 0.18 + Math.random() * 0.22);
+  }
 }
 
 // Low and fast over water, he tears it open. The wake is the line he flew; the steam is because he is on fire; and past
@@ -24119,7 +24634,7 @@ function updateCamera(dt) {
     camTarget.set(p.pos.x, p.pos.y + (p.perch ? 2.4 * K : 1.6), p.pos.z);
     const cp = Math.cos(pitch);
     camWant.set(camTarget.x + Math.sin(camYaw) * cp * dist, camTarget.y + Math.sin(pitch) * dist, camTarget.z + Math.cos(camYaw) * cp * dist);
-    if (p.dive) camWant.y = Math.max(camWant.y, groundAt(camWant.x, camWant.z, camWant.y + 6) + 1.2);   // (under the water with him, when he dives)
+    if (p.dive) camWant.y = Math.max(Math.min(camWant.y, p.dive.rise ? 1e9 : waterY(camWant.x, camWant.z) - 0.8), groundAt(camWant.x, camWant.z, camWant.y + 6) + 1.2);   // (under the water with him, when he dives: and kept under it, below the waves going over, until he goes up and out)
     else { camClear(camWant, camTarget, dt, 1.2, false); camWant.y = Math.max(camWant.y, WATER + 1); }
     { const Tin = temples.find(T => Math.abs(p.pos.x - T.x) < T.hw + 1 && Math.abs(p.pos.z - T.z) < T.hd + 1 && Math.abs(p.pos.y - T.y) < 4);
       if (Tin) camWant.y = Math.min(camWant.y, Tin.y + Tin.H - 0.7); }   // inside a temple the lens stays under the beams
@@ -30788,7 +31303,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { NEWB, newbHear, newbHeard, newbTyped, newbTalk, newbFallback, newbArrive });
