@@ -404,6 +404,25 @@
   .mk.wp.aim { opacity:1; } .mk.wp.aim b { font-size:14px; } .mk.wp.aim span { border-bottom:1px dotted currentColor; padding-bottom:1px; }
   #friendAsk { position:fixed; left:50%; top:calc(var(--st, 0px) + 78px); transform:translate(-50%, -8px); z-index:7; background:none; border:0; border-bottom:1px solid rgba(255,214,138,.5); padding:9px 4px 6px; color:#ffe6b0; font:inherit; font-size:10px; letter-spacing:.26em; white-space:nowrap; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .6s ease, transform .6s ease; text-shadow:0 0 8px #000; -webkit-tap-highlight-color:transparent; }
   #friendAsk.on { opacity:.94; transform:translate(-50%, 0); pointer-events:auto; } #friendAsk:hover { color:#fff; border-bottom-color:#fff; }
+  #xfCard { position:fixed; right:calc(var(--sr, 0px) + 10px); bottom:calc(var(--sb, 0px) + 66px); width:min(320px, calc(100vw - 28px)); z-index:22; border-radius:12px; background:rgba(6,7,12,.88); border:1px solid rgba(169,220,255,.28); color:#eaf4ff;
+    font-family:ui-monospace, Menlo, Consolas, monospace; font-size:12px; line-height:1.45; letter-spacing:.02em; padding:12px 14px 10px; opacity:0; transform:translateY(8px); pointer-events:none; transition:opacity .25s, transform .25s; box-shadow:0 8px 30px rgba(0,0,0,.45); }
+  #xfCard.on { opacity:1; transform:none; pointer-events:auto; }
+  #xfCard .xh { color:#a9dcff; font-size:13px; margin-bottom:2px; overflow-wrap:anywhere; } #xfCard .xl { color:#c9d6e2; overflow-wrap:anywhere; }
+  #xfCard .xb { height:3px; background:rgba(169,220,255,.16); margin:8px 0 2px; border-radius:2px; overflow:hidden; } #xfCard .xb i { display:block; height:100%; background:#a9dcff; transform-origin:0 50%; transform:scaleX(0); transition:transform .25s linear; }
+  #xfCard .xr, #xfList .xr { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  #xfCard button, #xfList button { min-height:44px; padding:0 14px; border-radius:8px; border:1px solid rgba(169,220,255,.35); background:rgba(169,220,255,.08); color:#eaf4ff; font:inherit; cursor:pointer; }
+  #xfCard .xr button:first-child { background:rgba(169,220,255,.2); border-color:#a9dcff; } #xfCard button:disabled { opacity:.45; cursor:default; }
+  #xfCard button:hover:not(:disabled), #xfList button:hover { border-color:#fff; } #xfCard button:focus-visible, #xfList button:focus-visible { outline:2px solid #a9dcff; outline-offset:2px; }
+  #xfList button.sure { border-color:#ffb070; color:#ffd8a8; }
+  .touch #xfCard { width:min(320px, calc(50vw - 18px)); }
+  #xfList { position:fixed; left:50%; top:50%; transform:translate(-50%, -48%) scale(.98); z-index:30; width:min(560px, calc(100vw - 24px)); max-height:min(80vh, calc(100vh - var(--st, 0px) - var(--sb, 0px) - 24px)); overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y;
+    display:none; opacity:0; transition:opacity .25s, transform .25s; background:rgba(4,5,10,.94); border:1px solid rgba(169,220,255,.3); color:#eaf4ff; font-family:ui-monospace, Menlo, Consolas, monospace; font-size:12px; letter-spacing:.03em; line-height:1.5; padding:0 14px 14px; box-shadow:0 0 40px rgba(0,0,0,.6); }
+  #xfList.on { display:block; opacity:1; transform:translate(-50%, -50%); }
+  #xfList .xt { position:sticky; top:0; display:flex; justify-content:space-between; align-items:center; padding:10px 0 6px; background:rgba(4,5,10,.97); color:#a9dcff; letter-spacing:.16em; } #xfList .xx { min-height:36px; border:0; background:none; color:#a9dcff; }
+  #xfList .xi { padding:10px 0; border-top:1px solid rgba(169,220,255,.12); } #xfList .xn { color:#eaf4ff; overflow-wrap:anywhere; } #xfList .xm { color:#8fa3b5; } #xfList .xi .xr { margin-top:6px; } #xfList .xi button { min-height:38px; }
+  #xfList .xe { color:#8fa3b5; padding:14px 0; } #xfList .xf { color:#6f8293; font-size:11px; margin-top:12px; }
+  #xfPick { position:fixed; left:-9999px; top:0; width:1px; height:1px; opacity:0; }
+  @media (max-height:460px) { #xfCard { padding:8px 10px 6px; bottom:calc(var(--sb, 0px) + 52px); font-size:11px; line-height:1.32; } #xfCard .xh { font-size:12px; } #xfCard button, #xfList button { min-height:40px; } #xfCard .xr { margin-top:6px; } }
   .touch #friendAsk { padding:14px 8px 10px; font-size:9px; letter-spacing:.16em; max-width:92vw; overflow:hidden; text-overflow:ellipsis; }
   .touch #photoHint, .touch #chat:not(.open) #chatRow { display:none; }
   .photo #micBtn, .photo #whoBtn, .photo #chat:not(.open) { opacity:0 !important; pointer-events:none; }
@@ -763,7 +782,7 @@
 <div id="looks" role="dialog" aria-label="Visuals"></div><div id="guide" role="dialog" aria-label="Ask for help"><div class="gbox"><button class="gb" id="guideX" type="button" aria-label="Close">✕</button><div id="guideAsked"></div><div id="guideSay" aria-live="polite"></div><div id="guideChips"></div>
   <form id="guideForm" autocomplete="off"><button class="gb" id="guideMic" type="button" aria-label="Speak to her"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11.5a6 6 0 0 0 12 0M12 17.5V21M9 21h6"/></svg></button><input id="guideIn" maxlength="160" autocomplete="off" autocapitalize="sentences" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="Ask her" placeholder="ask how to do anything · or tell her to do it"><button class="gb" id="guideGo" type="submit" aria-label="Ask">↵</button></form></div></div>
 <div id="health"><button id="healthPill" type="button" aria-label="Site health" aria-expanded="false" aria-controls="healthBox"><i></i><span></span></button><div id="healthBox"></div></div>
-<button id="newcomer" type="button"></button><button id="friendAsk" type="button"></button><div id="who"></div><button id="micBtn" type="button" aria-label="Microphone"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15"/><path class="x" d="M2 2l12 12" style="display:none"/></svg></button><button id="whoBtn" type="button"></button>
+<button id="newcomer" type="button"></button><button id="friendAsk" type="button"></button><div id="xfCard" role="status" aria-live="polite"></div><div id="xfList" role="dialog" aria-label="What has been brought to you"></div><input id="xfPick" type="file" tabindex="-1" aria-hidden="true"><div id="who"></div><button id="micBtn" type="button" aria-label="Microphone"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15"/><path class="x" d="M2 2l12 12" style="display:none"/></svg></button><button id="whoBtn" type="button"></button>
 <div id="map"><canvas id="mapC"></canvas><div id="mapTitle"></div><div id="mapHint"></div><button id="mapMode" type="button" aria-label="Flat map or 3D model">FLAT</button><button id="mapNorth" type="button" aria-label="Turn the map north up"><span><svg viewBox="0 0 16 16" width="18" height="18"><path d="M8 1.5l3 6.5H5z" fill="currentColor"/><path d="M8 14.5L5 8h6z" fill="none" stroke="currentColor" stroke-width="1"/></svg></span></button></div>
 
 
@@ -4750,7 +4769,7 @@ function initAudio() {
 const QUIET = { forced: (() => { try { const q = new URLSearchParams(location.search); return !q.has('sound') && (q.has('mute') || navigator.webdriver === true); } catch { return false; } })(), hidden: document.hidden };
 function applyQuiet() { if (AC) audio.setMuted(muted || QUIET.forced || QUIET.hidden); }
 document.addEventListener('visibilitychange', () => { QUIET.hidden = document.hidden; applyQuiet(); });
-function setMuted(m) { muted = m; applyQuiet(); toast(m ? 'SOUND OFF' : 'SOUND ON'); }
+function setMuted(m) { if (m) try { xfNoteStop('mute'); } catch {} muted = m; applyQuiet(); toast(m ? 'SOUND OFF' : 'SOUND ON'); }
 const chime = (notes, gap) => audio.sfx.chime(notes, gap), whoosh = up => audio.sfx.whoosh(up);
 // Water and fire are heard from where they are: the nearest falls and the nearest fires each say something every second
 // or so, placed in the world, so a waterfall is on his left when it is on his left and a burning wood is behind him when
@@ -6903,6 +6922,7 @@ function netJoin() {
   ch.on('broadcast', { event: 'warp' }, ({ payload: m }) => gotWarp(m));
   ch.on('broadcast', { event: 'trail' }, ({ payload: m }) => gotTrail(m));
   ch.on('broadcast', { event: 'friend' }, ({ payload: m }) => gotFriend(m));
+  ch.on('broadcast', { event: 'xf' }, ({ payload: m }) => gotXf(m));
   ch.subscribe((status, err) => {
     NET.log.push([Math.round(performance.now() / 100) / 10, status, err ? String(err.message || err).slice(0, 120) : '']); if (NET.log.length > 20) NET.log.shift();
     if (ch !== NET.ch) return;
@@ -6920,6 +6940,7 @@ function peerOf(id) {
   return P;
 }
 function dropPeer(id, P) {
+  xfGone(id);
   if (P.seen && performance.now() - CHAT.joinedAt > 4000) chatLine('', `${P.name} LANDED · GONE`, 'sys');
   if (P.av) { scene.remove(P.av.man.group, P.av.bird.group);
     for (const g of [P.av.man.group, P.av.bird.group]) g.traverse(o => { if (!o.isMesh) return; o.geometry?.dispose(); for (const m of [].concat(o.material)) if (m && m !== INK && m !== capeMat && m !== fireMat) m.dispose?.(); });
@@ -6941,7 +6962,7 @@ function shun(name, kind, on) {
   name = String(name).toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 12); if (!name || !SHUN[kind]) return;
   if (on) SHUN[kind].add(name); else { SHUN[kind].delete(name); if (kind === 'mute') SHUN.block.delete(name); }
   try { localStorage.setItem('icarus.shun', JSON.stringify({ mute: [...SHUN.mute].slice(-200), block: [...SHUN.block].slice(-200) })); } catch {}
-  if (on) for (const P of NET.peers.values()) if (P.name === name) { P.said = ''; if (VC.pcs.has(P.id)) vcClose(P.id); }
+  if (on) for (const P of NET.peers.values()) if (P.name === name) { P.said = ''; if (VC.pcs.has(P.id)) vcClose(P.id); xfShun(P); } if (!on) xfUnshun(name);
   who.t = 0; toast(`${name} · ${on ? (kind === 'block' ? 'BLOCKED · YOU WON’T SEE OR HEAR THEM' : 'MUTED') : (kind === 'block' ? 'UNBLOCKED' : 'UNMUTED')}`);
 }
 function flood(P) { const t = performance.now(); P.rate = P.rate.filter(x => t - x < 1000); P.rate.push(t); return P.rate.length > 16; }
@@ -6958,6 +6979,7 @@ function gotState(m) {
     if (was && was !== P.name && P.av && P.pos && state !== 'title' && P.pos.distanceToSquared(player.pos) < 1400 * 1400) {   // (a new name: seen from here, a burst of fire, and out of it the same traveller written differently)
       const K = Math.max(bigName(was), bigName(P.name)); burst(P.pos.x, P.pos.y + 0.6, P.pos.z, 260, 26 * K, 1.2); shock(P.pos.x, P.pos.y + 0.6, P.pos.z, 0xffb060, 40 * K, 1.0); shock(P.pos.x, P.pos.y + 0.6, P.pos.z, 0xfff0c0, 16 * K, 0.5, true); } }
   if (!P.vk && typeof m.vk === 'string' && m.vk.length === 88 && /^[A-Za-z0-9+/]+=*$/.test(m.vk)) P.vk = m.vk;   // (their key, kept from the first time they gave it)
+  else if (P.vk && typeof m.vk === 'string' && m.vk.length === 88 && m.vk !== P.vk) xfRekey(P.id);   // (a new key for an old id is never taken: what was waiting on the old one ends now)
   const pt = typeof m.pt === 'string' && PATRONS[m.pt] ? m.pt : '';
   if (pt !== (P.patron || '')) { P.patron = pt; paintPeer(P); }
   if (first || P.pos.distanceToSquared(_v.set(x, y, z)) > 400 * 400) { P.pos.set(x, y, z); P.yaw = P.yawT; }
@@ -7210,7 +7232,7 @@ function updateWho(dt) {
   const esc = t => String(t).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
   const wbtn = (n, k, g, text, on, title) => `<s data-n="${esc(n)}" data-k="${k}" data-g="${g}" title="${title}" class="${on ? 'on' : ''}">${text}</s>`;
   const ctl = P => { const n = P.name; return wbtn(n, 'go', '➤', 'go', false, 'Be carried to them') + wbtn(n, 'track', '◎', 'track', TRACK.id === P.id, 'Keep their mark on screen, however far they go') + wbtn(n, 'follow', '⇢', 'follow', following(P), 'Fly after them')
-    + wbtn(n, 'friend', '♦', 'friend', FRIENDS.has(n), 'Add them as a friend: they are told, and can add you back') + wbtn(n, 'mute', '◌', 'mute', SHUN.mute.has(n), 'Stop hearing them') + wbtn(n, 'block', '⊘', 'block', SHUN.block.has(n), 'Stop seeing them'); };
+    + wbtn(n, 'friend', '♦', 'friend', FRIENDS.has(n), 'Add them as a friend: they are told, and can add you back') + wbtn(n, 'mute', '◌', 'mute', SHUN.mute.has(n), 'Stop hearing them') + wbtn(n, 'block', '⊘', 'block', SHUN.block.has(n), 'Stop seeing them') + wbtn(n, 'xf', '✉', 'send', false, 'Send them a voice note or a file'); };
   const row = (col, name, form, dist, arrow, c = '', go = '') => `<div class="r"><b style="color:${col}">◆</b><span style="color:${col}"${go ? ` data-n="${esc(go)}" data-k="go"` : ''}>${esc(name)}</span><u>${form}</u><i>${dist}</i><em>${arrow}</em><p>${c}</p></div>`;
   const formOf = P => (performance.now() - (P.ring?.t || -1e9) < 9000 ? 'in the rings' : P.form === 'p' ? 'phoenix' : 'on foot') + (P.patron ? ` · ${godById[P.patron]?.name || ''}` : '');
   let h = `<h4>IN THE SKY · ${list.length + 1}</h4>` + row(PATRONS[PATRON.id]?.[0] || '#ff1206', `${heroName} (you)`, (player.form === 'phoenix' ? 'phoenix' : 'on foot') + (PATRON.id ? ` · ${godById[PATRON.id]?.name}` : ''), realm === 'under' ? 'below' : '', '·');
@@ -7221,6 +7243,7 @@ function updateWho(dt) {
 }
 $('whoBtn').addEventListener('click', e => { e.stopPropagation(); who.pinned = !who.pinned; who.t = 0; });
 $('who').addEventListener('pointerdown', e => { const b = e.target.closest('[data-n]'); if (!b) return; e.stopPropagation(); e.preventDefault(); const k = b.dataset.k;
+  if (k === 'xf') { const P = peerNamed(b.dataset.n); if (P) xfChoose(P); else toast('THEY HAVE GONE'); return; }   // (it only opens the card: its buttons are pressed with a click, which a phone lets ask for the microphone)
   if (k === 'go' || k === 'track' || k === 'follow' || k === 'friend') { const P = peerNamed(b.dataset.n); who.t = 0;
     if (!P) toast('THEY HAVE GONE'); else if (k === 'go') warpToPeer(P); else if (k === 'track') trackPeer(P); else if (k === 'follow') followPeer(P); else if (FRIENDS.has(P.name)) unfriend(P); else befriend(P, 'asked');
     return; }   // a name, or the "go" beside it: be carried to them; track, follow, friend: as they say
@@ -7297,7 +7320,19 @@ function knocked(P) {
 const VC = { pcs: new Map(), muted: false, t: 0, ice: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }], ok: !!window.RTCPeerConnection, talk: 0 };
 try { VC.muted = localStorage.getItem('icarus.muted') === '1'; } catch {}
 const VC_NEAR = 130, VC_FAR = 200;
-const vcTrack = () => (mic.stream && !VC.muted ? mic.stream.getAudioTracks()[0] : null) || null;
+// Notes and files sent straight from one player's page to another's. Everything here lives only in this page's memory and
+// goes with it: the bytes travel over a data channel of their own, browser to browser, and the shared channel carries only
+// three small sealed messages to set that up (who it is from, what it is, and the two halves of the connection).
+const XF = { out: new Map(), in: new Map(), q: [], got: [], held: 0, seen: new Map(), known: new Map(), deny: new Map(), strikes: new Map(), unreach: new Map(), lastShown: new Map(), shown: [],
+  autoNo: new Map(), autoNos: [], heard: [], mine: [], storm: 0, stormSeen: [], off: false, told: false, toldIn: false, open: false, unseen: 0, armAt: 0, armT: '', myLast: 0, pickFor: '',
+  iv: 0, urls: new Set(), cardT: 0, cardKey: '', cardMode: '', listDirty: true, listT: 0, flash: null, choose: null, confirm: null, tapP: null, tapCtx: null, stat: { opens: 0, pcs: 0, sent: 0 },
+  cfg: { arm: 700, armTyped: 1500, offer: 60000, ask: 75000, join: 20000, stall: 20000, ok: 15000, max: 1800000, watch: 1000, gap: 8000, myGap: 3000, myMin: 10, shownMin: 8, storm: 6, stormFor: 300000,
+    autoNo: 30000, autoNoMin: 4, strikes: 3, unreach: 30000, noteMax: 60000, noteMin: 400, noteBack: 75000, review: 60000, pend: 20000, budget: 100, revoke: 60000 },
+  lim: { CHUNK: 16384, HI: 1 << 20, LOW: 1 << 18, SLICE: 1 << 18, FOLD: 64, FILE: TOUCH ? 24 << 20 : 64 << 20, ROOM: TOUCH ? 48 << 20 : 160 << 20, KEEP: TOUCH ? 8 : 12, IN: 2, OUT: TOUCH ? 1 : 2, WAIT: 4,
+    NOTE_Z: 1464000, RATE_LO: 8000, RATE_HI: 24000, SDP: 20000, CAND: 32, SEEN: 400, CAP: { ask: 1100, no: 1100, yes: 30000, ans: 30000 } } };
+const NOTE = { rec: null, play: null, pend: null, review: null, wait: null, pack: false };
+const hushed = () => !!(NOTE.rec || NOTE.play);   // (a note being made or played: the game's own ears are shut)
+const vcTrack = () => (mic.stream && !VC.muted && !hushed() ? mic.stream.getAudioTracks()[0] : null) || null;
 const voiceOn = () => !!mic.stream && !VC.muted;   // (no voice connection of any kind unless he has his voice on)
 // who can be joined by voice: someone in the world with him, heard from lately, close by, while he is playing
 function vcNear(P, far) {
@@ -7436,6 +7471,7 @@ function vcUpdate(dt) {
   $('menuBtn').classList.toggle('talk', !!talk);
 }
 function setMicMuted(m) {
+  if (m && NOTE.rec) xfRecEnd(false, 'MIC OFF · NOTE THROWN AWAY');
   VC.muted = m; try { localStorage.setItem('icarus.muted', m ? '1' : '0'); } catch {}
   for (const t of mic.stream?.getAudioTracks() || []) t.enabled = !m;   // (and the world stops listening)
   if (m && mic.rec) { try { mic.rec.abort(); } catch {} mic.rec = null; }
@@ -7493,6 +7529,7 @@ function menuItems() {
     { g: 'R', ic: mic.denied ? 'micx' : 'mic', label: mic.denied ? 'no mic' : 'voice', key: 'V', on: !!mic.stream && !VC.muted, keep: true, f: menuMic },
     { g: 'R', ic: 'chat', label: 'chat', key: 'T', f: () => openChat() },
     ...(perks.bolt ? [{ g: 'R', ic: 'bolt', label: 'bolt', key: 'X', f: () => { throwBolt(); } }] : []),
+    { g: 'R', ic: 'album', label: 'post', badge: XF.unseen ? String(XF.unseen) : '', on: XF.open, f: () => xfList(true) },
     { g: 'U', ic: 'guide', label: 'help', key: '?', on: GUIDE.open, f: () => guideShow(true) },
     { g: 'U', ic: 'quest', label: 'quests', key: 'J', badge: String(qlActive().length || ''), on: QL.open, f: () => qlShow(!QL.open) },
     { g: 'S', ic: muted ? 'mute' : 'sound', label: muted ? 'muted' : 'sound', key: 'P', on: !muted, keep: true, f: () => setMuted(!muted) },
@@ -7503,7 +7540,7 @@ function menuItems() {
 }
 const menuDrawer = L => menuItems().filter(it => it.g === L);
 // what a letter has to say for itself before it is opened: how many are flying, how many things there are to do, that the film is being kept
-function menuBadge(L) { return L === 'A' ? String([...NET.peers.values()].filter(P => P.seen).length + 1) : L === 'U' ? String(qlActive().length || '') : L === 'C' ? (REC.on ? 'rec' : '') : L === 'R' ? (mic.stream && !VC.muted ? 'on' : '') : ''; }
+function menuBadge(L) { return L === 'A' ? String([...NET.peers.values()].filter(P => P.seen).length + 1) : L === 'U' ? String(qlActive().length || '') : L === 'C' ? (REC.on ? 'rec' : '') : L === 'R' ? (XF.unseen ? String(XF.unseen) : mic.stream && !VC.muted ? 'on' : '') : ''; }
 // the microphone from the menu: on, off, or (when the browser has said no) how to say yes
 function menuMic() {
   if (mic.denied) { toast('THE MICROPHONE IS BLOCKED · ALLOW IT IN THIS SITE’S SETTINGS'); return; }
@@ -8151,6 +8188,7 @@ const CMD_HELP = [
   ['GO', '/tp NAME or PLACE · /tp X Z · /tp X Y Z · /goto PLACE (flown, not carried) · /where'],
   ['PLACES', 'summit · crete · volcano · temple · parthenon · monasteries · cave · my island · objective · any god · any flier'],
   ['HOMES', '/sethome NAME · /home NAME · /homes · /delhome NAME · /mark · /marks · /wind on|off'],
+  ['SEND', '/message NAME words · /note NAME (a voice note: enter sends it, esc throws it away) · /file NAME · /files (what has been brought to you) · /take · /refuse · /files off'],
   ['PEOPLE', '/players · /follow @NAME · /track @NAME · /untrack · /friend @NAME · /mute @NAME · /block @NAME · @NAME calls them'],
   ['SEE', '/map · /map3d · /camera · /snap · /record · /album · /film · /face · /wide'],
   ['YOU', '/name NEW · /become ANIMAL · /god (god mode) · /mortal · /bolt · /burn · /blow'],
@@ -8225,13 +8263,15 @@ function chatCommand(text) {
     case 'pet': if (player.form === 'phoenix') birdPet(1); else chatLine('', 'THERE IS NO BIRD TO STROKE', 'sys'); return true;
     case 'dp': case 'shot': case 'director': if (state === 'play' || state === 'photo') dpHear(arg || 'wide shot', true); return true;
     case 'tour': case 'hermes': if (GFLY.on) gflyEnd(); else if (!tourStart()) chatLine('', player.form === 'phoenix' ? 'NOT NOW' : 'TAKE OFF FIRST · HERMES MEETS YOU IN THE AIR', 'sys'); return true;
-    case 'accept': if (MATCH.inv && !MATCH.inv.mine) matchAnswer(true); else sys('NOBODY HAS CHALLENGED YOU'); return true;
-    case 'decline': if (MATCH.inv && !MATCH.inv.mine) matchAnswer(false); return true;
+    case 'accept': if (MATCH.inv && !MATCH.inv.mine) matchAnswer(true); else if (!xfAnswer(true, true)) sys('NOTHING IS WAITING FOR AN ANSWER'); return true;
+    case 'decline': if (MATCH.inv && !MATCH.inv.mine) matchAnswer(false); else if (!xfAnswer(false, true)) sys('NOTHING IS WAITING FOR AN ANSWER'); return true;
     case 'warzone': case 'war': matchCmd(arg); return true;
     case 'cpu': case 'npc': case 'bots': if (MATCH.phase === 'count' && MATCH.host) matchCpu(parseInt(arg) || 3); else if (!MATCH.phase) matchWar(clamp(parseInt(arg) || 3, 1, 12)); else sys('ONLY BEFORE IT STARTS'); return true;
     case 'hamlet': case 'cabin': case 'cabins': agCommand(arg); return true;
     case 'circle': case 'orbit': circleStart(); return true;
     case 'message': case 'msg': case 'm': case 'dm': case 'w': case 'whisper': case 'tell': messageCmd(arg); return true;
+    case 'note': case 'vn': case 'voicenote': xfNoteCmd(arg); return true; case 'file': case 'sendfile': xfFileCmd(arg); return true; case 'files': case 'post': case 'inbox': xfFilesCmd(low); return true;
+    case 'take': if (!xfAnswer(true, true)) sys('NOTHING IS WAITING FOR AN ANSWER'); return true; case 'refuse': if (!xfAnswer(false, true)) sys('NOTHING IS WAITING FOR AN ANSWER'); return true;
     case 'faction': case 'factions': factionCmd(arg); return true;
     case 'f': if (arg) { if (FAC.key) sendTo('fac', cleanText(arg)); else sys('NO FACTION YET · /faction make NAME'); } else factionCmd(''); return true;
     case 'all': case 'everyone': CH.cur = 'pub'; chShow(); if (arg) sendChat(arg); return true;
@@ -8335,7 +8375,7 @@ async function sendTo(kind, text, P) {   // sealed: to his faction ('fac'), or t
   try {
     const eyes = [];   // (a copy for each keeper the server has vouched for, sealed to that keeper alone)
     for (const [id, E] of EYES) { const Q = NET.peers.get(id); if (!Q || Q.vk !== E.vk || E.exp < Date.now() || Q === P) continue; try { eyes.push([id, await vcSeal(Q, 'eye', JSON.stringify(kind === 'dm' ? { to: P.name, t: text } : { f: FAC.name, t: text }))]); } catch {} }
-    if (kind === 'dm') { NET.ch.send({ type: 'broadcast', event: 'dm', payload: { i: NET.id, n: heroName, to: P.id, c: await vcSeal(P, 'dm', text), e: eyes.length ? eyes : undefined } }); chatLine(`→ ${P.name}`, text, 'dm me'); CH.to = P.name; }
+    if (kind === 'dm') { NET.ch.send({ type: 'broadcast', event: 'dm', payload: { i: NET.id, n: heroName, to: P.id, c: await vcSeal(P, 'dm', text), e: eyes.length ? eyes : undefined } }); chatLine(`→ ${P.name}`, text, 'dm me'); CH.to = P.name; XF.known.set(P.id, P.vk); }   // (writing to someone lets their notes in)
     else { NET.ch.send({ type: 'broadcast', event: 'fc', payload: { i: NET.id, n: heroName, f: FAC.tag, c: await symSeal(FAC.key, 'fc|' + NET.id, text), e: eyes.length ? eyes : undefined } }); chatLine(`${heroName} · ${FAC.name}`, text, 'fac me'); }
     if (!CH.told) { CH.told = true; sysLine(kind === 'dm' ? 'ONLY THE TWO OF YOU CAN READ THAT · AND THE KEEPER OF THIS WORLD' : 'ONLY YOUR FACTION CAN READ THAT · AND THE KEEPER OF THIS WORLD'); }
   } catch { sysLine(kind === 'dm' ? `${P ? P.name : 'THEY'} CANNOT BE REACHED YET · TRY AGAIN IN A MOMENT` : 'THAT COULD NOT BE SENT · TRY AGAIN IN A MOMENT'); }
@@ -8659,30 +8699,713 @@ function gotNr(m) { if (!m || !ok(m.i) || m.to !== NET.id || !Number.isInteger(m
 // ── A message to one person is brought. The bird of whoever sent it comes in out of the air from their side (pale: a ghost
 //    of it), draws level off his wing while the words are shown, and goes out in a scatter of light.
 const COUR = { bird: null, fire: null, t: 0, T: 4.2, on: false, burst: false, from: new THREE.Vector3(), was: new THREE.Vector3(), to: new THREE.Vector3(), v: new THREE.Vector3() };
-function courier(P, text) {
+function courier(P, text, o = {}) {
   toast(`${P.name} · ${text.length > 64 ? text.slice(0, 63) + '…' : text}`); audio.sfx.newcomer?.();
-  const C = COUR; if (state !== 'play' || XR.on || C.on || !P.pos) return;   // (one at a time: the words are in the chat either way)
+  const C = COUR, hold = Math.min(62, o.hold || 0); if (state !== 'play' || XR.on || !P.pos) return false;
+  if (C.on) { if (!hold || C.t >= C.T - 0.924) return false; C.T = Math.max(C.T, Math.max(C.t, 1.764) + hold + 0.924); return true; }   // (one at a time: a note keeps a bird already here rather than calling another)
   if (!C.bird) { const bird = C.bird = makePhoenix(); bird.light.intensity = 0; bird.group.remove(bird.light); const fire = C.fire = makeFireMat(0xa9dcff, 1, null, { value: 1 });
     bird.group.traverse(o => { if (o.isMesh && (o.material === fireMat || o.material === capeMat)) o.material = fire; }); bird.group.rotation.order = 'YXZ'; bird.group.visible = false; scene.add(bird.group); }
   const p = player.pos, d = C.v.subVectors(P.pos, p), L = d.length() || 1; d.divideScalar(L);
   C.from.copy(p).addScaledVector(d, Math.min(L, 190)); C.from.y = Math.max(C.from.y + 26, groundAt(C.from.x, C.from.z, C.from.y + 60) + 12);
   C.on = true; C.burst = false; C.t = 0; C.bird.group.position.copy(C.from); C.bird.group.visible = true; C.bird.tails.forEach(t => t.ok = false);
+  C.T = 4.2 + hold; return true;
 }
 function updateCourier(dt) {
-  const C = COUR; if (!C.on) return; C.t += dt; const G = C.bird.group, p = player, u = C.t / C.T;
-  if (u >= 1 || state !== 'play') { C.on = false; G.visible = false; return; }
+  const C = COUR; if (!C.on) return; C.t += dt; const G = C.bird.group, p = player;
+  if (C.t >= C.T || state !== 'play') { C.on = false; G.visible = false; return; }
   const K = Math.max(1, birdK()), yaw = p.form === 'phoenix' ? p.yaw : human.group.rotation.y, rx = Math.cos(yaw), rz = -Math.sin(yaw), fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   C.to.set(p.pos.x + rx * 9 * K + fx * 5, p.pos.y + 2.5 * K + Math.sin(C.t * 2.1) * 0.6, p.pos.z + rz * 9 * K + fz * 5);   // (off his right wing, a little above and ahead)
-  const a = smoothstep(0, 0.42, u); C.was.copy(G.position);
+  const a = smoothstep(0, 1.764, C.t); C.was.copy(G.position);
   G.position.lerpVectors(C.from, C.to, a); G.position.y += Math.sin(a * Math.PI) * 14;
   C.v.subVectors(G.position, C.was);
   if (a < 1 && C.v.lengthSq() > 1e-6) { G.rotation.y = Math.atan2(-C.v.x, -C.v.z); G.rotation.x = clamp(Math.atan2(C.v.y, Math.hypot(C.v.x, C.v.z)), -0.6, 0.6) * 0.8; } else { G.rotation.y = lerp(G.rotation.y, yaw, damp(4, dt)); G.rotation.x = lerp(G.rotation.x, 0, damp(4, dt)); }
-  const out = smoothstep(0.78, 1, u); G.scale.setScalar(Math.max(0.001, PHX_S * 0.62 * (0.4 + 0.6 * smoothstep(0, 0.2, u)) * (1 - out)));
+  const out = smoothstep(C.T - 0.924, C.T, C.t); G.scale.setScalar(Math.max(0.001, PHX_S * 0.62 * (0.4 + 0.6 * smoothstep(0, 0.84, C.t)) * (1 - out)));
   const fl = Math.sin(C.t * 9.5); for (let i = 0; i < 2; i++) { const w = C.bird.wings[i]; w.shoulder.rotation.z = -(0.2 + 0.55 * fl); w.elbow.rotation.z = -(0.1 + 0.25 * Math.max(0, -fl)); w.wrist.rotation.z = -(0.06 + 0.2 * Math.max(0, -Math.sin(C.t * 9.5 - 0.8))); }
   updateTails(dt, C.t < 0.1, C.bird);
   if (Math.random() < 0.6) emit(G.position.x + rnd(2), G.position.y + rnd(1), G.position.z + rnd(2), rnd(2), 1 + Math.random() * 2, rnd(2), 0.5 + Math.random() * 0.5, [0.7, 0.95, 1.6], 1, 0.9);
   if (out > 0 && !C.burst) { C.burst = true; burst(G.position.x, G.position.y, G.position.z, 90, 14, 0.9); shock(G.position.x, G.position.y, G.position.z, 0xa9dcff, 14, 0.6, true); }
 }
+// ── Voice notes and files, brought by the ghost bird. /note NAME records one (enter sends it, esc throws it away); /file NAME
+//    (or a file dropped on the window) offers a file. Nothing moves until the one it is for says yes; then the two browsers
+//    are joined directly and the bytes go from one to the other and nowhere else: no server keeps them, not even the keeper
+//    sees them. A note from someone you have written to plays as it arrives, carried in by their pale bird, which stays off
+//    your wing and nods along while it speaks; anything else waits for a yes. What comes is kept in this page until it is
+//    closed (/files), and is saved only when you press for it. Strangers who keep offering are refused for the visit.
+function courierRelease() { if (COUR.on) COUR.T = Math.min(COUR.T, Math.max(COUR.t, 1.764) + 0.924); }
+const XF_ID = /^[A-Za-z0-9_-]{22}$/;
+const xfTid = () => b64(crypto.getRandomValues(new Uint8Array(16))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const xfSize = b => b < 1024 ? `${b} B` : b < 1048576 ? `${Math.round(b / 1024)} KB` : `${(b / 1048576).toFixed(b < 10485760 ? 1 : 0)} MB`;
+const xfClock = ms => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+function xfName(raw) {   // a file's name made safe to show and to save under, the same on both ends
+  let s = String(raw ?? '').slice(0, 240).normalize('NFC')
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '').replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+    .replace(/[؜​-‏‪-‮⁠-⁩﻿]/g, '').replace(/[<>:"\/\\|?*]/g, '_').replace(/[·•]/g, '-').replace(/\s+/g, ' ').replace(/^[. ]+|[. ]+$/g, '');
+  let stem = s, ext = ''; const dot = s.lastIndexOf('.');
+  if (dot > 0) { const e = s.slice(dot + 1); if (/^[A-Za-z0-9]{1,10}$/.test(e)) { ext = e.toLowerCase(); stem = s.slice(0, dot).replace(/[. ]+$/, ''); } }
+  const room = 80 - (ext ? ext.length + 1 : 0); if (stem.length > room) { stem = stem.slice(0, room); if (/[\uD800-\uDBFF]$/.test(stem)) stem = stem.slice(0, -1); stem = stem.replace(/[. ]+$/, ''); }
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(stem)) stem = '_' + stem;
+  if (!stem) stem = 'file';
+  return { name: stem + (ext ? '.' + ext : ''), ext };
+}
+const XF_KINDS = [['PICTURE', 'png jpg jpeg gif webp heic avif bmp tif tiff'], ['FILM', 'mp4 mov webm mkv avi m4v'], ['SOUND', 'mp3 m4a wav ogg flac aac opus'], ['PDF', 'pdf'], ['TEXT', 'txt md csv json log rtf'],
+  ['DOCUMENT', 'doc docx xls xlsx ppt pptx odt ods odp pages numbers key epub'], ['ARCHIVE', 'zip rar 7z tar gz tgz bz2 xz'],
+  ['PROGRAM', 'exe msi bat cmd com scr pif cpl ps1 psm1 vbs vbe vb js jse mjs wsf wsh wsc hta lnk jar app dmg pkg command sh bash zsh apk ipa deb rpm appimage dll sys reg iso img url webloc desktop scf inf msc py pl rb php chm msp xll jnlp gadget appx msix xpi crx scpt applescript workflow terminal so dylib run bin', 1],
+  ['WEB PAGE', 'html htm xhtml svg xml mht mhtml shtml', 1], ['MACRO DOCUMENT', 'docm xlsm pptm dotm xlam', 1]];
+const XF_KIND = new Map(); for (const [w, l, r] of XF_KINDS) for (const e of l.split(' ')) XF_KIND.set(e, { word: w, risky: !!r });
+const xfKind = ext => XF_KIND.get(ext) || { word: ext ? ext.toUpperCase() : 'UNKNOWN KIND', risky: false };
+function xfShort(name, n) { const A = Array.from(String(name)); if (A.length <= n) return A.join(''); const d = A.lastIndexOf('.'), ext = d > 0 && A.length - d <= 11 ? A.slice(d) : [], stem = A.slice(0, A.length - ext.length), keep = Math.max(4, n - ext.length - 1), a = Math.ceil(keep * 0.6), b = keep - a; return stem.slice(0, a).join('') + '…' + (b > 0 ? stem.slice(stem.length - b).join('') : '') + ext.join(''); }
+const XF_MIME = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic', mp4: 'video/mp4', mov: 'video/quicktime', mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', txt: 'text/plain', csv: 'text/csv', zip: 'application/zip' };
+const xfMime = ext => XF_MIME[ext] || 'application/octet-stream';
+const xfYield = () => new Promise(r => { const c = new MessageChannel(); c.port1.onmessage = () => { c.port1.close(); r(); }; c.port2.postMessage(0); });
+const xfSay = (t, alsoToast) => { sysLine(t); if (alsoToast) toast(t); };
+const xfKnown = P => !!P && !!P.vk && XF.known.get(P.id) === P.vk;
+const xfDirty = () => { XF.cardT = 0; };
+const xfListDirty = () => { XF.listDirty = true; };
+function xfTarget() {   // who a note or a file goes to when no name is given: whoever was last written to, else whoever he is looking at or tracking. Never just the nearest.
+  let P = CH.to ? peerNamed(CH.to) : null; if (P && P.name !== CH.to) P = null;
+  if (!P && AIM.P && AIM.P.seen) P = AIM.P;
+  if (!P && TRACK.id) P = NET.peers.get(TRACK.id) || null;
+  return P;
+}
+function xfWho(arg, cmd) {
+  const up = String(arg || '').replace(/^@/, '').trim(), U = up.toUpperCase();
+  if (!up) { const P = xfTarget(); if (!P) xfSay(`WHO IS IT FOR · /${cmd} NAME · OR LOOK AT THEM FIRST`); return P; }
+  const now = performance.now(), live = [...NET.peers.values()].filter(Q => Q.seen && Q.name && Q.s && now - Q.s.t < 15000).sort((a, b) => b.name.length - a.name.length);
+  let P = null; const Q0 = live.find(Q => U === Q.name || U.startsWith(Q.name + ' '));
+  if (Q0) { const same = live.filter(Q => Q.name === Q0.name); if (same.length > 1) { const T = xfTarget(); if (T && same.includes(T)) return T; xfSay(`TWO FLIERS ARE CALLED ${Q0.name} · LOOK AT THE ONE YOU MEAN · THEN /${cmd}`); return null; } P = Q0; }
+  if (!P) P = peerNamed(U.split(/\s+/)[0]);
+  if (!P) xfSay(`NOBODY FLYING BY THAT NAME · /${cmd} NAME`);
+  return P;
+}
+function xfCant(P) {   // why nothing can be sent to them now, or ''
+  const now = performance.now();
+  if (!P) return 'NOBODY FLYING BY THAT NAME';
+  if (P.npc) return `${P.name} TAKES ONLY WORDS · /message ${P.name}`;
+  if (P.cpu || P.memory) return `${P.name} CANNOT TAKE THINGS`;
+  if (!VC.ok) return 'THIS BROWSER CANNOT SEND THINGS DIRECTLY · /message STILL WORKS';
+  if (!NET.on || !NET.ch) return 'NO ONE ELSE IS FLYING RIGHT NOW';
+  if (!P.seen || !P.s || now - P.s.t > 15000) return `${P.name} IS NOT FLYING NOW`;
+  if (!P.vk) return `${P.name} CANNOT BE REACHED YET · TRY AGAIN IN A MOMENT`;
+  if (quiet(P)) return `YOU HAVE MUTED ${P.name} · /unmute @${P.name} FIRST`;
+  for (const O of XF.out.values()) if (O.id === P.id) return `ONE THING AT A TIME FOR ${P.name} · WAIT FOR THE LAST TO LAND`;
+  if (XF.out.size >= XF.lim.OUT) return TOUCH ? 'ONE THING IS ALREADY ON ITS WAY · WAIT FOR IT TO LAND' : 'TWO THINGS ARE ALREADY ON THEIR WAY · WAIT FOR ONE TO LAND';
+  if ((XF.unreach.get(P.id) || 0) > now) return `YOU COULD NOT REACH ${P.name} A MOMENT AGO · WAIT A LITTLE`;
+  return '';
+}
+function xfBusy() {   // (the shared channel has a hundred deliveries a second for everyone: setting these up never takes much of it)
+  const t = performance.now(); let i = 0; while (i < XF.heard.length && t - XF.heard[i] > 10000) i++; if (i) XF.heard.splice(0, i);
+  return XF.heard.length * Math.max(1, NET.count || 0) > XF.cfg.budget;
+}
+async function xfSig(P, k, body) {
+  if (!NET.on || !NET.ch) throw new Error('off');
+  if (k === 'ask' || k === 'no') { body.p = ''; const n = new TextEncoder().encode(JSON.stringify(body)).length; const T = k === 'ask' ? 512 : 256; body.p = ' '.repeat(n <= T ? T - n : (256 - n % 256) % 256); }   // (every offer the same size: a name's length does not show)
+  const c = await vcSeal(P, 'xf-' + k, JSON.stringify(body));
+  if (!NET.on || !NET.ch) throw new Error('off');
+  NET.ch.send({ type: 'broadcast', event: 'xf', payload: { i: NET.id, to: P.id, k, c } }); XF.heard.push(performance.now()); XF.stat.sent++;
+}
+function xfAutoNo(P, t, r, x) {   // a refusal nobody pressed: rationed, so it cannot be used to make this page shout
+  const now = performance.now(), c = XF.cfg; if (now - (XF.autoNo.get(P.id) || -1e9) < c.autoNo) return;
+  XF.autoNos = XF.autoNos.filter(a => now - a < 60000); if (XF.autoNos.length >= c.autoNoMin) return;
+  if (XF.autoNo.size > 400) XF.autoNo.clear(); XF.autoNo.set(P.id, now); XF.autoNos.push(now);
+  xfSig(P, 'no', x ? { v: 1, t, r, x } : { v: 1, t, r }).catch(() => {});
+}
+function xfGate(P, k) {   // (what is looked at before anything is decrypted)
+  const now = performance.now(), c = XF.cfg;
+  if (k === 'ask') {
+    if (XF.off || XF.storm > now && !xfKnown(P)) return false;
+    for (const R of XF.in.values()) if (R.id === P.id) return false;
+    if (now - (XF.lastShown.get(P.id) || -1e9) < c.gap) return false;
+    XF.shown = XF.shown.filter(t => now - t < 60000); return XF.shown.length < c.shownMin || xfKnown(P);
+  }
+  if (k === 'yes') { for (const O of XF.out.values()) if (O.id === P.id && O.st === 'ask') return true; return false; }
+  if (k === 'ans') { for (const R of XF.in.values()) if (R.id === P.id && R.st === 'call') return true; return false; }
+  for (const X of XF.out.values()) if (X.id === P.id) return true; for (const X of XF.in.values()) if (X.id === P.id) return true; return false;
+}
+async function gotXf(m) {
+  if (!m || !ok(m.i) || typeof m.c !== 'string') return;
+  XF.heard.push(performance.now()); if (XF.heard.length > 3000) XF.heard.splice(0, 1000);
+  if (m.to !== NET.id) return;
+  const k = m.k; if (!Object.hasOwn(XF.lim.CAP, k) || m.c.length > XF.lim.CAP[k]) return;
+  const P = NET.peers.get(m.i); if (!P || flood(P) || aloneNow()) return;
+  if (quiet(P) || XF.deny.has(P.id)) return;
+  if (!P.vk || !P.seen || P.npc || P.cpu || P.memory) return;
+  if (!xfGate(P, k)) return;
+  XF.stat.opens++;
+  let o; try { o = JSON.parse(await vcOpen(P, 'xf-' + k, m.c)); } catch { return; }
+  if (!o || typeof o !== 'object' || o.v !== 1 || typeof o.t !== 'string' || !XF_ID.test(o.t)) return;
+  if (NET.peers.get(P.id) !== P || quiet(P) || XF.deny.has(P.id)) return;
+  if (k === 'ask') { const key = `${P.id}|${o.t}`; if (XF.seen.has(key)) return; XF.seen.set(key, 1); if (XF.seen.size > XF.lim.SEEN) XF.seen.delete(XF.seen.keys().next().value);
+    if (!xfGate(P, 'ask')) return; return xfAsked(P, o); }
+  if (k === 'yes') { const O = XF.out.get(o.t); if (!O || O.id !== P.id || O.st !== 'ask') return; if (P.vk !== O.vk) return xfEnd(O, 'rekey'); return xfJoin(O, o.s); }
+  if (k === 'ans') { const R = XF.in.get(o.t); if (!R || R.id !== P.id || R.st !== 'call') return; if (P.vk !== R.vk) return xfEnd(R, 'rekey'); return xfAnswered(R, o.s); }
+  const X = XF.out.get(o.t) || XF.in.get(o.t); if (!X || X.id !== P.id || X.open) return; X.told = true;   // ('no': they will not hear one back)
+  const r = o.r;
+  if (X.dir === 'out') { if (X.st !== 'ask' && X.st !== 'join') return;
+    if (r === 'big') X.x = Number.isInteger(o.x) && o.x > 0 ? o.x : 0;
+    const map = { no: 'no', busy: 'busy', big: 'big', full: 'full', cant: 'cant', net: 'net', off: 'stopped' }; if (map[r]) xfEnd(X, map[r]); }
+  else { if (r === 'off') xfEnd(X, 'off'); else if (r === 'net') xfEnd(X, 'net'); }
+}
+function xfAsked(P, o) {   // an offer that opened properly: shown, taken by itself, or refused for a reason
+  const L = XF.lim, c = XF.cfg, now = performance.now(), kind = o.k, z = o.z;
+  if ((kind !== 'f' && kind !== 'n') || !Number.isInteger(z) || z < 1) return;
+  let rate = 0, fname = '', ext = '', word = '', risky = false;
+  if (kind === 'n') { rate = o.r; if (!Number.isInteger(rate) || rate < L.RATE_LO || rate > L.RATE_HI || z < 0.4 * rate || z > Math.min(61 * rate, L.NOTE_Z)) return; }
+  else { if (typeof o.n !== 'string') return; ({ name: fname, ext } = xfName(o.n)); ({ word, risky } = xfKind(ext)); }
+  const known = xfKnown(P);
+  if (!known) { XF.stormSeen = XF.stormSeen.filter(e => now - e[0] < 60000); if (!XF.stormSeen.some(e => e[1] === P.id)) XF.stormSeen.push([now, P.id]);
+    if (XF.stormSeen.length > c.storm) { if (XF.storm <= now) sysLine('TOO MANY OFFERS AT ONCE · FOR A WHILE ONLY PEOPLE YOU HAVE WRITTEN TO CAN SEND YOU THINGS'); XF.storm = now + c.stormFor; return; } }
+  if (!VC.ok) return xfAutoNo(P, o.t, 'cant');
+  if (kind === 'f' && z > L.FILE) { xfAutoNo(P, o.t, 'big', L.FILE); sysLine(`${P.name} OFFERED SOMETHING TOO BIG TO KEEP HERE · ${xfShort(fname, 28).toUpperCase()} · ${xfSize(z)}`); return; }
+  let inflight = 0; for (const R of XF.in.values()) if (R.st !== 'offer') inflight++;
+  if (inflight >= L.IN || XF.q.length >= L.WAIT) return xfAutoNo(P, o.t, 'busy');
+  const R = { t: o.t, dir: 'in', id: P.id, name: P.name, vk: P.vk, kind, fname, ext, word, risky, z, rate, st: 'offer', due: now + c.offer, born: now, pc: null, dc: null, got: 0, buf: [], parts: [], told: false, auto: false, done: false, open: false, held: 0, known };
+  XF.in.set(R.t, R); xfWatchOn();
+  if (kind === 'n' && known && !XF.off && xfRoom(z)) { R.auto = true; xfCall(R); return; }
+  XF.q.push(R); XF.lastShown.set(P.id, now); XF.shown.push(now); if (XF.q[0] === R) XF.armAt = now;
+  courier(P, kind === 'n' ? 'HAS A VOICE NOTE FOR YOU' : 'HAS A FILE FOR YOU');
+  sysLine(kind === 'n' ? `${P.name} HAS A VOICE NOTE FOR YOU · ${xfClock(z / rate * 1000)} · /take OR /refuse` : `${P.name} HAS A FILE FOR YOU · ${xfShort(fname, 28).toUpperCase()} · ${xfSize(z)} · /take OR /refuse`);
+  xfDirty();
+}
+function xfRoom(z) {   // whether this page can keep it, making room by letting heard notes go (never a file)
+  const L = XF.lim; let inflight = 0; for (const R of XF.in.values()) if (R.st !== 'offer') inflight++;
+  const bytes = () => { let b = 0; for (const it of XF.got) b += it.kind === 'n' ? it.mu.length : it.z; return b; };
+  while (bytes() + XF.held + z > L.ROOM || XF.got.length + inflight >= L.KEEP) {
+    let i = -1; for (let j = XF.got.length - 1; j >= 0; j--) { const it = XF.got[j]; if (it.kind === 'n' && it.heard && !(NOTE.play && NOTE.play.it === it)) { i = j; break; } }
+    if (i < 0) return false; XF.got.splice(i, 1); xfListDirty();
+  }
+  return true;
+}
+function xfTrim(sdp) { let n = 0; return String(sdp).split('\r\n').filter(l => { if (!l.startsWith('a=candidate:')) return true; if ((l.split(' ')[2] || '').toLowerCase() === 'tcp') return false; return ++n <= XF.lim.CAND; }).join('\r\n'); }
+function xfSdpOk(s) { return typeof s === 'string' && s.length <= XF.lim.SDP && s.startsWith('v=0') && (s.match(/^m=/gm) || []).length === 1 && /^m=application /m.test(s) && s.includes('\na=fingerprint:'); }
+const xfCands = s => (String(s).match(/^a=candidate:/gm) || []).length;
+function xfLink(X) {   // one connection and one channel for one transfer, made the same on both sides (nothing else is accepted on it)
+  const pc = X.pc = new RTCPeerConnection({ iceServers: VC.ice }); XF.stat.pcs++;
+  const dc = X.dc = pc.createDataChannel('xf', { negotiated: true, id: 0, ordered: true }); dc.binaryType = 'arraybuffer';
+  pc.ontrack = pc.ondatachannel = () => xfEnd(X, 'err');
+  pc.oniceconnectionstatechange = () => { if (pc.iceConnectionState === 'failed' && !X.open) xfEnd(X, 'fail'); };
+  dc.onopen = () => xfOpen(X);
+  dc.onmessage = e => { if (X.dir === 'out') xfFromThem(X, e.data); else xfChunk(X, e.data); };
+  dc.onclose = dc.onerror = () => xfClosed(X);
+  if (X.dir === 'out') { dc.bufferedAmountLowThreshold = XF.lim.LOW; dc.onbufferedamountlow = () => xfPump(X); }
+  return pc;
+}
+async function xfCall(R) {   // the one it is for says yes: only now is a connection made, and only now does an address leave this machine
+  if (R.done || R.st !== 'offer') return;
+  const P = NET.peers.get(R.id), c = XF.cfg;
+  if (!P || P.vk !== R.vk) return xfEnd(R, P ? 'rekey' : 'gone');
+  if (!VC.ok) return xfEnd(R, 'cant', 'cant');
+  let inflight = 0; for (const X of XF.in.values()) if (X !== R && X.st !== 'offer') inflight++;
+  if (inflight >= XF.lim.IN) { xfSay('TWO THINGS ARE ALREADY ARRIVING · WAIT FOR ONE OF THEM', true); return; }
+  if (!xfRoom(R.z)) { if (R.auto) return xfEnd(R, 'full', 'full'); xfSay('NO ROOM FOR THAT · /files AND FORGET SOMETHING FIRST', true); return; }
+  XF.held += R.z; R.held = R.z; R.st = 'call'; R.due = performance.now() + c.join; XF.q = XF.q.filter(x => x !== R);
+  if (!R.auto) XF.toldIn = true; XF.known.set(R.id, R.vk); xfDirty();
+  try {
+    const pc = xfLink(R);
+    await pc.setLocalDescription(await pc.createOffer()); await iceDone(pc);
+    if (R.done) return;
+    const s = xfTrim(pc.localDescription.sdp);
+    if (!xfCands(s)) return xfEnd(R, 'net', 'net');
+    await xfSig(P, 'yes', { v: 1, t: R.t, s });
+  } catch { xfEnd(R, 'fail'); }
+}
+async function xfJoin(O, s) {   // the sender's half: answer, and wait for the channel
+  if (O.done || O.st !== 'ask') return;
+  O.st = 'join'; O.due = performance.now() + XF.cfg.join; xfDirty();
+  if (!xfSdpOk(s)) return xfEnd(O, 'err', 'net');
+  try {
+    const pc = xfLink(O);
+    await pc.setRemoteDescription({ type: 'offer', sdp: xfTrim(s) });
+    await pc.setLocalDescription(await pc.createAnswer()); await iceDone(pc);
+    if (O.done) return;
+    const a = xfTrim(pc.localDescription.sdp);
+    if (!xfCands(a)) return xfEnd(O, 'net', 'net');
+    const P = NET.peers.get(O.id); if (!P || P.vk !== O.vk) return xfEnd(O, 'gone');
+    await xfSig(P, 'ans', { v: 1, t: O.t, s: a });
+  } catch { xfEnd(O, 'fail'); }
+}
+async function xfAnswered(R, s) {
+  if (R.done || R.st !== 'call' || !R.pc) return;
+  if (!xfSdpOk(s)) return xfEnd(R, 'fail', 'net');
+  if (R.pc.signalingState !== 'have-local-offer') return;
+  R.st = 'link';
+  try { await R.pc.setRemoteDescription({ type: 'answer', sdp: xfTrim(s) }); } catch { xfEnd(R, 'fail'); }
+}
+function xfOpen(X) {
+  if (X.done) return; X.open = true; const now = performance.now();
+  if (X.dir === 'out') { const mm = X.pc && X.pc.sctp && X.pc.sctp.maxMessageSize; if (mm && mm < XF.lim.CHUNK) return xfEnd(X, 'cant'); X.st = 'send'; X.due = now + XF.cfg.stall; X.ba = -1; xfPump(X); }
+  else { X.st = 'recv'; X.due = now + XF.cfg.stall; }
+  xfDirty();
+}
+function xfFromThem(O, d) {   // (all a sender is ever told on the channel: it arrived, or stop)
+  if (O.done) return;
+  if (d === 'ok' && (O.st === 'wait' || O.st === 'send' && O.sent === O.z)) return xfEnd(O, 'done');
+  if (d === 'stop') return xfEnd(O, 'stopped');
+  xfEnd(O, 'err');
+}
+function xfClosed(X) {
+  if (X.done) return;
+  if (X.dir === 'out' && X.st === 'wait' && X.dc && X.dc.bufferedAmount === 0) return xfEnd(X, 'unsure');
+  xfEnd(X, X.open ? 'stopped' : 'fail');
+}
+async function xfPump(O) {   // the bytes, a slice of the file at a time, as fast as the channel takes them (never the whole file at once)
+  if (O.busy || O.done || O.st !== 'send' || !O.dc) return; O.busy = true;
+  const L = XF.lim, dc = O.dc;
+  try {
+    while (!O.done && O.sent < O.z && dc.readyState === 'open' && dc.bufferedAmount < L.HI) {
+      if (O.kind === 'n') { const e = Math.min(O.z, O.sent + L.CHUNK); dc.send(O.mu.subarray(O.sent, e)); O.sent = e; }
+      else { const a = O.sent, b = Math.min(O.z, a + L.SLICE); let ab;
+        try { ab = await O.file.slice(a, b).arrayBuffer(); } catch { O.busy = false; return xfEnd(O, 'unread'); }
+        if (O.done) break; if (ab.byteLength !== b - a) { O.busy = false; return xfEnd(O, 'unread'); }
+        for (let off = 0; off < ab.byteLength; off += L.CHUNK) dc.send(new Uint8Array(ab, off, Math.min(L.CHUNK, ab.byteLength - off)));
+        O.sent = b; }
+      O.due = performance.now() + XF.cfg.stall;
+    }
+  } catch { O.busy = false; return xfEnd(O, 'stopped'); }
+  O.busy = false;
+  if (!O.done && O.sent === O.z && O.st === 'send') { O.st = 'wait'; O.due = performance.now() + XF.cfg.ok; }
+  if (!O.done) xfDirty();
+}
+async function xfChunk(R, d) {   // each piece must be exactly the size it should be: anything else, and it is thrown away
+  if (R.done) return;
+  if (typeof d === 'string') return xfEnd(R, d === 'stop' ? 'stopped' : 'lied');
+  if (R.st !== 'recv' || !(d instanceof ArrayBuffer)) return xfEnd(R, 'lied');
+  const L = XF.lim, len = d.byteLength;
+  if (!len || len !== Math.min(L.CHUNK, R.z - R.got)) return xfEnd(R, 'lied');
+  R.buf.push(d); R.got += len; R.due = performance.now() + XF.cfg.stall;
+  if (R.buf.length === L.FOLD) { R.parts.push(new Blob(R.buf)); R.buf = []; }
+  if (R.got % (L.CHUNK * 16) === 0) xfDirty();
+  if (R.got !== R.z) return;
+  try { R.dc.send('ok'); } catch {}
+  R.st = 'kept';
+  const all = new Blob([...R.parts, ...R.buf], { type: 'application/octet-stream' });
+  let res = all; if (R.kind === 'n') { try { res = new Uint8Array(await all.arrayBuffer()); } catch { return xfEnd(R, 'err'); } }
+  if (!R.done) xfKeep(R, res);
+}
+function xfKeep(R, res) {
+  const at = Date.now(), it = R.kind === 'n' ? { t: R.t, kind: 'n', mu: res, rate: R.rate, ms: R.z / R.rate * 1000, from: R.name, pid: R.id, at, heard: false, saved: false, seenU: false }
+    : { t: R.t, kind: 'f', name: R.fname, ext: R.ext, word: R.word, risky: R.risky, z: R.z, blob: res, from: R.name, pid: R.id, at, saved: false, seenU: false };
+  XF.got.unshift(it); XF.unseen++;
+  const dc = R.dc, pc = R.pc; R.dc = R.pc = null; setTimeout(() => { try { dc && dc.close(); } catch {} try { pc && pc.close(); } catch {} }, 3000);   // (closed once the word that it arrived has gone)
+  xfEnd(R, 'done');
+  chatLine(`${R.name} → YOU`, R.kind === 'n' ? `voice note · ${xfClock(it.ms)}` : `file · ${it.name} · ${xfSize(it.z)}`, 'dm'); CH.to = R.name;
+  (audio.sfx.gift || audio.sfx.newcomer)?.();
+  if (R.kind === 'f') { XF.flash = { m: 'kept', it, until: performance.now() + 8000 }; return; }
+  if (xfCanPlay()) xfPlay(it, false);
+  else if (!muted && !REC.on && state === 'play' && !document.hidden) NOTE.pend = { it, until: performance.now() + XF.cfg.pend };
+  else xfSay(muted ? `A VOICE NOTE FROM ${it.from} · ${xfClock(it.ms)} · SOUND IS OFF · /files TO HEAR IT LATER` : REC.on ? `A VOICE NOTE FROM ${it.from} · ${xfClock(it.ms)} · IT WAITS WHILE YOU FILM · /files` : `A VOICE NOTE FROM ${it.from} · ${xfClock(it.ms)} · /files TO HEAR IT`);
+}
+const XF_SILENT = new Set(['lapsed', 'shun', 'sig0']);
+function xfLine(X, why, st) {   // the one line an ending earns, or none
+  const N = X.name, F = xfShort(X.fname || '', 28).toUpperCase(), note = X.kind === 'n';
+  if (XF_SILENT.has(why)) return null;
+  if (X.dir === 'out') return ({ done: [note ? `${N} HAS YOUR NOTE` : `${N} HAS IT · ${F}`, 1], no: [`${N} SAID NO`, 1], busy: [`${N} HAS TOO MUCH ARRIVING · TRY LATER`, 1],
+    big: [`TOO BIG FOR ${N} · ${X.x ? xfSize(X.x) + ' IS THE MOST THEY CAN TAKE' : 'THEY CANNOT TAKE IT'}`, 1], full: [`${N} HAS NO ROOM LEFT FOR IT`, 1], cant: [`${N}’S BROWSER CANNOT TAKE THINGS DIRECTLY`, 1],
+    net: [`COULD NOT REACH ${N} DIRECTLY · SOME NETWORKS DO NOT ALLOW IT · NOTHING WAS SENT`, 1], fail: [`COULD NOT REACH ${N} DIRECTLY · SOME NETWORKS DO NOT ALLOW IT · NOTHING WAS SENT`, 1],
+    none: [`NO ANSWER FROM ${N} · NOTHING WAS SENT`, 1], stopped: [`${N} STOPPED IT`, 1], stall: ['IT STOPPED MOVING · NOT SENT', 1], unsure: [`SENT · BUT ${N} NEVER SAID IT ARRIVED`, 1],
+    gone: [`${N} HAS GONE · NOT SENT`, 1], rekey: [`${N} CANNOT BE REACHED · THEY MAY HAVE LEFT AND COME BACK · SEND IT AGAIN`, 1], err: ['SOMETHING WENT WRONG ON THE WAY · NOT SENT', 1],
+    lied: ['SOMETHING WENT WRONG ON THE WAY · NOT SENT', 1], unread: ['THAT COULD NOT BE READ', 1], sig: [`${N} CANNOT BE REACHED YET · TRY AGAIN IN A MOMENT`, 1], mine: [X.open ? 'STOPPED' : 'TAKEN BACK', 0] })[why] || null;
+  if ((why === 'gone' || why === 'rekey') && st === 'offer') return null;
+  return ({ done: note ? null : [`${F} · KEPT UNTIL YOU LEAVE · /files`, 0], no: [`SENT AWAY · ${N}`, 0], off: [`${N} TOOK IT BACK`, 0], lied: ['WHAT ARRIVED WAS NOT WHAT WAS OFFERED · THROWN AWAY', 1],
+    stall: ['IT STOPPED COMING · THROWN AWAY', 1], stopped: [`${N} STOPPED IT · THROWN AWAY`, 1], mine: ['STOPPED · NOTHING KEPT', 0], fail: [`COULD NOT REACH ${N} DIRECTLY · SOME NETWORKS DO NOT ALLOW IT`, 1],
+    net: [`COULD NOT REACH ${N} DIRECTLY · SOME NETWORKS DO NOT ALLOW IT`, 1], gone: [`${N} HAS GONE · NOTHING ARRIVED`, 0], rekey: [`${N} CANNOT BE REACHED · THEY MAY HAVE LEFT AND COME BACK`, 0],
+    err: ['SOMETHING WENT WRONG ON THE WAY · NOTHING KEPT', 1], cant: ['THIS BROWSER CANNOT TAKE THINGS DIRECTLY', 1], full: ['NO ROOM FOR A NOTE · /files AND FORGET SOMETHING', 0] })[why] || null;
+}
+function xfEnd(X, why, tell) {   // the one way any transfer ends, whatever ended it
+  if (!X || X.done) return; X.done = true; X.why = why; const st = X.st, c = XF.cfg;
+  if (tell && !X.told) { X.told = true; const P = NET.peers.get(X.id); if (P && P.vk === X.vk) xfSig(P, 'no', { v: 1, t: X.t, r: tell }).catch(() => {}); }
+  try { X.dc && X.dc.close(); } catch {} try { X.pc && X.pc.close(); } catch {}
+  X.dc = X.pc = null; X.file = X.mu = null; X.buf = X.parts = null;
+  if (X.held) { XF.held = Math.max(0, XF.held - X.held); X.held = 0; }
+  (X.dir === 'out' ? XF.out : XF.in).delete(X.t); XF.q = XF.q.filter(x => x !== X);
+  if (X.dir === 'in' && st === 'offer' && !X.known && (why === 'no' || why === 'lapsed')) { const n = (XF.strikes.get(X.id) || 0) + 1; XF.strikes.set(X.id, n);
+    if (n >= c.strikes && !XF.deny.has(X.id)) { XF.deny.set(X.id, { why: 'strikes', name: X.name }); sysLine(`NOTHING MORE FROM ${X.name} WILL BE SHOWN THIS VISIT · /mute @${X.name} FOR GOOD`); } }
+  if (why === 'fail' || why === 'net') XF.unreach.set(X.id, performance.now() + c.unreach);
+  const L = xfLine(X, why, st); if (L) xfSay(L[0], !!L[1]);
+  if (why === 'done' && X.dir === 'out') XF.flash = { m: 'sent', name: X.name, until: performance.now() + 4000 };
+  xfDirty(); xfListDirty();
+  if (!XF.out.size && !XF.in.size) xfWatchOff();
+}
+function xfStop(X) {   // his own stop: before the channel opened it is said with one sealed word, after it on the channel itself
+  if (!X || X.done) return;
+  if (X.open && X.dc) { try { X.dc.send('stop'); } catch {} xfEnd(X, 'mine'); } else xfEnd(X, 'mine', 'off');
+}
+function xfWatchOn() { if (!XF.iv) XF.iv = setInterval(xfWatch, XF.cfg.watch); }
+function xfWatchOff() { if (XF.iv) { clearInterval(XF.iv); XF.iv = 0; } }
+const xfLate = X => X.dir === 'out' ? ({ ask: 'none', join: 'fail', send: 'stall', wait: 'unsure' })[X.st] || 'stall' : ({ offer: 'lapsed', call: 'fail', link: 'fail', recv: 'stall' })[X.st] || 'stall';
+function xfWatch() {   // (a clock of its own, not the frame: a hidden tab stops drawing but a transfer still has to time out)
+  const now = performance.now(), c = XF.cfg, L = XF.lim;
+  for (const X of [...XF.out.values(), ...XF.in.values()]) {
+    if (X.done) continue;
+    if (now - X.born > c.max) { xfEnd(X, 'stall'); continue; }
+    if (X.dir === 'out' && X.st === 'send' && X.dc) { const ba = X.dc.bufferedAmount; if (ba !== X.ba) { X.ba = ba; X.due = now + c.stall; } if (!X.busy && ba < L.LOW) xfPump(X); }
+    if (X.dir === 'out' && X.st === 'wait' && X.dc && X.dc.bufferedAmount > 0) X.due = now + c.ok;
+    if (now > X.due) xfEnd(X, xfLate(X));
+  }
+  if (!XF.out.size && !XF.in.size) xfWatchOff();
+}
+function xfGone(id) {
+  for (const X of [...XF.out.values(), ...XF.in.values()]) if (X.id === id && !X.open) xfEnd(X, 'gone');
+  if (NOTE.rec && NOTE.rec.id === id) xfRecEnd(false, `${NOTE.rec.name} HAS GONE · NOTE THROWN AWAY`);
+  if (NOTE.review && NOTE.review.id === id) { xfSay(`${NOTE.review.name} HAS GONE · NOTE THROWN AWAY`); NOTE.review = null; xfDirty(); }
+  if (XF.choose && XF.choose.id === id) XF.choose = null; if (XF.confirm && XF.confirm.id === id) XF.confirm = null;
+}
+function xfShun(P) {   // muted or blocked: everything with them ends at once, and nothing more comes from them this visit, whatever they call themselves
+  if (!P) return; XF.deny.set(P.id, { why: 'shun', name: P.name });
+  for (const X of [...XF.out.values(), ...XF.in.values()]) if (X.id === P.id) xfEnd(X, 'shun');
+  if (NOTE.play && NOTE.play.it.pid === P.id) xfNoteStop('shun');
+  if (NOTE.pend && NOTE.pend.it.pid === P.id) NOTE.pend = null;
+  if (NOTE.rec && NOTE.rec.id === P.id) xfRecEnd(false, 'NOTE THROWN AWAY');
+  if (NOTE.review && NOTE.review.id === P.id) { NOTE.review = null; xfDirty(); }
+}
+function xfUnshun(name) { for (const [id, d] of XF.deny) if (d.why === 'shun' && d.name === name) XF.deny.delete(id); }
+function xfRekey(id) { for (const X of [...XF.out.values(), ...XF.in.values()]) if (X.id === id && !X.open) xfEnd(X, 'rekey'); }
+function xfAllOff() {   // the page is going: every connection closed, everything kept let go
+  for (const X of [...XF.out.values(), ...XF.in.values()]) xfEnd(X, 'shun');
+  if (NOTE.rec) xfRecEnd(false, ''); NOTE.review = null; if (NOTE.play) xfNoteStop('off'); NOTE.pend = null;
+  for (const u of XF.urls) try { URL.revokeObjectURL(u); } catch {} XF.urls.clear(); XF.got = []; XF.q = []; XF.unseen = 0;
+}
+const xfShown = () => XF.q.find(R => !R.done && R.st === 'offer') || null;
+function xfAnswer(yes, typed) {   // yes or no to the offer showing; false if there is none
+  const R = xfShown(); if (!R) return false;
+  if (performance.now() - XF.armAt < (typed ? XF.cfg.armTyped : XF.cfg.arm)) return true;   // (just appeared: a press already on its way is not an answer to it)
+  if (yes) xfCall(R); else xfEnd(R, 'no', 'no');
+  return true;
+}
+function xfKey(yes) {   // Y and U: only while an offer is showing (and U stops a note that is playing); nothing else, ever
+  if (!yes && NOTE.play) { xfNoteStop('mine'); return true; }
+  if (XF.cardMode === 'offer' && xfShown()) { xfAnswer(yes, false); return true; }
+  return false;
+}
+async function xfOffer(P, src) {
+  const c = XF.cfg, L = XF.lim, now = performance.now(), why = xfCant(P); if (why) { xfSay(why, true); return false; }
+  const isNote = !(src instanceof Blob);
+  if (!isNote) { if (!src.size) { xfSay('THAT FILE IS EMPTY', true); return false; } if (src.size > L.FILE) { xfSay(`THAT IS TOO BIG · ${xfSize(L.FILE)} AT MOST`, true); return false; } }
+  else if (!(src.mu instanceof Uint8Array) || !Number.isInteger(src.rate) || src.rate < L.RATE_LO || src.rate > L.RATE_HI || src.mu.length < 0.4 * src.rate) { xfSay('THE NOTE COULD NOT BE MADE · WRITE IT INSTEAD', true); return false; }
+  XF.mine = XF.mine.filter(t => now - t < 60000);
+  if (now - XF.myLast < c.myGap || XF.mine.length >= c.myMin) { xfSay('SLOW DOWN A LITTLE', true); return false; }
+  if (xfBusy()) { xfSay('THE SKY IS BUSY · TRY AGAIN IN A MOMENT', true); return false; }
+  const nm = isNote ? null : xfName(src.name), kd = nm ? xfKind(nm.ext) : null;
+  const O = { t: xfTid(), dir: 'out', id: P.id, name: P.name, vk: P.vk, kind: isNote ? 'n' : 'f', fname: nm ? nm.name : '', ext: nm ? nm.ext : '', word: kd ? kd.word : '', z: isNote ? src.mu.length : src.size, rate: isNote ? src.rate : 0,
+    file: isNote ? null : src, mu: isNote ? src.mu : null, st: 'ask', due: now + c.ask, born: now, pc: null, dc: null, sent: 0, ba: -1, busy: false, told: false, done: false, open: false };
+  XF.out.set(O.t, O); XF.myLast = now; XF.mine.push(now); xfWatchOn();
+  try { await xfSig(P, 'ask', isNote ? { v: 1, t: O.t, k: 'n', z: O.z, r: O.rate } : { v: 1, t: O.t, k: 'f', n: O.fname, z: O.z }); }
+  catch { xfEnd(O, 'sig'); return false; }
+  XF.known.set(P.id, P.vk);
+  chatLine(`→ ${P.name}`, isNote ? `voice note · ${xfClock(O.z / O.rate * 1000)}` : `file · ${O.fname} · ${xfSize(O.z)}`, 'dm me'); CH.to = P.name;
+  if (!XF.told) { XF.told = true; sysLine('IT GOES STRAIGHT FROM YOU TO THEM · THEY WILL SEE YOUR NETWORK ADDRESS · NO SERVER KEEPS IT · NOT EVEN THE KEEPER SEES IT · THEY CAN SAVE IT'); }
+  (audio.sfx.whoosh || audio.sfx.ui)?.(true); xfDirty(); return true;
+}
+// ── recording a note: the microphone the game already has, read sample by sample (nothing else hears it while it is made)
+const XF_TAP = `class T extends AudioWorkletProcessor { constructor() { super(); this.n = 0; this.b = new Float32Array(Math.round(sampleRate / 4));
+  this.port.onmessage = () => { this.port.postMessage(this.b.slice(0, this.n)); this.n = 0; this.port.postMessage('done'); }; }
+  process(ins) { const c = ins[0] && ins[0][0]; if (c) for (let i = 0; i < c.length; i++) { this.b[this.n++] = c[i]; if (this.n === this.b.length) { this.port.postMessage(this.b, [this.b.buffer]); this.b = new Float32Array(this.b.length); this.n = 0; } } return true; } }
+registerProcessor('xf-tap', T);`;
+function xfTapLoad() {
+  if (!AC || !AC.audioWorklet) return Promise.resolve(false);
+  if (!XF.tapP || XF.tapCtx !== AC) { XF.tapCtx = AC; const u = URL.createObjectURL(new Blob([XF_TAP], { type: 'application/javascript' })); XF.tapP = AC.audioWorklet.addModule(u).then(() => true, () => false).finally(() => URL.revokeObjectURL(u)); }
+  return XF.tapP;
+}
+const xfSleep = ms => new Promise(r => setTimeout(r, ms));
+async function xfRecStart(P) {   // (called inside his press: the browser may ask for the microphone now and only now)
+  if (NOTE.rec || NOTE.review || NOTE.wait || NOTE.pack || state !== 'play') return;
+  const why = xfCant(P); if (why) return xfSay(why, true);
+  if (!AC) initAudio();
+  if (!AC || !(AC.audioWorklet || AC.createScriptProcessor)) return xfSay('THIS BROWSER CANNOT RECORD A NOTE · WRITE IT INSTEAD', true);
+  if (mic.denied) return xfSay('THE MICROPHONE IS BLOCKED · ALLOW IT IN THIS SITE’S SETTINGS', true);
+  if (NOTE.play) xfNoteStop('mine');
+  audio.resume();
+  const W = { id: P.id, name: P.name, vk: P.vk };
+  XF.choose = null;
+  if (!mic.stream) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return xfSay('THIS BROWSER CANNOT RECORD A NOTE · WRITE IT INSTEAD', true);
+    startEar();
+    const w = NOTE.wait = { ...W, t0: performance.now() }; xfDirty();
+    while (NOTE.wait === w && !mic.stream && !mic.denied && performance.now() - w.t0 < 12000) await xfSleep(250);
+    if (NOTE.wait !== w) return; NOTE.wait = null; xfDirty();
+    if (mic.denied) return xfSay('THE MICROPHONE IS BLOCKED · ALLOW IT IN THIS SITE’S SETTINGS', true);
+    if (!mic.stream) return xfSay('NO MICROPHONE · WRITE IT INSTEAD', true);
+  }
+  if (AC.state !== 'running') { await xfSleep(300); if (AC.state !== 'running') return xfSay('NO SOUND YET · PRESS AGAIN', true); }
+  if (NOTE.rec || NOTE.review || state !== 'play') return;
+  const tr = mic.stream.getAudioTracks()[0];
+  if (!tr || tr.readyState !== 'live') return xfSay('NO MICROPHONE · WRITE IT INSTEAD', true);
+  if (tr.muted) return xfSay('THE MICROPHONE HAS GONE QUIET · WRITE IT INSTEAD', true);
+  const Q = NET.peers.get(W.id); if (!Q || Q.vk !== W.vk) return xfSay(`${W.name} HAS GONE · NOT SENT`, true);
+  let src = null; try { src = tr.clone(); src.enabled = true; } catch { src = null; }   // (a copy of the track: the one shared with calls and the game's ears is never turned on for this)
+  if (!src && VC.muted) return xfSay('MIC OFF · TURN IT ON TO RECORD A NOTE · /mic', true);
+  const q = Math.max(1, Math.ceil(AC.sampleRate / 24000)), rate = Math.round(AC.sampleRate / q);
+  if (rate < XF.lim.RATE_LO) { try { src && src.stop(); } catch {} return xfSay('THIS BROWSER CANNOT RECORD A NOTE · WRITE IT INSTEAD', true); }
+  const R = NOTE.rec = { ...W, t0: performance.now(), q, rate, parts: [], n: 0, sum: 0, peak: 0, lv: 0, acc: 0, accN: 0, shared: tr, track: src || tr, cloned: !!src, s: null, node: null, sink: null, back: 0, lost: null, ending: false, flushed: null };
+  hushOn();
+  R.back = setTimeout(() => { if (NOTE.rec === R) xfRecEnd(false, 'NOTE THROWN AWAY'); }, XF.cfg.noteBack);   // (however it went wrong, the game is never left deaf)
+  R.lost = () => { if (NOTE.rec === R) xfRecEnd(false, 'NO MICROPHONE · WRITE IT INSTEAD'); };
+  for (const t of new Set([tr, R.track])) { t.addEventListener('ended', R.lost); t.addEventListener('mute', R.lost); }
+  try {
+    R.s = AC.createMediaStreamSource(new MediaStream([R.track]));
+    const w = await xfTapLoad(); if (NOTE.rec !== R) return;
+    if (w) { R.node = new AudioWorkletNode(AC, 'xf-tap', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+      R.node.port.onmessage = e => { if (e.data === 'done') { if (R.flushed) R.flushed(); } else if (e.data instanceof Float32Array) xfRecBatch(R, e.data); };
+      R.node.onprocessorerror = () => { if (NOTE.rec === R) xfRecEnd(false, 'THE NOTE COULD NOT BE MADE · WRITE IT INSTEAD'); }; }
+    else { R.node = AC.createScriptProcessor(4096, 1, 1); R.node.onaudioprocess = e => { if (NOTE.rec === R) xfRecBatch(R, new Float32Array(e.inputBuffer.getChannelData(0))); }; }
+    R.sink = AC.createGain(); R.sink.gain.value = 0; R.s.connect(R.node); R.node.connect(R.sink); R.sink.connect(audio.master || AC.destination);   // (pulled, so it runs; at nothing, so it is never heard)
+  } catch { if (NOTE.rec === R) xfRecEnd(false, 'THE NOTE COULD NOT BE MADE · WRITE IT INSTEAD'); return; }
+  audio.sfx.ui?.(); xfDirty();
+}
+function xfRecBatch(R, f) {
+  if (NOTE.rec !== R) return;
+  const q = R.q, max = Math.round(R.rate * XF.cfg.noteMax / 1000), out = new Float32Array(Math.ceil((f.length + R.accN) / q) + 1);
+  let acc = R.acc, an = R.accN, k = 0, s2 = 0, pk = R.peak;
+  for (let i = 0; i < f.length; i++) { acc += f[i]; if (++an === q) { const v = acc / q; out[k++] = v; acc = 0; an = 0; } }
+  R.acc = acc; R.accN = an;
+  const take = Math.min(k, Math.max(0, max - R.n)), piece = out.slice(0, take);
+  for (let i = 0; i < take; i++) { const v = piece[i]; s2 += v * v; const a = v < 0 ? -v : v; if (a > pk) pk = a; }
+  if (take) { R.parts.push(piece); R.n += take; R.sum += s2; R.peak = pk; }
+  R.lv = clamp(Math.sqrt(s2 / Math.max(1, take)) / 0.14, 0, 1);
+  if (R.n >= max) xfRecFull(R);
+}
+function xfRecStop(R) {
+  clearTimeout(R.back);
+  try { R.s && R.s.disconnect(); } catch {} try { if (R.node) { R.node.disconnect(); R.node.onaudioprocess = null; if (R.node.port) R.node.port.onmessage = null; } } catch {} try { R.sink && R.sink.disconnect(); } catch {}
+  for (const t of new Set([R.shared, R.track])) try { t.removeEventListener('ended', R.lost); t.removeEventListener('mute', R.lost); } catch {}
+  if (R.cloned) try { R.track.stop(); } catch {}   // (the copy, never the shared track)
+}
+function xfRecFull(R) {   // a minute: it stops by itself and waits to be sent or thrown away
+  if (NOTE.rec !== R) return;
+  try { xfRecStop(R); } finally { NOTE.rec = null; hushOff(); }
+  NOTE.review = { id: R.id, name: R.name, vk: R.vk, parts: R.parts, n: R.n, rate: R.rate, sum: R.sum, peak: R.peak, until: performance.now() + XF.cfg.review }; xfDirty();
+}
+async function xfRecEnd(send, line) {
+  const R = NOTE.rec; if (!R || R.ending) return; R.ending = true;
+  if (send && R.node && R.node.port) await new Promise(res => { R.flushed = res; try { R.node.port.postMessage('flush'); } catch { res(); } setTimeout(res, 300); });   // (the last few samples)
+  if (NOTE.rec !== R) return;
+  try { xfRecStop(R); } finally { NOTE.rec = null; hushOff(); }
+  if (!send) { if (line) xfSay(line, true); xfDirty(); return; }
+  xfSendNote({ id: R.id, name: R.name, vk: R.vk, parts: R.parts, n: R.n, rate: R.rate, sum: R.sum, peak: R.peak });
+}
+async function xfSendNote(T) {
+  NOTE.review = null;
+  if (T.n / T.rate * 1000 < XF.cfg.noteMin) { xfSay('TOO SHORT TO SEND', true); xfDirty(); return; }
+  NOTE.pack = true; xfDirty(); let mu = null;
+  try { mu = await xfPack(T); } catch { mu = null; }
+  NOTE.pack = false; xfDirty();
+  if (!mu) return xfSay('THE NOTE COULD NOT BE MADE · WRITE IT INSTEAD', true);
+  const P = NET.peers.get(T.id); if (!P || P.vk !== T.vk) return xfSay(`${T.name} HAS GONE · NOTE THROWN AWAY`, true);
+  xfOffer(P, { mu, rate: T.rate });
+}
+const MU_DEC = (() => { const t = new Float32Array(256); for (let i = 0; i < 256; i++) { const u = ~i & 0xff, e = (u >> 4) & 7, m = u & 15, s = (((m << 3) + 0x84) << e) - 0x84; t[i] = (u & 0x80 ? -s : s) / 32768; } return t; })();
+function muEnc1(x) { let s = Math.round(clamp(x, -1, 1) * 32635); const sign = s < 0 ? 0x80 : 0; if (s < 0) s = -s; s += 0x84; let e = 7; for (let m = 0x4000; (s & m) === 0 && e > 0; m >>= 1) e--; return ~(sign | (e << 4) | ((s >> (e + 3)) & 15)) & 0xff; }
+function muEnc(f, g = 1) { const o = new Uint8Array(f.length); for (let i = 0; i < f.length; i++) o[i] = muEnc1(f[i] * g); return o; }
+function muDec(u) { const o = new Float32Array(u.length); for (let i = 0; i < u.length; i++) o[i] = MU_DEC[u[i]]; return o; }
+async function xfPack(T) {   // levelled to a speaking voice (never louder than it can be without clipping), then a byte a sample
+  const rms = Math.sqrt(T.sum / Math.max(1, T.n)) || 1e-4; let g = clamp(0.1 / rms, 0.5, 4); g = Math.min(g, 0.98 / Math.max(T.peak, 1e-4));
+  const out = new Uint8Array(T.n); let o = 0, since = 0;
+  for (const p of T.parts) { for (let i = 0; i < p.length; i++) out[o++] = muEnc1(p[i] * g); if ((since += p.length) >= 131072) { since = 0; await xfYield(); } }
+  return out;
+}
+function hushOn() {   // while a note is made or played: no listening for orders, nothing recorded for the game, his voice off every call
+  if (mic.rec) { try { mic.rec.abort(); } catch {} mic.rec = null; }
+  ear.hush?.();
+  for (const V of VC.pcs.values()) if (V.tr && V.sendT) { V.sendT = null; V.tr.sender.replaceTrack(null).catch(() => {}); }
+}
+function hushOff() {
+  if (hushed()) return;
+  mic.quietUntil = Math.max(mic.quietUntil, performance.now() + 1500);   // (what the recogniser was still holding, and the tail of the note in the room, is not an order)
+  ear.wake?.(); VC.t = 0; startMic();
+}
+// ── a note arriving, and playing: from the bird, if it came
+const xfCanPlay = () => !muted && !document.hidden && state === 'play' && !!AC && AC.state === 'running' && !!audio.voiceBus && !voiceSrc && !dlg.cur && !dlg.queue.length && !NOTE.rec && !NOTE.review && !NOTE.wait && !NOTE.play && !REC.on;
+async function xfNoteBuf(it) {
+  const n = it.mu.length, f = new Float32Array(n); let s2 = 0, pk = 0;
+  for (let i = 0; i < n; i += 131072) { const e = Math.min(n, i + 131072); for (let j = i; j < e; j++) { const v = MU_DEC[it.mu[j]]; f[j] = v; s2 += v * v; const a = v < 0 ? -v : v; if (a > pk) pk = a; } if (e < n) await xfYield(); }
+  const rms = Math.sqrt(s2 / Math.max(1, n)) || 1e-4, gain = Math.min(clamp(0.1 / rms, 0.5, 3), 0.9 / Math.max(pk, 1e-4));   // (levelled here: what the sender says it did is not trusted)
+  const step = Math.max(1, Math.round(it.rate / 20)), env = new Float32Array(Math.ceil(n / step));
+  for (let k = 0; k < env.length; k++) { let e = 0; const a = k * step, b = Math.min(n, a + step); for (let j = a; j < b; j++) e += f[j] * f[j]; env[k] = clamp(Math.sqrt(e / Math.max(1, b - a)) * gain / 0.14, 0, 1); }
+  let buf = null;
+  try { buf = AC.createBuffer(1, n, it.rate); buf.copyToChannel(f, 0); }
+  catch { const k = Math.ceil(22050 / it.rate); try { buf = AC.createBuffer(1, n * k, it.rate * k); const d = buf.getChannelData(0); for (let j = 0; j < n * k; j++) { const x = j / k, a = Math.floor(x), t = x - a; d[j] = f[a] + ((a + 1 < n ? f[a + 1] : f[a]) - f[a]) * t; } } catch { buf = null; } }
+  return buf ? { buf, env, gain } : null;
+}
+async function xfPlay(it, pressed) {
+  if (!it || it.kind !== 'n' || !it.mu) return false;
+  if (pressed) {
+    if (REC.on) { xfSay('STOP FILMING FIRST · A NOTE IS NEVER FILMED', true); return false; }
+    if (muted) { xfSay(TOUCH ? 'YOUR SOUND IS OFF · THE MENU TURNS IT ON' : 'YOUR SOUND IS OFF · P TURNS IT ON', true); return false; }
+    if (NOTE.rec || NOTE.review || NOTE.wait) return false;
+    if (!AC) initAudio(); audio.resume();
+    if (!AC || AC.state !== 'running') { await xfSleep(300); if (!AC || AC.state !== 'running') { xfSay('NO SOUND YET · PRESS AGAIN', true); return false; } }
+    if (NOTE.play) xfNoteStop('mine');
+  } else if (!xfCanPlay()) return false;
+  if (!audio.voiceBus) return false;
+  NOTE.pend = null;
+  const nb = await xfNoteBuf(it);
+  if (!nb) { xfSay('THAT NOTE CANNOT BE PLAYED HERE · IT CAN STILL BE SAVED', true); return false; }
+  if (NOTE.play || NOTE.rec || !XF.got.includes(it) || (!pressed && !xfCanPlay())) return false;
+  const src = AC.createBufferSource(); src.buffer = nb.buf; const g = AC.createGain(); g.gain.value = nb.gain; const pan = AC.createStereoPanner ? AC.createStereoPanner() : null;
+  src.connect(g); if (pan) g.connect(pan).connect(audio.voiceBus); else g.connect(audio.voiceBus);   // (through the voices' bus: under the game's own mute, and the score makes room for it)
+  const P = NET.peers.get(it.pid), dur = it.ms / 1000, flew = !!(P && P.pos && courier(P, `VOICE NOTE · ${xfClock(it.ms)}`, { hold: Math.min(62, dur + 0.6) })), lead = flew ? 1.5 : 0, t0 = AC.currentTime + lead;
+  src.start(t0);
+  const N = NOTE.play = { it, src, g, pan, gain: nb.gain, env: nb.env, flew, t0, dur, timer: 0 };
+  N.timer = setTimeout(() => { if (NOTE.play === N) xfNoteStop('end'); }, (lead + dur + 0.5) * 1000);   // (for browsers whose audio clock stands still)
+  src.onended = () => { if (NOTE.play === N) xfNoteStop('end'); };
+  hushOn();
+  if (!it.seenU) { it.seenU = true; XF.unseen = Math.max(0, XF.unseen - 1); }
+  xfDirty(); xfListDirty(); return true;
+}
+function xfNoteStop(why) {
+  const N = NOTE.play; if (!N) return; NOTE.play = null;
+  clearTimeout(N.timer); N.src.onended = null;
+  try { const t = AC.currentTime; N.g.gain.cancelScheduledValues(t); N.g.gain.setTargetAtTime(0, t, 0.02); N.src.stop(t + 0.1); } catch { try { N.src.stop(); } catch {} }
+  setTimeout(() => { try { N.src.disconnect(); N.g.disconnect(); N.pan && N.pan.disconnect(); } catch {} }, 200);
+  if (N.flew) courierRelease();
+  if (COUR.bird) COUR.bird.head.rotation.x = 0;
+  if (why === 'end') { N.it.heard = true; XF.flash = { m: 'ended', it: N.it, until: performance.now() + 8000 }; }
+  hushOff(); xfDirty(); xfListDirty();
+}
+function xfWav(it) {   // a note saved: sixteen-bit sound anything can open
+  const n = it.mu.length, b = new ArrayBuffer(44 + n * 2), v = new DataView(b), w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, it.rate, true); v.setUint32(28, it.rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, Math.round(MU_DEC[it.mu[i]] * 32768))), true);
+  return new Blob([b], { type: 'audio/wav' });
+}
+// ── the card (bottom right) and the list of what has been brought
+function xfChoose(P) { const why = xfCant(P); if (why) return xfSay(why, true); XF.choose = { id: P.id, name: P.name, vk: P.vk, until: performance.now() + 20000 }; xfDirty(); }
+function xfPickFor(P) { XF.pickFor = P.id; XF.choose = null; const i = $('xfPick'); i.value = ''; i.click(); }
+function xfConfirm(P, file) {
+  if (!file.size) return xfSay('THAT FILE IS EMPTY', true); if (file.size > XF.lim.FILE) return xfSay(`THAT IS TOO BIG · ${xfSize(XF.lim.FILE)} AT MOST`, true);
+  XF.confirm = { id: P.id, name: P.name, vk: P.vk, file, fname: xfName(file.name).name, until: performance.now() + 60000 }; XF.choose = null; xfDirty();
+}
+function xfNoteCmd(arg) {
+  if (NOTE.rec) return void xfRecEnd(true);
+  if (NOTE.review) return void xfSendNote(NOTE.review);
+  const P = xfWho(arg, 'note'); if (!P) return; const why = xfCant(P); if (why) return xfSay(why, true);
+  xfRecStart(P);
+}
+function xfFileCmd(arg) { const P = xfWho(arg, 'file'); if (!P) return; const why = xfCant(P); if (why) return xfSay(why, true); xfPickFor(P); }
+function xfFilesCmd(low) { if (low === 'off') { XF.off = true; xfSay('TAKING NOTHING FROM ANYONE · /files on'); } else if (low === 'on') { XF.off = false; xfSay('TAKING NOTES AND FILES AGAIN'); } else xfList(!XF.open); }
+function xfCardSpec() {   // what the card shows now: the first of these that applies
+  const now = performance.now(), R0 = NOTE.rec, V = NOTE.review, W = NOTE.wait, D = XF.desk = !TOUCH;
+  if (R0) return { m: 'rec', lines: [`Note for ${R0.name}`, `${xfClock(R0.n / R0.rate * 1000)} of 1:00`, D ? 'enter sends · esc throws it away' : ''], bar: R0.lv, btns: [['rsend', 'send'], ['rthrow', 'throw away']] };
+  if (V) return { m: 'review', lines: [`Note for ${V.name} · ${xfClock(V.n / V.rate * 1000)}`, 'That is as long as a note can be'], btns: [['rsend', 'send'], ['rthrow', 'throw away']] };
+  if (NOTE.pack) return { m: 'pack', lines: ['Getting the note ready'], btns: [] };
+  if (W) return { m: 'wait', lines: ['Waiting for the microphone'], btns: [['mwx', 'never mind']] };
+  const C = XF.confirm; if (C && now < C.until) return { m: 'confirm', lines: [`Send ${xfShort(C.fname, 34)} (${xfSize(C.file.size)}) to ${C.name}?`], btns: [['csend', 'send'], ['cno', 'no']] };
+  const H = XF.choose; if (H && now < H.until) return { m: 'choose', lines: [`Send ${H.name}`], btns: [['note', 'voice note'], ['file', 'file'], ['x', 'never mind']] };
+  const R = xfShown();
+  if (R) { const more = XF.q.filter(x => x.st === 'offer').length - 1;
+    return { m: 'offer', t: R.t, lines: [R.kind === 'n' ? `${R.name} has a voice note for you` : `${R.name} has a file for you`, R.known ? '' : 'new to you', R.kind === 'n' ? xfClock(R.z / R.rate * 1000) : xfShort(R.fname, 34), R.kind === 'n' ? '' : `${xfSize(R.z)} · ${R.word}`,
+      R.risky ? 'This kind of file can run things on a computer. Take it only from someone you know.' : '', XF.toldIn ? '' : `Taking it shows ${R.name} your network address`, more > 0 ? `${more} more waiting` : '', D ? 'y takes it · u says no' : ''],
+      btns: [['take', R.kind === 'n' ? 'hear it' : 'take it'], ['no', 'no'], ['mute', 'mute']] }; }
+  for (const X of XF.in.values()) if (X.st !== 'offer' && !X.done) { const what = X.kind === 'n' ? `Voice note · ${xfClock(X.z / X.rate * 1000)}` : xfShort(X.fname, 34);
+    return X.st === 'recv' ? { m: 'in', lines: [X.kind === 'n' ? what : `${what} · ${xfSize(X.got)} of ${xfSize(X.z)}`, `from ${X.name}`], bar: X.got / X.z, btns: [['istop', 'stop']], x: X.t } : { m: 'in', lines: [what, `Reaching ${X.name}`], btns: [['istop', 'stop']], x: X.t }; }
+  for (const X of XF.out.values()) if (!X.done) { const what = X.kind === 'n' ? `Voice note · ${xfClock(X.z / X.rate * 1000)}` : `${xfShort(X.fname, 34)} · ${xfSize(X.z)}`;
+    if (X.st === 'ask') return { m: 'out', lines: [what, `Waiting for ${X.name} to take it`], btns: [['ostop', 'take it back']], x: X.t };
+    if (X.st === 'join') return { m: 'out', lines: [`Reaching ${X.name}`], btns: [['ostop', 'stop']], x: X.t };
+    return { m: 'out', lines: [X.kind === 'n' ? what : `${xfShort(X.fname, 34)} · ${xfSize(X.sent)} of ${xfSize(X.z)}`, `to ${X.name}`], bar: X.sent / X.z, btns: [['ostop', 'stop']], x: X.t }; }
+  const N = NOTE.play; if (N && AC) { const el = clamp(AC.currentTime - N.t0, 0, N.dur); return { m: 'play', lines: [`${N.it.from} · voice note · ${xfClock(el * 1000)} of ${xfClock(N.dur * 1000)}`], bar: el / Math.max(0.1, N.dur), btns: [['pstop', 'stop']] }; }
+  const F = XF.flash; if (F && now < F.until) {
+    if (F.m === 'kept' && XF.got.includes(F.it)) return { m: 'kept', lines: [`${xfShort(F.it.name, 34)} · kept until you leave`], btns: [['fsave', TOUCH ? 'share' : 'download'], ['fx', 'later']] };
+    if (F.m === 'ended' && XF.got.includes(F.it)) return { m: 'ended', lines: [`${F.it.from} · voice note · ${xfClock(F.it.ms)}`], btns: [['again', 'again'], ['fx', 'done']] };
+    if (F.m === 'sent') return { m: 'sent', lines: [`${F.name} has it`], btns: [] }; }
+  return null;
+}
+function xfCardDraw() {
+  const el = $('xfCard'); if (!el) return;
+  const S = state === 'play' ? xfCardSpec() : null; XF.cardMode = S ? S.m : '';
+  el.classList.toggle('on', !!S); if (!S) { XF.cardKey = ''; return; }
+  const lines = S.lines.filter(Boolean), key = S.m + '|' + lines.length + '|' + S.btns.map(b => b[0] + b[1]).join(',') + '|' + (S.bar != null);
+  if (key !== XF.cardKey) { XF.cardKey = key; el.textContent = '';
+    for (let i = 0; i < lines.length; i++) { const p = document.createElement('div'); p.className = i ? 'xl' : 'xh'; el.append(p); }
+    if (S.bar != null) { const b = document.createElement('div'); b.className = 'xb'; b.append(document.createElement('i')); el.append(b); }
+    if (S.btns.length) { const r = document.createElement('div'); r.className = 'xr'; for (const [a, t] of S.btns) { const b = document.createElement('button'); b.type = 'button'; b.dataset.a = a; b.textContent = t; r.append(b); } el.append(r); } }
+  const ps = el.querySelectorAll('.xh, .xl'); lines.forEach((t, i) => { if (ps[i] && ps[i].textContent !== t) ps[i].textContent = t; });
+  if (S.bar != null) el.querySelector('.xb i').style.transform = `scaleX(${clamp(S.bar, 0, 1).toFixed(3)})`;
+  if (S.m === 'offer') { const sig = S.t + '|' + lines.join('|'); if (XF.armT !== sig) { XF.armT = sig; XF.armAt = performance.now(); } }   // (anything about it changed: a moment before it can be taken)
+  const tk = el.querySelector('[data-a="take"]'); if (tk) tk.disabled = performance.now() - XF.armAt < XF.cfg.arm;
+}
+function xfList(on) { XF.open = !!on && (state === 'play' || state === 'map' || state === 'photo'); $('xfList').classList.toggle('on', XF.open); if (XF.open) { XF.unseen = 0; for (const it of XF.got) it.seenU = true; XF.listDirty = true; xfListDraw(); } }
+function xfAgo(at) { const s = (Date.now() - at) / 1000; return s < 60 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; }
+function xfListDraw() {
+  const el = $('xfList'); if (!el) return; XF.listDirty = false; XF.listT = 20; el.textContent = '';
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const top = mk('div', 'xt'); top.append(mk('span', '', `BROUGHT TO YOU · ${XF.got.length} · GONE WHEN YOU LEAVE`)); const x = mk('button', 'xx', 'close'); x.type = 'button'; x.dataset.a = 'close'; top.append(x); el.append(top);
+  if (!XF.got.length) el.append(mk('div', 'xe', 'nothing has been brought to you yet'));
+  XF.got.forEach((it, i) => { const r = mk('div', 'xi');
+    r.append(mk('div', 'xn', it.kind === 'n' ? `Voice note · ${xfClock(it.ms)}${it.heard ? '' : ' · new'}` : xfShort(it.name, 34)));
+    r.append(mk('div', 'xm', it.kind === 'n' ? `from ${it.from} · ${xfAgo(it.at)}` : `${xfSize(it.z)} · ${it.word} · from ${it.from} · ${xfAgo(it.at)}`));
+    const bs = mk('div', 'xr'), btn = (a, t) => { const b = mk('button', '', t); b.type = 'button'; b.dataset.a = a; b.dataset.i = String(i); bs.append(b); };
+    if (it.kind === 'n') btn('play', NOTE.play && NOTE.play.it === it ? 'stop' : 'play');
+    btn('save', TOUCH ? 'share' : 'download'); btn('forget', 'forget'); r.append(bs); el.append(r); });
+  el.append(mk('div', 'xf', 'sent straight from them to you · kept only in this page · /files off takes nothing from anyone'));
+}
+function xfSave(it, btn) {
+  if (!it) return false;
+  if (it.kind === 'f' && it.risky && btn && !btn.classList.contains('sure')) { btn.classList.add('sure'); btn.textContent = 'download anyway?'; return false; }
+  const d = new Date(it.at), stamp = String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+  const name = it.kind === 'n' ? xfName(`note-from-${it.from.toLowerCase().replace(/ /g, '-')}-${stamp}.wav`).name : xfName(it.name).name, blob = it.kind === 'n' ? xfWav(it) : it.blob;
+  if (TOUCH && navigator.canShare) { const f = new File([blob], name, { type: it.kind === 'n' ? 'audio/wav' : xfMime(it.ext) }); if (navigator.canShare({ files: [f] })) { navigator.share({ files: [f] }).catch(e => { if (e && e.name !== 'AbortError') xfSay('THAT COULD NOT BE SHARED', true); }); it.saved = true; return true; } }
+  if (INAPP || TOUCH && !('download' in document.createElement('a'))) { xfSay('NOTHING CAN BE SAVED INSIDE THIS APP · OPEN THE GAME IN YOUR BROWSER', true); return false; }
+  const u = URL.createObjectURL(it.kind === 'n' ? blob : new Blob([blob], { type: 'application/octet-stream' })); XF.urls.add(u);   // (never opened, never shown: only handed to the browser to save)
+  const a = document.createElement('a'); a.href = u; a.download = name; a.rel = 'noopener'; a.click();
+  setTimeout(() => { try { URL.revokeObjectURL(u); } catch {} XF.urls.delete(u); }, XF.cfg.revoke);
+  it.saved = true; return true;
+}
+function xfForget(it, btn) {
+  if (!it) return; if (btn && !btn.classList.contains('sure')) { btn.classList.add('sure'); btn.textContent = 'forget for good?'; return; }
+  if (NOTE.play && NOTE.play.it === it) xfNoteStop('mine'); if (NOTE.pend && NOTE.pend.it === it) NOTE.pend = null;
+  XF.got = XF.got.filter(x => x !== it); it.mu = it.blob = null; xfListDirty(); xfDirty();
+}
+function xfTick(dt) {
+  const N = NOTE.play;
+  if (N) { if (state === 'talk' || state === 'prologue' || state === 'end' || state === 'title') xfNoteStop('state');
+    else if (AC) { let pn = 0.3, f = 1;
+      if (COUR.on && COUR.bird && COUR.bird.group.visible) { const G = COUR.bird.group.position; camera.getWorldDirection(_n); const rx = -_n.z, rz = _n.x, rl = Math.hypot(rx, rz) || 1, dx = G.x - camera.position.x, dz = G.z - camera.position.z, l = Math.hypot(dx, dz) || 1;
+        pn = clamp((dx * rx + dz * rz) / (l * rl), -0.9, 0.9); f = lerp(1, 0.45, clamp((player.pos.distanceTo(G) - 10) / 180, 0, 1)); }
+      N.g.gain.setTargetAtTime(N.gain * f * (voiceSrc ? 0.35 : 1), AC.currentTime, 0.08); if (N.pan) N.pan.pan.setTargetAtTime(pn, AC.currentTime, 0.08);
+      if (COUR.on && COUR.bird) { const lv = clamp(N.env[Math.floor((AC.currentTime - N.t0) * 20)] || 0, 0, 1), h = COUR.bird.head; h.rotation.x = lerp(h.rotation.x, -0.1 - 0.4 * lv, damp(14, dt)); } } }   // (the bird nods along with the voice)
+  if (NOTE.pend) { const it = NOTE.pend.it; if (!XF.got.includes(it)) NOTE.pend = null; else if (xfCanPlay()) { NOTE.pend = null; xfPlay(it, false); } else if (performance.now() > NOTE.pend.until) { NOTE.pend = null; xfSay(`A VOICE NOTE FROM ${it.from} · ${xfClock(it.ms)} · /files TO HEAR IT`); } }
+  if (NOTE.rec && state !== 'play') xfRecEnd(false, 'NOTE THROWN AWAY');
+  if (NOTE.review && performance.now() > NOTE.review.until) { NOTE.review = null; xfSay('NOTE THROWN AWAY'); xfDirty(); }
+  if (XF.open && state !== 'play' && state !== 'map' && state !== 'photo') xfList(false);
+  if (XF.open && (XF.listDirty || (XF.listT -= dt) <= 0)) xfListDraw();
+  if ((XF.cardT -= dt) <= 0) { XF.cardT = 0.25; xfCardDraw(); }
+}
+{ const swallow = el => { for (const ev of ['pointerdown', 'pointerup', 'touchstart']) el.addEventListener(ev, e => e.stopPropagation(), { passive: true }); };
+  const card = $('xfCard'), list = $('xfList'), pick = $('xfPick'); swallow(card); swallow(list);
+  card.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (!b) return; e.stopPropagation(); b.blur(); const a = b.dataset.a, S = xfCardSpec();
+    if (a === 'rsend') { if (NOTE.rec) xfRecEnd(true); else if (NOTE.review) xfSendNote(NOTE.review); }
+    else if (a === 'rthrow') { if (NOTE.rec) xfRecEnd(false, 'NOTE THROWN AWAY'); else if (NOTE.review) { NOTE.review = null; xfSay('NOTE THROWN AWAY'); } }
+    else if (a === 'mwx') NOTE.wait = null;
+    else if (a === 'csend') { const C = XF.confirm; XF.confirm = null; const P = C && NET.peers.get(C.id); if (!C) {} else if (!P || P.vk !== C.vk) xfSay(`${C.name} HAS GONE · NOT SENT`, true); else xfOffer(P, C.file); }
+    else if (a === 'cno') XF.confirm = null;
+    else if (a === 'note' || a === 'file') { const H = XF.choose, P = H && NET.peers.get(H.id); if (!P || P.vk !== H.vk) { XF.choose = null; xfSay(`${H ? H.name : 'THEY'} HAS GONE`, true); } else if (a === 'note') xfRecStart(P); else xfPickFor(P); }
+    else if (a === 'x') XF.choose = null;
+    else if (a === 'take' || a === 'no') { if (!b.disabled) xfAnswer(a === 'take', false); }
+    else if (a === 'mute') { const R = xfShown(); if (R) shun(R.name, 'mute', true); }
+    else if (a === 'istop' || a === 'ostop') { const X = (a === 'istop' ? XF.in : XF.out).get(S && S.x); if (X) xfStop(X); }
+    else if (a === 'pstop') xfNoteStop('mine');
+    else if (a === 'fsave') { const F = XF.flash; if (F && F.it) xfSave(F.it, b); XF.flash = null; }
+    else if (a === 'again') { const F = XF.flash; XF.flash = null; if (F && F.it) xfPlay(F.it, true); }
+    else if (a === 'fx') XF.flash = null;
+    xfDirty(); xfCardDraw(); });
+  list.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (!b) return; e.stopPropagation(); b.blur(); const a = b.dataset.a, it = XF.got[+b.dataset.i];
+    if (a === 'close') xfList(false); else if (a === 'play') { if (NOTE.play && NOTE.play.it === it) xfNoteStop('mine'); else xfPlay(it, true); } else if (a === 'save') { if (xfSave(it, b)) xfListDirty(); } else if (a === 'forget') xfForget(it, b); });
+  pick.addEventListener('change', () => { const fs = pick.files, P = NET.peers.get(XF.pickFor); XF.pickFor = ''; if (!fs || !fs.length) return; if (fs.length > 1) return xfSay('ONE FILE AT A TIME', true); if (!P) return xfSay('THEY HAVE GONE · NOT SENT', true); xfConfirm(P, fs[0]); pick.value = ''; });
+  const files = e => Array.from((e.dataTransfer && e.dataTransfer.types) || []).includes('Files');
+  addEventListener('dragover', e => { if (!files(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = state === 'play' ? 'copy' : 'none'; });
+  addEventListener('drop', e => { if (!files(e)) return; e.preventDefault(); if (state !== 'play') return;   // (a dropped file never takes the tab away from the game)
+    const it = e.dataTransfer.items && e.dataTransfer.items[0], en = it && it.webkitGetAsEntry && it.webkitGetAsEntry(); if (en && en.isDirectory) return xfSay('ONLY A FILE CAN BE SENT · NOT A FOLDER', true);
+    const fs = e.dataTransfer.files; if (!fs || !fs.length) return; if (fs.length > 1) return xfSay('ONE FILE AT A TIME', true);
+    const P = xfTarget(); if (!P) return xfSay('TO SEND A FILE · /file NAME', true); const why = xfCant(P); if (why) return xfSay(why, true); xfConfirm(P, fs[0]); });
+  addEventListener('keydown', e => {   // (first, before the game's own keys: while a note is being made, enter and escape are the note's)
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.metaKey || e.ctrlKey || e.altKey) return;
+    const eat = () => { e.preventDefault(); e.stopImmediatePropagation(); };
+    if (NOTE.rec || NOTE.review) { if (e.code === 'Enter' || e.code === 'NumpadEnter') { eat(); if (!e.repeat) { if (NOTE.rec) xfRecEnd(true); else xfSendNote(NOTE.review); } return; } if (e.code === 'Escape') { eat(); if (NOTE.rec) xfRecEnd(false, 'NOTE THROWN AWAY'); else { NOTE.review = null; xfSay('NOTE THROWN AWAY'); xfDirty(); } return; } }
+    if (XF.open && e.code === 'Escape') { eat(); xfList(false); return; }
+    if (!e.repeat && state === 'play' && (e.code === 'KeyY' || e.code === 'KeyU') && xfKey(e.code === 'KeyY')) { eat(); xfCardDraw(); }
+  }, true);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) return; if (NOTE.rec) xfRecEnd(false, 'NOTE THROWN AWAY'); if (NOTE.play) xfNoteStop('hidden'); });
+  addEventListener('pagehide', xfAllOff); }
+
 function sendChat(raw) {
   const text = String(raw || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
   if (!text) return;
@@ -15699,7 +16422,7 @@ function voiceRun(a) {
     case 'xr_leave': if (XR.on) { try { XR.sess?.end(); } catch {} } break;
     case 'act': if (state === 'play' && spaceAction()) pressSpace(); else toast('NOTHING HERE TO DO THAT TO'); break;
     case 'letters_fit': lettersSet(null, 'LETTERS TO FIT THIS SCREEN'); break;
-    case 'close': if (ALBUM.open) albumShow(false); else if (GUIDE.open) guideShow(false); else if (MENU.open) menuShow(false); else if (state === 'photo') closePhoto(); else if (state === 'map') closeMap(); else if (CHAT.open) closeChat(); else if (EXPLAIN.i >= 0) { EXPLAIN.i = 1e9; explainPanel(); } else if (who.pinned) who.pinned = false; else if (HEALTH.open) healthShow(false); break;
+    case 'close': if (XF.open) xfList(false); else if (ALBUM.open) albumShow(false); else if (GUIDE.open) guideShow(false); else if (MENU.open) menuShow(false); else if (state === 'photo') closePhoto(); else if (state === 'map') closeMap(); else if (CHAT.open) closeChat(); else if (EXPLAIN.i >= 0) { EXPLAIN.i = 1e9; explainPanel(); } else if (who.pinned) who.pinned = false; else if (HEALTH.open) healthShow(false); break;
     case 'godmode': godMode(true); break; case 'godmode_off': godMode(false); break; case 'warzone': matchWar(); break;
     case 'cinematic': TUT.cineOpen = true; cinema.manual = true; toast('CINEMATIC CAMERA'); break;
     case 'normalcam': cinema.manual = false; toast('FOLLOW CAMERA'); break;
@@ -17176,6 +17899,7 @@ function talkWait(ms) {
   }, ms || (talk.pendRec ? (open ? 2000 : 550) : open ? 2600 : words < 4 ? 2100 : 1500));   // (a recording has already waited out his pause before it was written down)
 }
 function overheard(text) {
+  if (hushed()) return;
   ear.wordsAt = performance.now();
   if (state !== 'talk') return voiceFast(text);
   if (talk.pend) talkWait(0);   // (he is still going: what he has said so far waits for the rest)
@@ -17241,6 +17965,7 @@ function talkCam(dt) {
 const mic = { on: false, mode: '', rec: null, stream: null, denied: false, quietUntil: 0, shownT: 0 };
 function setMic(on) { mic.on = on; $('mic').classList.toggle('on', on); }
 function heard(text, recorded = false) {
+  if (hushed()) return;   // (a note being made or played: nothing heard now is an order, or a word to anyone)
   text = (text || '').trim();
   if (!text || !recorded && (voiceSrc || performance.now() < mic.quietUntil)) return;   // that's a god's own voice coming back through the speakers (a recording's words were his before anything played)
   { const n = vNorm(text); if (VFAST.fired && performance.now() - VFAST.firedAt < 5000 && (n === VFAST.fired || VFAST.fired.startsWith(n))) { VFAST.fired = ''; return; } }   // (already done, the moment it was said)
@@ -17280,7 +18005,7 @@ function heard(text, recorded = false) {
   if (state === 'play') { spoke(text); chatSay(text); }   // anything else he says, he has said out loud: whoever is near has heard it, and everyone can read it
 }
 function startMic() {
-  if (mic.denied || VC.muted) return;
+  if (mic.denied || VC.muted || hushed()) return;
   startEar();
   if (mic.rec) return;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -17305,6 +18030,7 @@ const ear = { on: false, level: 0, loud: 0, scareT: -9, scareR: 0, ringT: 0, las
 async function startEar() {
   if (mic.stream || mic.denied || !AC || !navigator.mediaDevices?.getUserMedia) return;
   try { mic.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    if (VC.muted) for (const t of mic.stream.getAudioTracks()) t.enabled = false;   // (a microphone fetched for a note while he is muted stays off for everyone else)
     for (const V of VC.pcs.values()) V.tr?.sender.replaceTrack(vcTrack()).catch(() => {}); }
   catch { if (mic.mode !== 'sr') mic.denied = true; return; }
   const an = AC.createAnalyser(); an.fftSize = 1024;
@@ -17319,12 +18045,14 @@ async function startEar() {
     r.onstop = () => { if (r.keep && mine.length) uttered(new Blob(mine, { type: mine[0].type || 'audio/webm' }), r.dur, r.peak, r.at); };
     r.start();
   };
+  ear.hush = () => { if (rec) { rec.keep = false; try { rec.stop(); } catch {} rec = null; } speech = 0; quiet = 0; loud = 0; }; ear.wake = () => { if (!rec) open(); };
   open(); ear.on = true; if (mic.mode !== 'sr') setMic(true);
   setInterval(() => {
     if (document.hidden) return;
     an.getFloatTimeDomainData(buf);
     let s = 0; for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
     const rms = Math.sqrt(s / buf.length), now = performance.now();
+    if (hushed()) { ear.level = lerp(ear.level, 0, 0.5); return; }
     const ours = !!voiceSrc || now < mic.quietUntil;   // that is a voice of the game's coming back through the speakers
     const talking = !ours && rms > Math.max(0.022, floor * 3.2);
     // a breath blown into it: loud, the low end roaring and the rest a smooth hiss, no voice in it — the bird blows wind
@@ -22533,7 +23261,7 @@ function tick(dt) {
   else if (state === 'end') updateEnding(dt);
   else if (state === 'warp') updateWarp(dt);
   carryOn();    // (and then to where it has stood off to, if a bird is passing through it)
-  updateTail(dt); updateSmall(dt); updateCourier(dt); eyeStep(dt);
+  updateTail(dt); updateSmall(dt); updateCourier(dt); xfTick(dt); eyeStep(dt);
   updateGodDirector(dt);
   updateCinemaState(dt);
   if (state === 'title') updateTitle(dt);
@@ -24279,7 +25007,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);
