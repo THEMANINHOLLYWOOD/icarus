@@ -24405,7 +24405,7 @@ function flierFlap(F, ph, amp, sweep = 0.05) {
   });
 }
 // Crete: a limestone promontory over the sea, and on it the thing Daedalus built — seven rings of wall around a tower
-function buildCrete() {
+function buildCrete(world = false) {
   const sc = new THREE.Scene(), haze = new THREE.Color('#c6d5e2'), r = mulberry32(1881), C = PRO_C;
   sc.fog = new THREE.Fog(haze, 700, 8500);
   sc.add(new THREE.HemisphereLight(0xdfeaff, 0x9a8a66, 1.3));
@@ -24453,47 +24453,54 @@ function buildCrete() {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
     add(new THREE.Mesh(g, lam));
   }
-  const acc = newAcc(), stone = col('#f3e8cc'), stoneD = col('#dccfae'), pave = col('#2b241e'), court = col('#8f8061'), red = col('#a52a1c'), plaster = col('#e2d6ba'), olive = col('#4f6a34'), cyp = col('#27482c');
+  const st = newAcc(), sw = newAcc(), stone = col('#f3e8cc'), stoneD = col('#dccfae'), pave = col('#2b241e'), court = col('#8f8061'), red = col('#a52a1c'), plaster = col('#e2d6ba'), olive = col('#4f6a34'), cyp = col('#27482c');
   // paving: dark between the walls, so the rings read from the air
-  { _mat.compose(_p.set(C.x, C.y + 0.3, C.z), _q.identity(), _s.set(1, 1, 1)); addGeo(acc, new THREE.CylinderGeometry(212, 212, 0.6, 56).toNonIndexed(), _mat, pave);
-    _mat.compose(_p.set(C.x, C.y + 0.5, C.z), _q.identity(), _s.set(1, 1, 1)); addGeo(acc, new THREE.CylinderGeometry(34, 34, 0.6, 28).toNonIndexed(), _mat, court); }
-  const fires = [];
+  { _mat.compose(_p.set(C.x, C.y + 0.3, C.z), _q.identity(), _s.set(1, 1, 1)); addGeo(st, new THREE.CylinderGeometry(212, 212, 0.6, 56).toNonIndexed(), _mat, pave);
+    _mat.compose(_p.set(C.x, C.y + 0.5, C.z), _q.identity(), _s.set(1, 1, 1)); addGeo(st, new THREE.CylinderGeometry(34, 34, 0.6, 28).toNonIndexed(), _mat, court); }
+  const fires = [], walls = [], gates = [], spokes = [], groves = [];   // (where each wall, gap, dead end and tree is, for the near Crete to dress)
   for (let k = 0; k < 6; k++) {
     const R = 44 + k * 31, outer = k === 5, h = outer ? 22 : 13 + (k % 2) * 3, n = Math.round(6.2832 * R / 12), doors = [r() * 6.28, ...(k > 1 ? [r() * 6.28] : [])];
+    for (const d of doors) gates.push({ a: d, R, k, h, n });
     for (let i = 0; i < n; i++) {
       const a = (i + 0.5) / n * 6.2832;
       if (doors.some(d => Math.abs(wrapAngle(a - d)) < 11 / R)) continue;
       const x = C.x + Math.cos(a) * R, z = C.z + Math.sin(a) * R;
-      box(acc, 6.2832 * R / n * 1.05, h, 9, x, C.y + h / 2, z, i % 2 ? stone : stoneD, 0, Math.PI / 2 - a, 0);
-      if (outer && i % 2) box(acc, 5, 3, 10, x, C.y + h + 1.5, z, stone, 0, Math.PI / 2 - a, 0);
+      box(st, 6.2832 * R / n * 1.05, h, 9, x, C.y + h / 2, z, i % 2 ? stone : stoneD, 0, Math.PI / 2 - a, 0); walls.push({ x, z, a, len: 6.2832 * R / n * 1.05, h, R, k, i, n, outer });
+      if (outer && i % 2) box(st, 5, 3, 10, x, C.y + h + 1.5, z, stone, 0, Math.PI / 2 - a, 0);
       if (i % (outer ? 9 : 13) === 3) fires.push([x, C.y + h + 1.1, z]);
     }
     if (!outer) for (let j = 0, m = 2 + (k % 3); j < m; j++) {   // spokes: the dead ends
       const a = r() * 6.2832, rr = R + 15.5;
-      box(acc, 22, 12, 8, C.x + Math.cos(a) * rr, C.y + 6, C.z + Math.sin(a) * rr, stoneD, 0, -a, 0);
+      box(st, 22, 12, 8, C.x + Math.cos(a) * rr, C.y + 6, C.z + Math.sin(a) * rr, stoneD, 0, -a, 0); spokes.push({ x: C.x + Math.cos(a) * rr, z: C.z + Math.sin(a) * rr, a, rr });
     }
   }
   // the tower at the heart of it, where he was kept and where the wings were made
-  { _mat.compose(_p.set(C.x, C.y + 25, C.z), _q.identity(), _s.set(1, 1, 1)); addGeo(acc, new THREE.CylinderGeometry(9, 11.5, 50, 16).toNonIndexed(), _mat, plaster);
-    for (let i = 0; i < 12; i++) { const a = i / 12 * 6.2832; box(acc, 3.4, 2.2, 1.6, C.x + Math.cos(a) * 9.4, C.y + 51.1, C.z + Math.sin(a) * 9.4, stone, 0, Math.PI / 2 - a, 0); }
-    box(acc, 3.2, 6, 1.2, C.x, C.y + 3, C.z - 11.3, pave); for (const y of [16, 30, 42]) box(acc, 1.4, 3, 1, C.x + 0.2, C.y + y, C.z - 10.2 + y * 0.03, pave); }
+  { _mat.compose(_p.set(C.x, C.y + 25, C.z), _q.identity(), _s.set(1, 1, 1)); addGeo(st, new THREE.CylinderGeometry(9, 11.5, 50, 16).toNonIndexed(), _mat, plaster);
+    for (let i = 0; i < 12; i++) { const a = i / 12 * 6.2832; box(st, 3.4, 2.2, 1.6, C.x + Math.cos(a) * 9.4, C.y + 51.1, C.z + Math.sin(a) * 9.4, stone, 0, Math.PI / 2 - a, 0); }
+    box(st, 3.2, 6, 1.2, C.x, C.y + 3, C.z - 11.3, pave); for (const y of [16, 30, 42]) box(st, 1.4, 3, 1, C.x + 0.2, C.y + y, C.z - 10.2 + y * 0.03, pave); }
   // the palace of Minos beside it: flat roofs, red columns that taper downward, horns on the parapet
   { const pz = C.z + 285;
-    box(acc, 170, 16, 62, C.x, C.y + 8, pz, plaster); box(acc, 96, 12, 40, C.x - 20, C.y + 22, pz + 6, plaster); box(acc, 40, 10, 26, C.x + 44, C.y + 21, pz - 6, stone);
-    box(acc, 176, 1.6, 68, C.x, C.y + 16.6, pz, red); box(acc, 100, 1.4, 44, C.x - 20, C.y + 28.6, pz + 6, red);
-    for (let i = 0; i < 14; i++) { _mat.compose(_p.set(C.x - 78 + i * 12, C.y + 7, pz - 33), _q.identity(), _s.set(1, 1, 1)); addGeo(acc, new THREE.CylinderGeometry(1.7, 1.15, 14, 8).toNonIndexed(), _mat, red); }
-    box(acc, 170, 2, 6, C.x, C.y + 15, pz - 33, plaster);
-    for (let i = 0; i < 9; i++) for (const s of [-1, 1]) box(acc, 0.9, 3.4, 0.9, C.x - 70 + i * 17.5 + s * 1.6, C.y + 19, pz - 30, plaster, 0, 0, s * -0.35);
-    for (let i = 0; i < 6; i++) box(acc, 60 - i * 6, 1.2, 5, C.x, C.y + 0.6 + i * 1.2, pz - 44 + i * 2.2, stoneD); }
+    box(sw, 170, 16, 62, C.x, C.y + 8, pz, plaster); box(sw, 96, 12, 40, C.x - 20, C.y + 22, pz + 6, plaster); box(sw, 40, 10, 26, C.x + 44, C.y + 21, pz - 6, stone);
+    box(sw, 176, 1.6, 68, C.x, C.y + 16.6, pz, red); box(sw, 100, 1.4, 44, C.x - 20, C.y + 28.6, pz + 6, red);
+    for (let i = 0; i < 14; i++) { _mat.compose(_p.set(C.x - 78 + i * 12, C.y + 7, pz - 33), _q.identity(), _s.set(1, 1, 1)); addGeo(sw, new THREE.CylinderGeometry(1.7, 1.15, 14, 8).toNonIndexed(), _mat, red); }
+    box(sw, 170, 2, 6, C.x, C.y + 15, pz - 33, plaster);
+    for (let i = 0; i < 9; i++) for (const s of [-1, 1]) box(sw, 0.9, 3.4, 0.9, C.x - 70 + i * 17.5 + s * 1.6, C.y + 19, pz - 30, plaster, 0, 0, s * -0.35);
+    for (let i = 0; i < 6; i++) box(sw, 60 - i * 6, 1.2, 5, C.x, C.y + 0.6 + i * 1.2, pz - 44 + i * 2.2, stoneD); }
   // olives and cypress on the dry ground outside the walls
   for (let i = 0; i < 150; i++) {
     const a = r() * 6.2832, d = 225 + r() * 150, x = Math.cos(a) * d, z = 200 + Math.sin(a) * d * 0.95;
     if (Math.hypot(x - C.x, z - C.z) < 222 || Math.abs(x) < 100 && z > C.z + 235 && z < C.z + 330) continue;
-    if (i % 4) blob(acc, 4 + r() * 3, 3 + r() * 2, 4 + r() * 3, x, C.y + 3.5, z, olive);
-    else { _mat.compose(_p.set(x, C.y + 9, z), _q.identity(), _s.set(1, 1, 1)); addGeo(acc, new THREE.ConeGeometry(2.2, 18 + r() * 8, 6).toNonIndexed(), _mat, cyp); }
+    if (i % 4) { const sx = 4 + r() * 3, sy = 3 + r() * 2, sz = 4 + r() * 3; blob(sw, sx, sy, sz, x, C.y + 3.5, z, olive); groves.push({ kind: 'olive', x, z, sx, sy, sz, i }); }
+    else { const h = 18 + r() * 8; _mat.compose(_p.set(x, C.y + 9, z), _q.identity(), _s.set(1, 1, 1)); addGeo(sw, new THREE.ConeGeometry(2.2, h, 6).toNonIndexed(), _mat, cyp); groves.push({ kind: 'cyp', x, z, h, i }); }
   }
   // (and that is all of Crete there is: the rock, the walls, the tower, the palace. No hills behind it: the sea all round)
-  add(new THREE.Mesh(accToGeo(acc), lam));
+  // Two meshes where there was one, at no more cost: the stone of the walls and the tower, which near to is given its courses
+  // (cnMason); and the palace and the trees, which near to are put up again properly. See creteNear.
+  const stoneLod = new THREE.LOD(), lod = new THREE.LOD(), stoneG = accToGeo(st), sFar = new THREE.Mesh(stoneG, lam), sNear = new THREE.Mesh(stoneG, cnMason()), swap = new THREE.Mesh(accToGeo(sw), lam);
+  stoneLod.position.set(C.x, C.y, C.z); sFar.position.set(-C.x, -C.y, -C.z); sNear.position.copy(sFar.position); stoneLod.addLevel(sFar, 0, 0.05); add(stoneLod);
+  lod.position.set(0, C.y, 215); swap.position.set(0, -C.y, -215); lod.addLevel(swap, 0, 0.06); add(lod);
+  const cn = { world, walls, gates, spokes, groves, stoneLod, sFar, sNear, lod, target: sc, alive: () => pro.sc === sc };
+  if (!world) creteNear(cn);   // (the opening's Crete is near from its first moment)
   // braziers on the walls
   { const g = new THREE.BoxGeometry(1.5, 2.2, 1.5), m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 1.3, 0.35) }), fires.length);
     fires.forEach((f, i) => { _mat.makeTranslation(f[0], f[1], f[2]); m.setMatrixAt(i, _mat); }); add(m); }
@@ -24509,20 +24516,22 @@ function buildCrete() {
   feathers.frustumCulled = false; feathers.count = FN; feathers.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   const fp = Array.from({ length: FN }, () => ({ life: 0, p: new THREE.Vector3(), v: new THREE.Vector3(), a: 0, w: 0 }));
   _mat.makeScale(0, 0, 0); for (let i = 0; i < FN; i++) feathers.setMatrixAt(i, _mat);
-  return { sc, sky, halo, disc, seaU, feathers, fp, fi: 0 };
+  return world ? { sc, sky, halo, disc, seaU, feathers, fp, fi: 0, cn } : { sc, sky, halo, disc, seaU, feathers, fp, fi: 0 };
 }
 // What the island has in the world that the opening has no time for: olive groves and cypresses between the labyrinth and
 // the cliffs; a village on the rim, white walls and red roofs, looking out to sea; low walls along the edge; and under
 // the cliff a harbour: a mole of stone, boats on their moorings, a light at the end of it.
 function creteDress(g) {
-  const acc = newAcc(), r = mulberry32(4107), C = PRO_C, top = C.y, CZ = 215, R = 430;
+  const acc = newAcc(), r = mulberry32(4107), C = PRO_C, top = C.y, CZ = 215, R = 430, taken = CRETE.taken = [];   // (taken: where its trees and houses are, so the near Crete builds round them)
   const rad = a => R * (1 + 0.08 * Math.sin(3 * a + 1) + 0.05 * Math.sin(7 * a) + 0.03 * Math.sin(13 * a + 2));
   const white = [0.95, 0.92, 0.85], roof = [0.74, 0.3, 0.2], olive = [0.38, 0.47, 0.27], cyp = [0.15, 0.28, 0.17], trunk = [0.3, 0.24, 0.18], stone = [0.72, 0.68, 0.58], wood = [0.42, 0.3, 0.2], clear = (x, z) => Math.hypot(x - C.x, z - C.z) > 222;
   for (let i = 0, n = TOUCH ? 70 : 170; i < n; i++) { const a = r() * 6.283, d = (0.5 + r() * 0.44) * rad(a), x = Math.cos(a) * d, z = CZ + Math.sin(a) * d; if (!clear(x, z)) continue;
+    taken.push({ x, z, r: 3 });
     if (r() < 0.72) { const sz = 2.2 + r() * 1.9; box(acc, 0.35, sz * 0.9, 0.35, x, top + sz * 0.45, z, trunk); blob(acc, sz * 1.15, sz * 0.8, sz * 1.15, x, top + sz * 1.15, z, [olive[0] * (0.85 + r() * 0.3), olive[1] * (0.85 + r() * 0.3), olive[2]]); }
     else part(acc, G.shard, x, top, z, 1.1, 8 + r() * 6, 1.1, cyp); }
   for (let i = 0; i < 18; i++) { const a = 2.1 + i * 0.15 + r() * 0.05, d = (0.76 + (i % 3) * 0.07) * rad(a), x = Math.cos(a) * d, z = CZ + Math.sin(a) * d, w = 6 + r() * 4, h = 3.2 + r() * 2.4, yw = -a + (r() - 0.5) * 0.5; if (!clear(x, z)) continue;
-    box(acc, w, h, w * 0.8, x, top + h / 2, z, white, 0, yw, 0); for (const sd of [-1, 1]) box(acc, w * 1.08, 0.3, w * 0.5, x, top + h + 0.55, z, roof, sd * 0.4, yw, 0);
+    box(acc, w, h, w * 0.8, x, top + h / 2, z, white, 0, yw, 0); taken.push({ x, z, r: w * 0.8 });
+    box(acc, w * 1.06, 0.32, w * 0.86, x, top + h + 0.16, z, [0.8, 0.75, 0.64], 0, yw, 0); box(acc, w * 0.42, 1.9, w * 0.34, x - Math.cos(yw) * w * 0.2, top + h + 1.1, z + Math.sin(yw) * w * 0.2, white, 0, yw, 0);   // (flat roofs, a room on each, the way Cretan houses were)
     box(acc, 0.9, 1.7, 0.14, x + Math.sin(yw) * w * 0.41, top + 0.85, z + Math.cos(yw) * w * 0.41, [0.2, 0.32, 0.55], 0, yw, 0); }
   for (let i = 0; i < 64; i++) { if (i % 8 === 3) continue; const a = i / 64 * 6.283, d = rad(a) * 0.975, x = Math.cos(a) * d, z = CZ + Math.sin(a) * d; box(acc, 2 * 3.1416 * d / 64 * 1.04, 1.1, 0.7, x, top + 0.55, z, i % 2 ? stone : [0.78, 0.74, 0.64], 0, -a + Math.PI / 2, 0); }   // the wall along the edge, with gaps to look out through
   { const a = 4.25, cs = Math.cos(a), sn = Math.sin(a), d0 = rad(a) * 1.22, at = (d, o) => [cs * d - sn * o, CZ + sn * d + cs * o];
@@ -24533,17 +24542,735 @@ function creteDress(g) {
   const m = new THREE.Mesh(accToGeo(acc), new THREE.MeshLambertMaterial({ vertexColors: true })); m.castShadow = m.receiveShadow = true; g.add(m);
   if (CRETE.lamp) { const L = new THREE.PointLight(0xffd890, 0, 260, 1.6); L.position.set(CRETE.lamp.x, CRETE.lamp.y, CRETE.lamp.z); g.add(L); CRETE.light = L; }
 }
+// ───────────────────────── Crete, close to ─────────────────────────
+// Crete is where every life begins, and where the ones who have flown come back to sit on the tower like hawks and watch.
+// So it is built twice. What is above is all a far eye ever sees of it, and costs what it always did. This is put up behind
+// it the first time anyone comes near, and only drawn while they are near: every stone of the walls laid in courses, moss and
+// cracks and fallen blocks, torches in their brackets; the litter of a workshop on top of the tower; a palace of red columns
+// round a court, a town of flat roofs, gardens, goats; and under the cliff a harbour. (Nothing in it is anything the opening
+// stands on or flies through: the tower top, the parapet they jump from and the walls are where they were.)
+const CN = { t: { value: 0 } };
+const cnTick = () => { CN.t.value = performance.now() / 1000 % 3600; };
+const _cnE = new THREE.Euler(), _cnC = new THREE.Color(), _cnM = new THREE.Matrix4(), _cnL = new THREE.Matrix4(), _cnP = new THREE.Matrix4(), _cnV = new THREE.Vector3();
+const cnRad = a => 430 * (1 + 0.08 * Math.sin(3 * a + 1) + 0.05 * Math.sin(7 * a) + 0.03 * Math.sin(13 * a + 2));   // (the edge of the table of rock, as the promontory is drawn)
+const CN_K = [[1, 60], [1.035, 40], [1.11, 13], [1.24, -8]];
+function cnSurf(x, z) {   // the height of the rock under a point: the table, then the cliffs down into the sea
+  const a = Math.atan2(z - 215, x), k = Math.hypot(x, z - 215) / cnRad(a);
+  if (k <= 1) return 60;
+  for (let i = 0; i < 3; i++) if (k <= CN_K[i + 1][0]) return lerp(CN_K[i][1], CN_K[i + 1][1], (k - CN_K[i][0]) / (CN_K[i + 1][0] - CN_K[i][0]));
+  return -8 - (k - 1.24) * 80;
+}
+const cnAt = (a, k) => { const d = cnRad(a) * k; return [Math.cos(a) * d, 215 + Math.sin(a) * d]; };
+const CN_G = { cyl: new THREE.CylinderGeometry(1, 1, 1, 8).toNonIndexed(), cyl5: new THREE.CylinderGeometry(1, 1, 1, 5).toNonIndexed(), cyl12: new THREE.CylinderGeometry(1, 1, 1, 12).toNonIndexed(),
+  cone: new THREE.ConeGeometry(1, 1, 6).translate(0, 0.5, 0).toNonIndexed(), tor: new THREE.TorusGeometry(1, 0.22, 4, 10).toNonIndexed(), sph: new THREE.IcosahedronGeometry(1, 1).toNonIndexed(),
+  sph0: new THREE.IcosahedronGeometry(1, 0).toNonIndexed(), dode: new THREE.DodecahedronGeometry(1, 0).toNonIndexed(), band: new THREE.CylinderGeometry(1, 1, 1, 8, 1, true).toNonIndexed(), tor3: new THREE.TorusGeometry(1, 0.22, 3, 8).toNonIndexed(), cone4: new THREE.ConeGeometry(1, 1, 4, 1, true).translate(0, 0.5, 0).toNonIndexed(), dome: new THREE.SphereGeometry(1, 8, 4, 0, 6.2832, 0, Math.PI / 2).toNonIndexed() };
+const CN_GLSL = `
+float cnH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float cnN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(cnH(i), cnH(i + vec2(1.0, 0.0)), f.x), mix(cnH(i + vec2(0.0, 1.0)), cnH(i + vec2(1.0, 1.0)), f.x), f.y); }
+`;
+// cut stone, in courses: the faces of the walls laid block by block (each its own shade of limestone), mortar between,
+// rain streaks under the coping, moss and lichen low down, the odd crack; on a top face, flags. All of it from where the
+// fragment is, so it costs nothing in geometry, and it fades out where the blocks would be smaller than the letters.
+const CN_MASON = `{
+  vec3 on = normalize(cross(dFdx(vOP), dFdy(vOP)));
+  float topF = step(0.7, abs(on.y));
+  vec2 tg = normalize(vec2(-on.z, on.x) + vec2(1e-4));
+  vec2 q = mix(vec2(dot(vOP.xz, tg), vOP.y), vOP.xz, topF);
+  float aa = clamp(1.6 - length(fwidth(q)) * 3.0, 0.0, 1.0);
+  float ch = mix(0.86, 1.15, topF), row = floor(q.y / ch), rh = cnH(vec2(row, 7.1));
+  float bl = mix(1.15 + rh * 1.25, 1.4 + rh, topF), u = q.x / bl + rh * 3.0 + row * 0.5;
+  float ci = floor(u), fx = fract(u), fy = fract(q.y / ch), id = cnH(vec2(ci, row) + floor(on.xz * 3.0) * 13.0);
+  float e = min(min(fx, 1.0 - fx) * bl, min(fy, 1.0 - fy) * ch), mortar = 1.0 - smoothstep(0.03, 0.08, e);
+  vec3 tone = mix(vec3(1.05, 0.99, 0.9), vec3(0.9, 0.93, 0.98), cnH(vec2(id, 3.3))) * (0.82 + 0.32 * id);
+  float relief = mix(0.86 + 0.14 * smoothstep(0.0, 0.4, fy), 1.0, topF);
+  float n1 = cnN(q * 0.45), n2 = cnN(q * 2.3 + 9.0), gy = vOP.y - 60.0;
+  float crack = (1.0 - smoothstep(0.0, 0.018, abs(n1 - 0.5))) * step(0.74, cnN(q * 0.09 + 4.0)) * (1.0 - topF);
+  float moss = mix(smoothstep(2.6, 0.0, gy) * smoothstep(0.35, 0.75, n1 + n2 * 0.3), smoothstep(0.62, 0.85, cnN(q * 0.6 + 2.0)) * 0.3 + mortar * 0.25, topF);
+  float streak = (1.0 - topF) * smoothstep(0.55, 0.9, cnN(vec2(q.x * 1.7, q.y * 0.07)));
+  float lichen = step(0.87, n2) * (1.0 - topF);
+  vec3 c = diffuseColor.rgb * mix(vec3(1.0), tone * relief, aa);
+  c = mix(c, c * 0.45, mortar * aa);
+  c *= 1.0 - streak * 0.24 * aa;
+  c = mix(c, vec3(0.26, 0.34, 0.13), moss * 0.8);
+  c = mix(c, vec3(0.82, 0.6, 0.2), lichen * aa * 0.45);
+  c *= 1.0 - crack * 0.65 * aa;
+  diffuseColor.rgb = c;
+}`;
+// painted plaster, the way the palace was painted: (u, v) in metres along and up a panel, its height, which picture
+// 1 running spirals · 2 dolphins and little fish · 3 zigzag bands · 4 rosettes · 5 lilies · 6 a net (holes and all) · 7 bull-leaping
+const CN_FRESCO = `{
+  float u = vPQ.x, v = vPQ.y, H = max(vPQ.z, 0.01), t = v / H; int pat = int(vPQ.w + 0.5);
+  vec3 c = diffuseColor.rgb;
+  if (pat == 1) {
+    float L = H * 1.25, k = floor(u / L); vec2 p = vec2((fract(u / L) - 0.5) * L, v - H * 0.5) / (H * 0.34);
+    float r = length(p), a = atan(p.y, p.x) * (mod(k, 2.0) < 1.0 ? 1.0 : -1.0);
+    float sp = (1.0 - smoothstep(0.14, 0.24, abs(fract(a / 6.2832 + r * 1.5) - 0.5))) * step(r, 1.0) * step(0.16, r);
+    float wave = 1.0 - smoothstep(0.03, 0.08, abs(t - 0.5 - 0.3 * sin(u / L * 6.2832 + 1.57)));
+    c = mix(vec3(0.72, 0.16, 0.1), vec3(0.96, 0.93, 0.85), max(sp, wave * step(0.95, r)));
+    c = mix(c, vec3(0.12, 0.3, 0.64), step(r, 0.16));
+  } else if (pat == 2) {
+    c = mix(vec3(0.38, 0.64, 0.86), vec3(0.62, 0.82, 0.93), t);
+    float L = H * 2.3, k = floor(u / L), hk = cnH(vec2(k, 2.0));
+    vec2 p = vec2((fract(u / L) - 0.5) * L, v - H * (0.32 + 0.36 * hk)); p.x *= hk > 0.5 ? 1.0 : -1.0;
+    p.y -= 0.1 * H * sin(p.x / H * 2.4);
+    float body = length(p / vec2(H * 0.55, H * 0.12));
+    vec2 tq = p + vec2(H * 0.6, 0.0); float tail = step(abs(tq.y), max(0.0, -tq.x) * 0.9 + 0.02 * H) * step(-H * 0.2, tq.x) * step(tq.x, 0.0);
+    float fin = step(length((p - vec2(0.0, H * 0.11)) / vec2(H * 0.1, H * 0.09)), 1.0) * step(H * 0.1, p.y);
+    float dol = max(max(step(body, 1.0), tail), fin);
+    c = mix(c, vec3(0.08, 0.17, 0.4), dol);
+    c = mix(c, vec3(0.97, 0.95, 0.9), dol * step(p.y, -H * 0.045) * step(body, 1.0));
+    c = mix(c, vec3(0.96, 0.7, 0.22), dol * step(abs(p.y + H * 0.015), H * 0.02) * step(abs(p.x), H * 0.42));
+    vec2 g = vec2(u, v) / (H * 0.2), gi = floor(g);
+    c = mix(c, vec3(0.88, 0.55, 0.22), step(0.92, cnH(gi + 5.0)) * step(length((fract(g) - 0.5) * vec2(1.0, 2.4)), 0.3) * (1.0 - dol));
+  } else if (pat == 3) {
+    float b = t + abs(fract(u / (H * 0.5)) - 0.5) * 0.5, m = mod(floor(b * 5.0), 3.0);
+    c = m < 1.0 ? vec3(0.72, 0.16, 0.1) : m < 2.0 ? vec3(0.95, 0.91, 0.8) : vec3(0.13, 0.22, 0.42);
+  } else if (pat == 4) {
+    float L = H * 0.8; vec2 p = vec2((fract(u / L) - 0.5) * L, v - H * 0.5) / (H * 0.36);
+    float r = length(p), a = atan(p.y, p.x);
+    c = mix(vec3(0.86, 0.62, 0.24), vec3(0.96, 0.94, 0.87), step(r, 0.72 + 0.26 * cos(a * 8.0)));
+    c = mix(c, vec3(0.72, 0.16, 0.1), step(r, 0.26));
+  } else if (pat == 5) {
+    c = vec3(0.72, 0.18, 0.1);
+    float L = H * 0.45, x = (fract(u / L) - 0.5) * L / H;
+    float stem = step(abs(x + 0.03 * sin(t * 6.0)), 0.014) * step(t, 0.72);
+    vec2 p = vec2(x, t - 0.78); float a = atan(p.y, p.x);
+    float fl = step(length(p), 0.17 * (0.55 + 0.45 * abs(sin(a * 1.5)))) * step(-0.06, p.y);
+    c = mix(c, vec3(0.97, 0.95, 0.9), max(stem, fl));
+  } else if (pat == 6) {
+    vec2 g = fract(vec2(u, v) * 3.2);
+    if (min(g.x, g.y) > 0.17) discard;
+  } else if (pat == 7) {
+    c = vec3(0.88, 0.74, 0.44);
+    float L = H * 3.0; vec2 p = vec2((fract(u / L) - 0.5) * L, v - H * 0.42) / H;
+    float bull = step(length(p / vec2(0.6, 0.19)), 1.0);
+    float legs = step(abs(p.y + 0.28), 0.14) * max(step(abs(p.x - 0.38), 0.05), step(abs(p.x + 0.4), 0.05));
+    vec2 hp = p - vec2(0.7, 0.1); float head = step(length(hp / vec2(0.14, 0.11)), 1.0);
+    float horn = step(abs(hp.x - 0.05 - 0.4 * (hp.y - 0.1)), 0.03) * step(0.07, hp.y) * step(hp.y, 0.3);
+    float b = max(max(bull, legs), max(head, horn));
+    c = mix(c, vec3(0.3, 0.13, 0.07), b);
+    c = mix(c, vec3(0.97, 0.95, 0.92), bull * step(0.55, cnN(p * 9.0 + 3.0)));
+    vec2 lp = p - vec2(0.0, 0.4); float leap = step(abs(lp.y - 0.22 * sin(lp.x * 6.0)), 0.035) * step(abs(lp.x), 0.3);
+    c = mix(c, vec3(0.64, 0.25, 0.12), leap);
+  }
+  if (pat != 6 && pat != 0) c = mix(c, vec3(0.12, 0.12, 0.16), max(step(t, 0.05), step(0.95, t)));
+  diffuseColor.rgb = c;
+}`;
+// the materials of near Crete: one set per Crete that is built (the opening's is thrown away with it)
+function cnMats() {
+  const hook = (m, key, vert, frag) => {
+    m.customProgramCacheKey = () => key;
+    m.onBeforeCompile = sh => {
+      sh.uniforms.uT = CN.t;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uT;\n' + CN_GLSL + (vert[0] || '')).replace('#include <begin_vertex>', '#include <begin_vertex>\n' + (vert[1] || ''));
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uT;\n' + CN_GLSL + (frag[0] || '')).replace('#include <color_fragment>', '#include <color_fragment>\n' + (frag[1] || ''));
+    };
+    return m;
+  };
+  const L = o => new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, ...o });
+  return {
+    lam: L(), glow: new THREE.MeshBasicMaterial({ vertexColors: true }), inst: L(),
+    mason: cnMason(),
+    fresco: hook(L({ side: THREE.DoubleSide, flatShading: false }), 'cnFresco', ['attribute vec4 pq;\nvarying vec4 vPQ;', 'vPQ = pq;'], ['varying vec4 vPQ;', CN_FRESCO]),
+    cloth: hook(L({ side: THREE.DoubleSide, flatShading: false }), 'cnCloth', ['attribute float sw;', 'transformed += normal * sw * (0.24 * sin(uT * 2.1 + position.x * 0.9 + position.z * 0.6) + 0.09 * sin(uT * 5.3 + position.y * 3.0 + position.x));'], []),
+    flame: hook(new THREE.MeshBasicMaterial({ color: 0xffffff }), 'cnFlame', ['', 'float fi = float(gl_InstanceID), fk = 0.82 + 0.2 * sin(uT * 13.0 + fi * 1.7) + 0.12 * sin(uT * 27.0 + fi * 0.9); transformed.y *= fk; transformed.xz *= 1.12 - 0.22 * fk; transformed.x += transformed.y * 0.3 * sin(uT * 6.0 + fi);'], []),
+    goat: hook(L(), 'cnGoat', ['', `float gh = cnH(instanceMatrix[3].xz * 0.37), gg = smoothstep(0.15, 0.85, 0.5 + 0.5 * sin(uT * (0.3 + gh * 0.4) + gh * 40.0));
+      if (position.x > 0.3 && position.y > 0.45) { vec3 pv = transformed - vec3(0.3, 0.62, 0.0); float an = -gg * 1.05; transformed = vec3(0.3, 0.62, 0.0) + vec3(pv.x * cos(an) - pv.y * sin(an), pv.x * sin(an) + pv.y * cos(an), pv.z); }
+      if (position.x < -0.4 && position.y > 0.5) transformed.z += 0.05 * sin(uT * 9.0 + gh * 30.0);`], []),
+    bird: hook(L({ flatShading: false }), 'cnBird', ['', `float bi = float(gl_InstanceID), bh = cnH(vec2(bi, 3.7)), bs = bh > 0.5 ? 1.0 : -1.0;
+      float ba = uT * (0.16 + bh * 0.2) * bs + bi * 2.399, bR = 9.0 + cnH(vec2(bi, 9.1)) * 26.0;
+      vec3 bp = transformed; float glide = step(0.0, sin(uT * 0.5 + bi * 1.9));
+      bp.y += abs(bp.z) * step(0.1, abs(bp.z)) * (0.6 * sin(uT * (8.0 + bh * 5.0) + bi * 1.3) * (1.0 - glide) + 0.12 * glide);
+      bp.y -= bp.z * 0.32 * bs;
+      vec3 bf = vec3(-sin(ba), 0.0, cos(ba)) * bs, br = vec3(bf.z, 0.0, -bf.x);
+      transformed = bf * bp.x + vec3(0.0, bp.y, 0.0) + br * bp.z + vec3(cos(ba) * bR, sin(uT * 0.4 + bi) * 2.5, sin(ba) * bR);`], []),
+    puff: hook(L(), 'cnPuff', ['', `float pi = float(gl_InstanceID), ph = fract(uT * 0.07 + cnH(vec2(pi, 1.3)));
+      transformed *= mix(0.35, 2.3, ph) * (1.0 - smoothstep(0.72, 1.0, ph));
+      transformed += vec3(ph * ph * 9.0 + sin(uT * 0.7 + pi) * 0.4, ph * 15.0, ph * ph * 4.0);`], []),
+    drift: hook(L({ side: THREE.DoubleSide }), 'cnDrift', ['', `float di = float(gl_InstanceID), dh = cnH(vec2(di, 7.7)), dp = fract(uT * 0.03 + dh), sa = uT * (1.5 + dh) + di;
+      transformed = vec3(transformed.x * cos(sa) - transformed.y * sin(sa), transformed.x * sin(sa) + transformed.y * cos(sa), transformed.z) * (1.0 - smoothstep(0.86, 1.0, dp));
+      transformed += vec3(sin(uT * 0.6 + dh * 9.0) * 3.0 + dp * 30.0, 3.0 - dp * 52.0 + sin(uT * 1.7 + di) * 0.6, cos(uT * 0.5 + dh * 7.0) * 3.0 + dp * 10.0);`], []),
+    foam: hook(new THREE.MeshBasicMaterial({ color: 0xf4f8fa, transparent: true, depthWrite: false }), 'cnFoam', ['attribute vec2 fq;\nvarying vec2 vFQ;', 'vFQ = fq;'], ['varying vec2 vFQ;',
+      'float fn = cnN(vec2(vFQ.x * 0.3, vFQ.y * 2.0 - uT * 0.5)) * 0.65 + cnN(vec2(vFQ.x * 1.3 + uT * 0.2, vFQ.y * 4.0 - uT * 1.1)) * 0.45; float edge = 1.0 - abs(vFQ.y - 0.3) * 1.4; diffuseColor.a = smoothstep(0.5, 0.82, fn * edge + 0.22 * sin(vFQ.y * 9.0 - uT * 1.4 + vFQ.x * 0.05)) * 0.9;']),
+  };
+}
+function cnMason() {
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  m.customProgramCacheKey = () => 'cnMason';
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vOP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvOP = position;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vOP;\n' + CN_GLSL).replace('#include <color_fragment>', '#include <color_fragment>\n' + CN_MASON);
+  };
+  return m;
+}
+// a bucket: what one level of near Crete is made of, before it is made into things to draw
+function cnBucket() {
+  const b = { acc: newAcc(), st: newAcc(), glow: newAcc(), pan: { pos: [], nor: [], col: [], pq: [] }, cl: { pos: [], nor: [], col: [], sw: [] }, inst: {} };
+  b.i = (k, x, y, z, sx, sy = sx, sz = sx, ry = 0, c = null, rx = 0, rz = 0) => (b.inst[k] ||= []).push({ x, y, z, sx, sy, sz, ry, c, rx, rz });
+  return b;
+}
+function cnPut(acc, geo, M, x, y, z, sx, sy, sz, rgb, rx = 0, ry = 0, rz = 0) {   // a part placed in a frame of its own (M)
+  _cnL.compose(_p.set(x, y, z), _q.setFromEuler(_cnE.set(rx, ry, rz)), _s.set(sx, sy, sz)); _cnM.multiplyMatrices(M, _cnL); addGeo(acc, geo, _cnM, rgb);
+}
+// a flat painted panel: centred at (x, y, z), w along and h up, facing yaw (0 faces +z); flat: lying on the ground instead
+function cnPanel(P, x, y, z, w, h, yaw, pat, rgb, u0 = 0, flat = false) {
+  const tx = Math.cos(yaw), tz = -Math.sin(yaw), nx = Math.sin(yaw), nz = Math.cos(yaw);
+  const up = flat ? [-nx, 0, -nz] : [0, 1, 0], n = flat ? [0, 1, 0] : [nx, 0, nz];   // (wound so that the face that is seen is the one the normal says)
+  const V = (a, b) => [x + tx * a + up[0] * b, y + up[1] * b, z + tz * a + up[2] * b];
+  const q = [[-w / 2, -h / 2, 0, 0], [w / 2, -h / 2, w, 0], [w / 2, h / 2, w, h], [-w / 2, -h / 2, 0, 0], [w / 2, h / 2, w, h], [-w / 2, h / 2, 0, h]];
+  for (const [a, b, u, v] of q) { P.pos.push(...V(a, b)); P.nor.push(...n); P.col.push(...rgb); P.pq.push(u0 + u, v, h, pat); }
+}
+// cloth: a sheet from o along U and V (vectors), cut nu by nv, swaying by sw(u, v) (0 where it is tied), coloured by c(u, v)
+function cnCloth(Cl, o, U, V, nu, nv, sw, c) {
+  const n = _cnV.set(U[1] * V[2] - U[2] * V[1], U[2] * V[0] - U[0] * V[2], U[0] * V[1] - U[1] * V[0]).normalize();
+  const P = (u, v) => [o[0] + U[0] * u + V[0] * v, o[1] + U[1] * u + V[1] * v, o[2] + U[2] * u + V[2] * v];
+  for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) {
+    const u0 = i / nu, u1 = (i + 1) / nu, v0 = j / nv, v1 = (j + 1) / nv, rgb = c((u0 + u1) / 2, (v0 + v1) / 2);
+    for (const [u, v] of [[u0, v0], [u1, v0], [u1, v1], [u0, v0], [u1, v1], [u0, v1]]) { Cl.pos.push(...P(u, v)); Cl.nor.push(n.x, n.y, n.z); Cl.col.push(...rgb); Cl.sw.push(sw(u, v)); }
+  }
+}
+const cnTg = f => { const a = newAcc(); f(a); return accToGeo(a); };
+// the shapes that are drawn many times over, each once
+function cnTemplates(M) {
+  const I = new THREE.Matrix4(), W = [1, 1, 1], RED = col('#b3301e'), BLK = col('#1e1b19'), PL = col('#efe7d6'), TERRA = col('#b4623a'), TERRA2 = col('#8e4a2a');
+  const lathe = (pts, seg) => new THREE.LatheGeometry(pts.map(p => new THREE.Vector2(p[0], p[1])), seg).toNonIndexed();
+  const olive = v => cnTg(a => {
+    const rr = mulberry32(91 + v * 17), BARK = col('#5b4a3a'), BARK2 = col('#6e5d4a'), OL = [col('#6f8458'), col('#7d8f62'), col('#8a9a6a'), col('#62764c')];
+    for (const st of [0, 1]) { let x = 0, z = 0, y = 0; const dx = st ? 0.12 : -0.05, dz = st ? -0.08 : 0.06;
+      for (let i = 0; i < 3; i++) { const h = st ? 0.16 : 0.22, ox = dx + (rr() - 0.5) * 0.14, oz = dz + (rr() - 0.5) * 0.14; part(a, CN_G.cyl5, x + ox / 2, y + h / 2, z + oz / 2, (st ? 0.06 : 0.1) - i * 0.016, h * 1.08, (st ? 0.06 : 0.11) - i * 0.016, i % 2 ? BARK2 : BARK, 0, oz * 2.2, -ox * 2.2); x += ox; z += oz; y += h; } }
+    for (let i = 0; i < 8; i++) { const an = i / 8 * 6.2832 + rr(), d = i ? 0.42 + rr() * 0.36 : 0; part(a, CN_G.sph0, Math.cos(an) * d, 0.66 + rr() * 0.22 - d * 0.18, Math.sin(an) * d, 0.42 + rr() * 0.16, 0.24 + rr() * 0.1, 0.42 + rr() * 0.16, OL[(rr() * 4) | 0], rr() * 6, rr() * 0.4); }
+  });
+  return {
+    col: { mat: M.inst, geo: cnTg(a => { addGeo(a, new THREE.CylinderGeometry(1, 0.7, 0.85, 10, 1, true).translate(0, 0.425, 0).toNonIndexed(), I, RED); part(a, CN_G.cyl, 0, 0.885, 0, 1.28, 0.07, 1.28, BLK); part(a, CN_G.tor3, 0, 0.885, 0, 1.12, 1.12, 0.3, BLK, 0, Math.PI / 2); box(a, 2.3, 0.075, 2.3, 0, 0.962, 0, BLK); part(a, CN_G.cyl, 0, 0.01, 0, 0.82, 0.02, 0.82, col('#d8ccb0')); }) },
+    horn: { mat: M.inst, geo: cnTg(a => { box(a, 1.0, 0.22, 0.32, 0, 0.11, 0, PL); for (const s of [-1, 1]) { box(a, 0.17, 0.3, 0.24, s * 0.33, 0.36, 0, PL, 0, 0, -s * 0.08); box(a, 0.15, 0.26, 0.22, s * 0.39, 0.6, 0, PL, 0, 0, -s * 0.38); box(a, 0.12, 0.2, 0.2, s * 0.49, 0.78, 0, PL, 0, 0, -s * 0.75); } }) },
+    jar: { mat: M.inst, geo: cnTg(a => { addGeo(a, lathe([[0.2, 0], [0.3, 0.1], [0.41, 0.32], [0.45, 0.55], [0.41, 0.76], [0.28, 0.93], [0.25, 1.04], [0.17, 1.04]], 8), I, TERRA);
+      for (const [y, rr] of [[0.42, 0.435], [0.6, 0.462], [0.76, 0.42]]) part(a, CN_G.band, 0, y, 0, rr, 0.05, rr, TERRA2);   // (the rope-pattern bands)
+      for (const s of [-1, 1]) box(a, 0.05, 0.14, 0.12, s * 0.37, 0.85, 0, TERRA2); part(a, CN_G.sph0, 0, 0.99, 0, 0.2, 0.03, 0.2, [0.12, 0.08, 0.06]); }) },
+    amph: { mat: M.inst, geo: cnTg(a => { addGeo(a, lathe([[0, 0], [0.05, 0.03], [0.15, 0.25], [0.23, 0.55], [0.2, 0.78], [0.08, 0.9], [0.065, 1.02], [0.1, 1.06], [0, 1.06]], 8), I, col('#a85e38')); for (const s of [-1, 1]) part(a, CN_G.tor, s * 0.11, 0.9, 0, 0.08, 0.1, 0.3, col('#93512f')); }) },
+    rock: { mat: M.inst, geo: cnTg(a => part(a, CN_G.sph0, 0, 0, 0, 1, 1, 1, W)) },
+    lump: { mat: M.inst, geo: cnTg(a => part(a, CN_G.sph0, 0, 0, 0, 1, 1, 1, W)) },
+    blk: { mat: M.inst, geo: cnTg(a => box(a, 1, 1, 1, 0, 0, 0, W)) },
+    tuft: { mat: M.inst, geo: cnTg(a => { for (let i = 0; i < 3; i++) part(a, CN_G.cone4, (i - 1) * 0.25, 0, (i % 2) * 0.2 - 0.1, 0.18, 1 - i * 0.2, 0.18, W, i, (i - 1) * 0.3); }) },
+    fth: { mat: M.inst, geo: cnTg(a => { box(a, 0.075, 0.008, 0.3, 0, 0, 0, col('#f4f1e8')); box(a, 0.012, 0.012, 0.36, 0, 0.004, 0.02, col('#cfc7b4')); }) },
+    flame: { mat: M.flame, anim: true, pad: 1, geo: new THREE.OctahedronGeometry(1, 0).scale(0.13, 0.34, 0.13).translate(0, 0.26, 0) },
+    olive0: { mat: M.inst, geo: olive(0) }, olive1: { mat: M.inst, geo: olive(1) }, olive2: { mat: M.inst, geo: olive(2) },
+    cyp: { mat: M.inst, geo: cnTg(a => { addGeo(a, lathe([[0, 0], [0.3, 0.03], [0.42, 0.16], [0.45, 0.36], [0.4, 0.6], [0.28, 0.82], [0.12, 0.95], [0, 1]], 7), I, col('#2a4a2c')); part(a, CN_G.sph0, 0.12, 0.45, 0.1, 0.36, 0.22, 0.36, col('#33572f')); part(a, CN_G.sph0, -0.1, 0.7, -0.06, 0.26, 0.16, 0.26, col('#24432a')); }) },
+    goat: { mat: M.goat, anim: true, pad: 1, geo: cnTg(a => { const D = col('#4a3e34'), H = col('#3a3530');
+      box(a, 0.85, 0.4, 0.34, 0, 0.62, 0, W); box(a, 0.72, 0.12, 0.36, 0, 0.44, 0, [0.85, 0.85, 0.85]); box(a, 0.22, 0.32, 0.18, 0.42, 0.8, 0, W, 0, 0, -0.6); box(a, 0.3, 0.17, 0.15, 0.58, 0.93, 0, W, 0, 0, -0.35);
+      for (const s of [-1, 1]) { box(a, 0.04, 0.26, 0.04, 0.46, 1.07, s * 0.05, H, 0, 0, 0.95); box(a, 0.1, 0.04, 0.05, 0.5, 0.98, s * 0.1, W, s * 0.4, 0, 0); }
+      box(a, 0.04, 0.11, 0.04, 0.67, 0.81, 0, D); box(a, 0.06, 0.13, 0.05, -0.45, 0.78, 0, W, 0, 0, 0.7);
+      for (const x of [-0.32, 0.32]) for (const z of [-0.12, 0.12]) { box(a, 0.075, 0.42, 0.075, x, 0.21, z, W); box(a, 0.08, 0.06, 0.08, x, 0.03, z, H); } }) },
+    bird: { mat: M.bird, anim: true, pad: 40, geo: cnTg(a => { const G = col('#c4c8cc'); box(a, 0.34, 0.1, 0.1, 0, 0, 0, col('#f4f4f2')); box(a, 0.1, 0.09, 0.09, 0.2, 0.03, 0, col('#f4f4f2')); box(a, 0.06, 0.02, 0.03, 0.27, 0.02, 0, col('#e0a030'));
+      for (const s of [-1, 1]) { box(a, 0.16, 0.015, 0.46, 0.0, 0, s * 0.27, G); box(a, 0.1, 0.015, 0.14, -0.03, 0, s * 0.56, col('#2a2a2c')); } box(a, 0.1, 0.02, 0.1, -0.2, 0, 0, col('#e6e6e4')); }) },
+    dove: { mat: M.inst, geo: cnTg(a => { part(a, CN_G.sph0, 0, 0.1, 0, 0.14, 0.09, 0.09, col('#d6d6d8')); part(a, CN_G.sph0, 0.11, 0.18, 0, 0.055, 0.055, 0.055, col('#9a9ca4')); box(a, 0.12, 0.02, 0.07, -0.15, 0.1, 0, col('#8a8c94'), 0, 0, 0.3); }) },
+    puff: { mat: M.puff, anim: true, pad: 20, geo: cnTg(a => part(a, CN_G.sph0, 0, 0, 0, 1, 1, 1, W)) },
+    drift: { mat: M.drift, anim: true, pad: 60, geo: cnTg(a => box(a, 0.075, 0.3, 0.008, 0, 0, 0, col('#f4f1e8'))) },
+  };
+}
+const CN_SHADOW = new Set(['col', 'olive0', 'olive1', 'olive2', 'cyp', 'jar', 'horn']);   // (the repeated things big enough to throw a shadow worth its cost)
+const cnMesh = (geo, mat, sh) => { const m = new THREE.Mesh(geo, mat); m.receiveShadow = true; m.castShadow = !!sh; return m; };
+function cnDone(b, T, M, sh) {   // a bucket made into things to draw
+  const g = new THREE.Group(), buf = (P, extra) => { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(P.pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(P.nor, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(P.col, 3)); for (const k in extra) geo.setAttribute(k, new THREE.Float32BufferAttribute(P[extra[k][0]], extra[k][1])); return geo; };
+  if (b.acc.pos.length) g.add(cnMesh(accToGeo(b.acc), M.lam, sh));
+  if (b.st.pos.length) g.add(cnMesh(accToGeo(b.st), M.mason, sh));
+  if (b.glow.pos.length) g.add(new THREE.Mesh(accToGeo(b.glow), M.glow));
+  if (b.pan.pos.length) g.add(cnMesh(buf(b.pan, { pq: ['pq', 4] }), M.fresco));
+  if (b.cl.pos.length) { const m = cnMesh(buf(b.cl, { sw: ['sw', 1] }), M.cloth, sh); m.onBeforeRender = cnTick; g.add(m); }
+  for (const k in b.inst) {
+    const L = b.inst[k], t = T[k], m = new THREE.InstancedMesh(t.geo, t.mat, L.length);
+    L.forEach((o, i) => { _q.setFromEuler(_cnE.set(o.rx, o.ry, o.rz)); _cnL.compose(_p.set(o.x, o.y, o.z), _q, _s.set(o.sx, o.sy, o.sz)); m.setMatrixAt(i, _cnL); const c = o.c || [1, 1, 1]; m.setColorAt(i, _cnC.setRGB(c[0], c[1], c[2])); });
+    m.computeBoundingSphere(); if (t.pad) m.boundingSphere.radius += t.pad;
+    if (t.anim) m.onBeforeRender = cnTick; else { m.receiveShadow = true; m.castShadow = !!sh && CN_SHADOW.has(k); }
+    g.add(m);
+  }
+  return g;
+}
+function cnLod(g, x, y, z, dist) { const L = new THREE.LOD(); L.position.set(x, y, z); g.position.set(-x, -y, -z); L.addLevel(g, 0, 0.06); L.addLevel(new THREE.Object3D(), dist, 0.06); return L; }
+const cnFree = o => o.traverse(q => { q.geometry?.dispose(); q.material?.dispose?.(); });
+// where things can still go: on the table of rock, off the Labyrinth's paving, out of the palace, clear of every tree and house
+function cnSpace(cn) {
+  const taken = [...(cn.world && CRETE.taken || [])];
+  for (const t of cn.groves) taken.push({ x: t.x, z: t.z, r: t.kind === 'olive' ? t.sx * 0.75 : 2.2 });
+  const S = { taken,
+    free(x, z, r) {
+      if (Math.hypot(x, z - 215) + r > cnRad(Math.atan2(z - 215, x)) * 0.93) return false;
+      if (Math.hypot(x - PRO_C.x, z - PRO_C.z) < 217 + r) return false;
+      if (x > -122 - r && x < 95 + r && z > 380 - r && z < 528 + r) return false;
+      for (const t of taken) if ((x - t.x) ** 2 + (z - t.z) ** 2 < (t.r + r) ** 2) return false;
+      return true;
+    },
+    take(x, z, r) { taken.push({ x, z, r }); } };
+  return S;
+}
+// ── the Labyrinth: coping on every wall, a broken stretch here and there with its stones at its foot, moss, cracks, torches
+//    in iron brackets, gateposts and sills worn hollow at the gaps, bones in the dead ends, and the chamber round the tower
+function cnLabyrinth(cn, N, LM) {
+  const r = mulberry32(7301), C = PRO_C, Y = C.y;
+  const STONE = [[0.93, 0.88, 0.76], [0.86, 0.8, 0.68], [0.97, 0.93, 0.82], [0.8, 0.76, 0.66]], SC = () => STONE[(r() * 4) | 0];
+  const MOSS = col('#55663a'), MOSS2 = col('#6d7a3e'), IRON = col('#2a2622'), WOOD = col('#5d4330'), BONE = col('#e8dfc8'), SOOT = [0.16, 0.14, 0.12], RED = col('#a8301f'), CREAM = col('#efe5cf'), BRONZE = col('#a4823a');
+  for (const w of cn.walls) {
+    const ca = Math.cos(w.a), sa = Math.sin(w.a), ry = Math.PI / 2 - w.a, tx = -sa, tz = ca, top = Y + w.h, broken = r() < 0.13;
+    // coping: three slabs along the top, a hand proud of the faces; a broken stretch has lost some of them
+    for (let j = 0; j < 3; j++) { if (broken && r() < 0.6) continue; const o = (j - 1) * w.len / 3; box(N.st, w.len / 3 - 0.14, 0.42 + r() * 0.14, 9.7, w.x + tx * o, top + 0.2, w.z + tz * o, SC(), (r() - 0.5) * 0.03, ry + (r() - 0.5) * 0.03, (r() - 0.5) * 0.03); }
+    // what has come out of the wall over the years, at its foot on both sides
+    for (let s = -1; s <= 1; s += 2) {
+      const n = broken ? 3 + (r() * 4 | 0) : (r() < 0.45 ? 1 : 0) + (r() < 0.2 ? 1 : 0);
+      for (let q = 0; q < n; q++) { const o = (r() - 0.5) * w.len, dd = 4.9 + r() * (broken ? 3.4 : 1.1), sz = broken ? 0.45 + r() * 0.7 : 0.22 + r() * 0.36, x = w.x + tx * o + ca * dd * s, z = w.z + tz * o + sa * dd * s;
+        if (r() < 0.55) N.i('blk', x, Y + 0.6 + sz * 0.32, z, sz * 1.7, sz * 0.8, sz * 1.1, r() * 3, SC(), (r() - 0.5) * 0.5, (r() - 0.5) * 0.5);
+        else N.i('rock', x, Y + 0.6 + sz * 0.25, z, sz, sz * 0.7, sz, r() * 6, SC()); }
+    }
+    // moss on the top, and hanging down a face where the water runs
+    if (r() < 0.38) for (let q = 0, n = 1 + (r() * 3 | 0); q < n; q++) { const o = (r() - 0.5) * w.len * 0.9, s = r() < 0.5 ? -1 : 1, x = w.x + tx * o, z = w.z + tz * o, L = 1.4 + r() * 4.2, c = r() < 0.5 ? MOSS : MOSS2;
+      N.i('lump', x + ca * s * 4.2, top + 0.45, z + sa * s * 4.2, 1.1 + r() * 1.2, 0.35, 0.9 + r() * 0.8, r() * 6, c);
+      box(N.acc, 1.0 + r() * 1.6, L, 0.16, x + ca * s * 4.62, top - L / 2 + 0.1, z + sa * s * 4.62, c, 0, ry, 0); }
+    // cracks down the broken stretches
+    if (broken) for (let s = -1; s <= 1; s += 2) { let o = (r() - 0.5) * w.len * 0.6, y = top; for (let q = 0; q < 4 && y > Y + 2; q++) { const L = 1.2 + r() * 2.4, o2 = o + (r() - 0.5) * 1.8; box(N.acc, 0.16, L, 0.06, w.x + tx * (o + o2) / 2 + ca * s * 4.53, y - L / 2, w.z + tz * (o + o2) / 2 + sa * s * 4.53, SOOT, 0, ry, Math.atan2(o2 - o, L)); o = o2; y -= L * 0.95; } }
+    // a torch in an iron bracket every third stretch, on the side that faces along a passage, and the soot above it
+    if (w.i % 3 === 1 && !broken) {
+      const s = w.k === 0 ? 1 : w.i % 2 ? -1 : 1, x = w.x + ca * 4.5 * s, z = w.z + sa * 4.5 * s, y = Y + 3.7, ox = ca * s, oz = sa * s;
+      box(N.acc, 0.14, 0.14, 0.75, x + ox * 0.35, y, z + oz * 0.35, IRON, 0, ry, 0); box(N.acc, 0.1, 0.6, 0.1, x + ox * 0.08, y - 0.3, z + oz * 0.08, IRON, 0, ry, 0);
+      part(N.acc, CN_G.cyl5, x + ox * 0.68, y + 0.25, z + oz * 0.68, 0.065, 0.95, 0.065, WOOD); box(N.acc, 0.22, 0.26, 0.22, x + ox * 0.68, y + 0.82, z + oz * 0.68, [0.14, 0.11, 0.09]);
+      box(N.acc, 1.0, 2.6, 0.04, x + ox * 0.03, y + 2.1, z + oz * 0.03, SOOT, 0, ry, 0);
+      LM.i('flame', x + ox * 0.68, y + 0.92, z + oz * 0.68, 1.1, 1.3, 1.1, 0, [1.1, 0.58, 0.16]);
+    }
+    // weeds where the wall meets the paving
+    for (let q = 0, n = (r() * 4) | 0; q < n; q++) { const o = (r() - 0.5) * w.len, s = r() < 0.5 ? -1 : 1, h = 0.3 + r() * 0.7; if (TOUCH && q) continue; LM.i('tuft', w.x + tx * o + ca * s * 4.75, Y + 0.6, w.z + tz * o + sa * s * 4.75, 0.6 + r() * 0.6, h, 0.6 + r() * 0.6, r() * 6, r() < 0.7 ? [0.42, 0.55, 0.24] : [0.66, 0.62, 0.32]); }
+  }
+  // the gaps: a gatepost each side with horns on it, and a sill and two steps across, hollowed in the middle by all the feet
+  for (const gt of cn.gates) {
+    let lo = null, hi = null;
+    for (const w of cn.walls) if (w.k === gt.k) { const d = wrapAngle(w.a - gt.a); if (d > 0 && (!hi || d < hi.d)) hi = { w, d }; if (d < 0 && (!lo || d > lo.d)) lo = { w, d }; }
+    if (!lo || !hi) continue;
+    const half = Math.PI / gt.n, aL = lo.w.a + half, aH = hi.w.a - half, dA = wrapAngle(aH - aL);
+    if (dA <= 0 || dA > 1.2) continue;
+    for (const aj of [aL, aH]) { const x = C.x + Math.cos(aj) * gt.R, z = C.z + Math.sin(aj) * gt.R; box(N.st, 1.9, gt.h + 1.5, 10.4, x, Y + (gt.h + 1.5) / 2, z, STONE[2], 0, Math.PI / 2 - aj, 0); N.i('horn', x, Y + gt.h + 1.5, z, 2.3, 2.3, 2.3, Math.PI / 2 - aj, null); }
+    const am = aL + dA / 2, Lc = 2 * gt.R * Math.sin(dA / 2), ca = Math.cos(am), sa = Math.sin(am), x0 = C.x + ca * gt.R, z0 = C.z + sa * gt.R, ry = Math.PI / 2 - am, tx = -sa, tz = ca;
+    for (const [dd, hh, dep] of [[0, 0.34, 2.4], [-2.2, 0.17, 2.0], [2.2, 0.17, 2.0]]) {
+      const side = (Lc - 7) / 2;
+      for (const [o, len, worn] of [[-(3.5 + side / 2), side, 0], [0, 7, 1], [3.5 + side / 2, side, 0]]) if (len > 0.3) box(N.st, len, hh - worn * 0.08, dep, x0 + tx * o + ca * dd, Y + 0.6 + (hh - worn * 0.08) / 2, z0 + tz * o + sa * dd, worn ? [0.74, 0.7, 0.62] : STONE[0], 0, ry, 0);
+    }
+  }
+  // the dead ends: coping on the cross walls, and in some of them what was left of whoever was sent in
+  for (const sp of cn.spokes) {
+    const ca = Math.cos(sp.a), sa = Math.sin(sp.a), tx = -sa, tz = ca;
+    box(N.st, 22.5, 0.45, 8.7, sp.x, Y + 12.2, sp.z, STONE[1], 0, -sp.a, 0);
+    if (r() < 0.6) { const s = r() < 0.5 ? -1 : 1;
+      for (let q = 0, n = 5 + (r() * 6 | 0); q < n; q++) { const x = sp.x + tx * s * (4.6 + r() * 2.6) + ca * (r() - 0.5) * 12, z = sp.z + tz * s * (4.6 + r() * 2.6) + sa * (r() - 0.5) * 12; LM.i('blk', x, Y + 0.66, z, 0.07, 0.07, 0.35 + r() * 0.5, r() * 6, BONE); }
+      if (r() < 0.5) { const x = sp.x + tx * s * 5.2, z = sp.z + tz * s * 5.2, yw = r() * 6; LM.i('blk', x, Y + 0.78, z, 0.36, 0.26, 0.52, yw, BONE); for (const h of [-1, 1]) LM.i('blk', x + Math.cos(yw) * 0.3 * h, Y + 0.95, z - Math.sin(yw) * 0.3 * h, 0.4, 0.06, 0.06, yw, BONE, 0, h * 0.5); } }
+  }
+  // the chamber at the heart of it: a ring of red columns under a painted beam (open on the side of the tower's door), a
+  // floor of running spirals round the tower's foot, an altar with horns and double axes, and bronze braziers at the door
+  { const yF = Y + 0.8;
+    for (let i = 0; i < 20; i++) { const a = i / 20 * 6.2832 + 0.157; if (Math.abs(wrapAngle(a + Math.PI / 2)) < 0.3) continue; N.i('col', C.x + Math.cos(a) * 31, yF, C.z + Math.sin(a) * 31, 0.42, 4.6, 0.42, 0, null); }
+    for (let i = 0; i < 40; i++) { const a = (i + 0.5) / 40 * 6.2832; if (Math.abs(wrapAngle(a + Math.PI / 2)) < 0.4) continue; box(N.acc, 2 * Math.PI * 31 / 40 + 0.08, 0.6, 1.3, C.x + Math.cos(a) * 31, yF + 4.9, C.z + Math.sin(a) * 31, i % 2 ? RED : CREAM, 0, Math.PI / 2 - a, 0); }
+    for (let i = 0; i < 36; i++) { const a = (i + 0.5) / 36 * 6.2832, w = 2 * Math.PI * 21.5 / 36 + 0.05; cnPanel(N.pan, C.x + Math.cos(a) * 21.5, yF + 0.03, C.z + Math.sin(a) * 21.5, w, 5.5, -a - Math.PI / 2, 1, CREAM, i * w, true);
+      cnPanel(N.pan, C.x + Math.cos(a) * 14.2, yF + 0.03, C.z + Math.sin(a) * 14.2, 2 * Math.PI * 14.2 / 36 + 0.05, 2.2, -a - Math.PI / 2, 3, CREAM, i * 2.5, true); }
+    const az = C.z + 21; box(N.st, 6.2, 0.5, 4.2, C.x, yF + 0.25, az, STONE[2]); box(N.st, 4.8, 0.6, 3.1, C.x, yF + 0.8, az, STONE[0]); box(N.st, 3.4, 1.0, 2.2, C.x, yF + 1.6, az, STONE[2]);
+    N.i('horn', C.x, yF + 2.1, az, 1.5, 1.5, 1.5, 0, null);
+    for (const s of [-1, 1]) { const x = C.x + s * 2.7; part(N.acc, CN_G.cyl5, x, yF + 1.6, az, 0.07, 3.2, 0.07, WOOD); for (const h of [-1, 1]) box(N.acc, 0.55, 0.62, 0.05, x + h * 0.3, yF + 3.0, az, BRONZE, 0, 0, h * 0.25); }
+    for (const s of [-1, 1]) { const x = C.x + s * 4.6, z = C.z - 15.5; for (let i = 0; i < 3; i++) { const a = i * 2.094; part(N.acc, CN_G.cyl5, x + Math.cos(a) * 0.35, yF + 0.5, z + Math.sin(a) * 0.35, 0.05, 1.05, 0.05, BRONZE, 0, -Math.sin(a) * 0.3, Math.cos(a) * 0.3); }
+      part(N.acc, CN_G.cyl, x, yF + 1.08, z, 0.55, 0.22, 0.55, BRONZE); part(N.glow, CN_G.sph0, x, yF + 1.2, z, 0.45, 0.1, 0.45, [2.6, 0.95, 0.25]); LM.i('flame', x, yF + 1.2, z, 2.6, 3.0, 2.6, 0, [1.3, 0.66, 0.2]); }
+  }
+  // his father's shop at the tower's foot: a lean-to of reeds, the bench, the logs and planks, the hearth for the wax, a cart
+  { const yF = Y + 0.8, X = C.x, Z = C.z, WOODL = col('#8a6a46'), REED = col('#b39a5e'), CLAY = col('#a85e36');
+    for (const [x, z, h] of [[13.9, -5, 5.0], [13.9, 6, 5.0], [20.9, -5, 3.6], [20.9, 6, 3.6]]) box(N.acc, 0.28, h, 0.28, X + x, yF + h / 2, Z + z, WOOD);
+    box(N.acc, 8.4, 0.28, 12.6, X + 17.4, yF + 4.45, Z + 0.5, REED, 0, 0, -0.197); box(N.acc, 8.2, 0.12, 0.3, X + 17.4, yF + 4.2, Z - 5, WOOD, 0, 0, -0.197); box(N.acc, 8.2, 0.12, 0.3, X + 17.4, yF + 4.2, Z + 6, WOOD, 0, 0, -0.197);
+    box(N.acc, 3.2, 0.12, 0.9, X + 18.2, yF + 0.9, Z + 3.4, WOODL); for (const sx of [-1.45, 1.45]) for (const sz of [-0.35, 0.35]) box(N.acc, 0.1, 0.9, 0.1, X + 18.2 + sx, yF + 0.45, Z + 3.4 + sz, WOOD);
+    for (let i = 0; i < 6; i++) { const row = i < 3 ? 0 : i < 5 ? 1 : 2, k = i < 3 ? i : i < 5 ? i - 3 : 0; part(N.acc, CN_G.cyl, X + 15.6 + (k - (row === 0 ? 1 : row === 1 ? 0.5 : 0)) * 0.62, yF + 0.3 + row * 0.53, Z - 3.2, 0.3, 3.2, 0.3, i % 2 ? WOODL : WOOD, 0, Math.PI / 2); }
+    for (let i = 0; i < 5; i++) box(N.acc, 4.2, 0.1, 0.42, X + 18.0, yF + 0.06 + i * 0.11, Z - 0.6 + (i % 2) * 0.05, i % 2 ? WOODL : col('#9a7a52'));
+    for (let i = 0; i < 8; i++) { const a = i / 8 * 6.2832; N.i('rock', X + 19.2 + Math.cos(a) * 0.75, yF + 0.15, Z - 2.0 + Math.sin(a) * 0.75, 0.24, 0.2, 0.24, a, STONE[1]); }
+    part(N.glow, CN_G.sph0, X + 19.2, yF + 0.12, Z - 2.0, 0.55, 0.1, 0.55, [2.4, 0.8, 0.2]); part(N.acc, CN_G.cyl, X + 19.2, yF + 0.6, Z - 2.0, 0.38, 0.55, 0.38, col('#6e5a3a'));
+    part(N.acc, CN_G.cyl, X + 19.2, yF + 0.89, Z - 2.0, 0.34, 0.02, 0.34, col('#d9a84a'));
+    box(N.acc, 2.4, 0.18, 1.4, X + 23.0, yF + 0.85, Z + 8.5, WOODL); for (const s of [-1, 1]) part(N.acc, CN_G.tor, X + 23.0, yF + 0.55, Z + 8.5 + s * 0.78, 0.5, 0.5, 0.5, WOOD); box(N.acc, 2.6, 0.08, 0.08, X + 25.2, yF + 0.6, Z + 8.2, WOOD, 0, 0, 0.18); box(N.acc, 2.6, 0.08, 0.08, X + 25.2, yF + 0.6, Z + 8.8, WOOD, 0, 0, 0.18);
+    for (let i = 0; i < 3; i++) part(N.acc, CN_G.sph0, X + 22.4 + i * 0.6, yF + 1.2, Z + 8.5 + (i % 2) * 0.2, 0.32, 0.26, 0.3, col('#c9b48a'));
+    part(N.acc, CN_G.cyl, X + 12.9, yF + 0.32, Z + 1.2, 0.45, 0.62, 0.45, col('#b89a5e'));
+    for (const [x, z] of [[14.5, 4.8], [15.2, 5.2], [20.2, -4.4]]) { N.i('jar', X + x, yF, Z + z, 0.9, 0.9, 0.9, x, null); }
+    for (let i = 0; i < 40; i++) LM.i('blk', X + 16 + r() * 4, yF + 0.03, Z + 1.5 + r() * 3.5, 0.12, 0.02, 0.05, r() * 6, [0.86, 0.74, 0.5]);
+    for (const [x, z] of [[13.95, -3.2], [13.95, -2.4], [13.95, -1.6]]) box(N.acc, 0.06, 0.6, 0.12, X + x - 0.2, yF + 2.6, Z + z, IRON);
+    part(N.acc, CN_G.cyl, X + 16.5, yF + 0.4, Z + 2.8, 0.5, 0.8, 0.5, CLAY);
+  }
+}
+// ── the tower: string courses, a ring of corbels under the parapet, caps on the merlons (not over the gap they jump from),
+//    framed windows, a stone door frame with its door standing open, ivy, doves on the ledges, the rope from the hoist
+function cnTower(N, LM) {
+  const C = PRO_C, Y = C.y, X = C.x, Z = C.z, rAt = h => 11.5 - 2.5 * h / 50, r = mulberry32(4404);
+  const STONE = [0.95, 0.9, 0.79], STONE2 = [0.86, 0.81, 0.7], DARK = [0.07, 0.06, 0.05], WOOD = col('#5d4330'), IVY = [col('#3d5a2a'), col('#4c6a30'), col('#2f4a24')], ROPE = col('#a88e62');
+  for (const h of [17, 34]) { _mat.compose(_p.set(X, Y + h, Z), _q.identity(), _s.set(1, 1, 1)); addGeo(N.st, new THREE.CylinderGeometry(rAt(h) + 0.32, rAt(h) + 0.34, 0.55, 16).toNonIndexed(), _mat, STONE); }
+  for (let i = 0; i < 24; i++) { const a = (i + 0.5) / 24 * 6.2832, rr = rAt(48.6) + 0.22; box(N.st, 0.6, 0.95, 0.75, X + Math.cos(a) * rr, Y + 48.6, Z + Math.sin(a) * rr, STONE2, 0, Math.PI / 2 - a, 0); }
+  for (let i = 0; i < 12; i++) { if (i >= 8 && i <= 10) continue; const a = i / 12 * 6.2832; box(N.st, 3.7, 0.22, 1.9, X + Math.cos(a) * 9.4, Y + 52.31, Z + Math.sin(a) * 9.4, STONE, 0, Math.PI / 2 - a, 0); }
+  for (const [a, h] of [[0.3, 12], [1.4, 22], [2.5, 14], [3.4, 31], [4.2, 24], [5.5, 38], [0.9, 40], [2.0, 30], [5.0, 13]]) {
+    const rr = rAt(h), x = X + Math.cos(a) * rr, z = Z + Math.sin(a) * rr, ry = Math.PI / 2 - a, ox = Math.cos(a), oz = Math.sin(a);
+    box(N.st, 1.7, 2.7, 0.5, x, Y + h, z, STONE, 0, ry, 0); box(N.acc, 1.05, 2.0, 0.52, x + ox * 0.06, Y + h, z + oz * 0.06, DARK, 0, ry, 0); box(N.st, 1.95, 0.22, 0.75, x + ox * 0.15, Y + h - 1.36, z + oz * 0.15, STONE2, 0, ry, 0);
+    if (h < 30) for (const s of [-1, 1]) box(N.acc, 0.55, 2.0, 0.07, x + ox * 0.3 + Math.sin(a) * s * -0.95, Y + h, z + oz * 0.3 - Math.cos(a) * s * -0.95, WOOD, 0, ry + s * 0.9, 0);
+  }
+  { const z = Z - 11.55; box(N.st, 0.75, 6.9, 1.8, X - 1.98, Y + 3.45, z, STONE); box(N.st, 0.75, 6.9, 1.8, X + 1.98, Y + 3.45, z, STONE); box(N.st, 4.9, 0.95, 1.9, X, Y + 7.25, z, STONE2);
+    box(N.acc, 1.55, 5.7, 0.14, X + 1.6 - 0.78 * Math.cos(1.1), Y + 3.15, Z - 11.95 - 0.78 * Math.sin(1.1), WOOD, 0, Math.PI - 1.1, 0);
+    box(N.st, 5.4, 0.3, 1.0, X, Y + 0.95, Z - 12.7, STONE2); box(N.st, 5.8, 0.15, 0.9, X, Y + 0.88, Z - 13.6, STONE); }
+  for (let i = 0; i < 46; i++) { const h = 1 + r() * r() * 26, a = 2.25 + (r() - 0.5) * (0.5 - h * 0.012), rr = rAt(h) + 0.25; N.i('lump', X + Math.cos(a) * rr, Y + h, Z + Math.sin(a) * rr, 0.7 + r() * 0.8, 0.6 + r() * 0.7, 0.7 + r() * 0.8, r() * 6, IVY[i % 3]); }
+  for (const [a, h] of [[0.6, 17.3], [0.75, 17.3], [3.9, 34.3], [1.9, 34.3], [5.8, 17.3], [2.8, 17.3]]) { const rr = rAt(h) + 0.42; LM.i('dove', X + Math.cos(a) * rr, Y + h, Z + Math.sin(a) * rr, 1.1, 1.1, 1.1, -a + (r() - 0.5), null); }
+  part(LM.acc, CN_G.cyl5, X + 12.6, (Y + 52.6 + Y + 0.8) / 2, Z + 1.2, 0.05, 51.8, 0.05, ROPE);
+}
+// ── the top of the tower, where the wings were made: a floor of planks, the bench with a wing half done on it, the brazier
+//    and the wax, baskets of feathers, two spare frames against the parapet, rope, the hoist, an awning over the bench, a
+//    lamp, a drawing of the wing on a board, feathers everywhere — and nothing in the way of the two of them at the parapet.
+//    (Kept clear: the north side they jump from, x within 5.6 of the middle and z below -2.5, and the middle where a bird sits.)
+function cnTowerTop(F) {
+  const X = PRO_C.x, Z = PRO_C.z, Y0 = PRO_C.y + 50, r = mulberry32(5150);
+  const WOOD = col('#7a5a3c'), WOODD = col('#4e3826'), WOODL = col('#a07e54'), WAX = col('#d9a84a'), CLAY = col('#a85e36'), BRONZE = col('#9c7a3a'), WICK = col('#b89a5e'), WHITE = col('#f2efe6'),
+    ROPE = col('#a88e62'), IRON = col('#2b2724'), LINEN = col('#ece4cf'), STRIPE = col('#b8402a'), LEATHER = col('#6a4a30'), INK = [0.12, 0.1, 0.08];
+  for (let i = -11; i <= 11; i++) { const z = i * 0.76, L = 2 * Math.sqrt(Math.max(0, 8.5 * 8.5 - z * z)) - 0.2; if (L > 1) box(F.acc, L, 0.08, 0.7, X, Y0 + 0.04, Z + z, i % 3 ? WOOD : WOODL); }
+  const yD = Y0 + 0.08;
+  // the bench, and on it a wing half made: the ribs laid out in a fan, feathers going on from the back, the tools
+  { const bx = X, bz = Z + 6.0, top = yD + 0.95;
+    box(F.acc, 3.4, 0.12, 1.0, bx, top - 0.06, bz, WOODL); for (const sx of [-1.55, 1.55]) for (const sz of [-0.4, 0.4]) box(F.acc, 0.12, 0.9, 0.12, bx + sx, yD + 0.45, bz + sz, WOODD);
+    box(F.acc, 3.2, 0.06, 0.8, bx, yD + 0.3, bz, WOODD);
+    part(F.acc, CN_G.cyl, bx - 1.0, yD + 0.5, bz, 0.22, 0.34, 0.22, CLAY); part(F.acc, CN_G.cyl, bx - 0.5, yD + 0.48, bz + 0.1, 0.18, 0.3, 0.18, CLAY); part(F.acc, CN_G.cyl, bx + 0.8, yD + 0.52, bz, 0.32, 0.38, 0.32, WICK); part(F.acc, CN_G.sph0, bx + 0.8, yD + 0.72, bz, 0.3, 0.1, 0.3, WHITE);
+    const fx = bx - 1.45, fz = bz + 0.35; box(F.acc, 1.9, 0.04, 0.05, fx + 0.95, top + 0.02, fz, WOODL);
+    for (let i = 0; i < 7; i++) { const ph = (i - 3) * 0.09, L = 0.35 + i * 0.06, sx = fx + 0.15 + i * 0.27, cx = sx + Math.sin(ph) * L / 2, cz = fz - Math.cos(ph) * L / 2; box(F.acc, 0.025, 0.025, L, cx, top + 0.02, cz, WOODL, 0, ph, 0);
+      if (i >= 2) for (let q = 0; q < 3; q++) F.i('fth', cx + (q - 1) * 0.08, top + 0.04, cz - 0.05, 0.9 + q * 0.1, 1, 1.3, ph + (q - 1) * 0.15, null); }
+    for (let i = 0; i < 9; i++) F.i('fth', bx + 0.25 + i * 0.15, top + 0.01, bz - 0.3, 0.8, 1, 0.55 + i * 0.07, 0, null);
+    box(F.acc, 0.03, 0.03, 0.35, bx + 1.0, top + 0.02, bz + 0.25, WOODD); box(F.acc, 0.14, 0.11, 0.11, bx + 1.0, top + 0.06, bz + 0.07, WOOD);
+    box(F.acc, 0.02, 0.02, 0.22, bx + 1.25, top + 0.01, bz + 0.25, IRON, 0, 0.3, 0); box(F.acc, 0.02, 0.02, 0.2, bx + 1.32, top + 0.01, bz + 0.25, IRON, 0, -0.2, 0);
+    box(F.acc, 0.32, 0.03, 0.22, bx + 1.25, top + 0.01, bz - 0.05, col('#3a2c1e')); box(F.acc, 0.26, 0.032, 0.16, bx + 1.25, top + 0.012, bz - 0.05, col('#b08a4a'));
+    for (const s of [-1, 1]) box(F.acc, 0.015, 0.015, 0.26, bx + 0.55 + s * 0.04, top + 0.01, bz + 0.3, BRONZE, 0, s * 0.18, 0);
+    part(F.acc, CN_G.cyl, bx + 0.3, top + 0.06, bz + 0.3, 0.09, 0.12, 0.09, CLAY); part(F.acc, CN_G.cyl, bx + 0.3, top + 0.125, bz + 0.3, 0.08, 0.01, 0.08, WAX);
+    part(F.acc, CN_G.tor, bx + 0.05, top + 0.03, bz + 0.32, 0.06, 0.06, 0.3, LINEN, 0, Math.PI / 2);
+    box(F.acc, 0.2, 0.06, 0.1, bx - 0.25, top + 0.03, bz + 0.33, CLAY); part(F.glow, CN_G.sph0, bx - 0.15, top + 0.09, bz + 0.33, 0.025, 0.05, 0.025, [3, 1.8, 0.6]);
+    part(F.acc, CN_G.cyl5, bx + 1.2, yD + 0.25, bz - 1.0, 0.2, 0.04, 0.2, WOODL); for (let i = 0; i < 3; i++) { const a = i * 2.094; box(F.acc, 0.04, 0.45, 0.04, bx + 1.2 + Math.cos(a) * 0.13, yD + 0.22, bz - 1.0 + Math.sin(a) * 0.13, WOODD); }   // (and a stool)
+  }
+  // the brazier, coals in it, the pot of wax on the coals and the ladle; cakes of wax stacked by it; pots of wax on the floor
+  { const x = X - 4.4, z = Z + 3.6;
+    for (let i = 0; i < 3; i++) { const a = i * 2.094; part(F.acc, CN_G.cyl5, x + Math.cos(a) * 0.3, yD + 0.42, z + Math.sin(a) * 0.3, 0.035, 0.88, 0.035, IRON, 0, -Math.sin(a) * 0.32, Math.cos(a) * 0.32); }
+    part(F.acc, CN_G.cyl, x, yD + 0.88, z, 0.5, 0.18, 0.5, BRONZE); part(F.glow, CN_G.sph0, x, yD + 0.98, z, 0.42, 0.08, 0.42, [2.6, 0.9, 0.25]);
+    part(F.acc, CN_G.cyl, x, yD + 1.16, z, 0.3, 0.34, 0.3, BRONZE); part(F.acc, CN_G.cyl, x, yD + 1.335, z, 0.27, 0.02, 0.27, WAX); box(F.acc, 0.03, 0.03, 0.7, x + 0.12, yD + 1.45, z + 0.1, WOODD, 0.9, 0.5, 0);
+    F.i('puff', x, yD + 1.5, z, 0.22, 0.22, 0.22, 0, [0.82, 0.8, 0.78]); F.i('puff', x, yD + 1.5, z, 0.2, 0.2, 0.2, 0, [0.86, 0.85, 0.83]); F.i('puff', x, yD + 1.5, z, 0.24, 0.24, 0.24, 0, [0.8, 0.79, 0.77]);
+    for (let i = 0; i < 7; i++) box(F.acc, 0.42, 0.13, 0.3, X - 6.6 + (i % 2) * 0.05, yD + 0.065 + i * 0.13, Z + 0.9 + (i % 3) * 0.04, i % 2 ? WAX : col('#c9963c'), 0, i * 0.2, 0);
+    for (const [px, pz, s] of [[-5.6, 2.2, 1], [-3.5, 5.6, 0.8], [-5.4, 4.6, 0.9]]) { part(F.acc, CN_G.sph0, X + px, yD + 0.28 * s, Z + pz, 0.3 * s, 0.3 * s, 0.3 * s, CLAY); part(F.acc, CN_G.cyl, X + px, yD + 0.55 * s, Z + pz, 0.17 * s, 0.1 * s, 0.17 * s, CLAY); part(F.acc, CN_G.cyl, X + px, yD + 0.6 * s, Z + pz, 0.15 * s, 0.02, 0.15 * s, WAX); }
+  }
+  // baskets of feathers, and bundles tied with cord
+  for (const [px, pz] of [[4.6, 4.4], [5.7, 2.6], [3.4, 5.9]]) { const x = X + px, z = Z + pz; part(F.acc, CN_G.cyl, x, yD + 0.28, z, 0.42, 0.56, 0.42, WICK); part(F.acc, CN_G.tor, x, yD + 0.56, z, 0.42, 0.42, 0.3, col('#9a7e4a'), 0, Math.PI / 2); part(F.acc, CN_G.sph, x, yD + 0.6, z, 0.4, 0.17, 0.4, WHITE);
+    for (let q = 0; q < 6; q++) { const a = q * 1.05 + r(); F.i('fth', x + Math.cos(a) * 0.22, yD + 0.75, z + Math.sin(a) * 0.22, 1, 1, 1.2, a, null, -1.1 - r() * 0.3); } }
+  for (const [px, pz, a] of [[6.6, 0.6, 0.4], [6.9, 1.4, 1.2]]) { part(F.acc, CN_G.sph0, X + px, yD + 0.15, Z + pz, 0.42, 0.15, 0.17, WHITE, a); part(F.acc, CN_G.tor, X + px, yD + 0.15, Z + pz, 0.16, 0.16, 0.2, ROPE, a, 0, Math.PI / 2); }
+  // two spare wings against the west parapet: the spar, the ribs fanned from it, straps, and feathers on most of it
+  for (const [px, pz, yaw, full] of [[-7.6, -0.6, Math.PI / 2, true], [-6.9, 3.5, 2.03, false]]) {
+    _cnP.compose(_p.set(X + px, yD, Z + pz), _q.setFromEuler(new THREE.Euler(-0.26, yaw, 0, 'YXZ')), _s.set(1, 1, 1)); const P = _cnP.clone();
+    cnPut(F.acc, G.unitBox, P, 0, 1.3, 0, 0.07, 2.6, 0.07, WOODL);
+    for (let j = 0; j < 8; j++) { const y0 = 0.5 + j * 0.27, b = 0.25 + j * 0.1, L = 0.8 + j * 0.15, cx = Math.cos(b) * L / 2, cy = -Math.sin(b) * L / 2;
+      cnPut(F.acc, G.unitBox, P, cx, y0 + cy, 0, L, 0.03, 0.03, WOOD, 0, 0, -b);
+      if (full || j > 3) for (let q = 0; q < 4; q++) { const t = (q + 0.6) / 4.2; cnPut(F.acc, G.unitBox, P, Math.cos(b) * L * t + 0.05, y0 - Math.sin(b) * L * t - 0.17, 0.02, 0.07, 0.36, 0.006, q % 2 ? WHITE : col('#e4e0d4'), 0, 0, -b * 0.4); } }
+    for (const y of [0.4, 0.9]) cnPut(F.acc, G.unitBox, P, 0, y, 0, 0.14, 0.05, 0.12, LEATHER);
+  }
+  // rope: coils of it by the hoist; the hoist itself, a beam out over the edge with a pulley, a post and a brace
+  for (const [px, pz] of [[6.9, -0.6], [6.3, -2.2]]) for (let q = 0; q < 4; q++) part(F.acc, CN_G.tor, X + px, yD + 0.07 + q * 0.1, Z + pz, 0.42 - q * 0.04, 0.42 - q * 0.04, 0.42, ROPE, 0, Math.PI / 2);
+  box(F.acc, 7.0, 0.26, 0.26, X + 9.3, yD + 2.85, Z + 1.2, WOODD); box(F.acc, 0.24, 2.9, 0.24, X + 6.0, yD + 1.45, Z + 1.2, WOODD); box(F.acc, 2.3, 0.18, 0.18, X + 6.8, yD + 2.1, Z + 1.2, WOODD, 0, 0, Math.PI / 4);
+  part(F.acc, CN_G.tor, X + 12.6, yD + 2.6, Z + 1.2, 0.2, 0.2, 0.6, WOOD); box(F.acc, 0.1, 0.4, 0.1, X + 12.6, yD + 2.7, Z + 1.2, IRON);
+  // an awning of striped linen over the bench, tied at its corners, the middle of it lifting in the wind
+  for (const [px, pz] of [[-2.1, 4.7], [2.1, 4.7], [-2.1, 7.4], [2.1, 7.4]]) part(F.acc, CN_G.cyl5, X + px, yD + 1.36, Z + pz, 0.05, 2.72, 0.05, WOODD);
+  cnCloth(F.cl, [X - 2.3, yD + 2.74, Z + 4.5], [4.6, 0, 0], [0, -0.22, 3.1], 9, 5, (u, v) => Math.sin(Math.PI * u) * Math.sin(Math.PI * v) * 0.7, u => Math.floor(u * 7.5) % 2 ? LINEN : STRIPE);
+  // a lamp on a stand; a jar of water; an amphora of oil; the plan of the wing on a board on an easel
+  part(F.acc, CN_G.cyl5, X - 6.2, yD + 0.75, Z + 5.4, 0.04, 1.5, 0.04, BRONZE); part(F.acc, CN_G.cyl, X - 6.2, yD + 1.5, Z + 5.4, 0.13, 0.06, 0.13, BRONZE); part(F.glow, CN_G.sph0, X - 6.2, yD + 1.6, Z + 5.4, 0.04, 0.09, 0.04, [3.2, 1.9, 0.7]);
+  F.i('jar', X - 1.8, yD, Z + 7.6, 0.7, 0.7, 0.7, 0.4, null); F.i('amph', X + 6.4, yD + 0.05, Z + 4.4, 0.85, 0.85, 0.85, 0, null, 0.25, 0.2);
+  { const x = X + 6.5, z = Z - 3.2, yw = Math.atan2(-(X - x), -(Z - z)) + Math.PI;
+    for (const s of [-1, 1]) box(F.acc, 0.05, 1.7, 0.05, x + Math.cos(yw) * s * 0.4, yD + 0.85, z - Math.sin(yw) * s * 0.4, WOODD, -0.2, yw, 0);
+    box(F.acc, 1.0, 0.72, 0.04, x, yD + 1.25, z, col('#e8dcc0'), -0.2, yw, 0);
+    for (let j = 0; j < 5; j++) box(F.acc, 0.6 - j * 0.08, 0.015, 0.045, x + Math.cos(yw) * 0.05, yD + 1.42 - j * 0.07, z - Math.sin(yw) * 0.05, INK, -0.2, yw, -0.3 - j * 0.12); }
+  // the hatch down into the tower, its lid thrown back, the top of the ladder showing
+  { const x = X - 2.4, z = Z + 1.9; box(F.acc, 1.25, 0.03, 1.25, x, yD + 0.02, z, [0.05, 0.04, 0.03]);
+    for (const [ox, oz, w, d] of [[0, -0.66, 1.4, 0.1], [0, 0.66, 1.4, 0.1], [-0.66, 0, 0.1, 1.4], [0.66, 0, 0.1, 1.4]]) box(F.acc, w, 0.08, d, x + ox, yD + 0.04, z + oz, WOODD);
+    box(F.acc, 1.25, 0.07, 1.25, x, yD + 0.04 + 0.6 * Math.sin(1.9), z + 0.62 - 0.6 * Math.cos(1.9), WOOD, 1.9, 0, 0);
+    for (const s of [-1, 1]) box(F.acc, 0.06, 1.0, 0.06, x + s * 0.4, yD + 0.45, z - 0.35, WOODD); for (let q = 0; q < 2; q++) box(F.acc, 0.8, 0.04, 0.04, x, yD + 0.25 + q * 0.4, z - 0.35, WOODD); }
+  // feathers on the floor all over (some even where they stand), and on the merlons; and a few let go into the air
+  for (let i = 0; i < 150; i++) { const a = r() * 6.2832, d = 1.2 + Math.sqrt(r()) * 7.1; F.i('fth', X + Math.cos(a) * d, yD + 0.012, Z + Math.sin(a) * d, 0.8 + r() * 0.5, 1, 0.6 + r() * 0.7, r() * 6.28, null, (r() - 0.5) * 0.2); }
+  for (let i = 0; i < 12; i++) { const a = r() * 6.2832; F.i('drift', X + Math.cos(a) * 6, Y0 + 2 + r() * 3, Z + Math.sin(a) * 6, 1.2, 1.2, 1.2, 0, null); }
+  for (const i of [0, 1, 3, 5, 6]) { const a = i / 12 * 6.2832 + (r() - 0.5) * 0.2; F.i('dove', X + Math.cos(a) * 9.4, Y0 + 2.42, Z + Math.sin(a) * 9.4, 1.2, 1.2, 1.2, -a + Math.PI / 2 + (r() - 0.5) * 2, null); }
+  for (let i = 0; i < 9; i++) F.i('bird', X, Y0 + 12 + r() * 14, Z, 1.4, 1.4, 1.4, 0, null);
+}
+// ── the palace of Minos, close to: four wings round a long court, plastered and painted, red cornices, horns of consecration
+//    along every roof; porticoes of red columns that narrow toward their feet, black capitals; frescoes behind them; light wells;
+//    a shrine of three bays; the north portico up its steps; the store rooms with their great jars; the steps where people
+//    sat to watch; a paved road to the Labyrinth; banners. (Where the far palace is: it replaces it as you come in.)
+function cnPalace(N, PM) {
+  const Y = 60, pz = PRO_C.z + 285, r = mulberry32(2207);
+  const PL = col('#ece0c4'), PL2 = col('#e2d3b2'), GYP = [0.93, 0.91, 0.86], RED = col('#a8301f'), BLK = col('#22201e'), DARK = [0.06, 0.05, 0.05], STN = [0.86, 0.82, 0.72], WOOD = col('#5a4030'), EARTH = col('#7a6a52'), OCH = col('#c99a4a'), BLUE = col('#3b5f93');
+  const blocks = [[-85, -32, 404, 466, 0, 16, PL], [32, 85, 404, 466, 0, 16, PL], [-32, 32, 404, 420, 0, 12, PL2], [-32, 32, 450, 466, 0, 12, PL2], [-68, -38, 412, 460, 16, 27, PL], [36, 64, 414, 444, 16, 26, [0.92, 0.88, 0.78]]];
+  const outer = (b, f) => f === 0 ? b[0] === -85 : f === 1 ? b[1] === 85 : f === 2 ? b[2] === 404 : b[3] === 466;
+  for (const b of blocks) {
+    const [x0, x1, z0, z1, y0, y1, c] = b, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0, ground = y0 === 0;
+    if (ground) box(N.st, w + 0.3, 2.4, d + 0.3, cx, Y + 1.2, cz, GYP);
+    box(N.acc, w, y1 - y0 - (ground ? 2.4 : 0), d, cx, Y + (y1 + y0 + (ground ? 2.4 : 0)) / 2, cz, c);
+    box(N.acc, w + 1.2, 1.1, d + 1.2, cx, Y + y1 + 0.55, cz, RED); box(N.acc, w - 1.6, 0.14, d - 1.6, cx, Y + y1 + 1.12, cz, [0.84, 0.79, 0.68]); box(N.acc, w + 0.15, 0.5, d + 0.15, cx, Y + y0 + (ground ? 8.2 : 5.5), cz, col('#7a2a1c'));   // (a red cornice and the flat roof inside it; a painted band round the middle)
+    // the four faces: windows in red frames on the outside ones, horns along the edge of the roof
+    for (let f = 0; f < 4; f++) {
+      const along = f < 2 ? d : w, nx = f === 0 ? -1 : f === 1 ? 1 : 0, nz = f === 2 ? -1 : f === 3 ? 1 : 0, fx = f === 0 ? x0 : f === 1 ? x1 : cx, fz = f === 2 ? z0 : f === 3 ? z1 : cz, yw = f < 2 ? Math.PI / 2 : 0;
+      const P = s => [fx + (f < 2 ? 0 : s), fz + (f < 2 ? s : 0)];
+      for (let s = -along / 2 + 4; s <= along / 2 - 3; s += 8.5) { const [hx, hz] = P(s + (r() - 0.5)); N.i('horn', hx - nx * 0.4, Y + y1 + 1.1, hz - nz * 0.4, 1.7, 1.7, 1.7, yw, null); }
+      if (!(outer(b, f) || !ground)) continue;
+      for (const wy of ground ? [4.6, 11.4] : [4.0]) for (let s = -along / 2 + 3; s <= along / 2 - 2.5; s += 5.2) { const [hx, hz] = P(s);
+        box(N.acc, f < 2 ? 0.14 : 1.55, 1.95, f < 2 ? 1.55 : 0.14, hx + nx * 0.06, Y + y0 + wy, hz + nz * 0.06, RED); box(N.acc, f < 2 ? 0.16 : 1.05, 1.45, f < 2 ? 1.05 : 0.16, hx + nx * 0.09, Y + y0 + wy, hz + nz * 0.09, DARK);
+        box(N.acc, f < 2 ? 0.18 : 0.12, 1.45, f < 2 ? 0.12 : 0.18, hx + nx * 0.11, Y + y0 + wy, hz + nz * 0.11, RED); }
+    }
+  }
+  // the outer friezes: a painted band below the cornice all the way round
+  cnPanel(N.pan, 0, Y + 13.4, 403.9, 170, 1.6, Math.PI, 1, PL); cnPanel(N.pan, 0, Y + 13.4, 466.1, 170, 1.6, 0, 3, PL);
+  cnPanel(N.pan, -85.1, Y + 13.4, 435, 62, 1.6, -Math.PI / 2, 3, PL); cnPanel(N.pan, 85.1, Y + 13.4, 435, 62, 1.6, Math.PI / 2, 1, PL);
+  cnPanel(N.pan, -53, Y + 25.2, 411.9, 30, 1.2, Math.PI, 4, PL); cnPanel(N.pan, 50, Y + 24.2, 413.9, 28, 1.2, Math.PI, 4, PL);
+  // the court: flags of gypsum; porticoes round it; behind them, the frescoes
+  box(N.st, 64, 0.3, 30, 0, Y + 0.15, 435, GYP);
+  const yC = Y + 0.3;
+  for (const z of [423, 427, 443, 447]) N.i('col', -29.6, yC, z, 0.42, 5.8, 0.42, 0, null);
+  for (let z = 423; z <= 447.1; z += 4.8) { N.i('col', 29.6, yC, z, 0.42, 5.8, 0.42, 0, null); N.i('col', 29.6, yC + 6.45, z, 0.36, 4.9, 0.36, 0, null); }
+  for (let x = -26; x <= 26.1; x += 6.5) { N.i('col', x, yC, 422.6, 0.42, 5.8, 0.42, 0, null); N.i('col', x, yC, 447.4, 0.42, 5.8, 0.42, 0, null); }
+  for (const [x, z, w, d] of [[-30, 425, 4.4, 8.6], [-30, 445, 4.4, 8.6], [30, 435, 4.4, 28.6], [0, 421.8, 56, 3.6], [0, 448.2, 56, 3.6]]) { box(N.acc, w, 0.65, d, x, yC + 6.12, z, PL2); box(N.acc, w + 0.1, 0.3, d + 0.1, x, yC + 5.95, z, RED); box(N.acc, w, 0.7, d, x, yC + 6.8, z, PL); }
+  box(N.acc, 4.4, 0.65, 28.6, 30, yC + 11.67, 435, PL2); box(N.acc, 4.5, 0.3, 28.7, 30, yC + 11.5, 435, RED); box(N.acc, 0.3, 0.9, 28.6, 28, yC + 12.45, 435, PL);
+  cnPanel(N.pan, -31.9, yC + 3.2, 435, 28, 3.6, Math.PI / 2, 7, PL); cnPanel(N.pan, 31.9, yC + 3.2, 435, 28, 3.6, -Math.PI / 2, 2, PL);
+  cnPanel(N.pan, 0, yC + 3.2, 420.1, 62, 3.6, 0, 5, PL); cnPanel(N.pan, 0, yC + 3.2, 449.9, 62, 3.6, Math.PI, 1, PL);
+  cnPanel(N.pan, 0, yC + 6.12, 423.65, 56, 0.6, 0, 4, PL); cnPanel(N.pan, 0, yC + 6.12, 446.35, 56, 0.6, Math.PI, 4, PL); cnPanel(N.pan, 27.75, yC + 6.12, 435, 28.6, 0.6, -Math.PI / 2, 4, PL);
+  // the shrine of three bays on the west side of the court, horns on each roof, the middle one higher
+  for (const [z, h] of [[431.6, 3.9], [435, 5.2], [438.4, 3.9]]) { box(N.st, 4.4, 0.6, 3.3, -29.8, yC + 0.3, z, STN); N.i('col', -28.0, yC + 0.6, z, 0.3, h - 0.6, 0.3, 0, null); box(N.acc, 4.6, 0.5, 3.4, -29.8, yC + h + 0.25, z, PL); box(N.acc, 4.7, 0.25, 3.5, -29.8, yC + h, z, z === 435 ? BLUE : RED); N.i('horn', -28.6, yC + h + 0.5, z, 1.3, 1.3, 1.3, Math.PI / 2, null); }
+  box(N.st, 3.2, 1.0, 2.4, 0, yC + 0.5, 435, STN); N.i('horn', 0, yC + 1.0, 435, 1.2, 1.2, 1.2, 0, null);
+  for (const s of [-1, 1]) { part(N.acc, CN_G.cyl5, s * 2.4, yC + 1.6, 435, 0.07, 3.2, 0.07, WOOD); for (const h of [-1, 1]) box(N.acc, 0.55, 0.6, 0.05, s * 2.4 + h * 0.3, yC + 3.0, 435, col('#a4823a'), 0, 0, h * 0.25); }
+  for (const [x, z] of [[-26, 424.5], [26, 424.5], [-26, 445.5], [24, 445.5], [21.5, 445.8]]) N.i('jar', x, yC, z, 1.3, 1.3, 1.3, r() * 6, null);
+  // light wells: a dark square in a roof, a parapet round it, columns standing up out of it
+  for (const [x, z, s] of [[58, 455, 9], [-50, 408, 6]]) { box(N.acc, s, 0.12, s, x, Y + 16.06, z, DARK);
+    for (const [ox, oz, w, d] of [[0, -s / 2, s + 0.6, 0.3], [0, s / 2, s + 0.6, 0.3], [-s / 2, 0, 0.3, s], [s / 2, 0, 0.3, s]]) box(N.acc, w, 1.0, d, x + ox, Y + 16.5, z + oz, PL);
+    for (const ox of [-1, 1]) for (const oz of [-1, 1]) N.i('col', x + ox * (s / 2 - 1), Y + 12, z + oz * (s / 2 - 1), 0.32, 6.2, 0.32, 0, null);
+    box(N.acc, s - 1.4, 0.4, 0.5, x, Y + 18.4, z - s / 2 + 1, RED); box(N.acc, s - 1.4, 0.4, 0.5, x, Y + 18.4, z + s / 2 - 1, RED); }
+  // the north portico, two storeys of columns up its steps, as the far one has
+  for (let i = 0; i < 6; i++) box(N.st, 64 - i * 4, 0.3, 2.0, 0, Y + 0.15 + i * 0.3, 391 + i * 1.6, i % 2 ? STN : GYP);
+  box(N.st, 172, 1.8, 6, 0, Y + 0.9, 401, GYP);
+  for (let i = 0; i < 14; i++) N.i('col', -78 + i * 12, Y + 1.8, 400, 0.78, 12.4, 0.78, 0, null);
+  box(N.acc, 172, 1.2, 6.4, 0, Y + 14.8, 401, PL2); box(N.acc, 172.4, 0.5, 6.6, 0, Y + 14.15, 401, RED); cnPanel(N.pan, 0, Y + 14.8, 397.75, 172, 1.2, Math.PI, 4, PL);
+  for (let i = 0; i < 9; i++) N.i('horn', -70 + i * 17.5, Y + 15.4, 398.6, 2.1, 2.1, 2.1, 0, null);
+  // the store rooms west of it: long rooms open to the sky, two rows of great jars in each
+  box(N.acc, 15, 0.12, 54, -93.5, Y + 0.06, 435, EARTH);
+  for (const [x, z, w, d] of [[-93.5, 408, 15.6, 0.8], [-93.5, 462, 15.6, 0.8], [-101.2, 435, 0.8, 54]]) box(N.st, w, 4.2, d, x, Y + 2.1, z, STN);
+  for (let j = 1; j < 8; j++) box(N.st, 14.6, 4.2, 0.6, -94.0, Y + 2.1, 408 + j * 6.75, STN);
+  for (let j = 0; j < 8; j++) for (const oz of [-1.65, 1.65]) for (let q = 0; q < 4; q++) PM.i('jar', -98.6 + q * 3.3 + (r() - 0.5) * 0.3, Y + 0.12, 411.4 + j * 6.75 + oz, 1.5 + r() * 0.25, 1.5 + r() * 0.25, 1.5 + r() * 0.25, r() * 6, null);
+  // the steps people sat on to watch, at the corner
+  for (let i = 0; i < 5; i++) box(N.st, 34, 0.36 * (i + 1), 1.7, -63, Y + 0.18 * (i + 1), 383.5 + i * 1.7, i % 2 ? STN : GYP);
+  // the road from the north steps to the Labyrinth's wall, kerbed, and cypresses along it
+  box(N.st, 6.4, 0.3, 34, 0, Y + 0.15, 373, GYP); for (const s of [-1, 1]) box(N.st, 0.5, 0.5, 34, s * 3.45, Y + 0.25, 373, STN);
+  for (let z = 360; z <= 386; z += 6.5) for (const s of [-1, 1]) N.i('cyp', s * 6.5, Y, z, 2.6, 15 + r() * 4, 2.6, 0, [0.9 + r() * 0.2, 0.9 + r() * 0.2, 0.9 + r() * 0.2]);
+  // banners on masts at the north steps, and a pergola on the high west roof with cloth on it
+  for (const s of [-1, 1]) { const x = s * 34, z = 394; part(N.acc, CN_G.cyl5, x, Y + 9, z, 0.14, 18, 0.14, WOOD); N.i('horn', x, Y + 18, z, 1.0, 1.0, 1.0, 0, null);
+    cnCloth(N.cl, [x - 0.7, Y + 17.4, z], [1.4, 0, 0], [0, -7.5, 0.6], 2, 8, (u, v) => v * 1.2, (u, v) => v > 0.55 && v < 0.7 ? BLUE : s > 0 ? RED : OCH); }
+  for (const [ox, oz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(N.acc, 0.3, 2.6, 0.3, -53 + ox * 5, Y + 27 + 1.3, 440 + oz * 4, WOOD);
+  for (const oz of [-4, 4]) box(N.acc, 10.6, 0.25, 0.3, -53, Y + 29.7, 440 + oz, WOOD);
+  cnCloth(N.cl, [-58, Y + 29.8, 436], [10, 0, 0], [0, 0, 8], 6, 4, (u, v) => Math.sin(Math.PI * u) * Math.sin(Math.PI * v) * 0.5, u => Math.floor(u * 6) % 2 ? col('#e8dfc8') : col('#d27a3a'));
+  for (let i = 0; i < 5; i++) N.i('jar', -64 + i * 2.6, Y + 27, 457, 0.9, 0.9, 0.9, i, null);
+  for (let i = 0; i < 4; i++) PM.i('puff', 75 + (i % 2) * 0.5, Y + 17.2, 460, 1.1, 1.1, 1.1, 0, [0.78, 0.77, 0.75]);
+  box(N.acc, 1.2, 1.6, 1.2, 75, Y + 16.8, 460, PL2);
+}
+// ── one house of the town: two storeys or one under a flat roof with a parapet, timber courses, small windows framed in red,
+//    a door; perhaps a room on the roof or a pergola, a stair up the side, a chimney, a yard with a jar or an oven, washing
+function cnHouse(N, TM, x, z, yaw, w, d, fl, r, smoke, Y = 60) {
+  const H = fl * 3.4, ca = Math.cos(yaw), sa = Math.sin(yaw), L = (lx, lz) => [x + lx * ca + lz * sa, z - lx * sa + lz * ca];
+  const WALLS = [col('#efe6d2'), col('#e8dcc0'), col('#f2ead9'), col('#e6cfae'), col('#dcc4a4'), col('#f0d9c4')], wc = WALLS[(r() * 6) | 0], ROOF = [col('#cbbfa5'), col('#b8ab90'), col('#d6cbb2')][(r() * 3) | 0];
+  const RED = col('#a8301f'), DARK = [0.07, 0.06, 0.05], WOOD = col('#5a4030'), STN = [0.8, 0.76, 0.66];
+  const B = (acc, bw, bh, bd, lx, y, lz, c, ry = 0) => { const [px, pz] = L(lx, lz); box(acc, bw, bh, bd, px, y, pz, c, 0, yaw + ry, 0); };
+  B(N.st, w + 0.3, 0.9, d + 0.3, 0, Y + 0.45, 0, STN);
+  B(N.acc, w, H, d, 0, Y + H / 2, 0, wc);
+  for (let f = 1; f <= fl; f++) B(N.acc, w + 0.1, 0.22, d + 0.1, 0, Y + f * 3.4 - (f === fl ? 0.3 : 0), 0, WOOD);
+  B(N.acc, w + 0.5, 0.35, d + 0.5, 0, Y + H + 0.17, 0, ROOF);
+  for (const s of [-1, 1]) { B(N.acc, w + 0.5, 0.45, 0.25, 0, Y + H + 0.57, s * (d / 2 + 0.12), wc); B(N.acc, 0.25, 0.45, d + 0.5, s * (w / 2 + 0.12), Y + H + 0.57, 0, wc); }
+  const door = (r() - 0.5) * (w - 2.2);
+  B(N.acc, 1.0, 2.1, 0.14, door, Y + 1.05, d / 2 + 0.03, DARK); B(N.acc, 1.4, 0.22, 0.24, door, Y + 2.2, d / 2 + 0.06, WOOD);
+  for (let f = 0; f < fl; f++) { const n = Math.max(1, Math.floor(w / 2.6)); for (let i = 0; i < n; i++) { const lx = (i + 0.5) / n * w - w / 2; if (f === 0 && Math.abs(lx - door) < 1.2) continue; const y = Y + f * 3.4 + 1.95;
+    B(N.acc, 1.1, 1.3, 0.1, lx, y, d / 2 + 0.03, RED); B(N.acc, 0.76, 0.95, 0.12, lx, y, d / 2 + 0.05, DARK); if (f > 0) { B(N.acc, 0.1, 0.95, 0.14, lx, y, d / 2 + 0.06, RED); B(N.acc, 0.76, 0.1, 0.14, lx, y, d / 2 + 0.06, RED); } } }
+  if (fl > 1 || r() < 0.5) for (const s of [-1, 1]) { if (r() < 0.4) continue; const lz = (r() - 0.5) * (d - 2); B(N.acc, 0.1, 1.2, 1.0, s * (w / 2 + 0.03), Y + (fl - 1) * 3.4 + 1.95, lz, RED); B(N.acc, 0.12, 0.88, 0.7, s * (w / 2 + 0.05), Y + (fl - 1) * 3.4 + 1.95, lz, DARK); }
+  const top = Y + H + 0.35, kind = r();
+  if (kind < 0.4) { B(N.acc, w * 0.45, 2.5, d * 0.45, -w * 0.2, top + 1.25, -d * 0.15, wc); B(N.acc, w * 0.45 + 0.4, 0.3, d * 0.45 + 0.4, -w * 0.2, top + 2.6, -d * 0.15, ROOF); B(N.acc, 0.8, 1.7, 0.1, -w * 0.2, top + 0.85, -d * 0.15 + d * 0.225 + 0.03, DARK); }
+  else if (kind < 0.7) { for (const ox of [-1, 1]) for (const oz of [-1, 1]) B(N.acc, 0.14, 2.2, 0.14, ox * (w / 2 - 0.6), top + 1.1, oz * (d / 2 - 0.6), WOOD);
+    for (const oz of [-1, 1]) B(N.acc, w - 1.0, 0.14, 0.16, 0, top + 2.2, oz * (d / 2 - 0.6), WOOD);
+    if (r() < 0.5) B(N.acc, w - 1.2, 0.3, d - 1.2, 0, top + 2.4, 0, [0.34, 0.48, 0.22]);
+    else { const [px, pz] = L(-(w / 2 - 0.6), -(d / 2 - 0.6)); cnCloth(TM.cl, [px, top + 2.25, pz], [(w - 1.2) * ca, 0, -(w - 1.2) * sa], [(d - 1.2) * sa, 0, (d - 1.2) * ca], 4, 3, (u, v) => Math.sin(Math.PI * u) * Math.sin(Math.PI * v) * 0.4, () => [[0.93, 0.89, 0.8], [0.8, 0.36, 0.22], [0.36, 0.5, 0.7]][((x * 7 | 0) % 3 + 3) % 3]); } }
+  if (fl === 2 && d >= 4.6 && r() < 0.35) for (let j = 0; j < 10; j++) B(N.st, 0.95, 0.34 * (j + 1), 0.42, w / 2 + 0.5, Y + 0.17 * (j + 1), d / 2 - 0.4 - j * 0.42, STN);
+  if (r() < 0.4 || smoke) { const [px, pz] = L(w * 0.3, d * 0.25); box(N.acc, 0.6, 1.2, 0.6, px, top + 0.6, pz, wc, 0, yaw, 0); if (smoke) for (let i = 0; i < 4; i++) TM.i('puff', px, top + 1.3, pz, 0.5, 0.5, 0.5, 0, [0.74, 0.73, 0.71]); }
+  if (r() < 0.32) { B(N.st, w, 1.1, 0.4, 0, Y + 0.55, d / 2 + 3.2, STN); for (const s of [-1, 1]) B(N.st, 0.4, 1.1, 3.0, s * (w / 2 - 0.2), Y + 0.55, d / 2 + 1.6, STN);
+    const [px, pz] = L((r() - 0.5) * (w - 2), d / 2 + 1.6);
+    if (r() < 0.5) TM.i('jar', px, Y, pz, 1.0, 1.0, 1.0, r() * 6, null); else { part(N.acc, CN_G.dome, px, Y, pz, 0.9, 0.85, 0.9, STN); const [ox, oz] = L(0, d / 2 + 2.45); box(N.acc, 0.45, 0.45, 0.1, ox, Y + 0.25, oz, DARK, 0, yaw, 0); } }
+  if (r() < 0.14) { const [p0x, p0z] = L(-w / 2, d / 2 + 2.2), [p1x, p1z] = L(w / 2, d / 2 + 2.2);
+    for (const [px, pz] of [[p0x, p0z], [p1x, p1z]]) part(N.acc, CN_G.cyl5, px, Y + 1.1, pz, 0.05, 2.2, 0.05, WOOD);
+    for (let q = 0; q < 4; q++) { const t = (q + 0.6) / 4.4, px = lerp(p0x, p1x, t), pz = lerp(p0z, p1z, t), c = [[0.95, 0.92, 0.84], [0.72, 0.2, 0.12], [0.3, 0.42, 0.66], [0.9, 0.78, 0.4]][(q + (x | 0)) & 3]; cnCloth(TM.cl, [px - ca * 0.4, Y + 2.15, pz + sa * 0.4], [ca * 0.8, 0, -sa * 0.8], [0, -1.0, 0], 2, 3, (u, v) => v, () => c); } }
+  if (r() < 0.4) { const [px, pz] = L(door + 1.1, d / 2 + 0.6); TM.i('jar', px, Y, pz, 0.75, 0.75, 0.75, r() * 6, null); }
+  if (r() < 0.15) { const [px, pz] = L(-w / 2 + 1, d / 2 + 0.35); for (const s of [-1, 1]) box(N.acc, 0.07, 3.2, 0.07, px + ca * s * 0.25, Y + 1.55, pz - sa * s * 0.25, WOOD, -0.18, yaw, 0); for (let q = 0; q < 6; q++) box(N.acc, 0.5, 0.05, 0.05, px, Y + 0.4 + q * 0.5, pz, WOOD, 0, yaw, 0); }
+}
+// ── the town: lanes of houses round the palace and out toward the cliffs, each quarter on its own grid
+function cnTown(N, TM, space, world) {
+  const r = mulberry32(3313), LANE = [0.74, 0.69, 0.58];
+  const quarters = [{ x: 150, z: 440, yaw: 0.25, n: 4, sp: 12.5 }, { x: -175, z: 410, yaw: -0.35, n: 3, sp: 12.5 }, { x: 255, z: 270, yaw: 0.9, n: 3, sp: 12 }, { x: 120, z: 545, yaw: -0.15, n: 3, sp: 12 }, { x: -120, z: 560, yaw: 0.3, n: 3, sp: 12 }, { x: -265, z: 225, yaw: 1.4, n: 2, sp: 12 }, { x: 230, z: -10, yaw: -0.6, n: 2, sp: 12 }];
+  let smokes = 0;
+  for (const Q of quarters) {
+    const ca = Math.cos(Q.yaw), sa = Math.sin(Q.yaw), rows = new Map();
+    for (let gx = -Q.n; gx <= Q.n; gx++) for (let gz = -Q.n; gz <= Q.n; gz++) {
+      if (r() < 0.22) continue;
+      const lx = gx * Q.sp + (r() - 0.5) * 1.6, lz = gz * Q.sp * 1.1 + (r() - 0.5) * 1.2, x = Q.x + lx * ca + lz * sa, z = Q.z - lx * sa + lz * ca, w = 5 + r() * 3.4, d = 4.6 + r() * 3.2;
+      if (!space.free(x, z, Math.max(w, d) * 0.62 + 1.5)) continue;
+      space.take(x, z, Math.max(w, d) * 0.62 + 1);
+      cnHouse(N, TM, x, z, Q.yaw + (r() - 0.5) * 0.08, w, d, r() < 0.55 ? 2 : 1, r, smokes < 12 && r() < 0.22 && ++smokes > 0);
+      const row = rows.get(gz) || { a: gx, b: gx }; row.a = Math.min(row.a, gx); row.b = Math.max(row.b, gx); rows.set(gz, row);
+    }
+    for (const [gz, row] of rows) { if (row.b - row.a < 1) continue; const lz = (gz + 0.5) * Q.sp * 1.1, lx = (row.a + row.b) / 2 * Q.sp, len = (row.b - row.a + 1) * Q.sp, x = Q.x + lx * ca + lz * sa, z = Q.z - lx * sa + lz * ca;
+      if (cnSurf(x, z) > 59.9) box(N.acc, len, 0.08, 2.4, x, 60.04, z, LANE, 0, Q.yaw, 0); }
+  }
+}
+// ── green things: the olives and cypresses where the far ones stand, now with trunks; terraced gardens south of the palace
+//    with vines and beds and a row of beehives (the wax came from somewhere); goats on the open ground and on the cliffs,
+//    a goatherd's round hut and a pen; flowers
+function cnGreen(cn, N, GM, space) {
+  const r = mulberry32(8118), Y = 60;
+  for (const t of cn.groves) {
+    if (t.x > -122 && t.x < 95 && t.z > 380 && t.z < 470) continue;
+    const k = 0.85 + r() * 0.3;
+    if (t.kind === 'olive') N.i('olive' + (t.i % 3), t.x, Y, t.z, t.sx * 0.95, 3.5 + t.sy * 0.8, t.sz * 0.95, t.i * 1.7, [k, k * (0.95 + r() * 0.1), k]);
+    else N.i('cyp', t.x, Y - 0.3, t.z, 2.9, 9 + t.h / 2, 2.9, t.i, [k, k, k]);
+  }
+  // the terraces: four of them, stepping down away from the palace, walled with dry stone, planted
+  const EARTH = col('#8a6e4a'), EARTH2 = col('#6e563a'), STN = [0.78, 0.74, 0.64], VINE = col('#4f7a2c'), WOOD = col('#5a4030');
+  for (let i = 0; i < 4; i++) {
+    const h = 1.2 - i * 0.4 + 0.06, z0 = 472 + i * 12, zc = z0 + 6;
+    box(N.acc, 140, h, 12, 0, Y + h / 2, zc, EARTH); box(N.st, 140.4, h + 0.35, 0.7, 0, Y + (h + 0.35) / 2, z0 + 12, STN);
+    for (let f = 0; f < 7; f++) box(N.acc, 136, 0.06, 0.5, 0, Y + h + 0.02, z0 + 1 + f * 1.6, EARTH2);
+    if (i % 2 === 0) for (let row = 0; row < 4; row++) for (let x = -66; x <= 66; x += 2.2) { const zz = z0 + 1.8 + row * 2.8; GM.i('blk', x, Y + h + 0.6, zz, 0.08, 1.2, 0.08, 0, [0.42, 0.32, 0.22]); GM.i('lump', x + 1.1, Y + h + 1.0, zz, 1.0, 0.5, 0.45, r() * 6, [0.32 + r() * 0.1, 0.5 + r() * 0.1, 0.2]); }
+    else for (let q = 0; q < 160; q++) GM.i('lump', -68 + r() * 136, Y + h + 0.12, z0 + 1 + r() * 10, 0.22 + r() * 0.2, 0.15, 0.22 + r() * 0.2, r() * 6, r() < 0.15 ? [0.85, 0.6, 0.2] : [0.3 + r() * 0.15, 0.52, 0.22]);
+    box(N.st, 2.4, h + 0.2, 1.6, 0, Y + (h + 0.2) / 2, z0 + 12.6, STN);
+  }
+  for (let i = 0; i < 9; i++) { const x = 76 + i * 1.6, z = 478; box(N.st, 1.5, 0.6, 1.4, x, Y + 0.3, z, STN); part(N.acc, CN_G.cyl, x, Y + 0.95, z, 0.42, 1.2, 0.42, col('#b4703f'), 0, Math.PI / 2); box(N.acc, 0.12, 0.12, 0.05, x, Y + 0.85, z + 0.62, [0.08, 0.06, 0.05]); }
+  // goats: in herds where there is room, one with a pen and a hut; and wild ones on the ledges of the cliffs
+  const GC = [[0.95, 0.93, 0.88], [0.55, 0.4, 0.28], [0.22, 0.2, 0.19], [0.78, 0.66, 0.48], [0.9, 0.86, 0.8]];
+  let herds = 0;
+  for (let tries = 0; tries < 400 && herds < 4; tries++) {
+    const a = r() * 6.2832, k = 0.55 + r() * 0.3, [hx, hz] = cnAt(a, k);
+    if (!space.free(hx, hz, 16)) continue;
+    space.take(hx, hz, 14); herds++;
+    for (let g = 0; g < 7 + (r() * 5 | 0); g++) { const ga = r() * 6.2832, gd = Math.sqrt(r()) * 12, s = 0.85 + r() * 0.3; N.i('goat', hx + Math.cos(ga) * gd, Y, hz + Math.sin(ga) * gd, s, s, s, r() * 6.28, GC[(r() * 5) | 0]); }
+    if (herds === 1) { const px = hx + 15, pz = hz;
+      for (let i = 0; i < 22; i++) { const pa = i / 22 * 6.2832; if (i === 0) continue; GM.i('blk', px + Math.cos(pa) * 7, Y + 0.6, pz + Math.sin(pa) * 7, 0.14, 1.2, 0.14, 0, [0.42, 0.32, 0.22]); }
+      for (let i = 0; i < 22; i++) { const pa = (i + 0.5) / 22 * 6.2832; if (i === 0 || i === 21) continue; box(N.acc, 2.05, 0.08, 0.08, px + Math.cos(pa) * 7, Y + 0.9, pz + Math.sin(pa) * 7, WOOD, 0, Math.PI / 2 - pa, 0); }
+      part(N.st, CN_G.cyl12, px + 11, Y + 1.2, pz + 6, 2.4, 2.4, 2.4, STN); part(N.acc, CN_G.cone, px + 11, Y + 2.4, pz + 6, 2.9, 2.2, 2.9, col('#a99060')); box(N.acc, 0.9, 1.6, 0.2, px + 11 - 2.38, Y + 0.8, pz + 6, [0.07, 0.06, 0.05], 0, Math.PI / 2, 0); }
+  }
+  for (let g = 0; g < 9; g++) { const a = r() * 6.2832, k = 1.045 + r() * 0.05, [x, z] = cnAt(a, k), s = 0.8 + r() * 0.2; N.i('goat', x, cnSurf(x, z) - 0.05, z, s, s, s, -a + (r() < 0.5 ? 0 : Math.PI), GC[(r() * 2 | 0) + 1]); }
+  // flowers in the grass: poppies, crocus, yellow daisies
+  const FL = [[0.9, 0.16, 0.12], [0.62, 0.42, 0.85], [0.95, 0.82, 0.25], [0.96, 0.95, 0.9]];
+  for (let i = 0, n = TOUCH ? 200 : 700; i < n; i++) { const a = r() * 6.2832, k = 0.5 + r() * 0.42, [x, z] = cnAt(a, k); if (Math.hypot(x - PRO_C.x, z - PRO_C.z) < 214) continue; GM.i('blk', x, Y + 0.12, z, 0.22, 0.12, 0.22, r() * 6, FL[(r() * 4) | 0]); }
+  for (let i = 0, n = TOUCH ? 60 : 260; i < n; i++) { const a = r() * 6.2832, k = 0.45 + r() * 0.5, [x, z] = cnAt(a, k); if (Math.hypot(x - PRO_C.x, z - PRO_C.z) < 214) continue; GM.i('tuft', x, Y, z, 0.5 + r() * 0.5, 0.4 + r() * 0.6, 0.5 + r() * 0.5, r() * 6, r() < 0.6 ? [0.55, 0.6, 0.3] : [0.72, 0.66, 0.38]); }
+}
+// ── the shore: rocks along the waterline all round and stacks standing off it; surf; and (where there is a harbour, in the
+//    world) the quay under the cliff, ship sheds, a timber pier, ships with their sails furled, boats drawn up, nets drying,
+//    a store, jars stacked, and a stair cut down the cliff to it from the town
+function cnShore(N, SM, world, space) {
+  const r = mulberry32(6060), HA = 4.25, inHarbour = a => world && Math.abs(wrapAngle(a - HA)) < 0.16;
+  const ROCK = [col('#6e6654'), col('#857a66'), col('#5e574a'), col('#9a8e78')];
+  for (let i = 0, n = TOUCH ? 200 : 460; i < n; i++) { const a = r() * 6.2832, k = 1.165 + r() * r() * 0.14, [x, z] = cnAt(a, k), s = 1.1 + r() * r() * 5.5; if (inHarbour(a)) continue; N.i('rock', x, Math.max(cnSurf(x, z), -1.6) + s * 0.15, z, s * (1 + r() * 0.5), s * (0.6 + r() * 0.5), s, r() * 6, ROCK[(r() * 4) | 0], (r() - 0.5) * 0.6); }
+  for (let i = 0, n = TOUCH ? 180 : 520; i < n; i++) { const a = r() * 6.2832, k = 1.0 + r() * 0.16, [x, z] = cnAt(a, k), y = cnSurf(x, z); if (inHarbour(a) && k > 1.1) continue;   // (outcrops and scrub on the cliffs)
+    if (r() < 0.55) { const s = 0.8 + r() * 2.6; N.i('rock', x, y, z, s * 1.3, s * 0.7, s, r() * 6, ROCK[(r() * 4) | 0], (r() - 0.5) * 0.8, (r() - 0.5) * 0.8); }
+    else { const s = 0.7 + r() * 1.4; N.i('lump', x, y + s * 0.3, z, s, s * 0.6, s, r() * 6, r() < 0.5 ? [0.3, 0.38, 0.2] : [0.42, 0.44, 0.26]); } }
+  for (let i = 0; i < 7; i++) { const a = r() * 6.2832, k = 1.3 + r() * 0.12, [x, z] = cnAt(a, k); if (inHarbour(a) || Math.abs(wrapAngle(a - HA)) < 0.3) continue; const s = 4 + r() * 4;
+    for (let q = 0; q < 3; q++) N.i('rock', x + (r() - 0.5) * 2, -2 + q * s * 0.9, z + (r() - 0.5) * 2, s * (1 - q * 0.22), s * 0.9, s * (1 - q * 0.22) * 0.9, r() * 6, ROCK[q % 4]); }
+  // the surf: a band of foam where the cliff goes into the sea, moving
+  { const n = 200, ks = [[1.176, 1.1, 0], [1.19, 0.45, 0.35], [1.214, 0.18, 1]], pos = [], fq = [], P = (i, j) => { const a = i / n * 6.2832, [x, z] = cnAt(a, ks[j][0]); return [x, ks[j][1], z, a * cnRad(a), ks[j][2]]; };
+    for (let i = 0; i < n; i++) for (let j = 0; j < 2; j++) { const A = P(i, j), B = P(i + 1, j), C2 = P(i + 1, j + 1), D = P(i, j + 1); for (const v of [A, B, C2, A, C2, D]) { pos.push(v[0], v[1], v[2]); fq.push(v[3], v[4]); } }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('fq', new THREE.Float32BufferAttribute(fq, 2)); geo.computeVertexNormals();
+    N.foam = geo; }
+  if (!world) return;
+  const cs = Math.cos(HA), sn = Math.sin(HA), rad = cnRad(HA), d0 = rad * 1.22, at = (d, o) => [cs * d - sn * o, 215 + sn * d + cs * o], yaw = -HA;
+  const STN = [0.82, 0.78, 0.68], STN2 = [0.72, 0.68, 0.6], WOOD = col('#5a4030'), WOODL = col('#8a6a46'), DARK = [0.06, 0.05, 0.05], LINEN = col('#ece4cf'), RED = col('#a8301f'), BLUE = col('#3b5f93');
+  const B = (acc, dl, h, ol, d, o, y, c, ry = 0, rz = 0) => { const [x, z] = at(d, o); box(acc, dl, h, ol, x, y, z, c, 0, yaw + ry, rz); };
+  // the quay along the foot of the cliff, and the ship sheds cut back under it
+  B(N.st, 14, 8, 78, 539.5, -8, -2.2, STN);
+  for (let j = 0; j <= 4; j++) B(N.st, 13, 7.6, 1.1, 526.5, -44 + j * 8, 5.6, STN2);
+  B(N.acc, 14, 0.8, 34, 526.5, -28, 9.8, STN); B(N.acc, 14.4, 0.4, 34.4, 526.5, -28, 9.3, RED); B(N.acc, 0.8, 7.6, 32.4, 520.4, -28, 5.6, DARK); B(N.acc, 13, 0.3, 32.4, 526.5, -28, 1.95, STN2);
+  for (let j = 0; j < 4; j++) for (const s of [-1, 1]) { const [x, z] = at(533.2, -40 + j * 8 + s * 2.2); SM.i('horn', x, 10.2, z, 1.2, 1.2, 1.2, yaw + Math.PI / 2, null); }
+  // ships: a hull built of slices, narrow at both ends and lifted at them (the stern higher), a painted strake, mast, yard
+  // with the sail furled on it, oars along the side, a steering oar
+  const ship = (d, o, len, wid, ry, y0, mast, c1, c2) => {
+    const [x, z] = at(d, o); _cnP.compose(_p.set(x, y0, z), _q.setFromAxisAngle(UP, yaw + ry), _s.set(1, 1, 1)); const M = _cnP.clone();
+    for (let i = 0; i < 11; i++) { const u = (i + 0.5) / 11 - 0.5, w = wid * Math.sqrt(Math.max(0.06, 1 - (2 * u) ** 2)), lift = wid * 0.5 * (2 * u) ** 4 * (u > 0 ? 2.0 : 1.0);
+      cnPut(N.acc, G.unitBox, M, u * len, lift + 0.35, 0, len / 11 + 0.03, 0.8, w, i % 2 ? c1 : c2); cnPut(N.acc, G.unitBox, M, u * len, lift + 0.62, 0, len / 11 + 0.03, 0.14, w + 0.06, c2); }
+    cnPut(N.acc, G.unitBox, M, len * 0.53, wid * 1.3, 0, 0.25, wid * 1.6, 0.22, c2, 0, 0, -0.35); cnPut(N.acc, G.unitBox, M, -len * 0.52, wid * 0.9, 0, 0.22, wid * 1.0, 0.2, c2, 0, 0, 0.3);
+    for (const s of [-1, 1]) cnPut(N.acc, G.unitBox, M, len * 0.4, 0.66, s * wid * 0.3, 0.3, 0.22, 0.05, [0.95, 0.95, 0.9]);
+    cnPut(N.acc, G.unitBox, M, -len * 0.4, 0.3, wid * 0.4, len * 0.3, 0.08, 0.2, WOODL, 0, 0.5, -0.5);
+    if (mast) { cnPut(N.acc, CN_G.cyl5, M, len * 0.05, 0.6 + len * 0.3, 0, 0.12, len * 0.6, 0.12, WOOD); cnPut(N.acc, CN_G.cyl5, M, len * 0.05, 0.6 + len * 0.55, 0, 0.32, len * 0.7, 0.32, LINEN, Math.PI / 2, 0, 0);
+      for (let q = 0; q < 7; q++) for (const s of [-1, 1]) cnPut(N.acc, G.unitBox, M, (q - 3) * len * 0.09, 0.5, s * (wid * 0.5 + 1.1), 0.06, 0.06, 2.4, WOODL, s * 0.35, 0, 0); }
+  };
+  ship(557, -32.6, 15, 3.0, 0, 0.05, true, col('#7a4a2e'), col('#2c2420')); ship(569, -23.4, 13, 2.8, 0, 0.05, true, col('#3c5a8a'), col('#2c2420'));
+  ship(600, -12, 14, 3.0, 0.5, 0.05, true, col('#8a3a24'), col('#2c2420'));
+  for (const [d, o, c] of [[537, 22, col('#c9b48a')], [539.5, 26, col('#4a6a8a')], [537.5, 30, col('#a85a3a')]]) ship(d, o, 6, 1.6, Math.PI / 2 + (r() - 0.5) * 0.2, 1.45, false, c, col('#3a2c22'));
+  ship(526.5, -36, 7, 1.8, 0, 1.6, false, col('#7a5a3c'), col('#3a2c22')); ship(526.5, -20, 7, 1.8, 0, 1.6, false, col('#5a6a7a'), col('#3a2c22'));
+  // the pier: a timber deck on piles out from the quay
+  B(N.acc, 32, 0.25, 3.2, 562, -28, 1.7, WOODL); for (let d = 548; d <= 576; d += 4) for (const s of [-1.4, 1.4]) { const [x, z] = at(d, -28 + s); part(N.acc, CN_G.cyl5, x, -1.0, z, 0.18, 5.4, 0.18, WOOD); }
+  for (let d = 548; d <= 576; d += 7) { const [x, z] = at(d, -29.9); part(N.acc, CN_G.cyl5, x, 2.1, z, 0.16, 0.7, 0.16, WOOD); }
+  for (let o = -40; o <= 28; o += 6) { const [x, z] = at(545.6, o); part(N.st, CN_G.cyl, x, 2.15, z, 0.3, 0.7, 0.3, STN2); }
+  // nets drying on frames, floats along their tops; heaps of net; baskets of the catch
+  for (let q = 0; q < 3; q++) { const o = 2 + q * 5.4, d = 541;
+    for (const s of [0, 4.2]) { const [x, z] = at(d, o + s); part(N.acc, CN_G.cyl5, x, 3.0, z, 0.08, 2.6, 0.08, WOOD); }
+    B(N.acc, 0.1, 0.1, 4.4, d, o + 2.1, 4.25, WOOD); { const [x, z] = at(d, o + 2.1); cnPanel(SM.pan, x, 3.05, z, 4.1, 2.3, Math.atan2(cs, sn), 6, [0.3, 0.24, 0.17]); }
+    for (let f = 0; f < 6; f++) { const [x, z] = at(d + 0.05, o + 0.4 + f * 0.7); SM.i('lump', x, 4.12, z, 0.09, 0.09, 0.09, 0, [0.85, 0.5, 0.18]); } }
+  for (let q = 0; q < 5; q++) { const [x, z] = at(536 + r() * 5, -6 + r() * 6); SM.i('lump', x, 1.95, z, 0.9 + r() * 0.6, 0.35, 0.8 + r() * 0.5, r() * 6, [0.28, 0.23, 0.17]); }
+  for (let q = 0; q < 6; q++) { const [x, z] = at(543 + r() * 2, 4 + r() * 14); part(N.acc, CN_G.cyl, x, 2.05, z, 0.32, 0.45, 0.32, col('#b89a5e')); part(N.acc, CN_G.sph0, x, 2.3, z, 0.28, 0.08, 0.28, [0.72, 0.76, 0.8]); }
+  // a store on the quay, flat roofed, and jars stacked in front of it
+  { const [x, z] = at(537, 16); cnHouse(N, SM, x, z, yaw + Math.PI / 2, 7.5, 6, 2, r, true, 1.8); }
+  for (let row = 0; row < 3; row++) for (let q = 0; q < 6 - row; q++) { const [x, z] = at(541.5 + row * 0.25, -14 + q * 0.62 + row * 0.31); SM.i('amph', x, 1.8 + row * 0.5, z, 0.9, 0.9, 0.9, r() * 6, null, row ? 1.4 : 0); }
+  // the stair down the cliff: flights zigzagging across the face, a low wall on the open side
+  { const pts = []; let o = -62, kk = 0.985; for (let f = 0; f < 10; f++) { const o2 = f % 2 ? -62 : -46, k2 = Math.min(1.19, kk + (f < 2 ? 0.012 : 0.022)); pts.push([kk, o, k2, o2]); o = o2; kk = k2; }
+    for (const [k1, o1, k2, o2] of pts) { const d1 = rad * k1, d2 = rad * k2, len = Math.hypot(d2 - d1, o2 - o1), n = Math.max(2, Math.round(len / 0.9)), [x1, z1] = at(d1, o1), [x2, z2] = at(d2, o2), fy = Math.atan2(-(z2 - z1), x2 - x1);
+      for (let s = 0; s <= n; s++) { const t = s / n, x = lerp(x1, x2, t), z = lerp(z1, z2, t), y = Math.max(1.9, cnSurf(x, z) + 0.2); box(N.st, 1.0, 1.6, 2.2, x, y - 0.8, z, STN, 0, fy, 0);
+        if (s % 2 === 0) box(N.st, 1.0, 0.7, 0.3, x + Math.sin(fy) * -1.15, y + 0.3, z + Math.cos(fy) * -1.15, STN2, 0, fy, 0); } } }
+  // a little shrine at the root of the mole, horns on it, and the harbour's gulls
+  { const [x, z] = at(546, 4); box(N.st, 2.4, 1.6, 2.4, x, 2.6, z, STN); SM.i('horn', x, 3.4, z, 1.1, 1.1, 1.1, yaw, null); }
+  for (let i = 0; i < 10; i++) { const [x, z] = at(570 + r() * 30, -10 + r() * 30); N.i('bird', x, 16 + r() * 18, z, 1.4, 1.4, 1.4, 0, null); }
+}
+// ── birds over the palace and the town
+function cnLife(N) {
+  const r = mulberry32(9191);
+  for (let i = 0; i < 8; i++) N.i('bird', r() * 20 - 10, 88 + r() * 10, 435 + r() * 20 - 10, 1.0, 1.0, 1.0, 0, [0.85, 0.85, 0.88]);
+  for (let i = 0; i < 6; i++) N.i('bird', 150 + r() * 20, 80 + r() * 8, 430 + r() * 20, 1.0, 1.0, 1.0, 0, [0.8, 0.8, 0.84]);
+}
+// Put up near Crete a piece at a time (one piece a turn, so nothing stalls), have its shaders built behind the picture, and
+// only then let the near eye see it: from then on the levels of detail swap it in and out by distance on their own.
+function creteNear(cn) {
+  if (cn.started) return; cn.started = true; cn.t0 = performance.now();
+  const M = cnMats(), T = cnTemplates(M), space = cnSpace(cn), world = cn.world;
+  const N = cnBucket(), LM = cnBucket(), TF = cnBucket(), TM = cnBucket(), SM = cnBucket(), GM = cnBucket();
+  const steps = [() => cnLabyrinth(cn, N, LM), () => cnTower(N, LM), () => cnTowerTop(TF), () => cnPalace(N, TM), () => cnTown(N, TM, space, world), () => cnGreen(cn, N, GM, space), () => cnShore(N, SM, world, space), () => cnLife(N)];
+  let i = 0;
+  const finish = () => {
+    const near = cnDone(N, T, M, true), C = PRO_C;
+    near.add(cnLod(cnDone(LM, T, M), C.x, C.y + 2, C.z, 560));
+    near.add(cnLod(cnDone(TF, T, M, true), C.x, C.y + 51, C.z, 340));
+    near.add(cnLod(cnDone(TM, T, M), 40, 62, 420, 760));
+    near.add(cnLod(cnDone(GM, T, M), 0, 61, 330, 720));
+    if (world) { const [hx, hz] = cnAt(4.25, 1.21); near.add(cnLod(cnDone(SM, T, M), hx, 3, hz, 620)); }
+    if (N.foam) { const f = new THREE.Mesh(N.foam, M.foam); f.renderOrder = 2; f.onBeforeRender = cnTick; near.add(f); }
+    near.position.set(-cn.lod.position.x, -cn.lod.position.y, -cn.lod.position.z);
+    const install = () => {
+      if (!cn.alive()) { cnFree(near); cn.sNear.material.dispose(); return; }
+      cn.lod.levels[0].distance = 1300; cn.lod.addLevel(near, 0, 0.06);
+      cn.stoneLod.levels[0].distance = 1500; cn.stoneLod.addLevel(cn.sNear, 0, 0.05);
+      cn.done = true; cn.ms.push('ready ' + Math.round(performance.now() - cn.t0));
+    };
+    try { Promise.all([renderer.compileAsync(near, camera, cn.target), renderer.compileAsync(cn.sNear, camera, cn.target)]).then(install, install); } catch (e) { install(); }
+  };
+  const step = () => { if (!cn.alive()) return; if (i < steps.length) { const t0 = performance.now(); steps[i++](); (cn.ms ||= []).push(Math.round(performance.now() - t0)); setTimeout(step, 0); } else finish(); };   // (cn.ms: what each piece took)
+  setTimeout(step, 0);
+}
+// (in the world it waits for somebody to come within a few kilometres: until then Crete costs what it always did)
+function cnArm(cn) {
+  cn.sFar.onBeforeRender = (rr, sc, cam) => { if (cn.started) return; cn.stoneLod.getWorldPosition(_cnV); if (cam.position.distanceTo(_cnV) < 4500) creteNear(cn); };
+}
 // the same island, stood in the world: everything of it but its own sky, sun and sea
 function creteWorld() {
   if (CRETE.group) return;
-  const B = buildCrete(), g = CRETE.group = new THREE.Group();
+  const B = buildCrete(true), g = CRETE.group = new THREE.Group();
   for (const o of [...B.sc.children]) { if (o.isLight || o === B.sky || o === B.halo || o === B.disc || o === B.feathers || o.material?.isShaderMaterial) { o.geometry?.dispose(); o.material?.dispose?.(); continue; } g.add(o); }
   g.position.set(CRETE.x - PRO_C.x, WATER, CRETE.z - PRO_C.z); g.updateMatrixWorld(true);
   const b = new THREE.Box3().setFromObject(g); CRETE.R = Math.max(b.max.x - CRETE.x, CRETE.x - b.min.x, b.max.z - CRETE.z, CRETE.z - b.min.z);
   creteDress(g);
+  B.cn.target = scene; B.cn.alive = () => !!CRETE.group; CRETE.cn = B.cn; cnArm(B.cn);   // (the near Crete: put up the first time anyone comes near)
   g.visible = realm === 'over'; scene.add(g);
   lookout('THE TOWER OF DAEDALUS', CRETE.x, WATER + PRO_C.y + 50.6, CRETE.z, 8.6, 'over');
   lookout('CRETE · THE LABYRINTH', CRETE.x, WATER + PRO_C.y + 0.4, CRETE.z, 190, 'over');
+  lookout('', CRETE.x, WATER + PRO_C.y, CRETE.z - PRO_C.z + 215, 352, 'over');   // (the rest of the table of rock, under the town and the palace: ground to walk on, and no name, so it is never a perch that takes a bird from the tower)
 }
 // Whoever is in the opening is on Crete for anyone who has been through it already and has flown out to watch: on the
 // tower, then in the air, then falling. He himself sees and hears nobody until he has come down on Olympus.
