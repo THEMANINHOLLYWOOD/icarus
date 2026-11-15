@@ -46,7 +46,8 @@ export async function POST(req) {
   // away or bring them back. Signed here; every page shows it back here before it does anything, so nobody else can give one.
   if (b.op === 'decree' || b.op === 'decreeok') {
     const kind = String(b.kind || ''), arg = String(b.arg || '').slice(0, 40);
-    const okArg = kind === 'gather' ? /^-?\d{1,7},-?\d{1,7}$/.test(arg) : kind === 'weather' ? /^(clear|storm|rain|mist|day|night)$/.test(arg) : kind === 'npcs' ? /^[01a]{8}$/.test(arg) : false;
+    const okArg = kind === 'gather' ? /^-?\d{1,7},-?\d{1,7}$/.test(arg) : kind === 'weather' ? /^(clear|storm|rain|mist|day|night)$/.test(arg) : kind === 'npcs' ? /^[01a]{8}$/.test(arg)
+      : kind === 'fly' ? /^(end|restart|skip|shuffle):[dw][a-z0-9]{4,8}(:\d{13})?$/.test(arg) : false;   // (the keeper's hand on a fight: end it, run it again, skip its opening, shuffle its sides)
     if (!okArg) return json({ ok: false, error: 'bad decree' }, 400);
     if (b.op === 'decreeok') return json({ ok: +b.exp < Date.now() + 11 * 60_000 && orderOk('decree', kind + ':' + arg, b.exp, b.tok) });
     const me = await adminOf(req); if (!me) return json({ error: 'not yours to give' }, 403);
