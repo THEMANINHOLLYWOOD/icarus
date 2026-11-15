@@ -188,3 +188,23 @@ create table if not exists public.agent_skills (
 alter table public.agent_skills enable row level security;
 revoke all on public.agent_skills from anon, authenticated;
 grant select, insert, update, delete on public.agent_skills to service_role;
+
+-- ── Areas, who holds them (api/_areas.js): whoever finds a place may name it (owner_hash: the hash of their travel code,
+-- never the code); found by someone of a faction, it is the faction's too (group_tag: its public tag; group_key: the hash of a
+-- proof only its members can make; group_name: how it is shown). named_by and renamed_at: the name somebody gave it. And each
+-- place's wreath of torches: where it stands (wx, wy, wz, wyaw), the god it was last lit for (hero) and by whom (holder).
+-- All nullable: a place found before this has none of them, and the server works without these columns until they are added.
+alter table public.world_areas
+  add column if not exists owner_hash text,
+  add column if not exists group_tag text,
+  add column if not exists group_key text,
+  add column if not exists group_name text,
+  add column if not exists named_by text,
+  add column if not exists renamed_at timestamptz,
+  add column if not exists hero text,
+  add column if not exists holder text,
+  add column if not exists held_at timestamptz,
+  add column if not exists wx real,
+  add column if not exists wy real,
+  add column if not exists wz real,
+  add column if not exists wyaw real;

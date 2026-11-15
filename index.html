@@ -277,6 +277,12 @@
   #areaBar b { display:block; font-weight:500; font-size:11px; letter-spacing:.5em; padding-left:.5em; color:#fff1dc; }
   #areaBar i { display:block; font-style:normal; font-size:9px; letter-spacing:.3em; padding-left:.3em; margin-top:4px; color:var(--dim); }
   .touch #areaBar { top:calc(var(--st, 0px) + 46px); }
+  #areaBar span { display:none; margin-top:7px; gap:8px; justify-content:center; }
+  #areaBar.acts span { display:flex; }
+  #areaBar span button { pointer-events:none; font:inherit; font-size:9px; text-transform:uppercase; letter-spacing:.3em; padding:5px 10px 5px 13px; color:#fff1dc; background:rgba(20,12,6,.45); border:1px solid rgba(255,241,220,.35); border-radius:3px; cursor:pointer; text-shadow:inherit; }
+  #areaBar.on span button { pointer-events:auto; }
+  #areaBar span button:hover, #areaBar span button:focus-visible { border-color:#fff1dc; background:rgba(60,34,12,.6); outline:none; }
+  .touch #areaBar span button { font-size:11px; padding:9px 16px 9px 19px; }
   .photo #areaBar, .pro #areaBar, body:has(#menu.open) #areaBar, .moding #areaBar { display:none; }
   /* what he is in: god mode, a duel, the warzone. One line and a smaller one, top and centre, there for as long as it lasts */
   #modeBar { position:fixed; left:50%; top:calc(var(--st, 0px) + 10px); transform:translate(-50%, -8px); z-index:7; pointer-events:none; text-align:center; opacity:0; transition:opacity .5s, transform .5s; white-space:nowrap; text-shadow:0 0 8px #000, 0 0 2px #000; }
@@ -820,7 +826,7 @@
   <div class="abi"><div id="authWho"></div><button type="button" id="authStats" class="abb">YOUR STATS</button><button type="button" id="authOut" class="abl">sign out</button></div>
   <div id="authMsg" aria-live="polite"></div>
 </div></div>
-<div id="areaBar" aria-live="polite"><b></b><i></i></div>
+<div id="areaBar" aria-live="polite"><b></b><i></i><span></span></div>
 <div id="modeBar" aria-live="polite"><b></b><i></i></div>
 <div id="dpBar" aria-live="polite"><b></b><i></i></div><button id="dpExit" type="button">✕ exit camera<span> · esc</span></button><div id="matchBig" aria-live="assertive"></div><div id="fightCard" aria-live="polite"></div><button id="matchAsk" type="button"></button>
 <div id="title" class="hidden">
@@ -8264,6 +8270,7 @@ const CMD_HELP = [
   ['PEOPLE', '/players · /follow @NAME · /track @NAME · /untrack · /friend @NAME · /mute @NAME · /block @NAME · @NAME calls them'],
   ['SEE', '/map · /map3d · /camera · /snap · /record · /album · /film · /face · /wide'],
   ['YOU', '/name NEW · /become ANIMAL · /god (god mode) · /mortal · /bolt · /burn · /blow'],
+  ['NAMING', '/name-place NEW NAME (a place you found: its name for everyone, for good; found with a faction, the ones of it flying vote first) · /place (who named this one) · /aye · /nay (on a name your faction is voting on)'],
   ['CRETE', '/watch (go and see who is waking on Crete) · /circle (the bird goes round the island by itself and the lens stays on them; steer to take it back)'],
   ['RINGS', '/rings (a ring race for everyone flying: chains of rings come into the air, the most when the clock runs out wins) · /rings 4 (with four birds that fly themselves) · /race NAME (one against one) · look at someone flying: /duel or /race'],
   ['THE FIGHT', '/fly (a brawl with everyone flying) · /fly NAME (one against one) · /fly end · /challenge end (stop it: for everyone if you called it, for yourself if not) · /again (the same fight once more) · /fly settings · /fly set close 120 · speed 1.5 · ring 1800 · floor 300 · /warzone reset'],
@@ -8318,7 +8325,7 @@ function modSpawn(arg) {
   if (p.form === 'phoenix' && !p.perch) chatLine('', 'LAND TO SPEAK WITH THEM', 'sys'); else setTimeout(() => { if (state === 'play' && g.active) startTalk(g); }, 900);
 }
 function chatCommand(text) {
-  const m = text.match(/^\/([a-z0-9?]+)\s*(.*)$/i); if (!m) return false;
+  const m = text.match(/^\/([a-z0-9?][a-z0-9?-]*)\s*(.*)$/i); if (!m) return false;   // (a hyphen inside one, as in /name-place)
   const c = m[1].toLowerCase(), arg = m[2].trim(), low = arg.toLowerCase().replace(/^@/, ''), sys = t => chatLine('', t, 'sys'), p = player;
   const run = (...a) => { AP.q.push(...a); apPump(); }, off = /^(off|no|0|false|down)$/.test(low), homes = () => WP.list.filter(w => w.h && (w.r || 0) === (realm === 'under' ? 1 : 0));
   if (globalThis.DAIMON?.command(c, arg)) return true;   // (his agents: /agents · /a NAME … · /yes · /no · /bless · /share · /send — see daimon/icarus.js)
@@ -8396,6 +8403,8 @@ function chatCommand(text) {
     case 'mute': case 'block': case 'unmute': case 'unblock': { const F = peerNamed(low), nm = F ? F.name : low.toUpperCase(); if (!low) sys(`/${c} @NAME`); else shun(nm, c.replace('un', ''), !c.startsWith('un')); return true; }
     case 'ask': if (arg) { closeChat(); guideAsk(arg); } else guideShow(true); return true;
     case 'name': case 'rename': renameSelf(arg); return true;
+    case 'name-place': case 'nameplace': case 'rename-place': case 'renameplace': case 'rename-area': case 'renamearea': case 'name-area': case 'namearea': case 'place': case 'area': placeCmd(arg); return true;
+    case 'aye': case 'nay': areaVoteCmd(`${c} ${arg}`); return true; case 'vote': areaVoteCmd(arg); return true;
     case 'become': case 'be': case 'shape': if (low) { sys(`→ ${low.toUpperCase()}`); shapeshift(low.replace(/^(a|an|the)\s+/, '')); } return true;
     case 'sound': setMuted(off); return true;
     case 'mic': case 'voice': if (off) setMicMuted(true); else menuMic(); return true;
@@ -8486,7 +8495,7 @@ async function gotDm(m) {
 async function gotFc(m) {
   if (!m || !ok(m.i) || typeof m.c !== 'string' || m.c.length > 1400 || typeof m.f !== 'string') return; const P = peerOf(m.i); if (flood(P)) return; if (m.n) P.name = cleanName(m.n);
   if (!FAC.key || m.f !== FAC.tag) return eyeRead(P, m, 'fc'); if (quiet(P)) return;
-  try { const t = cleanText(await symOpen(FAC.key, 'fc|' + m.i, m.c)); if (t) { chatLine(`${P.name} · ${FAC.name}`, t, 'fac'); audio.sfx.ui?.(); } } catch {}
+  try { const t = cleanText(await symOpen(FAC.key, 'fc|' + m.i, m.c)); if (t && areaFc(P, t)) return; if (t) { chatLine(`${P.name} · ${FAC.name}`, t, 'fac'); audio.sfx.ui?.(); } } catch {}   // (a name put to the vote, or a vote: see placeCmd)
 }
 async function gotFi(m) {   // asked into a faction
   if (!m || !ok(m.i) || m.to !== NET.id || typeof m.c !== 'string' || m.c.length > 600) return; const P = peerOf(m.i); if (flood(P) || quiet(P)) return; if (m.n) P.name = cleanName(m.n);
@@ -25710,9 +25719,23 @@ import('./daimon/icarus.js').then(m => { globalThis.DAIMON = m.start({ THREE, sc
 //    its name is written across the sky behind him (each place arriving in its own way), and a line at the top says
 //    where he is. The first time anyone at all flies into a square, a name is found for it from what is there, and it is
 //    everyone's name for it after. The map writes them too.
+//    Whoever finds a place holds its name, and may give it any name of their own, for everyone, for good (until they change
+//    it again): /name-place NEW NAME, or the small RENAME on the line at the top in a place of theirs. Someone of a faction
+//    finds places for the faction: any of them may put a name to the others, the ones flying vote on it in their sealed chat
+//    (/aye · /nay, or the two on the line at the top), and it passes on more than half of them within two minutes (with
+//    nobody else of them up, the name he gave stands). The server keeps who holds each place (the hash of his travel code;
+//    the faction's tag and a proof only its members can make from their secret), checks it, and cleans every name.
 const AREA = { S: 3000, cur: '', t: 0, names: new Map(), asking: new Set(), seen: new Set(), barT: 0, fetched: new Set() };
+const AREA_V = { me: '', meOf: '', gp: '', gpOf: '', vote: null, open: new Map(), T: 120e3, told: false };   // (who he is to the server's list of holders; his faction's proof; his own open vote, and the ones put to him)
 try { for (const k of JSON.parse(localStorage.getItem('icarus.areas') || '[]')) AREA.seen.add(k); } catch {}
 const areaKey = (x, z, r = realm) => `${r === 'under' ? 'under' : 'over'}:${Math.floor(x / AREA.S)}:${Math.floor(z / AREA.S)}`;
+const hexOf = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');
+async function areaMe() { if (!WORLD.code || !globalThis.crypto?.subtle) return ''; if (AREA_V.meOf !== WORLD.code) { try { AREA_V.me = (await hexOf('icarus-traveller:' + WORLD.code)).slice(0, 16); AREA_V.meOf = WORLD.code; } catch {} } return AREA_V.me; }
+async function areaGp() { if (!FAC.key || !FAC.secret) return ''; if (AREA_V.gpOf !== FAC.secret) { try { AREA_V.gp = await hexOf('icarus-faction-place:' + FAC.secret); AREA_V.gpOf = FAC.secret; } catch { return ''; } } return AREA_V.gp; }
+const areaOwn = a => !a ? '' : a.g && FAC.key && a.g === FAC.tag ? 'fac' : a.o && AREA_V.me && a.o === AREA_V.me ? 'me' : '';   // (his to name: his faction's, or his own)
+const ownS = n => `${n}${/s$/i.test(n) ? "'" : "'s"}`;   // (WOLVES' · ICARUS' · BOB's)
+const areaWho = a => a.rn && a.nb ? `named by ${a.nb}` : a.by ? `found by ${a.by}${a.gn ? ' · ' + a.gn : ''}` : '';
+areaMe();
 function areaDesc(key) {
   const [r, i, j] = key.split(':'), x0 = +i * AREA.S, z0 = +j * AREA.S, S = AREA.S;
   if (r === 'under') return 'the Underworld: dark country under the earth, grey plains, the dead walking, pyres, the river Styx' + (UNDER.hall && Math.hypot(START.x - (x0 + S / 2), START.z - (z0 + S / 2)) < 2500 ? ', near the hall of Hades' : '');
@@ -25728,18 +25751,18 @@ function areaDesc(key) {
   for (const I of PANTHEON.isles || []) if (inside(I.x, I.z, 200)) parts.push(`the island of ${godById[I.id]?.name || I.id}`);
   return parts.join(', ');
 }
-async function areaFetch(keys) {
-  const ask = keys.filter(k => !AREA.names.has(k) && !AREA.fetched.has(k)); if (!ask.length) return;
+async function areaFetch(keys, force = false) {   // (force: asked again even if known, since a name can change)
+  const ask = keys.filter(k => force || !AREA.names.get(k)?.name && !AREA.fetched.has(k)); if (!ask.length) return;
   for (const k of ask) AREA.fetched.add(k);
-  try { const j = await fetch('/api/hub?fn=areas&k=' + encodeURIComponent(ask.join(','))).then(r => r.ok ? r.json() : null); for (const [k, a] of Object.entries(j?.areas || {})) AREA.names.set(k, a); } catch {}
+  try { const j = await fetch('/api/hub?fn=areas&k=' + encodeURIComponent(ask.join(','))).then(r => r.ok ? r.json() : null); for (const [k, a] of Object.entries(j?.areas || {})) AREA.names.set(k, Object.assign(AREA.names.get(k) || {}, a, { at: Date.now() })); } catch {}
 }
 async function areaName(key) {
-  if (AREA.names.has(key)) return AREA.names.get(key);
+  const h = AREA.names.get(key); if (h && h.name && Date.now() - (h.at || 0) < 300e3) return h;   // (known, and lately: a name some minutes old is asked for again, in case it was given another)
   if (AREA.asking.has(key)) return null; AREA.asking.add(key);
-  await areaFetch([key]);
-  if (!AREA.names.has(key)) {
-    try { const j = await fetch('/api/hub?fn=areas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, desc: areaDesc(key), name: heroName, hero: PATRON.id || '' }) }).then(r => r.ok ? r.json() : null);
-      if (j && j.name) AREA.names.set(key, { name: j.name, style: j.style | 0, by: j.by || '', fresh: !!j.fresh }); } catch {}
+  await areaFetch([key], true);
+  if (!AREA.names.get(key)?.name) {
+    try { const gp = await areaGp(), j = await fetch('/api/hub?fn=areas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, desc: areaDesc(key), name: heroName, hero: PATRON.id || '', code: WORLD.code, fac: gp ? { tag: FAC.tag, gp, name: FAC.name } : undefined }) }).then(r => r.ok ? r.json() : null);
+      if (j && j.name) AREA.names.set(key, Object.assign(AREA.names.get(key) || {}, j, { style: j.style | 0, by: j.by || '', fresh: !!j.fresh, at: Date.now() })); } catch {}
   }
   AREA.asking.delete(key); return AREA.names.get(key) || null;
 }
@@ -25755,16 +25778,98 @@ function updateAreas(dt) {
 function areaEnter(key, a) {
   const been = AREA.seen.has(key);
   if (!been) { AREA.seen.add(key); STATS.d.areas++; try { localStorage.setItem('icarus.areas', JSON.stringify([...AREA.seen].slice(-800))); } catch {} }
-  const mine = a.fresh && cleanName(a.by) === cleanName(heroName);
-  areaBar(been ? a.name : `entering · ${a.name}`, mine ? 'you named it' : !been && a.by ? `first found by ${a.by.toLowerCase()}` : '');
+  const mine = a.fresh && cleanName(a.by) === cleanName(heroName), own = areaOwn(a);
+  areaBar(been ? a.name : `entering · ${a.name}`, mine ? (a.g ? `found by you · ${ownS(a.gn || FAC.name)} to name` : 'you found it · yours to name') : a.rn && a.nb ? `named by ${a.nb}` : !been && a.by ? `first found by ${a.by}${a.gn ? ' · ' + a.gn : ''}` : own ? 'yours to name' : '', own || mine ? [['rename', () => openChat('/name-place ')]] : null);
   if (!been || cinema.on) worldTitle(a.name, been ? '' : mine ? 'NAMED THIS MOMENT · YOURS' : '', 2600, null, { style: a.style | 0, D: cinema.on ? 150 : 96 });
-  if (mine) wreathFound(key, a);   // (and a wreath of torches for it, right in front of him)
+  if (mine) { wreathFound(key, a);   // (and a wreath of torches for it, right in front of him)
+    if (!AREA_V.told) { AREA_V.told = true; setTimeout(() => sysLine(`THIS PLACE IS YOURS TO NAME · /name-place NEW NAME${a.g ? ` · ${a.gn || FAC.name} VOTES ON IT` : ''}`), 3200); } }
 }
-function areaBar(text, sub) {
+// the line at the top: where he is, who named it, and (in a place of his, or while his faction votes) a button or two
+function areaBar(text, sub, acts = null, ms = 4200) {
   const el = $('areaBar'); if (!el) return;
-  el.firstChild.textContent = String(text).toUpperCase(); el.lastChild.textContent = String(sub || '').toUpperCase();
+  el.querySelector('b').textContent = String(text).toUpperCase(); el.querySelector('i').textContent = String(sub || '').toUpperCase();
+  const row = el.querySelector('span'); row.textContent = '';
+  for (const [label, fn] of acts || []) { const B = document.createElement('button'); B.type = 'button'; B.textContent = label;
+    B.addEventListener('pointerdown', e => e.stopPropagation()); B.addEventListener('click', e => { e.stopPropagation(); B.blur(); fn(); }); row.appendChild(B); }
+  el.classList.toggle('acts', !!(acts && acts.length));
   el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
-  clearTimeout(AREA.barTo); AREA.barTo = setTimeout(() => el.classList.remove('on'), 4200);
+  clearTimeout(AREA.barTo); AREA.barTo = setTimeout(() => el.classList.remove('on'), acts && acts.length ? Math.max(ms, 9000) : ms);
+}
+// /name-place NEW NAME (here, where he is) · /name-place alone: who holds this place, and who named it
+async function placeCmd(arg) {
+  const key = areaKey(player.pos.x, player.pos.z), to = String(arg || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+  let a = AREA.names.get(key); if (!a || !a.name) a = await areaName(key);
+  if (!a || !a.name) return sysLine('THIS PLACE HAS NO NAME YET · FLY ON A MOMENT');
+  await areaMe(); const own = areaOwn(a);
+  if (!to) { sysLine(`${a.name.toUpperCase()}${areaWho(a) ? ' · ' + areaWho(a).toUpperCase() : ''}`); return sysLine(own ? `/name-place NEW NAME GIVES IT ANOTHER${own === 'fac' ? ` · ${FAC.name} VOTES ON IT` : ''}` : a.o || a.g ? 'ONLY WHOEVER FOUND IT CAN NAME IT' : 'NOBODY HOLDS THE NAME OF THIS PLACE'); }
+  if ([...to].length < 2 || [...to].length > 40) return sysLine('A NAME IS 2 TO 40 CHARACTERS');
+  if (to === a.name) return sysLine('THAT IS ITS NAME ALREADY');
+  if (!own && (a.o || a.g)) return sysLine(`${a.name.toUpperCase()} IS NOT YOURS TO NAME · IT IS ${ownS(a.g ? a.gn || 'A FACTION' : a.by || 'SOMEONE ELSE').toUpperCase()}`);
+  if (own === 'fac') return areaPropose(key, a, to);
+  return areaRename(key, to);   // (his alone; or nobody's known: the server says)
+}
+async function areaRename(key, to, dry = false) {
+  let j = null; const was = AREA.names.get(key)?.name || '';
+  try { const gp = await areaGp(); j = await fetch('/api/hub?fn=areas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'rename', key, to, dry: dry || undefined, code: WORLD.code, name: heroName, gp: gp || undefined }) }).then(r => r.json()).catch(() => null); } catch {}
+  if (!j || !j.ok) { sysLine(j && j.error ? `NOT NAMED · ${String(j.error).toUpperCase()}` : 'NOT NAMED · THE SERVER IS NOT ANSWERING'); return null; }
+  if (dry) return j;
+  const a = Object.assign(AREA.names.get(key) || {}, j, { at: Date.now() }); delete a.ok; delete a.key; AREA.names.set(key, a);
+  sysLine(`${was ? was.toUpperCase() + ' IS ' : ''}${a.name.toUpperCase()}${was ? ' NOW' : ''} · FOR EVERYONE · ${areaWho(a).toUpperCase()}`); (audio.sfx.rename || audio.sfx.halo)?.();
+  areaShow(key, a);
+  return a;
+}
+function areaShow(key, a) {   // a name just given, where he is: on the line at the top, and across the sky
+  if (areaKey(player.pos.x, player.pos.z) !== key) return;
+  areaBar(a.name, areaWho(a), areaOwn(a) ? [['rename', () => openChat('/name-place ')]] : null);
+  if (UIL.on) worldTitle(a.name, areaWho(a), 2600, null, { style: a.style | 0, D: 96 });
+}
+// a faction's vote: put to the others flying (sealed, in the faction's own chat); more than half of those up, him included, passes it
+async function areaPropose(key, a, to) {
+  const M = facMates();
+  if (!M.length) { sysLine(`NONE OF ${FAC.name} FLYING NOW · YOUR NAME STANDS`); return areaRename(key, to); }
+  if (AREA_V.vote) return sysLine('YOUR LAST NAME IS STILL BEING VOTED ON · WAIT FOR IT TO CLOSE');
+  const ok = await areaRename(key, to, true); if (!ok) return;   // (asked first whether it would be taken: no vote on a name the server will not keep)
+  const id = [...crypto.getRandomValues(new Uint8Array(3))].map(b => b.toString(16).padStart(2, '0')).join(''), name = ok.name || to;
+  const V = AREA_V.vote = { id, key, to: name, was: a.name, n: 1 + M.length, yes: new Set([NET.id]), no: new Set(), done: false };
+  V.timer = setTimeout(() => areaVoteEnd(V), AREA_V.T);
+  sendTo('fac', `would name ${a.name} "${name}" · /aye or /nay (vote ${id} ${key})`);
+  sysLine(`PUT TO ${FAC.name} · ${M.length} MORE FLYING · ${Math.floor(V.n / 2) + 1} OF ${V.n} TO PASS · TWO MINUTES`);
+}
+function areaVoteCheck(V) {
+  const n = Math.max(V.n, V.yes.size + V.no.size), need = Math.floor(n / 2) + 1;
+  if (V.yes.size >= need) areaVoteEnd(V, true); else if (V.no.size > n - need) areaVoteEnd(V, false);
+}
+function areaVoteEnd(V, pass) {
+  if (V.done) return; V.done = true; clearTimeout(V.timer); if (AREA_V.vote === V) AREA_V.vote = null;
+  const n = Math.max(V.n, V.yes.size + V.no.size); if (pass == null) pass = V.yes.size >= Math.floor(n / 2) + 1;
+  if (pass) areaRename(V.key, V.to).then(a => { if (a && FAC.key) sendTo('fac', `named ${V.was} "${a.name}" (place ${V.key})`); });
+  else { sysLine(`“${V.to.toUpperCase()}” DID NOT PASS · ${V.yes.size} OF ${n} FOR IT`); if (FAC.key) sendTo('fac', `"${V.to}" did not pass · ${V.yes.size} of ${n} for it`); }
+}
+// /aye · /nay (the latest name put to him) · /aye ID
+function areaVoteCmd(arg) {
+  const m = /^(aye|yes|yea|for|nay|no|against)?\s*([0-9a-f]{6})?$/i.exec(String(arg || '').trim()); if (!m || !m[1]) return sysLine('/aye OR /nay · ON A NAME YOUR FACTION IS VOTING ON');
+  if (!FAC.key) return sysLine('NO FACTION · NOTHING TO VOTE ON');
+  const now = performance.now(), L = [...AREA_V.open.values()].filter(O => now - O.at < AREA_V.T), O = m[2] ? L.find(O => O.id === m[2].toLowerCase()) : L[L.length - 1];
+  if (!O) return sysLine(AREA_V.vote ? 'YOUR OWN NAME COUNTS AS YOUR AYE' : 'NO NAME IS BEING VOTED ON');
+  const yes = /^(aye|yes|yea|for)$/i.test(m[1]); O.mine = yes ? 'aye' : 'nay';
+  sendTo('fac', `${O.mine} (vote ${O.id})`); areaBar(`“${O.to}”`, `your ${O.mine} is in`);
+}
+// what comes in on the faction's chat about names (the page that put it opened it with the faction's key): true if it was that
+function areaFc(P, t) {
+  let m = /^would name (.{1,60}?) "([^"]{2,40})" · \/aye or \/nay \(vote ([0-9a-f]{6}) ((?:over|under):-?\d{1,5}:-?\d{1,5})\)$/.exec(t);
+  if (m) { const [, was, to, id, key] = m; AREA_V.open.set(id, { id, key, to, was, from: P.name, at: performance.now() }); while (AREA_V.open.size > 8) AREA_V.open.delete(AREA_V.open.keys().next().value);
+    chatLine(`${P.name} · ${FAC.name}`, `would name ${was} “${to}” · /aye or /nay`, 'fac');
+    areaBar(`“${to}”?`, `${P.name} would name ${was} · ${FAC.name} votes`, [['aye', () => areaVoteCmd('aye ' + id)], ['nay', () => areaVoteCmd('nay ' + id)]], 30000); audio.sfx.ui?.(); return true; }
+  m = /^(aye|nay) \(vote ([0-9a-f]{6})\)$/.exec(t);
+  if (m) { const V = AREA_V.vote, O = AREA_V.open.get(m[2]), on = V && V.id === m[2] ? V : O;
+    chatLine(`${P.name} · ${FAC.name}`, `${m[1]}${on ? ` · “${on.to}”` : ''}`, 'fac');
+    if (V && V.id === m[2] && !V.done) { V.yes.delete(P.id); V.no.delete(P.id); (m[1] === 'aye' ? V.yes : V.no).add(P.id); areaVoteCheck(V); } return true; }
+  m = /^named (.{1,60}?) "([^"]{2,40})" \(place ((?:over|under):-?\d{1,5}:-?\d{1,5})\)$/.exec(t);
+  if (m) { const [, was, to, key] = m; for (const [id, O] of AREA_V.open) if (O.key === key) AREA_V.open.delete(id);
+    chatLine(`${P.name} · ${FAC.name}`, `named ${was} “${to}”`, 'fac');
+    areaFetch([key], true).then(() => { const a = AREA.names.get(key); if (a && a.name) areaShow(key, a); });   // (what the server keeps, not what was said)
+    return true; }
+  return false;
 }
 
 // build the summit and its surroundings before showing the title
@@ -25791,6 +25896,7 @@ setTimeout(() => {
   warmPrograms();
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
+  if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
   frame();
 }, 30);
 </script>
