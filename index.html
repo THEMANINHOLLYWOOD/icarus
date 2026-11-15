@@ -7977,6 +7977,7 @@ const now = () => performance.now() / 1000;
 function netCollide() {
   const p = player;
   if (!NET.on || p.form !== 'phoenix' || p.sub || p.cine || state !== 'play' || p.shade) return;
+  if (MATCH.phase === 'count' && MATCH.me.in) return;   // (flown by a fight's opening and its glide in, wing over wing with the others in it: nobody is run into)
   const me = realm === 'under' ? 1 : 0;
   for (const P of NET.peers.values()) {
     if (!P.s || P.form !== 'p' || P.realm !== me || P.menu || (P.ma || '') !== (MATCH.phase === 'live' && MATCH.me.alive ? MATCH.id : '')) continue;   // (a bird flying on its own is not run into; nor is one in a fight he is not in)
@@ -7993,7 +7994,7 @@ function gotHit(m) {
   const P = NET.peers.get(m.i); if (!P || flood(P)) return;
   if ((NET.hits.get(P.id) || 0) > time) return;
   NET.hits.set(P.id, time + 4);
-  if (player.form === 'phoenix' && !player.sub && state === 'play') knocked(P);
+  if (player.form === 'phoenix' && !player.sub && state === 'play' && !player.shade && !(MATCH.phase === 'count' && MATCH.me.in)) knocked(P);   // (not a ghost, nor one being flown into a fight)
 }
 function knocked(P) {
   const p = player, x = p.pos.x, y = p.pos.y, z = p.pos.z;
@@ -20424,6 +20425,7 @@ function updateAuto(dt) {
 const photo = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, roll: 0, fov: 50, snap: false, back: 'play' };
 function openPhoto(free) {
   if (state !== 'play') return;
+  if (MATCH.phase === 'live' && MATCH.me.alive) { toast('NOT IN THE MIDDLE OF A FIGHT'); return; }   // (the world stood still for him alone: nothing could reach him)
   state = 'photo'; timeK = 0.02; for (const k in keys) keys[k] = false;
   photo.pos.copy(camera.position); _e.setFromQuaternion(camera.quaternion, 'YXZ'); photo.yaw = _e.y; photo.pitch = _e.x; photo.roll = 0; photo.fov = camera.fov;
   document.body.classList.add('photo'); document.body.classList.remove('cinema');
@@ -31699,7 +31701,7 @@ function matchEnd(win) {
   M.fin = { t: performance.now(), L, win }; M.overFor = win ? 15500 : 6500; if (win && !mine) M.watch = win;
   for (const id of M.roster.keys()) { const T = TRON.trails.get(id); if (T) { tronClear(T); T.sign = id === win; } }   // (every wall goes out; the winner's sky is clean)
   if (L) { matchBoom(L.x, L.y, L.z, L.col, 1.6 * (L.K || 1), L.v, false, L.h); chatLine('', `THE LAST ONE OUT · ${L.name}${L.by ? ' · ' + L.by.toUpperCase() : ''}`, 'sys'); }
-  M.seen = null; if (matchSees()) { timeK = 0.3; const t0 = performance.now(), id = M.id, back = () => { const u = (performance.now() - t0) / 2300; if (u >= 1 || MATCH.id !== id) { timeK = 1; return; } timeK = 0.3 + 0.7 * u * u; requestAnimationFrame(back); }; requestAnimationFrame(back); }
+  M.seen = null; if (matchSees()) { timeK = 0.3; const t0 = performance.now(), id = M.id, back = () => { if (state === 'photo') return; const u = (performance.now() - t0) / 2300; if (u >= 1 || MATCH.id !== id) { timeK = 1; return; } timeK = 0.3 + 0.7 * u * u; requestAnimationFrame(back); }; requestAnimationFrame(back); }
   matchBig(L ? 'THE LAST FIRE' : nm ? `${nm} WINS` : 'NOBODY WINS', L ? 1700 : 4200, L ? L.col : win ? matchCol(win) : null); pwClear();
   if (L) setTimeout(() => { if (MATCH.id === M.id && MATCH.phase === 'over') { matchBig(nm ? `${nm} WINS` : 'NOBODY WINS', 4200, win ? matchCol(win) : null); audio.sfx.halo?.(); } }, 1800);
   if (rg) { chatLine('', nm ? `${nm} WINS THE RING RACE · ${RG.sc.get(win) || 0} RINGS` : 'THE RING RACE IS A TIE', 'sys'); const b = ringsBoard(6); if (b) chatLine('', b, 'sys');
@@ -31740,7 +31742,7 @@ function matchLeave() {
   for (const C of MATCH.cpus) { cpuShow(C, false); const P = NET.peers.get(C.id); if (P) { P.seen = false; dropPeer(C.id, P); NET.peers.delete(C.id); } tronDrop(C.id); }
   if (MATCH.ring) MATCH.ring.visible = false;
   if (MATCH.kind === 'war') MATCH.cool = performance.now() + 6000;
-  if (timeK < 1) timeK = 1;
+  if (timeK < 1 && state !== 'photo') timeK = 1;   // (a picture being taken keeps its own still time)
   if (MATCH.last && (wasIn || MATCH.host) && over) { MATCH.againUntil = performance.now() + 25000; const el = $('matchAsk'); el.textContent = `${MATCH.last.game === 'rings' ? 'THE RING RACE' : MATCH.last.kind === 'duel' ? 'THE DUEL' : MATCH.last.party ? 'THE PARTY FIGHT' : 'THE WARZONE'} AGAIN · ${TOUCH ? 'TAP' : 'CLICK'} · OR /again`; el.classList.add('on'); }
   if (ghost) { matchUnghost(); toast(over ? 'THE FIGHT IS OVER · YOU FLY ON' : 'YOU FLY ON'); }
   if (over) { MATCH.seen = null; if (NPCS.fight?.id === MATCH.id) NPCS.fight = null; }
@@ -31893,6 +31895,7 @@ function updateMatch(dt) {
 function matchLive(now) {
   const M = MATCH, p = player, sees = matchSees() && (!M.late || now - M.t0 < 3000);
   miEnd(); if (!M.late) for (const id of M.roster.keys()) { const T = TRON.trails.get(id); if (T) tronClear(T); } trailRib.key = null;
+  if (state === 'photo' && M.me.alive) closePhoto();   // (a picture of the opening, and then he flies it)
   M.phase = 'live'; M.lastS = 0; M.goAt = M.t0 + (M.game === 'rings' ? 0 : M.warmS * 1000); M.warm = now < M.goAt;
   M.liveAt = performance.now() - Math.max(0, now - (M.warm ? M.t0 : M.goAt));
   if (sees) { matchBig(M.warm ? `WARM-UP · ${Math.ceil((M.goAt - now) / 1000)}` : 'FLY', M.warm ? 1800 : 1100); audio.sfx.rebirth?.(); }
