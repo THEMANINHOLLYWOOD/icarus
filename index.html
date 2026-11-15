@@ -14798,6 +14798,7 @@ function reefSite(sx, sz) {   // what (if anything) lies in this square, and whe
   for (let k = 0; k < 12; k++) {
     const x = sx * SC + 50 + r() * (SC - 100), z = sz * SC + 50 + r() * (SC - 100), bed = terrainAt(x, z), wd = WATER - bed;
     if (wd < 5 || wd > 70 || Math.hypot(x - CRETE.x, z - CRETE.z) < 2600) continue;
+    if (Math.abs(terrainAt(x + 7, z) - terrainAt(x - 7, z)) + Math.abs(terrainAt(x, z + 7) - terrainAt(x, z - 7)) > 7) continue;   // (on ground level enough for it to have come to rest there, not down the face of a drop)
     const roll = r(), kind = wd < 24 ? (roll < 0.3 ? 'statue' : roll < 0.52 ? 'columns' : roll < 0.78 ? 'amphorae' : roll < 0.9 ? 'fallen' : 'head') : (roll < 0.34 ? 'head' : roll < 0.58 ? 'columns' : roll < 0.8 ? 'bronze' : 'amphorae');
     const N = RUIN_NAMES[kind];
     return { id: `${sx}_${sz}`, x, z, bed, wd, kind, name: N[0][Math.floor(r() * N[0].length)], sub: N[1], yaw: r() * 6.283, seed: (r() * 1e9) >>> 0, mesh: null };
