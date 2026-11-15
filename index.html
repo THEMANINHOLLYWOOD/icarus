@@ -29715,7 +29715,7 @@ function tronTake(P, ts, pts) {
     tronPut(T, x, y, z); }
 }
 // did flying from a to b go through a wall? (not his own last second of it). Which one, if so.
-function tronHit(ax, ay, az, bx, by, bz, selfId, matchId) {
+function tronHit(ax, ay, az, bx, by, bz, selfId, matchId, K = birdK()) {   // (K: how big the bird flying it is; his own, unless said)
   const C = TRON.CELL, x0 = Math.floor(Math.min(ax, bx) / C) - 1, x1 = Math.floor(Math.max(ax, bx) / C) + 1, z0 = Math.floor(Math.min(az, bz) / C) - 1, z1 = Math.floor(Math.max(az, bz) / C) + 1, dx = bx - ax, dz = bz - az;
   for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { const L = TRON.grid.get(x * 73856093 ^ z * 19349663); if (!L) continue;
     for (let q = 0; q < L.length; q += 2) { const T = L[q], i = L[q + 1] - T.base; if (i <= T.start || i >= T.n || T.match !== matchId) continue;
@@ -29723,7 +29723,7 @@ function tronHit(ax, ay, az, bx, by, bz, selfId, matchId) {
       if (T.match && sameSide(T.id, selfId)) continue;   // (a friend's wall lets him through: see teamParse)
       const P = T.pts, c = (i - 1) * 3, d = i * 3, ex = P[d] - P[c], ez = P[d + 2] - P[c + 2], den = dx * ez - dz * ex; if (Math.abs(den) < 1e-6) continue;
       const s = ((P[c] - ax) * ez - (P[c + 2] - az) * ex) / den, u = ((P[c] - ax) * dz - (P[c + 2] - az) * dx) / den; if (s < 0 || s > 1 || u < -0.05 || u > 1.05) continue;
-      const wy = P[c + 1] + (P[d + 1] - P[c + 1]) * clamp(u, 0, 1), y = ay + (by - ay) * s; if (Math.abs(y - wy) < T.h / 2 + 1.6 * birdK()) return T; } }
+      const wy = P[c + 1] + (P[d + 1] - P[c + 1]) * clamp(u, 0, 1), y = ay + (by - ay) * s; if (Math.abs(y - wy) < T.h / 2 + 1.6 * K) return T; } }
   return null;
 }
 function updateTron(dt) {
@@ -31461,7 +31461,8 @@ function fbStep(dt) {
   let warn = null, wd = 1e9;
   for (const F of FB.list) { if (F.dead) continue;
     const T = F.lock ? fbAt(F.to) : null; if (F.lock && !T) F.lock = false;
-    const d = fbSteer(F, T ? T.x : null, T ? T.y : 0, T ? T.z : 0, dt), hitR = 9 + 4 * mdK(F.to || F.by);
+    const ox = F.pos.x, oy = F.pos.y, oz = F.pos.z; let d = fbSteer(F, T ? T.x : null, T ? T.y : 0, T ? T.z : 0, dt); const hitR = 9 + 4 * mdK(F.to || F.by);
+    if (T) { const sx = F.pos.x - ox, sy = F.pos.y - oy, sz = F.pos.z - oz, L2 = sx * sx + sy * sy + sz * sz, u = L2 > 1e-6 ? clamp(((T.x - ox) * sx + (T.y - oy) * sy + (T.z - oz) * sz) / L2, 0, 1) : 1; d = Math.min(d, Math.hypot(ox + sx * u - T.x, oy + sy * u - T.y, oz + sz * u - T.z)); }   // (the nearest it came on the way, this frame: a slow frame does not let it fly through him)
     const g = Math.max(groundAt(F.pos.x, F.pos.z, F.pos.y + 20), WATER); if (F.t > FB.life || F.pos.y < g + 1) { F.dead = true; fbPop(F, F.pos.y < g + 1); continue; }
     if (T && d < hitR) {
       if (F.to === NET.id && !M.glide) { F.dead = true; fbPop(F, true); matchSend({ k: 'fbx', id: M.id, f: F.f }); matchOut(`${matchName(F.by)}’s fireball`); continue; }
@@ -31801,7 +31802,7 @@ function cpuFly(C, dt) {
   // what is in the way: looked for a few times a second, straight ahead and to either side
   if ((C.probeT -= dt) <= 0) { C.probeT = 0.1 + (1 - C.skill) * 0.16;
     const L = C.speed * (1.0 + C.skill * 0.9), blocked = (dy, dp) => { const y = C.yaw + dy, p = clamp(C.pitch + dp, -0.7, 0.7), cp = Math.cos(p), x = C.pos.x - Math.sin(y) * cp * L, yy = C.pos.y + Math.sin(p) * L, z = C.pos.z - Math.cos(y) * cp * L;
-      if (yy < Math.max(groundAt(x, z, yy + 200), WATER) + 26 || yy > M.base + 1500) return true; if (Math.hypot(x - M.cx, z - M.cz) > M.R - 40) return true; return !!tronHit(C.pos.x, C.pos.y, C.pos.z, x, yy, z, C.id, M.id); };
+      if (yy < Math.max(groundAt(x, z, yy + 200), WATER) + 26 || yy > M.base + 1500) return true; if (Math.hypot(x - M.cx, z - M.cz) > M.R - 40) return true; return !!tronHit(C.pos.x, C.pos.y, C.pos.z, x, yy, z, C.id, M.id, 1); };
     const want = wrapAngle(Math.atan2(-(C.tgt.x - C.pos.x), -(C.tgt.z - C.pos.z)) - C.yaw), wp = clamp(Math.atan2(C.tgt.y - C.pos.y, Math.hypot(C.tgt.x - C.pos.x, C.tgt.z - C.pos.z) + 60), -0.5, 0.5) - C.pitch;
     C.turn = clamp(want * 1.6, -1.5, 1.5); C.climb = clamp(wp * 2, -0.9, 0.9);
     if (blocked(C.turn * 0.25, 0)) { const l = blocked(0.7, 0), r = blocked(-0.7, 0);
@@ -31811,7 +31812,7 @@ function cpuFly(C, dt) {
   C.prev.copy(C.pos); const cp = Math.cos(C.pitch); C.pos.x -= Math.sin(C.yaw) * cp * C.speed * dt; C.pos.y += Math.sin(C.pitch) * C.speed * dt; C.pos.z -= Math.cos(C.yaw) * cp * C.speed * dt;
   const T = tronTrail(C.id, C.name, teamOf(C.id) >= 0 ? teamCol(teamOf(C.id)) : PATRONS[C.pat][0]); T.match = M.id; T.h = tronH(C.name); tronLay(T, C.pos.x, C.pos.y, C.pos.z);
   // and what it has flown into
-  let hit = tronHit(C.prev.x, C.prev.y, C.prev.z, C.pos.x, C.pos.y, C.pos.z, C.id, M.id);
+  let hit = tronHit(C.prev.x, C.prev.y, C.prev.z, C.pos.x, C.pos.y, C.pos.z, C.id, M.id, 1);   // (the house's birds are all of the usual size)
   if (hit && C.glass > time && !M.warm) { pwShatter(C.pos.x, C.pos.y, C.pos.z, true); hit = null; }   // (through the glass)
   const by = hit ? (hit.id === C.id ? 'its own fire' : `${hit.name}’s fire`) : C.pos.y < Math.max(groundAt(C.pos.x, C.pos.z, C.pos.y + 100), WATER) + 3 ? 'the ground' : Math.hypot(C.pos.x - M.cx, C.pos.z - M.cz) > M.R + 30 ? 'the ring' : '';
   cpuShow(C, true);
