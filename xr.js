@@ -19,6 +19,14 @@
 //           them hard and he runs.
 //   join    in the air, bring your hands together and hold them: the wings meet, and he glides down to land.
 //   (and a flap is a flap whatever the hands are doing: both arms swept down hard at your sides. Keep flapping to go faster.)
+//   palms   which way both palms face, arms out: down (as a bird's wings are), ahead (thrown forward against the air:
+//           the brake, a hover), up (the hands turned right over: he is on his back).
+//   brake   arms out with the palms thrown forward, or two fists held out wide, or both palms held up in front of you,
+//           still, like a hand stopping traffic — he flares and hangs in the air.
+//   twist   pinch thumb and finger and turn the wrist, as if it held a key: he rolls with it (a quarter turn of the
+//           wrist is half a roll). The pinch is read for its twist; only a pinch with no twist in it is a tap.
+//   flick   one hand flicked hard, the other still — a trick: up, a loop; down, a split-S; out to either side, a barrel
+//           roll that way; forward, an Immelmann; back toward you, a stall turn.
 
 const FINGERS = ['index', 'middle', 'ring', 'pinky'];
 
@@ -79,7 +87,11 @@ export function makeHands() {
     const thumb = tt && tpx ? { up: tt.y - w.y > 0.05 && tt.y - tpx.y > 0.02, down: w.y - tt.y > 0.05 && tpx.y - tt.y > 0.02 } : null;
     // which way the fingers run and which way the knuckles lie (for the hand he is given, when it is his own to move)
     const fv = sub(k, w), fl = len(fv) || 1, av = sub(joints['index-finger-phalanx-proximal'], joints['pinky-finger-phalanx-proximal']), al = len(av) || 1;
-    return { palm, palmW, wrist: toLocal(w), wristW: { x: w.x, y: w.y, z: w.z }, tipW: joints['index-finger-tip'] || null, n, fd: dirLocal([fv[0] / fl, fv[1] / fl, fv[2] / fl]), ac: dirLocal([av[0] / al, av[1] / al, av[2] / al]),
+    const fd = dirLocal([fv[0] / fl, fv[1] / fl, fv[2] / fl]), ac = dirLocal([av[0] / al, av[1] / al, av[2] / al]);
+    // how far the wrist is turned about the fingers, as a key is turned: clockwise, looking along them, is more
+    const F = [fd.x, fd.y, fd.z], u0 = [-F[0] * F[1], 1 - F[1] * F[1], -F[2] * F[1]], ul = len(u0) || 1, U = u0.map(x => x / ul), R0 = cross(F, U);
+    const twist = Math.atan2(ac.x * U[0] + ac.y * U[1] + ac.z * U[2], ac.x * R0[0] + ac.y * R0[1] + ac.z * R0[2]);
+    return { palm, palmW, wrist: toLocal(w), wristW: { x: w.x, y: w.y, z: w.z }, tipW: joints['index-finger-tip'] || null, n, fd, ac, twist,
       straight, open, fist, point, aim, pinch, thumb, v: S.v, rise: dy, drop: dropY };
   }
   const ready = (name, t) => (H.cool[name] || 0) <= H.t ? ((H.cool[name] = H.t + t), true) : false;
@@ -103,7 +115,7 @@ export function makeHands() {
     H.bodyYaw = wrapA(H.bodyYaw + wrapA(tgt - H.bodyYaw) * Math.min(1, dt * k));
     const hd = frame(head, head.yaw), bd = frame(head, H.bodyYaw);
     const l = readHand('L', L, bd, dt, hd), r = readHand('R', R, bd, dt, hd);
-    const out = { axes: [0, 0], boost: false, run: false, pose: '', events: [], hands: { l, r }, bodyYaw: H.bodyYaw, flapV: 0, flapRate: 0 };
+    const out = { axes: [0, 0], boost: false, run: false, pose: '', events: [], hands: { l, r }, bodyYaw: H.bodyYaw, flapV: 0, flapRate: 0, palms: '', brake: 0, twist: 0, twisting: false, flick: null };
     const both = l && r;
     const air = ctx.form === 'phoenix';
     // the distance between the palms, and how fast it is closing
@@ -113,6 +125,10 @@ export function makeHands() {
 
     if (both) {
       const wide = Math.abs(r.palm.x - l.palm.x) > 0.72 && l.palm.x < -0.25 && r.palm.x > 0.25;
+      // which way the palms face, if both agree: down, thrown forward against the air, or turned right over
+      { const pd = h => h.n.y < -0.6 ? 'down' : h.n.y > 0.6 ? 'up' : h.n.z > 0.6 ? 'ahead' : '', pl = pd(l); if (pl && pl === pd(r)) out.palms = pl; }
+      // the brake: arms out with the palms thrown forward, or fists held out wide (fists close in are the fold, below)
+      if (wide && (out.palms === 'ahead' || l.fist && r.fist)) out.brake = 1;
       // clap: palms meeting, fast
       if (sep < 0.11 && H.sepV < -1.1 && ready('clap', 0.9)) out.events.push('clap');
       // flap: both arms swept down, hard, together, out at the sides — whatever the hands are doing. The harder, the more.
@@ -135,8 +151,10 @@ export function makeHands() {
       if (!out.pose && l.open && r.open && sep < 0.3 && l.palm.z > 0.36 && r.palm.z > 0.36 && (l.palm.y + r.palm.y) / 2 < -0.05) {
         out.pose = 'stoop'; out.axes = [dz((l.palm.x + r.palm.x) / 2, 0.06, 0.25), 1]; out.boost = true;
       }
-      // fold: both fists, held
-      if (l.fist && r.fist) { if ((H.foldHeld += dt) > 0.45 && !H.folded) { H.folded = true; out.events.push('fold'); } out.pose ||= 'fists'; }
+      // hover: both palms up in front, facing ahead, held still — a hand stopping traffic (shoved, it is the push)
+      if (!out.pose && !wide && out.palms === 'ahead' && l.palm.z > 0.2 && r.palm.z > 0.2 && len(l.v) < 0.6 && len(r.v) < 0.6) { out.brake = 1; out.pose = 'hover'; }
+      // fold: both fists, held in close
+      if (l.fist && r.fist && !wide) { if ((H.foldHeld += dt) > 0.45 && !H.folded) { H.folded = true; out.events.push('fold'); } out.pose ||= 'fists'; }
       else { H.foldHeld = 0; H.folded = false; }
       // leap: both hands thrown up
       if (l.v[1] > 1.3 && r.v[1] > 1.3 && l.rise > 0.15 && r.rise > 0.15 && ready('leap', 1)) out.events.push('leap');
@@ -144,6 +162,22 @@ export function makeHands() {
       if (l.n.z > 0.6 && r.n.z > 0.6 && l.v[2] > 1.1 && r.v[2] > 1.1 && ready('push', 1)) out.events.push('push');
     } else { H.spreadHeld = 0; H.spreadFired = false; H.foldHeld = 0; H.folded = false; H.joinHeld = 0; H.joined = false; }
     while (H.flaps.length && H.t - H.flaps[0] >= 2.5) H.flaps.shift(); out.flapRate = H.flaps.length;   // (in time order: the old ones are at the front)
+
+    // twist: a pinch held, and how far the wrist has turned since it closed (either hand; the right if both)
+    for (const [h, S] of [[r, H.R], [l, H.L]]) {
+      if (h && h.pinch) { if (!S.tw) S.tw = { a: h.twist, acc: 0 }; else { S.tw.acc += wrapA(h.twist - S.tw.a); S.tw.a = h.twist; } }
+      else S.tw = null;
+    }
+    { const tw = H.R.tw || H.L.tw; if (tw) { out.twisting = true; out.twist = tw.acc; } }
+    // flick: one hand thrown hard one way while the other is still (two together are a flap, a leap, a push)
+    if (air) {
+      const sp = h => h ? len(h.v) : 0, sl = sp(l), sr = sp(r), fh = sl > 2.2 && sr < 0.8 ? ['L', l] : sr > 2.2 && sl < 0.8 ? ['R', r] : null;
+      if (fh && ready('flick', 1.2)) {
+        const [side, h] = fh, v = h.v, ax = Math.abs(v[0]), ay = Math.abs(v[1]), az = Math.abs(v[2]);
+        const dir = ay >= ax && ay >= az ? (v[1] > 0 ? 'up' : 'down') : ax >= az ? ((v[0] < 0) === (side === 'L') ? 'out' : 'in') : (v[2] > 0 ? 'ahead' : 'back');
+        out.events.push('flick'); out.flick = { side, dir, x: Math.sign(v[0]) };
+      }
+    }
 
     // offer: one palm up, open, still, in front
     const up = [l, r].find(h => h && h.open && h.n.y > 0.72 && h.palm.z > 0.15 && Math.hypot(...h.v) < 0.35);
@@ -176,9 +210,9 @@ export function makeHands() {
 }
 
 // A hand, laid out in the room for tests: the palm at `at`, facing `facing` ('down' | 'up' | 'ahead' | 'in'), fingers
-// pointing `toward` (unit [x,y,z] in the room), in a given shape ('open' | 'fist' | 'point'). Head at the origin looking down -z.
+// pointing `toward` (unit [x,y,z] in the room), in a given shape ('open' | 'fist' | 'point' | 'pinch'). Head at the origin looking down -z.
 export function fakeHand(side, at, { shape = 'open', facing = 'down', toward = [0, 0, -1] } = {}) {
-  const f = toward, nrm = { down: [0, -1, 0], up: [0, 1, 0], ahead: [0, 0, -1], in: side === 'R' ? [-1, 0, 0] : [1, 0, 0] }[facing];
+  const f = toward, nrm = Array.isArray(facing) ? facing : { down: [0, -1, 0], up: [0, 1, 0], ahead: [0, 0, -1], in: side === 'R' ? [-1, 0, 0] : [1, 0, 0] }[facing];   // (or any [x,y,z], for a wrist turned part way)
   // across the palm, from the index side to the pinky side: for the right hand that is cross(fingers, normal)… solved so
   // that the game's normal rule (right: cross(index−wrist, pinky−wrist)) comes back as `nrm`
   let across = cross(f, nrm); if (side === 'L') across = across.map(x => -x);
@@ -202,5 +236,6 @@ export function fakeHand(side, at, { shape = 'open', facing = 'down', toward = [
     }
   }
   j['thumb-tip'] = P(0.03, -0.06, 0.02);
+  if (shape === 'pinch') { j['index-finger-phalanx-intermediate'] = P(0.075, -0.045, 0.015); j['index-finger-phalanx-distal'] = P(0.05, -0.058, 0.02); j['index-finger-tip'] = P(0.031, -0.06, 0.021); }   // (the fingertip on the thumb's)
   return j;
 }
