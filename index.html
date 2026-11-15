@@ -1671,15 +1671,15 @@ function biomeTree(acc, x, y, z, r, s, bio) {
     part(acc, G.bole, x, y - 1.5, z, r0, H * 0.72, r0, r() < 0.5 ? WOOD.redwood : WOOD.barkDark, ry);
     for (let i = 0; i < 4; i++) { const a = ry + i * 1.571; part(acc, G.bole, x + Math.cos(a) * r0 * 1.3, y - 1.5, z + Math.sin(a) * r0 * 1.3, r0 * 0.5, r0 * 3.4, r0 * 0.5, WOOD.barkDark, 0, Math.sin(a) * -0.7, Math.cos(a) * 0.7); }
     SWAY = [y, 0.004];
-    for (let i = 0; i < 5; i++) { const t = i / 5, tr = (13 - 8 * t) * s; part(acc, G.tier, x, y + H * (0.5 + 0.1 * i), z, tr, H * 0.19, tr, J(WOOD.fir), ry + i); }
+    for (let i = 0; i < 5; i++) { const t = i / 5, tr = (13 - 8 * t) * s; part(acc, G.tier, x, y + H * (0.5 + 0.1 * i), z, tr, H * 0.19, tr, shade(J(WOOD.fir), 0.8 + 0.08 * i), ry + i); }
     SWAY = null;
     solid(x, z, r0 * 1.1, y - 1, y + H * 0.52, 'a titanwood'); solid(x, z, 11 * s, y + H * 0.5, y + H, 'a tree', true, 0, y + H * 0.5);
   } else if (bio === 'blossom') {
     const H = (7 + r() * 5) * s, r0 = (0.32 + r() * 0.14) * s, R = (3.4 + r() * 1.6) * s;
     part(acc, G.bole, x, y - 0.3, z, r0, H * 0.72, r0, WOOD.barkDark, ry, (r() - 0.5) * 0.2);
     SWAY = [y, 0.012];
-    for (let i = 0; i < 3; i++) { const a = ry + i * 2.1, d = R * 0.42; part(acc, G.ico0, x + Math.cos(a) * d, y + H * 0.8 + (i - 1) * R * 0.14, z + Math.sin(a) * d, R * 0.62, R * 0.46, R * 0.62, J(BIO.blossom), r() * 6); }
-    part(acc, G.ico0, x, y + H * 0.97, z, R * 0.6, R * 0.5, R * 0.6, J(BIO.blossom), ry);
+    for (let i = 0; i < 3; i++) { const a = ry + i * 2.1, d = R * 0.42; part(acc, G.ico0, x + Math.cos(a) * d, y + H * 0.8 + (i - 1) * R * 0.14, z + Math.sin(a) * d, R * 0.62, R * 0.46, R * 0.62, shade(J(BIO.blossom), 0.86), r() * 6); }
+    part(acc, G.ico0, x, y + H * 0.97, z, R * 0.6, R * 0.5, R * 0.6, shade(J(BIO.blossom), 1.1), ry);
     SWAY = null;
     solid(x, z, R * 0.8, y + H * 0.5, y + H * 1.2, 'a tree', true, r0, y);
   } else {
@@ -1747,12 +1747,27 @@ function clearTrees() {
   }
 }
 // a broad crown is not one lump: a few smaller clumps stand out from it, so the wind has edges to work on
-function leafClumps(acc, cx, cy, cz, R, pal, n) {
+function leafClumps(acc, cx, cy, cz, R, pal, n, lit = 1) {
   const lr = mulberry32(((cx * 13.7) | 0) * 2654435761 ^ ((cz * 7.3) | 0) * 40503);
   for (let i = 0; i < n; i++) {
     const a = lr() * 6.28, e = lr() * 1.1 - 0.25, q = R * (0.22 + lr() * 0.14), k = R * 0.92;
-    part(acc, G.oct, cx + Math.cos(a) * Math.cos(e) * k, cy + Math.sin(e) * k * 0.75, cz + Math.sin(a) * Math.cos(e) * k, q, q * 0.8, q, jitter(pal[Math.floor(lr() * pal.length)], lr), lr() * 6);
+    part(acc, G.oct, cx + Math.cos(a) * Math.cos(e) * k, cy + Math.sin(e) * k * 0.75, cz + Math.sin(a) * Math.cos(e) * k, q, q * 0.8, q, shade(jitter(pal[Math.floor(lr() * pal.length)], lr), lit * (0.92 + 0.2 * e)), lr() * 6);
   }
+}
+// Layers. A crown is more than one skin: the leaves deep inside it are in shadow and darker, those out at the edge and on
+// top are in the sun and lighter, and a few boughs go out from the trunk into it, showing wherever the leaves part. (The
+// extra pieces throw dice of their own, seeded from the tree's turn, so the forest's dice, and every tree after this one,
+// fall exactly as they did. Boughs are added with no sway: they are wood, and burn and char as wood.)
+G.limb = new THREE.CylinderGeometry(0.45, 1, 1, 3, 1, true).translate(0, 0.5, 0).toNonIndexed();   // a bough: three sides, open at both ends
+const LAYERS = () => !TOUCH && tierIdx > 0;   // (a phone, and the lowest setting, keep the single skin and only the shading)
+const shade = (c, k, warm = 0) => [Math.min(1, c[0] * k * (1 + warm)), Math.min(1, c[1] * k * (1 + warm * 0.35)), Math.min(1, c[2] * k * (1 - warm * 0.6))];   // (never past white: past white is fire, to the letters)
+const layerDice = ry => mulberry32(((ry * 104729) | 0) ^ 0x2f6b4d);
+const _ld = new THREE.Vector3();
+function limb(acc, x, y, z, dx, dy, dz, L, w, rgb) {   // a bough from (x, y, z) out along (dx, dy, dz), L long, w thick at the foot
+  _ld.set(dx, dy, dz).normalize(); _mat.compose(_p.set(x, y, z), _q.setFromUnitVectors(UP, _ld), _s.set(w, L, w)); addGeo(acc, G.limb, _mat, rgb);
+}
+function boughs(acc, x, z, y0, y1, R, n, w, rgb, lr) {   // n boughs off the trunk between heights y0 and y1, reaching out about R
+  for (let i = 0; i < n; i++) { const a = lr() * 6.283, e = 0.45 + lr() * 0.5; limb(acc, x, lerp(y0, y1, (i + 0.3 + lr() * 0.5) / n), z, Math.cos(a), e, Math.sin(a), R * (0.6 + lr() * 0.3), w * (0.8 + lr() * 0.3), rgb); }
 }
 function growTree0(acc, x, y, z, r, s, kind) {
   const bio = kind !== 'snag' && realm === 'over' && y < 300 ? biomeAt(x, z) : '';
@@ -1772,32 +1787,39 @@ function growTreeA(acc, x, y, z, r, s, kind) {
     const fir = kind === 'fir', H = (fir ? 17 + r() * 13 : 13 + r() * 9) * s, r0 = (0.3 + r() * 0.12) * s * (fir ? 1.25 : 1.1), n = fir ? 4 : 3, R = (fir ? 3.2 : 4.4) * s * (0.85 + r() * 0.3);
     part(acc, G.bole, x, y - 0.4, z, r0, H * 0.6, r0, fir ? WOOD.barkDark : WOOD.bark, ry);
     SWAY = [y, 0.011];
-    for (let i = 0; i < n; i++) {
-      const t = i / n, tr = R * (1 - 0.68 * t);
-      part(acc, G.tier, x, y + H * (0.22 + 0.74 * t * 0.95), z, tr, H * 0.74 / n * 1.75, tr, fir && y > 470 && i === n - 1 ? COL.snow : J(fir ? WOOD.fir : WOOD.pine), ry + i);
+    const lr = layerDice(ry);
+    for (let i = 0; i < n; i++) {   // each skirt a little off true, the low ones in their own shade, the top in the sun
+      const t = i / n, tr = R * (1 - 0.68 * t), ty = y + H * (0.22 + 0.74 * t * 0.95), th = H * 0.74 / n * 1.75, ox = (lr() - 0.5) * tr * 0.14, oz = (lr() - 0.5) * tr * 0.14;
+      const c = fir && y > 470 && i === n - 1 ? COL.snow : shade(J(fir ? WOOD.fir : WOOD.pine), 0.8 + 0.34 * i / (n - 1));
+      part(acc, G.tier, x + ox, ty, z + oz, tr, th, tr, c, ry + i, (lr() - 0.5) * 0.09, (lr() - 0.5) * 0.09);
+      if (LAYERS() && i === 0) part(acc, G.tier, x - ox, ty + th * 0.3, z - oz, tr * 0.8, th * 0.8, tr * 0.8, shade(c, 0.62), ry + 0.52);   // (a darker skirt underneath, its points showing between the others')
     }
     SWAY = null;
     solid(x, z, R * 0.8, y + H * 0.24, y + H * 0.98, 'a tree', true, r0, y);
   } else if (kind === 'cypress') {
     const H = (11 + r() * 9) * s, w = (1.2 + r() * 0.5) * s;
     part(acc, G.bole, x, y - 0.3, z, 0.3 * s, 2.5, 0.3 * s, WOOD.bark, ry);
-    SWAY = [y, 0.026]; part(acc, G.oct, x, y + H * 0.53, z, w, H * 0.5, w, J(WOOD.cypress), ry); SWAY = null;
+    SWAY = [y, 0.026]; part(acc, G.oct, x, y + H * 0.53, z, w, H * 0.5, w, shade(J(WOOD.cypress), 0.84), ry);
+    if (LAYERS()) { const lr = layerDice(ry); part(acc, G.oct, x + (lr() - 0.5) * w * 0.4, y + H * 0.6, z + (lr() - 0.5) * w * 0.4, w * 0.84, H * 0.42, w * 0.84, shade(WOOD.cypress[1], 1.18, 0.04), ry + 0.785); }   // (a second, sunnier skin turned between the first one's faces)
+    SWAY = null;
     solid(x, z, w * 0.9, y + 1.5, y + H, 'a cypress', true, 0.35 * s, y);
   } else if (kind === 'olive') {
     const H = (4.6 + r() * 2.4) * s, R = (2.5 + r() * 1.4) * s, lean = 0.12 + r() * 0.2, la = r() * 6.28, lx = Math.sin(la) * lean, lz = Math.cos(la) * lean;
     part(acc, G.bole, x, y - 0.3, z, 0.5 * s, H * 0.62, 0.5 * s, WOOD.barkOlive, ry, lz, -lx);
     const cx = x + lx * H * 0.5, cz = z + lz * H * 0.5;
+    if (LAYERS()) boughs(acc, cx, cz, y + H * 0.48, y + H * 0.62, R * 0.85, 2, 0.2 * s, WOOD.barkOlive, layerDice(ry));
     SWAY = [y, 0.018];
-    part(acc, G.ico0, cx, y + H * 0.82, cz, R, R * 0.55, R, J(WOOD.olive), ry);
-    for (let i = 0, n = 2 + Math.floor(r() * 2); i < n; i++) { const a = r() * 6.28, q = R * (0.5 + r() * 0.3); part(acc, G.oct, cx + Math.cos(a) * R * 0.7, y + H * (0.7 + r() * 0.25), cz + Math.sin(a) * R * 0.7, q, q * 0.6, q, J(WOOD.olive), r() * 6); }
+    part(acc, G.ico0, cx, y + H * 0.82, cz, R, R * 0.55, R, shade(J(WOOD.olive), 0.8), ry);
+    for (let i = 0, n = 2 + Math.floor(r() * 2); i < n; i++) { const a = r() * 6.28, q = R * (0.5 + r() * 0.3); part(acc, G.oct, cx + Math.cos(a) * R * 0.7, y + H * (0.7 + r() * 0.25), cz + Math.sin(a) * R * 0.7, q, q * 0.6, q, shade(J(WOOD.olive), 1.14, -0.04), r() * 6); }   // (the silver of the leaves on the outside)
     SWAY = null;
     solid(cx, cz, R * 1.1, y + H * 0.5, y + H * 0.82 + R * 0.5, 'an olive tree', true, 0.55 * s, y);
   } else if (kind === 'birch') {
     const H = (11 + r() * 7) * s, R = (1.7 + r() * 0.6) * s;
     part(acc, G.bole, x, y - 0.3, z, 0.24 * s, H * 0.85, 0.24 * s, WOOD.barkPale, ry);
+    if (LAYERS()) boughs(acc, x, z, y + H * 0.42, y + H * 0.72, R * 1.15, 2, 0.1 * s, WOOD.barkPale, layerDice(ry));   // (white limbs in the gaps of an open crown)
     SWAY = [y, 0.036];
-    for (let i = 0; i < 3; i++) part(acc, G.oct, x + jr(0.5) * s, y + H * (0.52 + i * 0.2), z + jr(0.5) * s, R * (1 - i * 0.2), R * 1.25 * (1 - i * 0.12), R * (1 - i * 0.2), J(WOOD.birch), r() * 6);
-    if (!TOUCH) leafClumps(acc, x, y + H * 0.7, z, R * 1.1, WOOD.birch, 3);
+    for (let i = 0; i < 3; i++) part(acc, G.oct, x + jr(0.5) * s, y + H * (0.52 + i * 0.2), z + jr(0.5) * s, R * (1 - i * 0.2), R * 1.25 * (1 - i * 0.12), R * (1 - i * 0.2), shade(J(WOOD.birch), 0.8 + i * 0.15), r() * 6);
+    if (!TOUCH) leafClumps(acc, x, y + H * 0.7, z, R * 1.1, WOOD.birch, 3, 1.08);
     SWAY = null;
     solid(x, z, R, y + H * 0.42, y + H * 1.05, 'a birch', true, 0.28 * s, y);
   } else if (kind === 'umbrella') {
@@ -1805,32 +1827,35 @@ function growTreeA(acc, x, y, z, r, s, kind) {
     const H = (12 + r() * 6) * s, lean = 0.08 + r() * 0.12, la = r() * 6.28, lx = Math.sin(la) * lean, lz = Math.cos(la) * lean, R = (5 + r() * 2.2) * s;
     part(acc, G.bole, x, y - 0.3, z, 0.42 * s, H * 0.62, 0.42 * s, WOOD.bark, ry, lz, -lx);
     const cx = x + lx * H * 0.9, cz = z + lz * H * 0.9;
+    if (LAYERS()) { const lr = layerDice(ry), bx = x + lx * H * 0.6, bz = z + lz * H * 0.6;   // the trunk forks under the parasol
+      for (let i = 0; i < 2; i++) { const a = ry + i * 3.14 + (lr() - 0.5); limb(acc, bx, y + H * 0.58, bz, Math.cos(a) * 0.6 + lx, 1, Math.sin(a) * 0.6 + lz, H * 0.44, 0.24 * s, WOOD.bark); } }
     SWAY = [y, 0.012];
-    part(acc, G.ico0, cx, y + H, cz, R, R * 0.3, R, J(WOOD.umbrella), ry);
-    for (let i = 0; i < 3; i++) { const a = r() * 6.28, q = R * (0.45 + r() * 0.2); part(acc, G.ico0, cx + Math.cos(a) * R * 0.55, y + H - 0.4 + r() * 0.8, cz + Math.sin(a) * R * 0.55, q, q * 0.32, q, J(WOOD.umbrella), r() * 6); }
+    part(acc, G.ico0, cx, y + H, cz, R, R * 0.3, R, shade(J(WOOD.umbrella), 0.78), ry);
+    for (let i = 0; i < 3; i++) { const a = r() * 6.28, q = R * (0.45 + r() * 0.2); part(acc, G.ico0, cx + Math.cos(a) * R * 0.55, y + H - 0.4 + r() * 0.8, cz + Math.sin(a) * R * 0.55, q, q * 0.32, q, shade(J(WOOD.umbrella), 1.12, 0.04), r() * 6); }
     SWAY = null;
     solid(cx, cz, R, y + H - 1.5, y + H + R * 0.35, 'a stone pine', true, 0.45 * s, y);
   } else if (kind === 'cedar') {
     // the cedar: flat shelves of blue-green, one over another
     const H = (14 + r() * 8) * s, R = (5 + r() * 2) * s;
     part(acc, G.bole, x, y - 0.4, z, 0.55 * s, H * 0.62, 0.55 * s, WOOD.barkDark, ry);
+    if (LAYERS()) boughs(acc, x, z, y + H * 0.4, y + H * 0.62, R * 0.95, 2, 0.2 * s, WOOD.barkDark, layerDice(ry));   // (the limbs that hold the shelves, between them)
     SWAY = [y, 0.01];
-    for (let i = 0; i < 4; i++) { const t = i / 4, rr = R * (1 - 0.55 * t); part(acc, G.ico0, x + jr(0.6) * s, y + H * (0.38 + 0.2 * i), z + jr(0.6) * s, rr, rr * 0.22, rr, J(WOOD.cedar), r() * 6); }
+    for (let i = 0; i < 4; i++) { const t = i / 4, rr = R * (1 - 0.55 * t); part(acc, G.ico0, x + jr(0.6) * s, y + H * (0.38 + 0.2 * i), z + jr(0.6) * s, rr, rr * 0.22, rr, shade(J(WOOD.cedar), 0.8 + 0.12 * i), r() * 6); }
     SWAY = null;
     solid(x, z, R * 0.9, y + H * 0.3, y + H, 'a cedar', true, 0.55 * s, y);
   } else if (kind === 'poplar') {
     // the poplar: tall and narrow, light green, every leaf turning
     const H = (16 + r() * 8) * s, w = (1.4 + r() * 0.5) * s;
     part(acc, G.bole, x, y - 0.3, z, 0.28 * s, 3, 0.28 * s, WOOD.barkPale, ry);
-    SWAY = [y, 0.03]; part(acc, G.oct, x, y + H * 0.55, z, w, H * 0.48, w, J(WOOD.poplar), ry); part(acc, G.oct, x + jr(0.3), y + H * 0.72, z + jr(0.3), w * 0.75, H * 0.3, w * 0.75, J(WOOD.poplar), ry + 1); SWAY = null;
+    SWAY = [y, 0.03]; part(acc, G.oct, x, y + H * 0.55, z, w, H * 0.48, w, shade(J(WOOD.poplar), 0.84), ry); part(acc, G.oct, x + jr(0.3), y + H * 0.72, z + jr(0.3), w * 0.75, H * 0.3, w * 0.75, shade(J(WOOD.poplar), 1.14, 0.05), ry + 1); SWAY = null;
     solid(x, z, w, y + 2, y + H, 'a poplar', true, 0.3 * s, y);
   } else if (kind === 'willow') {
     // by the water, the willow: a wide crown with its leaves hanging all the way down
     const H = (8 + r() * 3) * s, R = (4 + r() * 1.5) * s;
     part(acc, G.bole, x, y - 0.3, z, 0.55 * s, H * 0.55, 0.55 * s, WOOD.barkOlive, ry);
     SWAY = [y, 0.03];
-    part(acc, G.ico0, x, y + H * 0.85, z, R, R * 0.55, R, J(WOOD.willow), ry);
-    for (let i = 0; i < 10; i++) { const a = i / 10 * 6.28 + jr(0.2), d = R * (0.75 + r() * 0.25), L = H * (0.45 + r() * 0.2); part(acc, G.oct, x + Math.cos(a) * d, y + H * 0.85 - L * 0.5, z + Math.sin(a) * d, 0.55 * s, L * 0.5, 0.55 * s, J(WOOD.willow), a); }
+    part(acc, G.ico0, x, y + H * 0.85, z, R, R * 0.55, R, shade(J(WOOD.willow), 0.8), ry);
+    for (let i = 0; i < 10; i++) { const a = i / 10 * 6.28 + jr(0.2), d = R * (0.75 + r() * 0.25), L = H * (0.45 + r() * 0.2); part(acc, G.oct, x + Math.cos(a) * d, y + H * 0.85 - L * 0.5, z + Math.sin(a) * d, 0.55 * s, L * 0.5, 0.55 * s, shade(J(WOOD.willow), i & 1 ? 1.12 : 0.92), a); }
     SWAY = null;
     solid(x, z, R, y + H * 0.4, y + H * 0.85 + R * 0.5, 'a willow', true, 0.55 * s, y);
   } else if (kind === 'palm') {
@@ -1839,7 +1864,7 @@ function growTreeA(acc, x, y, z, r, s, kind) {
     let px = x, py = y - 0.2, pz = z;
     for (let i = 0; i < 4; i++) { const t = (i + 0.5) / 4, ang = bend * t * 2, sx2 = lx * Math.sin(ang) * H / 4, sz2 = lz * Math.sin(ang) * H / 4; part(acc, G.bole, px + sx2 * 0.5, py, pz + sz2 * 0.5, 0.26 * s * (1 - t * 0.3), H / 4 * 1.05, 0.26 * s * (1 - t * 0.3), WOOD.barkOlive, ry, lz * ang, -lx * ang); px += sx2; pz += sz2; py += H / 4 * Math.cos(ang); }
     SWAY = [y, 0.02];
-    for (let i = 0; i < 7; i++) { const a = i / 7 * 6.28 + r() * 0.3, L = (3.2 + r() * 1.2) * s; part(acc, G.oct, px + Math.cos(a) * L * 0.45, py + 0.1 - L * 0.12, pz + Math.sin(a) * L * 0.45, L * 0.5, 0.12 * s, 0.45 * s, J(WOOD.palm), -a, 0, 0.35); }
+    for (let i = 0; i < 7; i++) { const a = i / 7 * 6.28 + r() * 0.3, L = (3.2 + r() * 1.2) * s; part(acc, G.oct, px + Math.cos(a) * L * 0.45, py + 0.1 - L * 0.12, pz + Math.sin(a) * L * 0.45, L * 0.5, 0.12 * s, 0.45 * s, shade(J(WOOD.palm), i & 1 ? 1.1 : 0.88), -a, 0, 0.35); }
     SWAY = null;
     solid(px, pz, 2.5 * s, py - 1, py + 1, 'a palm', true, 0.28 * s, y);
   } else if (kind === 'redwood') {
@@ -1847,7 +1872,7 @@ function growTreeA(acc, x, y, z, r, s, kind) {
     const H = (32 + r() * 14) * s, r0 = (1.0 + r() * 0.4) * s;
     part(acc, G.bole, x, y - 0.6, z, r0, H * 0.66, r0, WOOD.redwood, ry);
     SWAY = [y, 0.006];
-    for (let i = 0; i < 4; i++) { const t = i / 4, tr = (4.2 - 2.4 * t) * s; part(acc, G.tier, x, y + H * (0.5 + 0.13 * i), z, tr, H * 0.2, tr, J(WOOD.fir), ry + i); }
+    for (let i = 0; i < 4; i++) { const t = i / 4, tr = (4.2 - 2.4 * t) * s; part(acc, G.tier, x, y + H * (0.5 + 0.13 * i), z, tr, H * 0.2, tr, shade(J(WOOD.fir), 0.8 + 0.11 * i), ry + i); }
     SWAY = null;
     solid(x, z, r0 * 1.1, y - 1, y + H * 0.5, 'a redwood'); solid(x, z, 4.5 * s, y + H * 0.45, y + H, 'a tree', true, 0, y + H * 0.45);
   } else if (kind === 'giant') {
@@ -1855,18 +1880,22 @@ function growTreeA(acc, x, y, z, r, s, kind) {
     const H = 44 + r() * 16, r0 = 2.2 + r() * 0.6;
     part(acc, G.bole, x, y - 1, z, r0, H * 0.62, r0, WOOD.barkDark, ry);
     for (let i = 0; i < 5; i++) { const a = ry + i * 1.257; part(acc, G.bole, x + Math.cos(a) * r0 * 1.5, y - 1.5, z + Math.sin(a) * r0 * 1.5, r0 * 0.5, r0 * 3.2, r0 * 0.5, WOOD.barkDark, 0, Math.sin(a) * -0.75, Math.cos(a) * 0.75); }
+    if (LAYERS()) boughs(acc, x, z, y + H * 0.48, y + H * 0.72, 15, 4, r0 * 0.4, WOOD.barkDark, layerDice(ry));   // (limbs as thick as trees, out into the crown)
     SWAY = [y, 0.008];
-    for (let i = 0; i < 7; i++) { const a = r() * 6.28, d = i ? 5 + r() * 9 : 0, R = (i ? 7 : 11) + r() * 4; part(acc, G.ico0, x + Math.cos(a) * d, y + H * (i ? 0.62 + r() * 0.3 : 0.9), z + Math.sin(a) * d, R, R * 0.72, R, J(WOOD.oak), r() * 6); }
+    for (let i = 0; i < 7; i++) { const a = r() * 6.28, d = i ? 5 + r() * 9 : 0, R = (i ? 7 : 11) + r() * 4; part(acc, G.ico0, x + Math.cos(a) * d, y + H * (i ? 0.62 + r() * 0.3 : 0.9), z + Math.sin(a) * d, R, R * 0.72, R, shade(J(WOOD.oak), i ? 0.8 + 0.12 * (i % 3) : 1.12, i ? 0 : 0.04), r() * 6); }
     SWAY = null;
     solid(x, z, r0 * 1.05, y - 1, y + H * 0.6, 'the oldest tree in the forest');
     solid(x, z, 17, y + H * 0.5, y + H * 1.08, 'a tree', true, 0, y + H * 0.5);
   } else {
     const pal = kind === 'autumn' ? COL.autumn : WOOD.oak, H = (9 + r() * 6) * s, r0 = (0.5 + r() * 0.25) * s, R = (3.8 + r() * 2) * s;
     part(acc, G.bole, x, y - 0.3, z, r0, H * 0.6, r0, WOOD.bark, ry);
+    const lr = layerDice(ry);
+    if (LAYERS()) boughs(acc, x, z, y + H * 0.4, y + H * 0.62, R * 0.95, 2, r0 * 0.4, WOOD.bark, lr);
     SWAY = [y, 0.019];
-    part(acc, G.ico0, x, y + H * 0.74, z, R, R * 0.8, R, J(pal), ry);
-    leafClumps(acc, x, y + H * 0.74, z, R, pal, TOUCH ? 2 : 4);
-    for (let i = 0, n = 2 + Math.floor(r() * 2); i < n; i++) { const a = r() * 6.28, q = R * (0.5 + r() * 0.28); part(acc, i ? G.oct : G.ico0, x + Math.cos(a) * R * 0.72, y + H * (0.58 + r() * 0.3), z + Math.sin(a) * R * 0.72, q, q * 0.85, q, J(pal), r() * 6); }
+    part(acc, G.ico0, x, y + H * 0.74, z, R, R * 0.8, R, shade(J(pal), 0.78), ry);   // the heart of the crown, in its own shadow
+    leafClumps(acc, x, y + H * 0.74, z, R, pal, TOUCH ? 2 : 4, 1.12);
+    for (let i = 0, n = 2 + Math.floor(r() * 2); i < n; i++) { const a = r() * 6.28, q = R * (0.5 + r() * 0.28); part(acc, i ? G.oct : G.ico0, x + Math.cos(a) * R * 0.72, y + H * (0.58 + r() * 0.3), z + Math.sin(a) * R * 0.72, q, q * 0.85, q, shade(J(pal), 0.94 + 0.1 * i), r() * 6); }
+    if (LAYERS()) { const c = pal[Math.floor(lr() * pal.length)]; part(acc, G.oct, x + (lr() - 0.5) * R * 0.3, y + H * 0.74 + R * 0.62, z + (lr() - 0.5) * R * 0.3, R * 0.52, R * 0.36, R * 0.52, shade(c, 1.22, 0.06), lr() * 6); }   // and a sunlit top
     SWAY = null;
     solid(x, z, R * 1.15, y + H * 0.42, y + H * 0.74 + R * 0.8, 'a tree', true, r0, y);
   }
@@ -2000,7 +2029,7 @@ const nearSite = (x, z, r) => BEACONS.some(b => (x - b.x) ** 2 + (z - b.z) ** 2 
 // one wind for everything that drifts: clouds, their shadows, snow, the ribbons of air
 const WIND = new THREE.Vector3(0.93, 0, 0.37);
 // shared by every piece of ground: cloud shadows sliding over the hills, and a waterline that breathes
-const worldFx = { uTime: { value: 0 }, uShade: { value: 1 }, uUnder: { value: 0 }, uWater: { value: WATER }, uBird: { value: new THREE.Vector4() }, uGale: { value: 0 }, uSunD: { value: new THREE.Vector3(0.4, 0.8, 0.3) }, uSlope: { value: 1 }, uWet: { value: 0 }, uSky: { value: new THREE.Color(0.6, 0.75, 0.9) } };   // (uWet, uSky: the ground after rain, and what its puddles show; see WC)
+const worldFx = { uTime: { value: 0 }, uShade: { value: 1 }, uUnder: { value: 0 }, uWater: { value: WATER }, uBird: { value: new THREE.Vector4() }, uGale: { value: 0 }, uSunD: { value: new THREE.Vector3(0.4, 0.8, 0.3) }, uSlope: { value: 1 }, uWet: { value: 0 }, uSky: { value: new THREE.Color(0.6, 0.75, 0.9) }, uSoot: { value: new THREE.Vector4(0, 0, 1, 0) } };   // (uWet, uSky: the ground after rain, and what its puddles show; see WC. uSoot: where black rain fell: x, z, radius, how dark)
 function patchWorld(mat, shore, sways) {
   mat.customProgramCacheKey = () => 'world' + (shore ? 'S' : '') + (sways ? 'W' : '') + '|a3';   // (the flags change the shader: each kind compiled for itself)
   mat.onBeforeCompile = sh => {
@@ -2023,7 +2052,7 @@ function patchWorld(mat, shore, sways) {
           vLeaf = lf;
         } else vLeaf = 0.0;` : ''));
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vWp; uniform float uTime, uShade, uUnder, uWater, uSlope, uWet; uniform vec3 uSunD, uSky;${sways ? ' varying float vLeaf;' : ''}
+      varying vec3 vWp; uniform float uTime, uShade, uUnder, uWater, uSlope, uWet; uniform vec3 uSunD, uSky; uniform vec4 uSoot;${sways ? ' varying float vLeaf;' : ''}
       float wHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float wNoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(wHash(i), wHash(i + vec2(1.0, 0.0)), f.x), mix(wHash(i + vec2(0.0, 1.0)), wHash(i + vec2(1.0, 1.0)), f.x), f.y); }`)
@@ -2037,6 +2066,7 @@ function patchWorld(mat, shore, sways) {
         float c = wNoise(q) * 0.6 + wNoise(q * 2.3 + 7.0) * 0.4;
         float under = smoothstep(430.0, 300.0, vWp.y) * uShade;
         gl_FragColor.rgb *= mix(1.0, mix(0.6, 1.0, smoothstep(0.4, 0.62, c)), under);
+        if (uSoot.w > 0.0) gl_FragColor.rgb *= 1.0 - uSoot.w * smoothstep(uSoot.z, uSoot.z * 0.35, length(vWp.xz - uSoot.xy)) * (0.7 + 0.3 * wNoise(vWp.xz * 0.06));   // grimed by black rain
         ${shore ? `{
           // the ground is never one flat colour: patches of lighter and darker growth a few metres across, drier and lusher
           // ground, the grain of the soil and the odd pebble under that, and on the steep faces the rock showing in its layers
@@ -14537,6 +14567,7 @@ const BLAZE = { list: [], key: new Set(), scanT: 0, seen: false, light: new THRE
 scene.add(BLAZE.light);
 const F_CATCH = 3, F_SHRIVEL = [9, 21], F_BLACK = 21, F_REGROW = 170, F_GREEN = 196;
 const F_CHAR = [0.07, 0.055, 0.05], F_FLAME = [2.0, 0.62, 0.1];   // (flame: orange that stays orange, not burned out to white)
+const F_FLASH = [2.4, 1.55, 0.45], F_RED = [0.9, 0.12, 0.02];   // (the flash of a leaf catching; the red of one curling up)
 function treeGrid(g) {   // trees by 20 m squares, so a fire can find its neighbours
   if (g.userData.tgrid) return g.userData.tgrid;
   const m = new Map();
@@ -14570,25 +14601,34 @@ function paintFire(f) {
   const t = g.userData.trees?.[f.i]; if (!t) return;   // (the ground under it has been cut again since: that tree is gone)
   const geo = g.userData.deco.geometry, Pa = geo.attributes.position, Ca = geo.attributes.color, Sa = geo.attributes.sway;
   if (f.g !== g) { f.g = g; f.P = Pa.array.slice(t.v0 * 3, t.v1 * 3); f.C = Ca.array.slice(t.v0 * 3, t.v1 * 3); }   // (a fresh chunk: remember the tree as it was)
-  const P = Pa.array, C = Ca.array, S = Sa.array, T = f.t, H = Math.max(1, t.top - t.y0), O = f.P, K = f.C;
+  const P = Pa.array, C = Ca.array, S = Sa.array, T = f.t, H = Math.max(1, t.top - t.y0), O = f.P, K = f.C, fu = f.flare || 0;
   const back = smoothstep(F_REGROW, F_GREEN, T), ember = smoothstep(F_CATCH + 2, F_CATCH + 6, T) * (1 - smoothstep(F_BLACK, F_BLACK + 26, T));
-  // leaf by leaf (a leaf is three corners): the fire climbs from the foot of the tree to the top of the crown, each leaf
-  // catches at its own moment and flickers by itself, curls up where it hangs and drops; the wood chars and keeps embers
+  // leaf by leaf (a leaf is three corners): the fire climbs from the foot of the tree to the top of the crown a layer at a
+  // time (it hangs at each skirt of leaves, then rushes up into the next), each leaf catches at its own moment with a
+  // white-yellow flash, burns orange, flickers by itself and licks upward as a tongue of flame, curls to a red knot where it
+  // hangs and drops; the wood chars from the foot up behind a glowing line, and keeps embers in its cracks
   for (let v = t.v0, j = 0; v < t.v1; v += 3, j += 9) {
     const n = Math.min(3, t.v1 - v), leaf = S[v] > 0;
-    let cx = 0, cy = 0, cz = 0; for (let q = 0; q < n; q++) { cx += O[j + q * 3]; cy += O[j + q * 3 + 1]; cz += O[j + q * 3 + 2]; } cx /= n; cy /= n; cz /= n;
-    const hs = ((v * 2654435761 >>> 8) & 1023) / 1023, Tv = T - clamp((cy - t.y0) / H, 0, 1) * 2.4 - hs * 1.6;
+    let cx = 0, cy = 0, cz = 0, top = 0; for (let q = 0; q < n; q++) { cx += O[j + q * 3]; cy += O[j + q * 3 + 1]; cz += O[j + q * 3 + 2]; if (O[j + q * 3 + 1] > O[j + top * 3 + 1]) top = q; } cx /= n; cy /= n; cz /= n;
+    const hs = ((v * 2654435761 >>> 8) & 1023) / 1023, hn = clamp((cy - t.y0) / H, 0, 0.999) * 4, lay = Math.floor(hn) + smoothstep(0.55, 1, hn - Math.floor(hn));
+    const Tv = T - lay * 1.15 - hs * 1.4;
     const hot = smoothstep(0, F_CATCH, Tv) * (1 - smoothstep(F_SHRIVEL[1] - 3, F_BLACK + 2, Tv)), black = smoothstep(F_CATCH * 0.6, F_BLACK, Tv) * (1 - back);
     const shr = leaf ? smoothstep(F_SHRIVEL[0], F_SHRIVEL[1], Tv + hs * 4) * 0.94 * (1 - back) : 0, drop = shr * shr * (0.5 + hs * 1.5);
     const fl = 0.62 + 0.38 * Math.sin(time * (11 + hs * 9) + v), glow = leaf ? 0 : ember * Math.max(0, Math.sin(time * (1.3 + hs * 2) + v * 0.7)) * (hs > 0.45 ? 1 : 0.2);
+    const flash = leaf ? smoothstep(-0.2, 0.5, Tv) * (1 - smoothstep(0.5, 2.6, Tv)) : 0, red = leaf ? smoothstep(F_SHRIVEL[0] - 1, F_SHRIVEL[1] - 4, Tv) * (1 - smoothstep(F_BLACK - 2, F_BLACK + 5, Tv)) * (1 - back) : 0;
+    const front = leaf ? 0 : black * (1 - black) * 4 * (1 - back) * (0.55 + 0.45 * fl), lick = leaf && hot > 0.25 ? hot * (0.7 + hs * 1.9) * (0.55 + 0.45 * Math.sin(time * (9 + hs * 7) + v * 1.3)) * (1 + fu * 1.4) : 0;
     for (let q = 0; q < n; q++) {
       const o = (v + q) * 3, jj = j + q * 3;
       for (let a = 0; a < 3; a++) {
         let c = lerp(K[jj + a], F_CHAR[a] * (leaf ? 0.8 : 1), black);
-        if (leaf) c = lerp(c, F_FLAME[a] * fl, hot * 0.9); else c += F_FLAME[a] * (0.5 * glow + 0.3 * hot * fl);
+        if (leaf) { c = lerp(c, F_FLAME[a] * fl * (1 + fu * 0.35), hot * 0.9); c = lerp(c, F_FLASH[a], flash * 0.8); c += F_RED[a] * red * (0.5 + 0.5 * fl); }
+        else c += F_FLAME[a] * (0.5 * glow + 0.3 * hot * fl + 0.75 * front);
         C[o + a] = c;
       }
-      if (leaf) { P[o] = lerp(O[jj], cx, shr); P[o + 1] = lerp(O[jj + 1], cy, shr) - drop; P[o + 2] = lerp(O[jj + 2], cz, shr); }
+      if (leaf) {
+        P[o] = lerp(O[jj], cx, shr); P[o + 1] = lerp(O[jj + 1], cy, shr) - drop; P[o + 2] = lerp(O[jj + 2], cz, shr);
+        if (q === top && lick) { P[o] += (cx - P[o]) * 0.35 + WIND.x * lick * 0.35; P[o + 1] += lick; P[o + 2] += (cz - P[o + 2]) * 0.35 + WIND.z * lick * 0.35; }   // (the top corner drawn up into a point, leaning downwind)
+      }
       else { P[o] = O[jj]; P[o + 1] = O[jj + 1]; P[o + 2] = O[jj + 2]; }
     }
   }
@@ -14612,21 +14652,29 @@ function updateFire(dt) {
         if ((t.x - p.pos.x) ** 2 + (t.z - p.pos.z) ** 2 < (t.rad + 3) ** 2 && p.pos.y > t.y0 - 2 && p.pos.y < t.top + 5) ignite(ck, i, true);
       });
   }
+  updateSmoke(dt);   // (the smoke, and what it rains, outlive the flames)
   if (!BLAZE.list.length) { BLAZE.light.intensity = 0; return; }
-  const c = camera.position, wet = realm === 'over' ? WX.rain : 0;
-  let near = null, nd = 1e9, budget = TOUCH || XR.on ? 30 : 70; BLAZE.burning = 0;
+  const c = camera.position, wet0 = realm === 'over' ? WX.rain : 0, smk = SMOKE.rate();
+  let near = null, nd = 1e9, budget = TOUCH || XR.on ? 30 : 70, flareK = 0; BLAZE.burning = 0;
   for (let n = BLAZE.list.length - 1; n >= 0; n--) {
-    const f = BLAZE.list[n];
+    const f = BLAZE.list[n], wet = Math.max(wet0, sootWet(f.x, f.z));   // (black rain puts out the fire that made it)
     f.t += dt;
     if (wet > 0.45 && f.t > F_CATCH && f.t < F_BLACK) f.t = Math.min(F_BLACK, f.t + dt * 6 * wet);   // rain beats it down
     const burning = f.t < F_BLACK;
     if (burning) BLAZE.burning++;
+    // now and then a tree flares: a gust into it, a pocket of resin; the flames double and throw sparks high
+    if (f.flare) f.flare = Math.max(0, f.flare - dt * 0.8); else if (burning && f.t > F_CATCH + 1 && f.t < F_BLACK - 4 && Math.random() < dt * 0.07 * (1 - wet)) { f.flare = 1; f.flared = false; }
     const g = chunks.get(f.ck);
     if (g && ((f.upd -= dt) < 0 || f.g !== g)) { f.upd = burning || f.t > F_REGROW ? 0.1 : f.t < F_BLACK + 28 ? 0.16 : 2; paintFire(f); }   // (after the flames, the embers in the wood still pulse for a while)
     if (f.t > F_GREEN) { if (g) { f.t = F_GREEN + 1; paintFire(f); } BLAZE.key.delete(f.k); BLAZE.list.splice(n, 1); continue; }
-    if (!burning || !g) continue;
+    if (!g) continue;
     const t = g.userData.trees?.[f.i];
     if (!t || f.realm !== undefined && f.realm !== realm) continue;   // (a different world's chunk under the same key: the Underworld's has other trees)
+    const d = Math.hypot(t.x - c.x, t.z - c.z);
+    if (!burning) {   // black, it smoulders: thinner, greyer smoke for half a minute more
+      if (f.t < F_BLACK + 30 && d < SMOKE.far && (f.sm = (f.sm || 0) + dt * smk * SMOKE.lod(d) * 0.35 * (1 - smoothstep(F_BLACK, F_BLACK + 30, f.t))) > 1) { f.sm -= 1; smokePuff(t.x + rnd(t.rad * 0.4), lerp(t.y0, t.top, 0.5), t.z + rnd(t.rad * 0.4), t.rad, d, 0); }
+      continue;
+    }
     if (f.t > F_CATCH && !f.sc) { f.sc = true; scorch(t.x, t.z, t.rad * 1.15 + 1.5); }   // the ground under it goes black
     // it spreads: on the wind more than against it, not at all in rain
     if (f.t > F_CATCH && (f.nextSpread -= dt) < 0) {
@@ -14638,22 +14686,27 @@ function updateFire(dt) {
         if (Math.random() < 0.3 * (1 + 0.9 * down) * (1 - wet)) ignite(ck2, i2, false);
       });
     }
-    // flames out of the crown, sparks, and smoke going up a long way
-    const d = Math.hypot(t.x - c.x, t.z - c.z);
+    // flames out of the crown, sparks, and black smoke going up a long way
     if (d < nd) { nd = d; near = t; }
+    const k = f.t < F_CATCH ? f.t / F_CATCH : 1 - smoothstep(F_BLACK - 5, F_BLACK, f.t);
+    if (d < SMOKE.far && (f.sm = (f.sm || 0) + dt * smk * SMOKE.lod(d) * (0.25 + 0.75 * k) * (1 + (f.flare || 0) * 2)) > 1) { f.sm -= 1; smokePuff(t.x + rnd(t.rad * 0.35), lerp(t.y0, t.top, 0.85), t.z + rnd(t.rad * 0.35), t.rad, d, 1); }
+    if (f.flare) flareK = Math.max(flareK, f.flare * smoothstep(400, 100, d));
     if (d < 900 && budget > 0) {
-      const k = f.t < F_CATCH ? f.t / F_CATCH : 1 - smoothstep(F_BLACK - 5, F_BLACK, f.t), geo = g.userData.deco.geometry, Pa = geo.attributes.position.array, S = geo.attributes.sway.array;
+      const geo = g.userData.deco.geometry, Pa = geo.attributes.position.array, S = geo.attributes.sway.array;
       for (let e = 0; e < 3 * k && budget > 0; e++) {
         const v = t.v0 + Math.floor(Math.random() * (t.v1 - t.v0)); if (!(S[v] > 0) && Math.random() < 0.7) continue;
         budget--; emit(Pa[v * 3] + rnd(0.8), Pa[v * 3 + 1], Pa[v * 3 + 2] + rnd(0.8), rnd(1.5) + WIND.x * 2, 3 + Math.random() * 6, rnd(1.5) + WIND.z * 2, 0.5 + Math.random() * 0.8, pick(EMBER), 5, 1.4 + Math.random() * 1.5);
       }
-      if (Math.random() < 0.35 * k) { budget--; emit(t.x + rnd(t.rad * 0.5), t.top + 1, t.z + rnd(t.rad * 0.5), WIND.x * 3 + rnd(1), 4 + Math.random() * 3, WIND.z * 3 + rnd(1), 5 + Math.random() * 3, [0.2, 0.19, 0.19], 4, 3 + Math.random() * 3); }
-      if (d < 320 && Math.random() < 0.3 * k) { budget--; const a = Math.random() * 6.283, r = Math.random() * t.rad;   // burning leaves let go and come down on the wind
+      if (d < 320 && Math.random() < 0.4 * k) { budget--; const a = Math.random() * 6.283, r = Math.random() * t.rad;   // burning leaves let go and come down on the wind
         emit(t.x + Math.cos(a) * r, lerp(t.y0, t.top, 0.45 + Math.random() * 0.5), t.z + Math.sin(a) * r, WIND.x * 4 + rnd(2), -0.5 - Math.random() * 2, WIND.z * 4 + rnd(2), 1.6 + Math.random() * 1.4, pick(EMBER), -2.2, 0.9 + Math.random() * 0.8); }
+      if (d < 500 && Math.random() < 0.45 * k) { budget--; emit(t.x + rnd(t.rad * 0.6), t.top - Math.random() * 3, t.z + rnd(t.rad * 0.6), WIND.x * 2.5 + rnd(1), 2 + Math.random() * 2, WIND.z * 2.5 + rnd(1), 3 + Math.random() * 2.5, EMBER[Math.random() < 0.5 ? 0 : 1], 1.6, 0.35 + Math.random() * 0.3); }   // embers floating up and away, small and slow, for a long time
       if (d < 420 && f.t > 1 && f.t < F_CATCH + 3 && Math.random() < 0.5) { budget--; emit(t.x + rnd(t.rad * 0.7), lerp(t.y0, t.top, clamp(f.t / 4, 0.1, 1)) + rnd(1), t.z + rnd(t.rad * 0.7), rnd(2), 9 + Math.random() * 9, rnd(2), 0.5 + Math.random() * 0.4, EMBER[3], 7, 2.2 + Math.random() * 1.6); }   // a tongue of flame going up it as it catches
+      if (f.flare && !f.flared && d < 600) { f.flared = true;   // the flare itself: a column of fire out of the top, and a fistful of sparks thrown high
+        for (let e = 0; e < (TOUCH ? 8 : 18); e++) emit(t.x + rnd(t.rad * 0.5), lerp(t.y0, t.top, 0.6 + Math.random() * 0.4), t.z + rnd(t.rad * 0.5), rnd(3), 10 + Math.random() * 14, rnd(3), 0.6 + Math.random() * 0.7, e & 1 ? EMBER[3] : EMBER[1], 6, 2 + Math.random() * 2.4);
+        for (let e = 0; e < 3; e++) smokePuff(t.x + rnd(t.rad * 0.4), t.top, t.z + rnd(t.rad * 0.4), t.rad * 1.3, d, 1); }
     }
   }
-  BLAZE.light.intensity = near && nd < 400 ? (2.2 + Math.sin(time * 13) * 0.4 + Math.sin(time * 31) * 0.3) * smoothstep(400, 120, nd) : 0;
+  BLAZE.light.intensity = near && nd < 400 ? (2.2 + Math.sin(time * 13) * 0.4 + Math.sin(time * 31) * 0.3 + flareK * 1.6) * smoothstep(400, 120, nd) : 0;
   if (near) BLAZE.light.position.set(near.x, near.top + 4, near.z);
 }
 // What fire leaves on the ground: a black mark, ragged at the edge, with a line of embers still alive round it for a few
@@ -14697,6 +14750,150 @@ function scorch(x, z, r, y) {
   _mat.compose(_p.set(x, g + 0.07, z), _q, _s.set(r, 1, r)); m.setMatrixAt(i, _mat);
   const B = m.geometry.attributes.aBorn, D = m.geometry.attributes.aSeed; B.array[i] = time; D.array[i] = Math.random(); B.needsUpdate = D.needsUpdate = true;
   m.instanceMatrix.needsUpdate = true; m.count = S.n;
+}
+// Smoke. What a burning wood sends up is black: thick, rolling columns, lit orange underneath by the fire, that lean over
+// with the wind as they climb and, a hundred metres up or so, stop climbing and spread out flat. Over a big fire the
+// columns run together into one dark pall. Each puff is a soft sprite turned to the lens and drawn over what is behind it
+// (smoke takes light away; the sparks add it). A pool of them, the oldest given up first; far fires send fewer, bigger ones.
+const SMOKE = { N: TOUCH ? 240 : 760, head: 0, live: 0, ms: 0, far: TOUCH ? 1100 : 1800, pallT: 0,
+  cap: () => TOUCH ? 240 : [380, 560, 760][tierIdx] || 560,
+  rate: () => (TOUCH ? 0.8 : 1.6) * (tierIdx === 0 ? 0.7 : 1) / (1 + BLAZE.burning / 14),   // (puffs a second from one burning tree: fewer each when there are many, and the pall takes over)
+  lod: d => 1 - 0.6 * smoothstep(450, SMOKE.far, d) };
+for (const k of ['x', 'y', 'z', 'y0', 'vx', 'vy', 'vz', 'rise', 'age', 'life', 's0', 's1', 'a0', 'shade', 'warm', 'top', 'seed']) SMOKE[k] = new Float32Array(SMOKE.N);
+{ const S = SMOKE, q = new THREE.PlaneGeometry(1, 1), geo = S.geo = new THREE.InstancedBufferGeometry();
+  geo.index = q.index; geo.setAttribute('position', q.attributes.position);
+  S.attrP = new THREE.InstancedBufferAttribute(new Float32Array(S.N * 4), 4).setUsage(THREE.DynamicDrawUsage);   // where, and how big
+  S.attrQ = new THREE.InstancedBufferAttribute(new Float32Array(S.N * 4), 4).setUsage(THREE.DynamicDrawUsage);   // how thick, how lit from below, its own turn, how dark
+  geo.setAttribute('aP', S.attrP); geo.setAttribute('aQ', S.attrQ); geo.instanceCount = 0;
+  S.mat = new THREE.ShaderMaterial({
+    uniforms: Object.assign(THREE.UniformsUtils.merge([THREE.UniformsLib.fog]), { uTime: worldFx.uTime, uLit: { value: new THREE.Color() }, uWarm: { value: new THREE.Color(1.5, 0.5, 0.1) } }),
+    vertexShader: `attribute vec4 aP, aQ; uniform float uTime; varying vec4 vUv, vQ;
+      #include <fog_pars_vertex>
+      void main(){
+        float r = aQ.z * 6.283 + uTime * (aQ.z - 0.5) * 0.12, c = cos(r), s = sin(r);
+        vec4 mvPosition = modelViewMatrix * vec4(aP.xyz, 1.0);
+        vQ = aQ; vQ.x *= smoothstep(0.0, aP.w * 0.9, -mvPosition.z);   // (thinned as the lens goes into it, not a wall)
+        vec2 t = vec2(position.x * c - position.y * s, position.x * s + position.y * c);
+        vUv = vec4(position.xy, t);   // (unturned for the light, which comes from above whichever way the puff is turned)
+        mvPosition.xy += t * aP.w;
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }`,
+    fragmentShader: `uniform vec3 uLit, uWarm; varying vec4 vUv, vQ;
+      #include <fog_pars_fragment>
+      float sH(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float sN(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(sH(i), sH(i + vec2(1.0, 0.0)), f.x), mix(sH(i + vec2(0.0, 1.0)), sH(i + vec2(1.0, 1.0)), f.x), f.y); }
+      void main(){
+        vec2 p = vUv.zw * 2.0; float r = length(p);
+        float b = sN(p * 2.2 + vQ.z * 41.0) * 0.6 + sN(p * 4.7 - vQ.z * 17.0) * 0.4;   // billows, a different lump for every puff
+        float a = smoothstep(1.0, 0.42, r + (b - 0.5) * 0.6) * vQ.x;
+        if (a < 0.008) discard;
+        float up = vUv.y + 0.5;   // (0 at the foot of the puff, 1 at its crown)
+        vec3 c = uLit * vQ.w * (0.4 + 0.9 * up * (0.6 + 0.6 * b));   // black, the tops of the billows catching a little of the sky
+        c += uWarm * vQ.y * (1.0 - up) * (0.4 + b);   // and the fire's light on its underside
+        gl_FragColor = vec4(c, a);
+        #include <fog_fragment>
+      }`,
+    transparent: true, depthWrite: false, fog: true,
+    blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor });   // (alpha left alone: the hero's mark in the picture is not disturbed)
+  S.mesh = new THREE.Mesh(geo, S.mat); S.mesh.frustumCulled = false; S.mesh.renderOrder = 3; S.mesh.visible = false; scene.add(S.mesh);
+  // and the thick heart of each puff, once more, into the depth only: the letters draw open sky faint and sparse, and smoke
+  // standing against the sky has to count as something solid there or it is lost in it
+  S.core = new THREE.Mesh(geo, new THREE.ShaderMaterial({ vertexShader: S.mat.vertexShader.replace(/#include <fog_\w+>/g, ''),
+    fragmentShader: S.mat.fragmentShader.replace(/#include <fog_\w+>/g, '').replace('if (a < 0.008) discard;', 'if (a < 0.6) discard; gl_FragColor = vec4(0.0); return;'),   // (the same billowed edge, so what the letters outline is the smoke's own shape)
+    uniforms: { uTime: worldFx.uTime, uLit: S.mat.uniforms.uLit, uWarm: S.mat.uniforms.uWarm }, transparent: true, colorWrite: false, depthWrite: true }));
+  S.core.frustumCulled = false; S.core.renderOrder = 3.5; S.core.visible = false; scene.add(S.core); }
+// one puff: kind 1 a burning tree's (black, quick, lit from below), 0 a smouldering one's (grey, slow, thin), 2 the pall (wide, flat, slow)
+function smokePuff(x, y, z, rad, dist, kind) {
+  const S = SMOKE, i = S.head++ % S.cap(), far = smoothstep(450, S.far, dist);
+  S.x[i] = x; S.y[i] = S.y0[i] = y; S.z[i] = z; S.vx[i] = rnd(0.8); S.vz[i] = rnd(0.8); S.age[i] = 0; S.seed[i] = Math.random();
+  if (kind === 2) { S.y0[i] = y - 130; S.rise[i] = S.vy[i] = 0.3; S.life[i] = 38 + Math.random() * 22; S.s0[i] = 26 + Math.random() * 16; S.s1[i] = 70 + Math.random() * 40; S.a0[i] = 0.5; S.shade[i] = 0.3 + Math.random() * 0.15; S.warm[i] = 0; S.top[i] = 0; return; }
+  const big = kind ? 1 : 0.6;
+  S.rise[i] = S.vy[i] = kind ? 7 + Math.random() * 4 : 3.5 + Math.random() * 2;
+  S.life[i] = kind ? 17 + Math.random() * 9 : 9 + Math.random() * 5;
+  S.s0[i] = (1.8 + rad * 0.45) * big * (1 + far * 1.4); S.s1[i] = (16 + Math.random() * 12) * big * (1 + far * 0.7);
+  S.a0[i] = kind ? 0.92 + Math.random() * 0.08 : 0.5; S.shade[i] = kind ? 0.16 + Math.random() * 0.18 : 0.55 + Math.random() * 0.25; S.warm[i] = kind ? 1 : 0.25;
+  S.top[i] = kind ? 95 + Math.random() * 70 : 40 + Math.random() * 30;   // (how high it climbs before it spreads out flat)
+}
+function updateSmoke(dt) {
+  const t0 = performance.now(), S = SMOKE, on = realm === 'over' && state !== 'title' && state !== 'loading';
+  updateSoot(dt, on);
+  // a big fire's pall: once enough is burning, wide slow sheets laid down where the columns spread out, drifting downwind
+  if (on && (SOOT.n >= 10 || SOOT.k > 0.1) && (S.pallT -= dt) < 0) { S.pallT = (TOUCH ? 5 : 2.6) / Math.max(1, Math.min(4, SOOT.n / 10 + SOOT.k * 2)); const a = Math.random() * 6.283, Q = SOOT;
+    if (Q.n >= 10 && (Q.k < 0.1 || Math.random() < 0.55)) { const r = Math.sqrt(Math.random()) * Q.spread; smokePuff(Q.cx + Math.cos(a) * r + WIND.x * 50, Q.cy + 100 + Math.random() * 70, Q.cz + Math.sin(a) * r + WIND.z * 50, 0, 0, 2); }
+    else { const r = Math.sqrt(Math.random()) * Q.r * 0.8, x = Q.x + Math.cos(a) * r, z = Q.z + Math.sin(a) * r; smokePuff(x, Math.max(terrainAt(x, z), WATER) + 120 + Math.random() * 80, z, 0, 0, 2); } }   // (and over where the soot is falling, the cloud it falls from)
+  const A = S.attrP.array, B = S.attrQ.array, gust = 1 + storm * 2, kv = Math.min(1, dt * 0.9), kw = Math.min(1, dt * 0.45); let n = 0;
+  for (let i = 0; i < S.N; i++) {
+    if (S.life[i] <= 0) continue;
+    const age = S.age[i] += dt, L = S.life[i];
+    if (age >= L) { S.life[i] = 0; continue; }
+    // it climbs fast off the fire and slows as it cools; at its height it stops and spreads; the higher, the harder the wind has it
+    const up = S.y[i] - S.y0[i], top = S.top[i], lift = top ? 1 - smoothstep(top * 0.55, top, up) : 1, w = (2 + Math.max(0, up) * 0.045) * gust;
+    S.vy[i] += (S.rise[i] * lift - S.vy[i]) * kv; S.vx[i] += (WIND.x * w - S.vx[i]) * kw; S.vz[i] += (WIND.z * w - S.vz[i]) * kw;
+    S.x[i] += S.vx[i] * dt; S.y[i] += S.vy[i] * dt; S.z[i] += S.vz[i] * dt;
+    const u = age / L, o = n * 4;
+    A[o] = S.x[i]; A[o + 1] = S.y[i]; A[o + 2] = S.z[i]; A[o + 3] = lerp(S.s0[i], S.s1[i], Math.sqrt(u)) * (top ? 1.9 - 0.9 * lift : 1);
+    B[o] = S.a0[i] * smoothstep(0, 0.08, u) * (1 - smoothstep(0.5, 1, u)); B[o + 1] = S.warm[i] * Math.max(0, 1 - age / 2.2); B[o + 2] = S.seed[i]; B[o + 3] = S.shade[i] * (1 + u * 0.7);   // (thinning and greying as it goes)
+    n++;
+  }
+  S.live = n; S.geo.instanceCount = n; S.mesh.visible = S.core.visible = on && n > 0;
+  if (n) { S.attrP.clearUpdateRanges(); S.attrQ.clearUpdateRanges(); S.attrP.addUpdateRange(0, n * 4); S.attrQ.addUpdateRange(0, n * 4); S.attrP.needsUpdate = S.attrQ.needsUpdate = true;
+    S.mat.uniforms.uLit.value.copy(scene.fog.color).multiplyScalar(0.17); }
+  S.ms = lerp(S.ms, performance.now() - t0, 0.05);
+}
+// Black rain. A fire big enough, burning long enough, puts so much soot into the air that it comes down again: under the
+// pall, downwind of the fire, the rain falls black. It is a layer of its own, with its own streaks (the weather's rain is
+// not touched): dark streaks round the lens while he is under it, the air going brown-grey, the ground and everything on it
+// left grimed for a few minutes after (worldFx.uSoot, in the ground's and the trees' shaders and the grass's). And it does
+// what rain does to a fire: what is burning under it is beaten down and stops spreading (sootWet, in updateFire).
+const SOOT = { n: 0, cx: 0, cy: 0, cz: 0, spread: 60, load: 0, k: 0, x: 0, z: 0, r: 300, amt: 0, scanT: 0, stain: worldFx.uSoot.value, N: TOUCH ? 420 : 1100, fog: new THREE.Color(0x2b2622) };
+// (the drops: each the same one falling through a box that goes with the lens, as the rain's do, heavier and slower; worked
+// out on the card from where the lens is, so nothing is sent each frame; each a streak a few pixels wide however far off it
+// is, since a line one pixel wide is lost in the letters)
+{ const S = SOOT, q = new THREE.PlaneGeometry(1, 1), geo = new THREE.InstancedBufferGeometry();
+  geo.index = q.index; geo.setAttribute('position', q.attributes.position);
+  geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(Float32Array.from({ length: S.N * 3 }, Math.random), 3)); geo.instanceCount = 0; S.geo = geo;
+  S.vel = new THREE.Vector3(WIND.x * 16, -52, WIND.z * 16);
+  S.mat = new THREE.ShaderMaterial({ uniforms: { uDir: { value: S.vel.clone().normalize() }, uOff: { value: new THREE.Vector3() }, uBox: { value: new THREE.Vector3(90, 60, 90) }, uOp: { value: 0 }, uCol: { value: new THREE.Color(0x0e0b09) } },
+    vertexShader: `attribute vec3 aSeed; uniform vec3 uDir, uOff, uBox; varying float vA; varying float vX;
+      void main(){
+        vec3 aPos = cameraPosition + mod(aSeed * uBox + uOff - cameraPosition, uBox) - uBox * 0.5;
+        vec3 to = cameraPosition - aPos; float d = length(to);
+        vec3 side = normalize(cross(uDir, to));
+        vec3 w = aPos + uDir * position.y * 3.6 + side * position.x * 0.11 * max(1.0, d / 10.0);
+        vA = (position.y + 0.5) * smoothstep(1.0, 5.0, d); vX = position.x * 2.0;   // (darkest at the head, gone at the tail)
+        gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
+      }`,
+    fragmentShader: `uniform vec3 uCol; uniform float uOp; varying float vA; varying float vX;
+      void main(){ gl_FragColor = vec4(uCol, uOp * vA * (1.0 - vX * vX * 0.6)); }`,
+    transparent: true, depthWrite: false,
+    blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor });
+  S.mesh = new THREE.Mesh(geo, S.mat); S.mesh.frustumCulled = false; S.mesh.visible = false; S.mesh.renderOrder = 4; scene.add(S.mesh); }
+function sootWet(x, z) { return SOOT.k > 0.01 ? SOOT.k * 0.9 * smoothstep(SOOT.r, SOOT.r * 0.4, Math.hypot(x - SOOT.x, z - SOOT.z)) : 0; }
+function updateSoot(dt, on) {
+  const S = SOOT, c = camera.position;
+  if ((S.scanT -= dt) < 0) {   // where the fire is, how much of it, and how wide
+    S.scanT = 0.5; let n = 0, sx = 0, sz = 0, mx = 0;
+    for (const f of BLAZE.list) if (f.t > F_CATCH && f.t < F_BLACK) { sx += f.x; sz += f.z; n++; }
+    if (n) { S.cx = sx / n; S.cz = sz / n; for (const f of BLAZE.list) if (f.t > F_CATCH && f.t < F_BLACK) mx = Math.max(mx, (f.x - S.cx) ** 2 + (f.z - S.cz) ** 2); S.spread = Math.sqrt(mx) + 20; S.cy = Math.max(terrainAt(S.cx, S.cz), WATER); }
+    S.n = n;
+  }
+  // the soot builds up while a big fire burns (half a minute or more of one), and rains out slowly once it is down
+  S.load = clamp(S.load + (S.n >= 12 ? dt * S.n / 40 / 60 : -dt / 70), 0, 1);
+  S.k = smoothstep(0.3, 0.75, S.load);
+  if (S.n) { const R = clamp(170 + S.spread * 1.3 + S.n * 2.5, 220, 700), j = S.k > 0.02 ? damp(0.15, dt) : 1;   // (it falls downwind of the fire, under the pall)
+    S.x = lerp(S.x, S.cx + WIND.x * R * 0.4, j); S.z = lerp(S.z, S.cz + WIND.z * R * 0.4, j); S.r = lerp(S.r, R, j); }
+  const st = S.stain;   // the ground it falls on goes dark, and is slowly clean again
+  if (S.k > 0.02) { if (st.w < 0.03) st.set(S.x, S.z, S.r * 0.9, st.w); const j = damp(0.05, dt); st.x = lerp(st.x, S.x, j); st.y = lerp(st.y, S.z, j); st.z = lerp(st.z, S.r * 0.9, j); st.w = Math.min(0.6, st.w + S.k * dt / 35); }
+  else if (st.w > 0) st.w = Math.max(0, st.w - dt / 240);
+  const gy = Math.max(terrainAt(S.x, S.z), WATER);
+  S.amt = lerp(S.amt, on && S.k > 0 ? S.k * smoothstep(S.r, S.r * 0.55, Math.hypot(c.x - S.x, c.z - S.z)) * smoothstep(gy + 520, gy + 260, c.y) : 0, damp(0.8, dt));
+  S.mesh.visible = S.amt > 0.02;
+  if (!S.mesh.visible) return;
+  S.mat.uniforms.uOp.value = Math.min(0.92, S.amt * 1.15);
+  scene.fog.color.lerp(S.fog, S.amt * 0.6); scene.fog.near = lerp(scene.fog.near, Math.min(scene.fog.near, 50), S.amt * 0.75); scene.fog.far = lerp(scene.fog.far, Math.min(scene.fog.far, 900), S.amt * 0.65);   // (the air under it goes dark and close)
+  const B = S.mat.uniforms.uBox.value; S.mat.uniforms.uOff.value.set((S.vel.x * time) % B.x, (S.vel.y * time) % B.y, (S.vel.z * time) % B.z);
+  S.geo.instanceCount = Math.floor(S.N * Math.min(1, S.amt * 1.3));
 }
 function netBurn(x, z) { if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'burn', payload: { i: NET.id, x: Math.round(x), z: Math.round(z) } }); }
 function gotBurn(m) {
@@ -15133,7 +15330,7 @@ GRASS.mesh = (() => {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, worldFx); sh.uniforms.uPush = GRASS.push; sh.uniforms.uCen = GRASS.cen;
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime, uGale; uniform vec4 uBird, uPush; uniform vec3 uCen;')
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime, uGale; uniform vec4 uBird, uPush; uniform vec3 uCen; uniform vec4 uSoot;')
       .replace('#include <project_vertex>', `
       vec4 mvPosition = instanceMatrix * vec4(transformed, 1.0);
       {
@@ -15153,6 +15350,7 @@ GRASS.mesh = (() => {
         mvPosition.y -= min(dot(off, off), 1.6) * bend * tall * 0.3;
         float fade = smoothstep(uCen.y, uCen.y * 0.72, length(root.xz - uCen.xz));
         mvPosition.y = root.y + (mvPosition.y - root.y) * fade;
+        vColor.rgb *= 1.0 - uSoot.w * 1.2 * smoothstep(uSoot.z, uSoot.z * 0.35, length(root.xz - uSoot.xy));   // (black rain grimes the grass too)
       }
       mvPosition = modelViewMatrix * mvPosition;
       gl_Position = projectionMatrix * mvPosition;`);
@@ -15190,7 +15388,7 @@ FLOWERS.mesh = (() => {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, worldFx); sh.uniforms.uPush = GRASS.push; sh.uniforms.uCen = GRASS.cen;
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime, uGale; uniform vec4 uBird, uPush; uniform vec3 uCen;')
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime, uGale; uniform vec4 uBird, uPush; uniform vec3 uCen; uniform vec4 uSoot;')
       .replace('#include <color_vertex>', `vColor = color;
       #ifdef USE_INSTANCING_COLOR
         vColor.xyz *= mix(vec3(1.0), instanceColor.xyz, step(0.83, position.y));
@@ -15213,6 +15411,7 @@ FLOWERS.mesh = (() => {
         mvPosition.y -= min(dot(off, off), 1.4) * bend * tall * 0.3;
         float fade = smoothstep(uCen.y, uCen.y * 0.72, length(root.xz - uCen.xz));
         mvPosition.y = root.y + (mvPosition.y - root.y) * fade;
+        vColor.rgb *= 1.0 - uSoot.w * 1.2 * smoothstep(uSoot.z, uSoot.z * 0.35, length(root.xz - uSoot.xy));   // (black rain grimes the grass too)
       }
       mvPosition = modelViewMatrix * mvPosition;
       gl_Position = projectionMatrix * mvPosition;`);
@@ -26311,7 +26510,7 @@ setTimeout(() => {
   titleStart();
   warmPrograms();
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
-    camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
+    camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
   frame();
 }, 30);
