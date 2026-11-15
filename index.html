@@ -717,6 +717,38 @@
   #modWall { position:fixed; inset:0; z-index:60; display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:#05070d; color:#ffb070; font-family:ui-monospace, Menlo, monospace; letter-spacing:.3em; text-align:center; padding:24px; }
   #modWall.on { display:flex; } #modWall b { font-size:15px; } #modWall span { font-size:11px; color:#9c958b; letter-spacing:.2em; }
   .asciiui #bars { display:none; }   /* (the film's black bars are drawn in the grid too, so what is typed there is not under them) */
+  /* the rest of the interface, typed into the grid too (see auiDom): each panel keeps its place and its buttons, laid out in
+     letters the size of the grid's and unseen, so where a word is on the page is where it is typed */
+  body.asciiui .auid, body.asciiui .auid * { font-family:Menlo, Consolas, "DejaVu Sans Mono", monospace !important; font-size:calc(var(--cw, 9px) / 0.6) !important; line-height:var(--ch, 14px) !important; letter-spacing:0 !important; font-style:normal !important;
+    -webkit-text-fill-color:transparent !important; text-shadow:none !important; caret-color:transparent !important; background-color:transparent !important; background-image:none !important; border-color:transparent !important; box-shadow:none !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; filter:none !important; outline-color:transparent !important; }
+  body.asciiui .auid svg, body.asciiui .auid img, body.asciiui .auid canvas, body.asciiui .auid *::before, body.asciiui .auid *::after { opacity:0 !important; }
+  body.asciiui .auid ::placeholder, body.asciiui .auid::placeholder { color:transparent !important; -webkit-text-fill-color:transparent !important; }
+  body.asciiui #chatLog .cl b { margin-right:var(--cw, 9px) !important; }
+  body.asciiui #markers .mk b, body.asciiui #markers .mk span { -webkit-text-fill-color:transparent !important; text-shadow:none !important; background:transparent !important; filter:none !important; animation:none !important; }
+  body.asciiui .godeye .mk::after { display:none; }
+  body.asciiui #mapTitle, body.asciiui #mapHint { visibility:hidden; }
+  body.asciiui #mapMode, body.asciiui #mapNorth { color:transparent !important; background:transparent !important; border-color:transparent !important; } body.asciiui #mapNorth svg { opacity:0; }
+  /* his record, in the sky (see STV): the page catches the hand; with the letters off, the same page is written out on it */
+  #stv { position:fixed; inset:0; z-index:11; display:none; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; }
+  #stv.on { display:block; } #stv.thru { pointer-events:none; } #stv .stvk { pointer-events:auto; }
+  #stv .stvk { position:fixed; right:calc(var(--sr, 0px) + 14px); top:calc(var(--st, 0px) + 12px); min-height:40px; padding:0 14px; border:1px solid rgba(255,190,130,.45); border-radius:4px; background:rgba(5,7,13,.62); color:#ffd8a8; font:inherit; font-size:11px; letter-spacing:.16em; cursor:pointer; }
+  #stvBack { display:none; } body.stvmap #stvBack { display:block; left:calc(var(--sl, 0px) + 14px); right:auto; }
+  #stvPlain { position:absolute; left:0; right:0; top:calc(var(--st, 0px) + 9vh); margin:auto; width:min(560px, 90vw); color:#f4ead2; text-align:center; font-family:ui-monospace, Menlo, Consolas, monospace; text-shadow:0 0 6px #000, 0 0 2px #000; }
+  #stvPlain h2 { margin:0 0 6px; font-weight:500; font-size:12px; letter-spacing:.45em; color:#ffb070; }
+  #stvPlain .big { display:block; font-size:min(16vw, 92px); line-height:1.05; font-weight:600; color:#ffe2b8; } #stvPlain .big small { font-size:.3em; letter-spacing:.2em; color:#ffb070; }
+  #stvPlain p { margin:2px 0 12px; font-size:11px; letter-spacing:.3em; color:#ffb070; }
+  #stvPlain dl { display:grid; grid-template-columns:1fr auto; gap:5px 18px; margin:0; padding:10px 14px; text-align:left; font-size:12px; letter-spacing:.06em; background:rgba(5,7,13,.6); max-height:38vh; overflow:auto; }
+  #stvPlain dt { color:#bdb4a4; } #stvPlain dd { margin:0; color:#fff; text-align:right; }
+  #stvNav { position:fixed; left:0; right:0; bottom:calc(var(--sb, 0px) + 10px); display:flex; flex-wrap:wrap; justify-content:center; gap:6px; padding:0 10px; }
+  body.stvmap #stvNav { display:none; } #stvNav button { min-height:34px; padding:0 10px; border:1px solid rgba(244,234,210,.25); border-radius:3px; background:rgba(5,7,13,.6); color:#d8cfbf; font:inherit; font-size:10px; letter-spacing:.14em; cursor:pointer; }
+  #stvNav button[aria-current] { color:#ffd8a8; border-color:#ffb070; }
+  body.asciiui #stvPlain, body.asciiui #stvNav { opacity:0; pointer-events:none; }   /* (still there to be read aloud) */
+  body.asciiui #stv .stvk { color:transparent; background:transparent; border-color:transparent; }
+  body.statsv #hud, body.statsv #chat, body.statsv #menuBtn, body.statsv #menu, body.statsv #who, body.statsv #health, body.statsv #areaBar, body.statsv #modeBar, body.statsv #newcomer, body.statsv #friendAsk, body.statsv #waveBtn, body.statsv #flipBtn, body.statsv #diveBtn, body.statsv #joyBase, body.statsv #joyKnob, body.statsv #ctlBtn { visibility:hidden !important; }
+  body.stvmap #map #mapHint { visibility:hidden; }
+  /* and with the letters off, the size of the words is the page's to set */
+  body:not(.asciiui) :is(#status, #chat, #who, #toast, #dialog, #talk, #prompt, #warn, #bag, #bldBar, #xfCard, #xfList, #guide, #qlog, #areaBar, #modeBar, #menu, #stvPlain, #stvNav, #stv .stvk, #card, #mapTitle, #mapHint, #explain) { zoom:var(--uiz, 1); }
+  body:not(.asciiui) #markers .mk > * { zoom:var(--uiz, 1); }
   /* each picture moves the way the thing itself does, when a hand is over it or has just pressed it */
   .ic * { transform-box:view-box; } .ic .w, .ic .s { opacity:.5; }
   .hot .ic-mic .w1, .hot .ic-micx .w1 { animation:icOutL .8s ease-out infinite; } .hot .ic-mic .w2, .hot .ic-micx .w2 { animation:icOutR .8s ease-out infinite; }
@@ -3064,7 +3096,7 @@ function farStep(dt) {
   // how far he can see: from up high, or going fast, a long way; down among the hills, as before
   const alt = c.y - Math.max(terrainAt(c.x, c.z), WATER), sp = p.form === 'phoenix' ? p.speed : Math.hypot(p.vel.x, p.vel.y, p.vel.z);
   // and on a wide shot (the director's long lenses, a camera far off him, the photo camera on a long lens) all the way out
-  const wideShot = (cinema.on && cinema.shot && /^(profile|wide|crane|top|orbit)$/.test(cinema.shot.type)) || (state === 'photo' && camera.fov < 42) || (state === 'play' && c.distanceTo(p.pos) > 95);
+  const wideShot = (cinema.on && cinema.shot && /^(profile|wide|crane|top|orbit)$/.test(cinema.shot.type)) || (state === 'photo' && camera.fov < 42) || (state === 'play' && c.distanceTo(p.pos) > 95) || state === 'stats';
   FAR.wide = lerp(FAR.wide || 0, wideShot ? 1 : 0, damp(wideShot ? 1.4 : 0.6, dt));
   VIEW_X = FAR.wide > 0.6 && !XR.on ? (TOUCH ? 1 : 2) : FAR.wide < 0.3 ? 0 : VIEW_X;
   const want = FAR.mesh ? Math.max(smoothstep(60, 700, alt), smoothstep(110, 280, sp) * 0.75, FAR.wide) : 0;
@@ -4225,13 +4257,13 @@ const postMat = new THREE.ShaderMaterial({
     uNear: { value: 0.3 }, uFar: { value: 14000 }, uEdge: { value: 1 }, uLineFar: { value: 1e5 }, uFlash: { value: 0 }, uFlashCol: { value: new THREE.Color(1, 0.75, 0.45) }, uHeat: { value: 0 }, uGlow: { value: 0 },
     uTint: { value: new THREE.Color(1, 1, 1) }, uFade: { value: 1 }, uWarp: { value: 0 }, uLight: { value: 0 }, uSpeed: { value: 0 }, uDanger: { value: 0 }, uDof: { value: 0 }, uSea: { value: 0 }, uVib: { value: 1 }, tBlur: { value: null }, uTime: worldFx.uTime,
     tCells: { value: null }, tCells2: { value: null }, uCells: { value: new THREE.Vector2(1, 1) }, uRelief: { value: 6 },
-    uGlitch: { value: 0 }, uStTint: { value: new THREE.Color(1, 1, 1) }, uStA: { value: new THREE.Vector4(0, 1, 1, 1) }, uStB: { value: new THREE.Vector4(1, 1, 0, 0) }, tUI: { value: null }, tChars: { value: null }, uUiOn: { value: 0 }, uUiK: { value: 1 }, uUiN: { value: new THREE.Vector2(1, 1) }, tUI2: { value: null }, uUi2On: { value: 0 }, uUi2N: { value: new THREE.Vector2(1, 1) }, uWt: { value: [new THREE.Color(1, 0.9, 0.7), new THREE.Color(1, 0.7, 0.35), new THREE.Color(0.4, 0.2, 0.08)] }, uSayCol: { value: new THREE.Color(1, 0.7, 0.35) }, uUiCol: { value: [new THREE.Color(1, 0.54, 0.23), new THREE.Color(1, 0.85, 0.66), new THREE.Color(0.42, 0.15, 0.03)] } },
+    uGlitch: { value: 0 }, uStTint: { value: new THREE.Color(1, 1, 1) }, uStA: { value: new THREE.Vector4(0, 1, 1, 1) }, uStB: { value: new THREE.Vector4(1, 1, 0, 0) }, tUI: { value: null }, tChars: { value: null }, uUiOn: { value: 0 }, uUiK: { value: 1 }, uUiN: { value: new THREE.Vector2(1, 1) }, tUI2: { value: null }, uUi2On: { value: 0 }, uUi2N: { value: new THREE.Vector2(1, 1) }, uWt: { value: [new THREE.Color(1, 0.9, 0.7), new THREE.Color(1, 0.7, 0.35), new THREE.Color(0.4, 0.2, 0.08)] }, uSayCol: { value: new THREE.Color(1, 0.7, 0.35) }, uUiCol: { value: [new THREE.Color(1, 0.54, 0.23), new THREE.Color(1, 0.85, 0.66), new THREE.Color(0.42, 0.15, 0.03)] }, uMk: { value: Array.from({ length: 6 }, () => new THREE.Color(0.75, 0.9, 1)) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tScene, tDepth, tGlyph, tName, tPrev; uniform vec2 uRes, uCell; uniform vec3 uTint, uFlashCol; uniform float uNameNs[9]; uniform float uNameW;
     uniform float uAscii, uTotal, uNear, uFar, uEdge, uFlash, uHeat, uGlow, uFade, uWarp, uLight, uSpeed, uDanger, uTime, uPersist, uTitleT, uRays; uniform vec2 uSunUV; uniform sampler2D tTitle;
     uniform sampler2D tCells, tCells2, tBlur; uniform vec2 uCells; uniform float uDof, uSea, uVib;
-    uniform vec3 uStTint; uniform vec4 uStA, uStB; uniform sampler2D tUI, tUI2, tChars; uniform float uUiOn, uUi2On, uGlitch, uUiK; uniform vec2 uUi2N; uniform vec3 uWt[3], uSayCol; uniform vec2 uUiN; uniform vec3 uUiCol[3];
+    uniform vec3 uStTint; uniform vec4 uStA, uStB; uniform sampler2D tUI, tUI2, tChars; uniform float uUiOn, uUi2On, uGlitch, uUiK; uniform vec2 uUi2N; uniform vec3 uWt[3], uSayCol; uniform vec2 uUiN; uniform vec3 uUiCol[3]; uniform vec3 uMk[6];
     // ── the name, on fire. A texture of the word stretched to fill the screen; flames are the word's own shape pulled upward
     //    by moving noise; then a ragged front burns through it, leaving a glowing edge, char, and then nothing but sparks.
     float hT(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 45758.5453); }
@@ -4426,7 +4458,7 @@ const postMat = new THREE.ShaderMaterial({
         float code = floor(U.r * 255.0 + 0.5);
         if (code > 32.5) {
           float ci = floor(U.g * 255.0 + 0.5), gm = texture2D(tChars, vec2((code - 32.0 + clamp(ul.x, 0.02, 0.98)) / 96.0, clamp(ul.y, 0.02, 0.98))).r;
-          vec3 ink = ci < 0.5 ? vec3(0.96, 0.92, 0.82) : ci < 1.5 ? uUiCol[0] : ci < 2.5 ? uUiCol[1] : ci < 3.5 ? uUiCol[2] : ci < 4.5 ? vec3(1.0) : ci < 5.5 ? uWt[0] : ci < 6.5 ? uWt[1] : uWt[2];   // (5, 6, 7: the inks of whatever is being named — a place's own, a god's own)
+          vec3 ink = ci < 0.5 ? vec3(0.96, 0.92, 0.82) : ci < 1.5 ? uUiCol[0] : ci < 2.5 ? uUiCol[1] : ci < 3.5 ? uUiCol[2] : ci < 4.5 ? vec3(1.0) : ci < 5.5 ? uWt[0] : ci < 6.5 ? uWt[1] : ci < 7.5 ? uWt[2] : ci < 8.5 ? uMk[0] : ci < 9.5 ? uMk[1] : ci < 10.5 ? uMk[2] : ci < 11.5 ? uMk[3] : ci < 12.5 ? uMk[4] : uMk[5];   // (5, 6, 7: the inks of whatever is being named — a place's own, a god's own; 8 to 13: the colours of whoever is marked in the world)
           col = mix(col, ink * (0.2 + U.b * 1.25), gm);
           col += ink * gm * U.b * U.b * 0.22;
         }
@@ -4438,7 +4470,7 @@ const postMat = new THREE.ShaderMaterial({
         float bcode = floor(B.r * 255.0 + 0.5);
         if (bcode > 32.5) {
           float bi = floor(B.g * 255.0 + 0.5), bm = texture2D(tChars, vec2((bcode - 32.0 + clamp(bl.x, 0.02, 0.98)) / 96.0, clamp(bl.y, 0.02, 0.98))).r;
-          vec3 bink = bi < 0.5 ? vec3(0.96, 0.92, 0.82) : bi < 1.5 ? uUiCol[0] : bi < 2.5 ? uUiCol[1] : uSayCol;
+          vec3 bink = bi < 0.5 ? vec3(0.96, 0.92, 0.82) : bi < 1.5 ? uUiCol[0] : bi < 2.5 ? uUiCol[1] : bi < 3.5 ? uSayCol : bi < 4.5 ? vec3(1.0) : bi < 8.5 ? uMk[0] : bi < 9.5 ? uMk[1] : bi < 10.5 ? uMk[2] : bi < 11.5 ? uMk[3] : bi < 12.5 ? uMk[4] : uMk[5];   // (4: white; 8 to 13 the marks' own inks, as in the small letters)
           col = mix(col, bink * (0.2 + B.b * 1.25), bm);
         }
       }
@@ -4832,6 +4864,7 @@ const UIB = { nx: 0, ny: 0, buf: null, tex: null, used: false, was: false };
 const RECT = new WeakMap(); let rectGen = 0; addEventListener('resize', () => rectGen++);
 function rectOf(el, ms = 400) { const now = performance.now(), c = RECT.get(el); if (c && c.g === rectGen && now - c.t < ms) return c.r; const r = el.getBoundingClientRect(); RECT.set(el, { r, t: now, g: rectGen }); return r; }   // (the big sheet: one of its cells is four of the other's)
 function uibText(c, r, str, ci = 0, b = 255) { const B = UIB.buf, nx = UIB.nx; if (r < 0 || r >= UIB.ny) return; for (let k = 0; k < str.length; k++) { const x = c + k; if (x < 0 || x >= nx) continue; const cc = str.charCodeAt(k), i = (r * nx + x) * 4; B[i] = cc > 32 && cc < 127 ? cc : cc === 8217 || cc === 8216 ? 39 : cc === 8220 || cc === 8221 ? 34 : cc === 8212 || cc === 8211 ? 45 : cc === 8230 ? 46 : 32; B[i + 1] = ci; B[i + 2] = b; } UIB.used = true; }
+function uibPut(c, r, code, ci = 0, b = 255, a = -1) { if (c < 0 || r < 0 || c >= UIB.nx || r >= UIB.ny) return; const i = (r * UIB.nx + c) * 4, B = UIB.buf; B[i] = code; B[i + 1] = ci; B[i + 2] = b; if (a >= 0 && a > B[i + 3]) B[i + 3] = a; UIB.used = true; }
 function uibPlate(c0, r0, c1, r1, a) { const B = UIB.buf, nx = UIB.nx; c0 = Math.max(0, c0); c1 = Math.min(nx - 1, c1); r0 = Math.max(0, r0); r1 = Math.min(UIB.ny - 1, r1); for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const i = (r * nx + c) * 4 + 3; if (a > B[i]) B[i] = a; } if (c1 >= c0 && r1 >= r0) UIB.used = true; }
 function uilSize(nx, ny, cw, ch) {
   UIL.nx = nx; UIL.ny = ny; UIL.cw = cw; UIL.ch = ch; UIL.buf = new Uint8Array(nx * ny * 4);
@@ -4850,6 +4883,7 @@ function uilPut(c, r, code, ci = 0, b = 255, a = -1) {
   const i = (r * UIL.nx + c) * 4, B = UIL.buf; B[i] = code; B[i + 1] = ci; B[i + 2] = b; if (a >= 0 && a > B[i + 3]) B[i + 3] = a; UIL.used = true;
 }
 function uilText(c, r, str, ci = 0, b = 255, a = -1) { for (let k = 0; k < str.length; k++) { const cc = str.charCodeAt(k); uilPut(c + k, r, cc > 32 && cc < 127 ? cc : cc === 183 || cc === 8226 ? 42 : 32, ci, b, a); } }
+function uilClear(c0, r0, c1, r1) { const B = UIL.buf, nx = UIL.nx; c0 = Math.max(0, c0); c1 = Math.min(nx - 1, c1); r0 = Math.max(0, r0); r1 = Math.min(UIL.ny - 1, r1); for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) B[(r * nx + c) * 4] = 0; }
 function uilPlate(c0, r0, c1, r1, a) { const B = UIL.buf, nx = UIL.nx; c0 = Math.max(0, c0); c1 = Math.min(nx - 1, c1); r0 = Math.max(0, r0); r1 = Math.min(UIL.ny - 1, r1); for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const i = (r * nx + c) * 4 + 3; if (a > B[i]) B[i] = a; } if (c1 >= c0 && r1 >= r0) UIL.used = true; }
 // fire, in the grid: the same old field of heat, a cell to a cell
 const AF = { strip: null, mark: null, t: 0 };
@@ -4867,6 +4901,10 @@ function afDraw(F, c0, r0) {
 }
 const TOAST = { msg: '', t0: 0, until: 0 };
 const FIRE_G = ' .,:;+*x%#@';
+// how big what the game has to say is written (a setting: see uiSizeSet): each step a size more for every letter of the
+// interface, never so big that fewer than forty-four go across the screen; with the letters off, the page's words grow too
+const UISZ = { i: (() => { try { return clamp(+localStorage.getItem('icarus.uisize') || 0, 0, 3); } catch { return 0; } })(), K: [1, 1.25, 1.5, 2], N: ['NORMAL', 'LARGE', 'LARGER', 'LARGEST'] };
+document.documentElement.style.setProperty('--uiz', UISZ.K[UISZ.i]);
 let cellIdx = fitCell(), asciiOn = true;
 let rtScale = tier.rt;  // scene resolution under the glyphs; lowered if frames run slow
 function resize() {
@@ -4884,7 +4922,7 @@ function resize() {
   // a cell is a whole number of the screen's own pixels, whatever the scale: every letter falls on the glass the same way
   { const cwp = Math.max(4, Math.round(CELLS[cellIdx][0] * dpr)), chp = Math.max(6, Math.round(CELLS[cellIdx][1] * dpr)); postMat.uniforms.uCell.value.set(cwp, chp);
     const nx = Math.max(1, Math.ceil(w * dpr / cwp)), ny = Math.max(1, Math.ceil(h * dpr / chp)); cellRT.setSize(nx, ny); cellRT2.setSize(nx, ny); postMat.uniforms.uCells.value.set(nx, ny);
-    const k = FIT.k = TOUCH && !VISION ? clamp(Math.round(9 / (cwp / dpr) * 2) / 2, 1, 2) : cwp / dpr < 5.6 ? 2 : 1;   // (fine print is for the picture: what the game has to say is typed two cells to a letter, so it can be read)
+    const k0 = TOUCH && !VISION ? clamp(Math.round(9 / (cwp / dpr) * 2) / 2, 1, 2) : cwp / dpr < 5.6 ? 2 : 1, k = FIT.k = Math.max(k0, Math.min(k0 * UISZ.K[UISZ.i], w * dpr / cwp / 44));   // (fine print is for the picture: what the game has to say is typed two cells to a letter, so it can be read — and bigger, if he asks)
     postMat.uniforms.uUiK.value = k; uilSize(Math.ceil(nx / k), Math.ceil(ny / k), cwp * k / dpr, chp * k / dpr); }
   postMat.uniforms.uAscii.value = asciiOn ? 1 : 0;
   postMat.uniforms.uNear.value = camera.near; postMat.uniforms.uFar.value = camera.far;
@@ -7708,6 +7746,7 @@ const ICON = {
   album: ic('album', '<rect class="c1 bg" x="6.5" y="5.5" width="11" height="13" rx="1.2"/><rect class="c3 bg" x="6.5" y="5.5" width="11" height="13" rx="1.2"/><rect class="c2 bg" x="6.5" y="5.5" width="11" height="13" rx="1.2"/><path class="hill" d="M8.6 15.6l2.6-3 1.8 1.8 1.3-1.3 1.2 2.5"/>'),
   cine: ic('cine', '<path d="M4 11h16v8.2a.8.8 0 0 1-.8.8H4.8a.8.8 0 0 1-.8-.8z"/><g class="clap"><path class="bg" d="M4 7.6h16V11H4z"/><path d="M8.6 7.6L7 11M12.8 7.6L11.2 11M17 7.6L15.4 11"/></g>'),
   chat: ic('chat', '<path d="M4.4 5h15.2a.9.9 0 0 1 .9.9v9.7a.9.9 0 0 1-.9.9H12l-4.4 3.4v-3.4H4.4a.9.9 0 0 1-.9-.9V5.9a.9.9 0 0 1 .9-.9z"/><circle class="d d1 f" cx="8.4" cy="10.8" r="1"/><circle class="d d2 f" cx="12" cy="10.8" r="1"/><circle class="d d3 f" cx="15.6" cy="10.8" r="1"/>'),
+  size: ic('size', '<path d="M3.5 18.5l4-11 4 11M5 14.5h5"/><path class="f1" d="M13.5 18.5l3-8 3 8M14.6 15.6h3.8"/>'),
   stats: ic('stats', '<path d="M4 19.5h16"/><path class="f1" d="M6.5 19.5v-6"/><path class="f2" d="M11 19.5V8"/><path class="f3" d="M15.5 19.5v-9"/><path d="M19 4.5l-4.5 4-3-2.2L6 10"/>'),
   acct: ic('acct', '<circle cx="12" cy="8.6" r="3.6"/><path d="M4.8 20c.9-4 3.7-6 7.2-6s6.3 2 7.2 6"/>'),
   tilt: ic('tilt', '<g class="ph"><rect x="7.6" y="3.6" width="8.8" height="16.8" rx="1.8"/><path d="M11 17.6h2"/></g><path class="w" d="M3.4 9.2a9.5 9.5 0 0 0 0 5.6M20.6 9.2a9.5 9.5 0 0 1 0 5.6"/>'),
@@ -7730,7 +7769,7 @@ function menuItems() {
     ...(flags.morphed ? [{ g: 'I', ic: 'acct', label: AUTH.s ? 'account' : 'sign in', on: !!AUTH.s, f: () => authShow(true) }] : []),
     { g: 'I', ic: 'bag', label: 'bag', key: 'I', badge: INV.log ? String(INV.log) : '', on: INV.open, f: () => bagShow(!INV.open) },
     ...(INV.log || BLD.mine.length ? [{ g: 'I', ic: 'build', label: 'build', on: BLD.on, f: () => bldMode(!BLD.on) }] : []),
-    { g: 'I', ic: 'stats', label: 'stats', f: () => { statsSend(false); open('/stats/', '_blank', 'noopener'); } },
+    { g: 'I', ic: 'stats', label: 'stats', key: 'Z', f: () => statsOpen() },
     { g: 'C', ic: 'cam', label: 'camera', key: 'F', f: () => { if (state === 'play') openPhoto(true); } },
     // (the film of his flight is already running while the strip is down: this says whether it stays when the strip goes)
     { g: 'C', ic: 'cine', label: 'film', key: 'C', on: cine, keep: true, f: () => { TUT.cineOpen = true; MENU.cineHeld = false; cinema.manual = !cine; toast(cinema.manual ? 'CINEMATIC CAMERA · IT STAYS' : 'FOLLOW CAMERA'); } },
@@ -7747,6 +7786,7 @@ function menuItems() {
     { g: 'U', ic: 'quest', label: 'quests', key: 'J', badge: String(qlActive().length || ''), on: QL.open, f: () => qlShow(!QL.open) },
     { g: 'S', ic: muted ? 'mute' : 'sound', label: muted ? 'muted' : 'sound', key: 'P', on: !muted, keep: true, f: () => setMuted(!muted) },
     { g: 'S', ic: 'look', label: 'visuals', on: LOOK.open, f: () => lookShow(true) },
+    { g: 'S', ic: 'size', label: 'text size', badge: ['', '+', '++', '+++'][UISZ.i], on: UISZ.i > 0, keep: true, f: () => uiSizeSet(UISZ.i + 1, true) },
     { g: 'S', ic: 'hand', label: 'hands', key: 'H', on: cam.on || cam.loading || XR.on, keep: !XR.supported, f: () => handsToggle() },
     ...(TOUCH ? [{ g: 'S', ic: tilt.on ? 'tilt' : 'thumb', label: tilt.on ? 'tilt' : 'thumb', keep: true, f: () => { if (tilt.on) { useStick(); toast('STEER WITH YOUR LEFT THUMB'); } else useTilt(); } }] : []),
   ];
@@ -7876,6 +7916,7 @@ const AIC = {
   cine: [["/////", "|   |", "|___|"], ["_____", "|///|", "|___|"]],
   chat: [[" ___ ", "(.  )", " v   "], [" ___ ", "(.. )", " v   "], [" ___ ", "(...)", " v   "]],
   stats: [["   / ", " |/| ", "_|||_"], ["  _/ ", " |||/", "_|||_"]],
+  size: [["     ", "A    ", "A  A "], ["    A", "  A A", "A A A"]],
   acct: [["  o  ", " /|\\ ", " / \\ "], [" \\o/ ", "  |  ", " / \\ "]],
   tilt: [["  _  ", " | | ", " |_| "], ["   _ ", "  / /", " /_/ "]],
   thumb: [[" .-. ", "( o )", " '-' "], [" .-. ", "(o  )", " '-' "], [" .-. ", "(  o)", " '-' "]],
@@ -8068,16 +8109,30 @@ function auiTalkKeys() {
       for (let c = c0; c <= c0 + Math.max(t.length + 2, 8); c++) uilPut(c, row - 1, 45, 0, focus ? 90 : 45, 60); } }   // (and a faint rule under it)
   const hn = $('talkHint'); if (hn && !TOUCH) { const r = rectOf(hn, 400), t = asciiOf(hn.textContent).toUpperCase(); if (r.width > 2 && t) { const row = uilRow(r.top + r.height / 2), c0 = uilCol(r.left + r.width / 2) - (t.length >> 1); uilText(c0, row, t, 0, 155); } }
 }
+// What he is about, at the top left: in the big letters where they fit, on dark ground, one thing to a line — the errand's
+// mark and whose it is in the colour of the house, what to do in plain words broken where the words break, how far along
+// he is — and under it, quieter, what the story wants of him. The quest's own button lies under it, unseen, to be pressed.
+function auiQuest() {
+  const big = UIB.nx >= 34, K = big ? 2 : 1, nx = big ? UIB.nx : UIL.nx, put = big ? uibText : uilText, plate = big ? uibPlate : uilPlate;
+  let max = Math.max(16, Math.min(48, Math.floor(nx * (TOUCH ? 0.64 : 0.5)) - 2));
+  { const hp = $('health'); if (hp && hp.classList.contains('on')) { const r = rectOf($('healthPill'), 500); if (r.width > 2 && r.top < UIL.ch * 4) max = Math.max(12, Math.min(max, Math.floor(r.left / (UIL.cw * K)) - 4)); } }   // (and never under the FPS pill)
+  const wrap = (t, n) => { const L = ['']; for (const w of t.split(/\s+/)) { if (!w) continue; const i = L.length - 1, u = L[i] ? L[i] + ' ' + w : w; if (L[i] && u.length > n) L.push(w.slice(0, n)); else L[i] = u.slice(0, n); } return L.filter(Boolean); };
+  const lines = [], o = uiAsc($('obj').textContent).replace(/^\s*<>\s*/, '').trim();
+  if (QL.line) { const k = QL.line.indexOf(' · '), head = uiAsc(k > 0 ? QL.line.slice(0, k) : QL.line).toUpperCase(), goal = uiAsc(k > 0 ? QL.line.slice(k + 3) : '');
+    lines.push({ t: head.slice(0, max - 2), ink: 1, b: 255, mark: true, q: true });
+    for (const l of wrap(goal.charAt(0).toUpperCase() + goal.slice(1), max).slice(0, 3)) lines.push({ t: l, ink: 0, b: 250, q: true });
+    if (QL.line2) for (const l of wrap(uiAsc(QL.line2), max).slice(0, 2)) lines.push({ t: l, ink: 2, b: 190, q: true }); }
+  if (o) for (const l of wrap(o.toUpperCase(), max).slice(0, 2)) lines.push({ t: l, ink: 0, b: QL.line ? 175 : 235, gap: !!QL.line && l === wrap(o.toUpperCase(), max)[0] });
+  let row = Math.floor(innerHeight / (UIL.ch * K)) - 1 - (big ? 0 : 1), qTop = -1, qN = 0, qW = 0;
+  for (const L of lines) { if (L.gap) row--; const w = L.t.length + (L.mark ? 2 : 0);
+    plate(1, row, w + 3, row, L.q ? 225 : 185);
+    if (L.mark) { put(2, row, '>', 1, 255); put(4, row, L.t, L.ink, L.b); } else put(L.mark === false ? 2 : 2, row, L.t, L.ink, L.b);
+    if (L.q) { if (qTop < 0) qTop = row; qN++; qW = Math.max(qW, w + 3); } row--; }
+  const qt = $('qtrack'); if (qt && qN) { const ch = UIL.ch * K, cw = UIL.cw * K, top = innerHeight - (qTop + 1) * ch, g = `${top}|${qN}|${qW}|${cw}`; if (qt._g !== g) { qt._g = g; qt.style.left = cw + 'px'; qt.style.top = top + 'px'; qt.style.width = qW * cw + 'px'; qt.style.height = qN * ch + 'px'; } }
+  QL.rows = lines.length ? (lines.length + (QL.line && o ? 1 : 0)) * K + 1 : 0;
+}
 function auiSay() {
-  const nx = UIL.nx, ny = UIL.ny;
-  if (state === 'play' || state === 'map' && !M3.on) { const o = ($('obj').textContent || '').trim(), q = ($('quest').textContent || '').trim();   // (not over the standing map: it has its own heading)
-    let max = Math.max(20, (nx >> 1) - 2);
-    { const hp = $('health'); if (hp && hp.classList.contains('on')) { const r = rectOf($('healthPill'), 500); if (r.width > 2 && r.top < UIL.ch * 3.5) max = Math.max(10, Math.min(max, Math.floor(r.left / UIL.cw) - 6)); } }   // (and never under the FPS pill)
-    if (o) { const t = o.length > max ? o.slice(0, max - 1) + '…' : o; uilPlate(1, ny - 2, t.length + 2, ny - 2, 120); uilText(2, ny - 2, t.toUpperCase(), 0, 170); }
-    { const qt = $('qtrack'), r0 = o ? ny - 3 : ny - 2, L1 = QL.line ? (QL.line.length > max ? QL.line.slice(0, max - 1) + '.' : QL.line).toUpperCase() : '', L2 = QL.line2 ? QL.line2.slice(0, max) : '';
-      if (L1) { const w = Math.max(L1.length, L2.length) + 3; uilPlate(1, r0 - (L2 ? 1 : 0), w, r0, 150); uilPut(2, r0, 42, 1, 255); const k = L1.indexOf(' · '); uilText(4, r0, k > 0 ? L1.slice(0, k) : L1, 1, 235); if (k > 0) uilText(4 + k, r0, L1.slice(k), 0, 205); if (L2) uilText(4, r0 - 1, L2, 0, 150);
-        if (qt) { const top = (ny - r0 - 1) * UIL.ch, h = (L2 ? 2 : 1) * UIL.ch, wpx = w * UIL.cw; if (qt._g !== top + ',' + h + ',' + wpx) { qt._g = top + ',' + h + ',' + wpx; qt.style.left = UIL.cw + 'px'; qt.style.top = top + 'px'; qt.style.width = wpx + 'px'; qt.style.height = h + 'px'; } } }
-      QL.rows = L1 ? (o ? 1 : 0) + (L2 ? 2 : 1) : o ? 1 : 0; } }
+  if ((state === 'play' || state === 'map' && !M3.on) && !MENU.open && !who.open && !QL.open && !GUIDE.open) auiQuest(); else QL.rows = 0;   // (not over the standing map: it has its own heading; nor over the strip)
   const D = $('dialog'), sayH = h => { if (UIB.h !== h) { UIB.h = h; document.body.style.setProperty('--sayH', h + 'px'); } };
   if (!D || D.classList.contains('hidden')) return sayH(0);
   const text = ($('dlgText').textContent || '').trim(), title = ($('dlgTitle').textContent || '').trim(); if (!text) return sayH(0);
@@ -8097,7 +8152,8 @@ function drawAsciiUi(dt) {
     const p = player, d = Math.max(0.5, camera.position.distanceTo(p.pos)), ppm = innerHeight / (2 * d * Math.tan(camera.fov * Math.PI / 360));
     const raw = p.form === 'human' ? clamp(0.7 * MAN_SCALE * ppm / CELLS[cellIdx][0], 2, 12) : 2, u = postMat.uniforms.uNameW;
     if (Math.abs(raw - u.value) > 0.8) u.value = Math.round(raw); }
-  if (on !== UIL.on) { UIL.on = on; cl.toggle('asciiui', on); }
+  if (on !== UIL.on) { UIL.on = on; cl.toggle('asciiui', on); for (const R of AUID.roots) R.dirty = true; }
+  if (STV.on) statsFrame(dt);
   { const u = postMat.uniforms.uGlitch; if (state !== 'dead') GLITCH.want = 0; u.value = Math.abs(GLITCH.want - u.value) < 0.004 ? GLITCH.want : lerp(u.value, GLITCH.want, damp(GLITCH.want > u.value ? 10 : 2.6, dt)); }
   if (UIL.used || UIL.was) UIL.buf.fill(0);
   UIL.was = UIL.used; UIL.used = false;
@@ -8108,13 +8164,387 @@ function drawAsciiUi(dt) {
     { const want = cl.contains('cinema') || cl.contains('pro') ? 1 : 0; UIL.bar = lerp(UIL.bar || 0, want, damp(want ? 3.2 : 5, dt)); if (UIL.bar > 0.02) { const rows = Math.round(Math.max(innerHeight * 0.11, 48) / UIL.ch * UIL.bar); if (rows > 0) { uilPlate(0, 0, UIL.nx - 1, rows - 1, 250); uilPlate(0, UIL.ny - rows, UIL.nx - 1, UIL.ny - 1, 250); } } }   // (the film's black bars: rows of dark tiles, top and bottom)
     if (state !== 'map') auiTitle(dt);   // (the names written on the sky belong to the world, not to the map of it)
     if (TOMB.say && shown) { const S = TOMB.say; uilPlate(S.c - (S.t1.length >> 1) - 1, S.r - (S.t2 ? 1 : 0), S.c + ((S.t1.length + 1) >> 1), S.r, 150); uilText(S.c - (S.t1.length >> 1), S.r, S.t1, 0, 235); if (S.t2) uilText(S.c - (S.t2.length >> 1), S.r - 1, S.t2, 1, 200); }
-    if (shown && !REC.on) auiMark();
+    if (state === 'stats' || STV.map) auiStats(dt);
+    if (state === 'map' && mapV.open) auiMapChrome();
+    if (state === 'play' && !cl.contains('pro')) auiMarks();
+    if (state !== 'title' && state !== 'stats' && !cl.contains('pro') && !cl.contains('photo')) auiDom();
+    if (shown && !REC.on && !STV.on) auiMark();
     if (state !== 'title' && !REC.on) { auiMenu(); auiToast(); }
     if (state !== 'title' && !cl.contains('pro') && !cl.contains('photo')) { if (state === 'talk') auiTalk(); else auiSay(); }   // (also while he is dying, or the film is running: what is said is always there to be read)
   }
   if (UIL.used || UIL.was) UIL.tex.needsUpdate = true;
   postMat.uniforms.uUiOn.value = UIL.used ? 1 : 0;
   if (UIB.tex && (UIB.used || UIB.was)) UIB.tex.needsUpdate = true; postMat.uniforms.uUi2On.value = UIB.used ? 1 : 0;
+}
+// ───────────────────────── his record, in the sky ─────────────────────────
+// Stats are not a page somewhere else any more. Asked for (the strip, Z, /stats), the lens eases out to a wide shot of
+// wherever he is — and the game holds its breath meanwhile: nothing can hurt him, the bird hangs where it was with its
+// wings going — and his record is written into the sky over the country, a stretch of sky to each page: the big numbers
+// built out of their own letters, the rest in lines under them. Dragging, swiping, the wheel or the arrows turn the lens
+// along the sky from one to the next (the letters stay where they were put in it, so the country turns under them), and
+// the last of them is the map itself, stood up, with where he has flown on it. Esc puts everything back as it was.
+const STV = { on: false, page: 0, pan: 0, panV: 0, sc: [], t: 0, yaw0: 0, p0: new THREE.Vector3(), q0: new THREE.Quaternion(), fov0: 50, world: null, worldT: -1e9,
+  pages: [], lay: null, layKey: '', hits: [], drag: null, map: false, el: null, step: 1, wheelT: 0, wheelAcc: 0, relWas: true, said: -1 };
+const stvN = n => Math.round(n).toLocaleString('en-US');
+const stvKm = km => km < 10 ? km.toFixed(2) : km < 100 ? km.toFixed(1) : stvN(km);
+const stvTime = s => { s = Math.max(0, s | 0); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h}H ${String(m).padStart(2, '0')}M` : `${m}M ${String(s % 60).padStart(2, '0')}S`; };
+const stvClock = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const stvDay = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase(); };
+// what is written where: a page is a title, one big number (or his name), what the number is, and lines under it
+function statsPages() {
+  const D = STATS.d, W = STV.world, war = D.war || {}, met = [...story.met].map(id => godById[id]?.name || id).filter(Boolean), it = story.items || [];
+  const mine = [...AREA.names.values()].filter(a => a && a.name && (a.nb === heroName || a.by === heroName && !a.rn)).length;
+  const fr = [...FRIENDS], now = [...NET.peers.values()].filter(P => P.s && performance.now() - P.s.t < 15000);
+  const patron = PATRON.id ? (godById[PATRON.id]?.name || PATRON.id).toUpperCase() : 'NONE YET';
+  const P = [
+    { key: 'you', title: 'WHO YOU ARE', name: heroName, label: rankOf(), rows: [['FLYING FOR', patron], ['FIRST FLEW', stvDay(D.first)], ['TIME IN THE AIR', stvTime(D.air)], ['DISTANCE', stvKm(D.km) + ' KM'], ['GODS MET', `${story.met.size} OF ${gods.length}`], ['FRIENDS', String(fr.length)]] },
+    { key: 'flight', title: 'FLIGHT', big: stvKm(D.km), unit: 'KM', label: 'FLOWN, ALL TOLD', rows: [['TIME IN THE AIR', stvTime(D.air)], ['FASTEST EVER', D.top ? `${stvN(D.top.v * 3.6)} KM/H` : '-'], ['FASTEST KILOMETRE', D.km1 ? stvClock(D.km1.v) : '-'], ['FASTEST MILE', D.mile ? stvClock(D.mile.v) : '-'], ['FLIGHTS', stvN(D.flights)], ['DIVES', stvN(D.dives)], ['TRICKS', stvN(D.tricks)], ['RINGS FLOWN THROUGH', stvN(D.rings || 0)]] },
+    { key: 'land', title: 'THE COUNTRY', big: stvN(D.areas || AREA.seen.size), label: 'PLACES FOUND', rows: [['PLACES YOU NAMED', String(mine)], ['LAND YOU HAVE SEEN', `${stvN(mapCells.over.size * MAPC * MAPC / 1e6)} KM2`], ['SEEN FIRST, BY YOU', `${stvN(WORLD.first * MAPC * MAPC / 1e6)} KM2`], ['ERRANDS DONE', stvN(D.quests)], ['TREES FELLED', stvN(D.felled || 0)], ['WAVES RAISED', stvN(D.tsunamis)], ['WATER THROWN UP', `${stvN(D.water)} M3`]] },
+    { key: 'gods', title: 'THE GODS', big: `${story.met.size}/${gods.length}`, label: 'GODS MET', rows: [...met.map(n => [n.toUpperCase(), 'MET']), ['TIMES YOU TALKED', stvN(D.talks)], ['WORDS YOU SAID', stvN(D.words)], ['WORDS YOU TYPED', stvN(D.typed)]] },
+    { key: 'falls', title: 'FIGHTS AND FALLS', big: stvN(D.deaths), label: D.deaths === 1 ? 'TIME YOU DIED' : 'TIMES YOU DIED', rows: [['CRASHES', stvN(D.crashes)], ['FIGHTS', stvN(war.n || 0)], ['FIGHTS WON', stvN(war.wins || 0)], ['DUELS WON', stvN(war.dwins || 0)], ['BIRDS YOU PUT OUT', stvN(war.kills || 0)], ['RING RACES WON', stvN(war.rwins || 0)], ['TIME IN FIGHTS', stvTime(war.secs || 0)]] },
+    { key: 'bag', title: 'WHAT YOU CARRY', big: String(it.length), label: it.length === 1 ? 'GIFT FROM THE GODS' : 'GIFTS FROM THE GODS', rows: [...it.slice().sort((a, b) => b.amt - a.amt).map(o => [String(o.name).toUpperCase(), `+${o.amt} ${String(o.stat).toUpperCase()}`]), ['LOGS', String(INV.log | 0)], ['SAPLINGS', String(INV.sapling | 0)], ['AXE', INV.axe ? 'YES' : 'NO']] },
+    { key: 'friends', title: 'FRIENDS', big: String(fr.length), label: fr.length === 1 ? 'FRIEND' : 'FRIENDS', rows: [['FLYING NOW', String(now.length + 1)], ...fr.map(n => [n, now.some(Q => Q.name === n) ? 'FLYING NOW' : 'AWAY'])] },
+    { key: 'world', title: 'EVERYONE', big: W ? stvN(W.sum.km) : '...', unit: W ? 'KM' : '', label: W ? 'FLOWN BY EVERYONE' : 'ASKING THE WORLD', rows: W ? [['TRAVELLERS', stvN(W.n)], ['YOU BY DISTANCE', `${stvN(W.rank)} OF ${stvN(W.of)}`], ['HOURS IN THE AIR', stvN(W.sum.air / 3600)], ['DEATHS', stvN(W.sum.deaths)], ['WORDS SAID TO GODS', stvN(W.sum.words + W.sum.typed)], ['WAVES RAISED', stvN(W.sum.tsunamis)], ['FASTEST ANYONE', `${stvN(W.top * 3.6)} KM/H`], ...(WORLD.totals?.cells ? [['LAND CHARTED', `${stvN(WORLD.totals.cells * MAPC * MAPC / 1e6)} KM2`]] : [])] : [['', 'THE NUMBERS ARE ON THEIR WAY']] },
+    { key: 'map', title: 'THE MAP', label: 'WHERE YOU HAVE FLOWN', rows: [] },
+  ];
+  return P;
+}
+// everyone's numbers, asked for now and then
+function statsWorld() {
+  if (performance.now() - STV.worldT < 120000 || !WORLD.code) return; STV.worldT = performance.now();
+  fetch('/api/hub?fn=stats', { method: 'POST', headers: authH({ 'Content-Type': 'application/json' }), body: JSON.stringify({ op: 'world', code: WORLD.code, name: heroName, km: STATS.d.km }) })
+    .then(r => r.ok ? r.json() : null).then(j => { if (j && j.sum) { STV.world = j; if (STV.on) { STV.pages = statsPages(); STV.layKey = ''; statsPlain(true); } } }).catch(() => {});
+}
+function statsOpen() {
+  if (STV.on) return;
+  if (state === 'map') closeMap();
+  if (state !== 'play' || player.cine || player.sub || XR.on) { toast('NOT JUST NOW'); return; }
+  if (MATCH.phase === 'live' && MATCH.me?.alive) { toast('NOT IN THE MIDDLE OF A FIGHT'); return; }
+  if (MENU.open) menuShow(false); if (CHAT.open) closeChat(); if (QL.open) qlShow(false); if (GUIDE.open) guideShow(false);
+  statsSend(false); state = 'stats'; Object.assign(STV, { on: true, t: 0, page: 0, pan: 0, panV: 0, sc: [], drag: null, map: false, said: -1, layKey: '' });
+  for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+  STV.p0.copy(camera.position); STV.q0.copy(camera.quaternion); STV.fov0 = camera.fov;
+  STV.yaw0 = player.form === 'human' ? human.group.rotation.y : player.yaw;
+  STV.pages = statsPages(); statsWorld();
+  STV.el.classList.add('on'); document.body.classList.add('statsv'); statsPlain(true);
+  audio.sfx.mapOpen?.();
+}
+function statsClose() {
+  if (!STV.on) return;
+  if (STV.map) statsMapOut(false);
+  STV.on = false; STV.drag = null; if (state === 'stats') state = 'play';
+  STV.el.classList.remove('on', 'thru'); document.body.classList.remove('statsv', 'stvmap'); STV.plain.innerHTML = STV.nav.innerHTML = '';
+  for (const k in keys) keys[k] = false; audio.sfx.mapClose?.();
+}
+const stvLast = () => STV.pages.length - 1;
+function statsGo(i) { const n = clamp(Math.round(i), 0, stvLast()); if (n !== STV.page) { STV.page = n; audio.sfx.mapTurn?.(0.5); } }
+// the last page is the map: the real one, opened stood up, with everything it always has on it
+function statsMapIn() {
+  STV.map = true; STV.relWas = mapV.relief; state = 'play'; openMap();
+  if (state !== 'map') { state = 'stats'; STV.map = false; STV.page = STV.pan = stvLast() - 1; return; }
+  mapV.relief = true; $('mapMode').textContent = 'FLAT'; $('mapNorth').style.display = ''; mapHint();
+  $('mapTitle').textContent = 'WHERE YOU HAVE FLOWN · ' + $('mapTitle').textContent;
+  document.body.classList.add('stvmap'); STV.el.classList.add('thru');
+}
+function statsMapOut(toSky) {
+  if (!STV.map) return; STV.map = false; document.body.classList.remove('stvmap'); STV.el.classList.remove('thru');
+  if (mapV.relief && !STV.relWas) { mapV.relief = false; $('mapMode').textContent = '3D'; $('mapNorth').style.display = 'none'; }
+  if (state === 'map') closeMap();
+  if (toSky && state === 'play') { state = 'stats'; STV.page = stvLast() - 1; STV.pan = STV.page + 0.6; STV.t = 0; STV.p0.copy(camera.position); STV.q0.copy(camera.quaternion); STV.fov0 = camera.fov; }
+}
+// the lens: back off him and up, looking out along the way he was going with the horizon low, so the sky is the page
+function statsCam(dt) {
+  const p = player, K = p.form === 'human' ? 0.3 : birdK(), D = 74 * K, h = STV.yaw0, fx = -Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h);
+  _v.set(p.pos.x - fx * D + rx * D * 0.32, p.pos.y + D * 0.2, p.pos.z - fz * D + rz * D * 0.32);
+  _v.y = Math.max(_v.y, groundAt(_v.x, _v.z, _v.y + 6) + 4 * Math.max(1, K), WATER + 4);
+  STV.t += dt; const e = smoothstep(0, 1.7, STV.t), fov = (TOUCH ? 64 : 56) * fovK();
+  camera.fov = lerp(STV.fov0, fov, e); camera.updateProjectionMatrix();
+  STV.step = 2 * Math.atan(Math.tan(camera.fov * Math.PI / 360) * camera.aspect) * 0.72;   // (a page to a stretch of sky a little narrower than the lens)
+  camera.position.lerpVectors(STV.p0, _v, e);
+  _q.setFromEuler(_e.set(0.11 + Math.sin(time * 0.07) * 0.012, h + STV.pan * STV.step + Math.sin(time * 0.05) * 0.02, 0, 'YXZ'));
+  camera.quaternion.slerpQuaternions(STV.q0, _q, e); camera.up.set(0, 1, 0);
+}
+// the bird hangs where it was, beating; on foot he simply stands
+function statsStep(dt) { const p = player; if (p.form === 'phoenix' && !p.perch && !p.sub) flyWings(dt, { boost: false, dive: 0, climb: 0.7 }); }
+// every frame it is open (in the sky, or on its map page): where the lens is along the sky, and going into the map and out of it
+function statsFrame(dt) {
+  if (STV.map && state !== 'map') { STV.map = false; document.body.classList.remove('stvmap'); STV.el.classList.remove('thru'); if (state === 'play') { state = 'stats'; STV.page = stvLast() - 1; STV.pan = STV.page + 0.6; STV.t = 0; STV.p0.copy(camera.position); STV.q0.copy(camera.quaternion); STV.fov0 = camera.fov; } }
+  if (!STV.map && state !== 'stats') { statsClose(); return; }   // (carried off somewhere, or someone came to talk: the record is put away)
+  if (STV.map) return;
+  if (!STV.drag && performance.now() - STV.wheelT > 160) { const d = STV.page - STV.pan; STV.pan = Math.abs(d) < 0.002 ? STV.page : STV.pan + d * damp(7, dt); }
+  if (STV.page === stvLast() && Math.abs(STV.pan - STV.page) < 0.25 && !STV.drag) statsMapIn();
+  { const i = STV.page, s = STV.sc[i] || 0, want = clamp(STV.scT?.[i] ?? 0, 0, STV.lay?.[i]?.max || 0); STV.sc[i] = Math.abs(want - s) < 0.01 ? want : lerp(s, want, damp(10, dt)); }
+  if (STV.said !== STV.page) { STV.said = STV.page; statsPlain(true); }
+  if (!UIL.on) statsPlain(false);
+}
+// the big letters: each built out of its own character, five across and seven high — or, where the screen is short,
+// three across and five high with every stroke two cells wide, so it still reads as a number and not as a stripe
+const F35 = { 0: [7, 5, 5, 5, 7], 1: [2, 6, 2, 2, 7], 2: [7, 1, 7, 4, 7], 3: [7, 1, 3, 1, 7], 4: [5, 5, 7, 1, 1], 5: [7, 4, 7, 1, 7], 6: [7, 4, 7, 5, 7], 7: [7, 1, 1, 2, 2], 8: [7, 5, 7, 5, 7], 9: [7, 5, 7, 1, 7],
+  '.': [0, 0, 0, 0, 2], ',': [0, 0, 0, 2, 4], ':': [0, 2, 0, 2, 0], '/': [1, 1, 2, 4, 4], '-': [0, 0, 7, 0, 0], ' ': [0, 0, 0, 0, 0] };
+const F57X = { ',': [0, 0, 0, 0, 12, 4, 8], ':': [0, 12, 12, 0, 12, 12, 0], '/': [1, 1, 2, 4, 8, 16, 16], ' ': [0, 0, 0, 0, 0, 0, 0] };
+const stvBigW = (s, sm) => s.length * (sm ? 8 : 6) - (sm ? 2 : 1);
+// a page laid out, once for this size of screen: rows counted down from its top, columns from its middle
+// (in the big letters where the screen has room for a page of them; in the small ones where it does not)
+const stvG = () => UIB.nx >= 56 && UIB.ny >= 16 ? { K: 2, nx: UIB.nx, ny: UIB.ny, put: uibPut, text: uibText, plate: uibPlate } : { K: 1, nx: UIL.nx, ny: UIL.ny, put: uilPut, text: uilText, plate: uilPlate };
+function statsLayout() {
+  const G = stvG(), nx = G.nx, ny = G.ny, key = `${G.K}|${nx}|${ny}|${STV.pages.map(p => p.big + p.rows.length).join()}`;
+  if (key === STV.layKey && STV.lay) return STV.lay; STV.layKey = key;
+  const small = ny < 36, two = nx >= 104, colW = Math.min(44, two ? (nx - 14) >> 1 : nx - 8), view = ny - 9;   // (top: two rows and the title; foot: the way along)
+  STV.lay = STV.pages.map(pg => {
+    const ops = []; let r = 0;
+    const t = pg.title.split('').join(' '); ops.push({ k: 't', c: -(t.length >> 1), r, s: t, ink: 1, b: 235 }); r += 2;
+    if (pg.key === 'map') { ops.push({ k: 't', c: -(pg.label.length >> 1), r, s: pg.label, ink: 0, b: 200 }); r += 2; ops.push({ k: 't', c: -9, r, s: 'OPENING THE MAP...', ink: 2, b: 230 }); return { ops, h: r + 1, max: 0 }; }
+    const big = pg.name ? String(pg.name).toUpperCase().replace(/[^A-Z0-9 '.!?-]/g, '') : pg.big, sm = small && !pg.name && [...big].every(ch => F35[ch]), bh = sm ? 5 : 7, bw = stvBigW(big, sm), unit = pg.unit || '';
+    const bc = -((bw + (unit ? unit.length + 2 : 0)) >> 1); ops.push({ k: 'plate', c0: bc - 2, r0: r - 1, c1: bc + bw + (unit ? unit.length + 2 : 0) + 1, r1: r + bh, a: 120 });
+    ops.push({ k: 'big', c: bc, r, s: big, sm, ink: 2, b: 245 }); if (unit) ops.push({ k: 't', c: bc + bw + 2, r: r + bh - 1, s: unit, ink: 1, b: 235 }); r += bh + 1;
+    if (pg.label) { ops.push({ k: 't', c: -(pg.label.length >> 1), r, s: pg.label, ink: 1, b: 225, plate: 190 }); r += 2; }
+    const rows = pg.rows, per = two ? Math.ceil(rows.length / 2) : rows.length, r0 = r;
+    rows.forEach(([a, v], i) => { const col = two && i >= per ? 1 : 0, rr = r0 + (i - col * per), c = two ? (col ? 3 : -3 - colW) : -(colW >> 1), lab = String(a).slice(0, colW - String(v).length - 2), val = String(v).slice(0, colW);
+      ops.push({ k: 'plate', c0: c - 1, r0: rr, c1: c + colW, r1: rr, a: 175 });
+      if (lab) ops.push({ k: 't', c, r: rr, s: lab, ink: 0, b: 175 });
+      for (let d = c + lab.length + 1; d < c + colW - val.length - 1; d += 2) ops.push({ k: 't', c: d, r: rr, s: '.', ink: 0, b: 95 });
+      ops.push({ k: 't', c: c + colW - val.length, r: rr, s: val, ink: 4, b: 245 }); });
+    r = r0 + per + 1;
+    return { ops, h: r, max: Math.max(0, r - view) };
+  });
+  return STV.lay;
+}
+// the sky of numbers, every frame: each page where it hangs, the way along the bottom, the way out at the top
+function auiStats(dt) {
+  if (STV.map) return auiStatsMap();
+  const G = stvG(), nx = G.nx, ny = G.ny, L = statsLayout(), W = innerWidth, uilPut = G.put, uilText = G.text, uilPlate = G.plate, CW = UIL.cw * G.K, half = Math.tan(camera.fov * Math.PI / 360) * camera.aspect, top = ny - 3, foot = 3, rev = smoothstep(0.35, 1.5, STV.t);
+  STV.hits.length = 0;
+  for (let i = 0; i < L.length; i++) {
+    const da = (i - STV.pan) * STV.step; if (Math.abs(da) > 1.35) continue;
+    const cx = Math.round((W / 2 + Math.tan(da) / half * W / 2) / CW), sc = STV.sc[i] || 0, P = L[i], si = Math.round(sc);
+    const bot = foot + (P.max > si ? 1 : 0), row = r => top - (r - si), vis = r => { const y = row(r); return y > bot && y <= top; };   // (a row kept clear at the foot for saying there is more)
+    for (const o of P.ops) {
+      if (o.k === 'plate') { const a = Math.max(o.r0, si), b = o.r1; if (b < a) continue; const y0 = row(b), y1 = row(a); if (y1 <= bot) continue; uilPlate(cx + o.c0, Math.max(bot + 1, y0), cx + o.c1, Math.min(top, y1), o.a * rev | 0); continue; }
+      if (o.k === 't') { if (!vis(o.r)) continue; const y = row(o.r); if (o.plate) uilPlate(cx + o.c - 1, y, cx + o.c + o.s.length, y, o.plate * rev | 0);
+        if (rev < 1) { for (let k = 0; k < o.s.length; k++) if ((Math.abs(Math.sin((cx + o.c + k) * 12.9898 + y * 78.233) * 43758.5453) % 1) < rev * 1.1) uilPut(cx + o.c + k, y, o.s.charCodeAt(k) > 32 && o.s.charCodeAt(k) < 127 ? o.s.charCodeAt(k) : 32, o.ink, o.b); }
+        else uilText(cx + o.c, y, o.s, o.ink, o.b); continue; }
+      if (o.k === 'big') { const sm = o.sm, rows = sm ? 5 : 7, wid = sm ? 3 : 5;
+        for (let k = 0; k < o.s.length; k++) { const ch = o.s[k], g = sm ? F35[ch] : F57[ch] || F57X[ch]; if (!g) continue; const code = /[0-9A-Z]/.test(ch) ? ch.charCodeAt(0) : ch === '/' ? 47 : 42, x0 = cx + o.c + k * (sm ? 8 : 6);
+          for (let l = 0; l < rows; l++) { if (!vis(o.r + l)) continue; const y = row(o.r + l);
+            for (let b = 0; b < wid; b++) if (g[l] >> (wid - 1 - b) & 1) { const f = Math.sin(time * 2.6 + (x0 + b) * 0.8 + l * 1.3 + k), h = Math.abs(Math.sin((x0 + b) * 12.9898 + y * 78.233) * 43758.5453) % 1; if (h > rev * 1.15) continue;
+              const ink = f > 0.55 ? 4 : f > -0.2 ? 2 : 1, br = (o.b + f * 10) | 0; if (sm) { uilPut(x0 + b * 2, y, code, ink, br, 120); uilPut(x0 + b * 2 + 1, y, code, ink, br, 120); } else uilPut(x0 + b, y, code, ink, br, 120); } } } }
+    }
+    if (i === STV.page && P.max > 0) { if (si > 0) uilText(cx - 3, top, '^ MORE', 2, 220); if (si < P.max) { uilPlate(cx - 4, foot + 1, cx + 3, foot + 1, 200); uilText(cx - 3, foot + 1, 'v MORE', 2, 230); } }
+  }
+  // the way along: every page by name (or, where there is no room for that, which of how many), the one he is on lit
+  const pg = STV.pages, cur = STV.page; uilPlate(0, 0, nx - 1, 2, 215);
+  const names = pg.map(p => p.key === 'you' ? 'YOU' : p.title.split(' ').slice(-1)[0]), full = names.reduce((s, n) => s + n.length + 4, 0) + 6 < nx;
+  if (full) { let c = (nx - names.reduce((s, n) => s + n.length + 4, 0)) >> 1;
+    names.forEach((n, i) => { const on = i === cur; if (on) { uilPut(c, 1, 91, 2, 255); uilPut(c + n.length + 3, 1, 93, 2, 255); } uilText(c + 2, 1, n, on ? 2 : 0, on ? 255 : 150); STV.hits.push({ c0: c, c1: c + n.length + 3, r0: 0, r1: 2, go: i }); c += n.length + 4; }); }
+  else { const t = `${cur + 1} / ${pg.length}  ${pg[cur].title}`; uilText((nx - t.length) >> 1, 1, t, 2, 245); }
+  { const t = TOUCH ? 'SWIPE TO TURN THE SKY  -  TAP THE GROUND TO FLY ON' : 'DRAG, SCROLL OR ARROW KEYS TO TURN THE SKY  -  ESC TO FLY ON'; if (t.length < nx - 2) uilText((nx - t.length) >> 1, 0, t, 0, 120); }
+  // either side, which way there is more; at the top, the way back to flying
+  const blink = 0.5 + 0.5 * Math.sin(time * 4), mid = (ny >> 1);
+  if (cur > 0) { uilPlate(0, mid - 1, 3, mid + 1, 170); uilText(1, mid, blink > 0.5 ? '<<' : ' <', 2, 240); STV.hits.push({ c0: 0, c1: 5, r0: mid - 3, r1: mid + 3, go: cur - 1 }); }
+  if (cur < pg.length - 1) { uilPlate(nx - 4, mid - 1, nx - 1, mid + 1, 170); uilText(nx - 3, mid, blink > 0.5 ? '>>' : '> ', 2, 240); STV.hits.push({ c0: nx - 6, c1: nx - 1, r0: mid - 3, r1: mid + 3, go: cur + 1 }); }
+  stvKey($('stvX'), 'X FLY ON', nx - 13, ny - 2, G);
+}
+// the map page: the map is the map; over it, only which page this is and the two ways off it
+function auiStatsMap() {
+  const nx = UIL.nx, ny = UIL.ny, t = TOUCH ? 'DRAG TO MOVE · PINCH · TWO FINGERS TURN' : 'DRAG TO MOVE · RIGHT-DRAG TURNS · [ BACK TO THE SKY · ESC FLY ON';
+  uilPlate(0, 0, nx - 1, 1, 200); if (t.length < nx - 2) uilText((nx - t.length) >> 1, 0, t, 0, 130);
+  const G = { K: 1, put: uilPut, text: uilText, plate: uilPlate }; stvKey($('stvBack'), '< THE SKY', 1, 1, G); stvKey($('stvX'), 'X FLY ON', nx - 13, 1, G);
+}
+// a key typed into the grid, with the page's own button sized and put under it, unseen, so it is the thing pressed
+function stvKey(b, lab, c0, row, G) {
+  if (!b) return; const cw = UIL.cw * G.K, ch = UIL.ch * G.K, w = (lab.length + 4) * cw, x = c0 * cw, y = innerHeight - (row + 1) * ch - ch * 0.35, h = ch * 1.7;
+  if (b._k !== `${x}|${y}|${w}`) { b._k = `${x}|${y}|${w}`; Object.assign(b.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' }); }
+  const hot = b.matches(':hover') || document.activeElement === b;
+  G.plate(c0, row, c0 + lab.length + 3, row, hot ? 240 : 210); G.put(c0, row, 91, hot ? 2 : 1, 255); G.put(c0 + lab.length + 3, row, 93, hot ? 2 : 1, 255); G.text(c0 + 2, row, lab, hot ? 2 : 0, hot ? 255 : 230);
+}
+// with the letters off (and for anyone reading it with a screen reader): the same page, written on the page in words
+function statsPlain(fresh) {
+  const el = STV.plain; if (!el || !STV.on) return;
+  if (fresh) { const pg = STV.pages[STV.page]; if (!pg) return; const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    el.innerHTML = `<h2>${esc(pg.title)}</h2>${pg.name ? `<b class="big">${esc(pg.name)}</b>` : pg.big ? `<b class="big">${esc(pg.big)}${pg.unit ? ` <small>${esc(pg.unit)}</small>` : ''}</b>` : ''}<p>${esc(pg.label || '')}</p><dl>${pg.rows.map(([a, v]) => `<dt>${esc(a)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`
+; STV.nav.innerHTML = STV.pages.map((p, i) => `<button type="button" data-p="${i}"${i === STV.page ? ' aria-current="page"' : ''}>${esc(p.key === 'you' ? 'YOU' : p.title)}</button>`).join(''); }
+  if (!UIL.on) for (const b of [$('stvX'), $('stvBack')]) if (b && b._k) { b._k = ''; b.removeAttribute('style'); }   // (the keys go back to being buttons of their own)
+  el.style.transform = `translateX(${((STV.page - STV.pan) * innerWidth * 0.8).toFixed(1)}px)`;
+}
+{ const el = STV.el = document.createElement('div'); el.id = 'stv'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Your stats');
+  el.innerHTML = '<div id="stvPlain" aria-live="polite"></div><nav id="stvNav" aria-label="Pages"></nav><button type="button" id="stvX" class="stvk">✕ FLY ON</button><button type="button" id="stvBack" class="stvk">‹ THE SKY</button>';
+  document.body.appendChild(el); STV.plain = el.firstChild;
+  el.querySelector('#stvX').addEventListener('click', e => { e.stopPropagation(); statsClose(); });
+  el.querySelector('#stvBack').addEventListener('click', e => { e.stopPropagation(); statsMapOut(true); });
+  STV.nav = el.querySelector('#stvNav'); STV.nav.addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (b) { e.stopPropagation(); statsGo(+b.dataset.p); } });
+  for (const ev of ['pointerdown', 'pointerup', 'touchstart']) STV.nav.addEventListener(ev, e => e.stopPropagation(), { passive: true });
+  for (const ev of ['pointerdown', 'pointerup', 'touchstart']) for (const b of el.querySelectorAll('.stvk')) b.addEventListener(ev, e => e.stopPropagation(), { passive: true });
+  // a finger or a mouse: drawn sideways it turns the sky, up and down it reads further down a page; let go fast and it carries on to the next
+  el.addEventListener('pointerdown', e => { if (!STV.on || STV.map) return; try { el.setPointerCapture(e.pointerId); } catch {} STV.drag = { x: e.clientX, y: e.clientY, t: performance.now(), pan: STV.pan, sc: STV.scT?.[STV.page] || 0, ax: '', vx: 0, lx: e.clientX, lt: performance.now() }; });
+  el.addEventListener('pointermove', e => { const d = STV.drag; if (!d) return; const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (!d.ax && Math.hypot(dx, dy) > 9) d.ax = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (d.ax === 'x') { STV.pan = clamp(d.pan - dx / (innerWidth * 0.8), -0.3, stvLast() - 0.6); const now = performance.now(); d.vx = (e.clientX - d.lx) / Math.max(1, now - d.lt); d.lx = e.clientX; d.lt = now; }
+    else if (d.ax === 'y') { (STV.scT ||= [])[STV.page] = clamp(d.sc - dy / (UIL.ch * stvG().K), 0, STV.lay?.[STV.page]?.max || 0); } });
+  const up = e => { const d = STV.drag; STV.drag = null; if (!d || e.type !== 'pointerup') return;
+    if (d.ax === 'x') { statsGo(Math.round(STV.pan - clamp(d.vx * 0.9, -1, 1) * (Math.abs(d.vx) > 0.35 ? 1 : 0))); return; }
+    if (d.ax) return;
+    const K = stvG().K, c = Math.floor(e.clientX / (UIL.cw * K)), r = Math.floor((innerHeight - e.clientY) / (UIL.ch * K)), h = STV.hits.find(h => c >= h.c0 && c <= h.c1 && r >= h.r0 && r <= h.r1);
+    if (h) { statsGo(h.go); return; }
+    if (e.clientX < innerWidth * 0.16) statsGo(STV.page - 1); else if (e.clientX > innerWidth * 0.84) statsGo(STV.page + 1);
+    else if (r > 2 && e.clientY > innerHeight * 0.7) statsClose(); };   // (a tap down on the ground, under the sky of numbers: back to flying)
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  // the wheel, and two fingers on a trackpad: sideways turns the sky; up and down reads down the page, and past its end turns to the next
+  el.addEventListener('wheel', e => { if (!STV.on || STV.map) return; e.preventDefault(); const k = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1, dx = e.deltaX * k, dy = e.deltaY * k, now = performance.now();
+    if (Math.abs(dx) > Math.abs(dy)) { STV.wheelT = now; STV.pan = clamp(STV.pan + dx / 900, -0.3, stvLast() - 0.6); STV.page = clamp(Math.round(STV.pan), 0, stvLast()); return; }
+    const S = STV.scT ||= [], i = STV.page, max = STV.lay?.[i]?.max || 0, s = S[i] || 0;
+    if (max > 0 && (dy > 0 ? s < max : s > 0)) { S[i] = clamp(s + dy / 40, 0, max); STV.wheelAcc = 0; return; }
+    if (now - STV.wheelT2 > 260) STV.wheelAcc = 0; STV.wheelT2 = now; STV.wheelAcc += dy;
+    if (Math.abs(STV.wheelAcc) > 90) { statsGo(STV.page + Math.sign(STV.wheelAcc)); STV.wheelAcc = -Math.sign(STV.wheelAcc) * 400; } }, { passive: false });
+  STV.wheelT2 = 0;
+}
+// the keys, ahead of everything else while it is open
+addEventListener('keydown', e => {
+  if (!STV.on || e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey) return;
+  const c = e.code, eat = () => { e.preventDefault(); e.stopPropagation(); };
+  if (c === 'Escape' || c === 'KeyZ' && !STV.map) { eat(); if (!e.repeat) statsClose(); return; }
+  if (STV.map) { if (c === 'BracketLeft' || c === 'Backspace' || c === 'KeyM') { eat(); statsMapOut(true); } return; }   // (the rest of the keys are the map's)
+  const S = STV.scT ||= [], i = STV.page, max = STV.lay?.[i]?.max || 0;
+  if (['ArrowLeft', 'KeyA', 'PageUp', 'BracketLeft'].includes(c)) { eat(); statsGo(i - 1); }
+  else if (['ArrowRight', 'KeyD', 'PageDown', 'BracketRight', 'Space', 'Enter'].includes(c)) { eat(); statsGo(i + 1); }
+  else if (['ArrowUp', 'KeyW'].includes(c)) { eat(); S[i] = clamp((S[i] || 0) - 3, 0, max); }
+  else if (['ArrowDown', 'KeyS'].includes(c)) { eat(); S[i] = clamp((S[i] || 0) + 3, 0, max); }
+  else if (c === 'Home') { eat(); statsGo(0); } else if (c === 'End' || c === 'KeyM') { eat(); statsGo(stvLast()); }
+  else if (/^Digit[1-9]$/.test(c)) { eat(); statsGo(+c[5] - 1); }
+  else if (c !== 'Tab' && c !== 'KeyP' && c !== 'KeyY') eat();   // (nothing else flies him while the sky is his record)
+}, true);
+
+// ───────────────────────── the rest of the interface, in the letters ─────────────────────────
+// What used to sit over the picture as page — the chat, who is flying, the prompts, the cards, the bag, the buttons — is
+// typed into the grid too. The page keeps every one of them, laid out as before but in letters the size of the grid's
+// (so where a word is on the page is where it is typed), unseen; a press still lands on the real thing. A panel is
+// looked at afresh when something in it changes, or every quarter of a second, and typed in again every frame from that.
+const AUID = { ids: ['chat', 'who', 'prompt', 'warn', 'mic', 'areaBar', 'modeBar', 'newcomer', 'friendAsk', 'xfCard', 'xfList', 'waveBtn', 'flipBtn', 'diveBtn', 'bag', 'bldBar', 'matchBig', 'fightCard', 'matchAsk', 'dpBar', 'dpExit', 'recChip', 'guide', 'qlog', 'healthPill', 'looks', 'patron', 'tut'],
+  panels: new Set(['who', 'xfCard', 'xfList', 'bag', 'bldBar', 'guide', 'qlog', 'looks', 'patron', 'fightCard']), roots: [], mo: null };
+const UIASC = { '⟲': '@', '✕': 'X', '×': 'x', '◂': '<', '▸': '>', '‹': '<', '›': '>', '«': '<<', '»': '>>', '→': '->', '←': '<-', '↑': '^', '↓': 'v', '●': '*', '◉': '@', '◎': '@', '◆': '<>', '◇': '<>', '✦': '*', '✧': '+', '⌂': 'n', '♣': '&', '△': '^', '▲': '^', '▶': '>', '▦': '#', '▣': '#', '†': '+', '—': '-', '–': '-', '…': '...', '’': "'", '‘': "'", '“': '"', '”': '"', '·': '*', '•': '*', '²': '2', '³': '3', '°': 'o', '✓': 'v', '★': '*', '☆': '*', '♥': '<3', '✎': '>_', '⚑': 'P', '⏵': '>', '⏸': '||' };
+const uiAsc = s => String(s || '').replace(/[^\x20-\x7e]/g, ch => UIASC[ch] ?? (/[À-ÿ]/.test(ch) ? ch.normalize('NFD')[0] : ''));
+function auidInit() {
+  postMat.uniforms.uMk.value[5].setRGB(0.66, 0.86, 1);   // (the last of the marks' inks is the cool blue the page uses for the post and the sea)
+  for (const id of AUID.ids) { const el = $(id); if (el && !AUID.roots.some(R => R.el === el)) { el.classList.add('auid'); AUID.roots.push({ el, items: [], t: -1, dirty: true }); } }
+  if (!AUID.mo) AUID.mo = new MutationObserver(ms => { for (const m of ms) for (const R of AUID.roots) if (R.el.contains(m.target)) R.dirty = true; });
+  for (const R of AUID.roots) if (!R.obs) { R.obs = true; AUID.mo.observe(R.el, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'hidden', 'disabled'] }); }
+}
+// a colour on the page, as one of the grid's inks, and how bright
+function auidInk(css) {
+  const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(css || ''); if (!m) return [0, 210];
+  const r = +m[1], g = +m[2], b = +m[3], lum = 0.3 * r + 0.59 * g + 0.11 * b, br = clamp(110 + lum * 0.6, 120, 255) | 0;
+  return [r > b + 50 && r > 140 ? (g > 175 ? 2 : 1) : b > r + 30 ? 13 : 0, br];
+}
+function auidScan(R) {
+  R.items = []; R.dirty = false; R.t = performance.now();
+  const root = R.el, cs0 = getComputedStyle(root); if (cs0.display === 'none' || cs0.visibility === 'hidden') return;
+  const rr = root.getBoundingClientRect(); if (rr.width < 1 || rr.height < 1 || rr.bottom < 0 || rr.top > innerHeight) return;
+  const look = new Map(), sty = el => { let s = look.get(el); if (s) return s;
+    const cs = getComputedStyle(el); let a = +cs.opacity; for (let p = el.parentElement; p && a > 0.02; p = p.parentElement) { a *= +getComputedStyle(p).opacity; if (p === root) break; }
+    const [ink, br] = auidInk(cs.color), btn = el.closest('button, [role="button"], s, kbd, .ql-go');
+    s = { vis: cs.visibility !== 'hidden' && cs.display !== 'none' && a > 0.04, a: Math.min(1, a), ink, br, up: cs.textTransform === 'uppercase', btn: btn && root.contains(btn) ? btn : null }; look.set(el, s); return s; };
+  const W = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), rg = document.createRange(), cw = UIL.cw, push = (x, y, h, str, s, extra) => { if (!str) return; R.items.push({ c: uilCol(x + 1), r: uilRow(y + h / 2), s: str, ink: s.ink, b: s.br * s.a | 0, a: s.a, btn: s.btn, ...extra }); };
+  for (let n = W.nextNode(); n; n = W.nextNode()) {
+    const raw = n.nodeValue; if (!raw || !raw.trim()) continue;
+    const pe = n.parentElement; if (!pe || pe.closest('svg, script, style')) continue; const s = sty(pe); if (!s.vis) continue;
+    rg.selectNodeContents(n); const rs = [...rg.getClientRects()].filter(q => q.width > 0.5); if (!rs.length) continue;
+    let txt = uiAsc(raw.replace(/\s+/g, ' ')).trim(); if (s.up) txt = txt.toUpperCase(); if (!txt) continue;
+    if (rs.length === 1) { push(rs[0].left, rs[0].top, rs[0].height, txt, s); continue; }
+    const words = txt.split(' '); let wi = 0;   // (laid out over several lines: the words shared out among them, as many as each line had room for)
+    rs.forEach((q, li) => { const cap = Math.max(1, Math.round(q.width / cw)); let line = '';
+      while (wi < words.length) { const t = line ? line + ' ' + words[wi] : words[wi]; if (line && t.length > cap + 1 && li < rs.length - 1) break; line = t; wi++; }
+      push(q.left, q.top, q.height, line, s); });
+  }
+  // the lines typed into: what is in them (never a password), or what they ask for
+  for (const inp of root.querySelectorAll('input:not([type="password"]):not([type="hidden"]), textarea')) { const s = sty(inp); if (!s.vis) continue; const q = inp.getBoundingClientRect(); if (q.width < 2) continue;
+    R.items.push({ c: uilCol(q.left + 2), r: uilRow(q.top + q.height / 2), s: '', ink: 0, b: 240, a: s.a, inp, w: Math.max(4, Math.floor(q.width / cw) - 1) }); }
+  // a button with only a picture on it: its name
+  for (const b of root.matches('button') ? [root] : root.querySelectorAll('button')) { if (b.textContent.trim()) continue; const s = sty(b); if (!s.vis) continue; const q = b.getBoundingClientRect(); if (q.width < 2) continue;
+    const t = uiAsc(b.getAttribute('aria-label') || '').toUpperCase().slice(0, 14); if (t) R.items.push({ c: uilCol(q.left + q.width / 2) - (t.length >> 1), r: uilRow(q.top + q.height / 2), s: t, ink: 2, b: 235, a: s.a, btn: b }); }
+  // a button with room in it for brackets gets them, at its own edges, round all its words; a small one is told by its colour
+  { const seen = new Set(); for (const it of R.items) { const b = it.btn; if (!b || seen.has(b)) continue; seen.add(b); const q = b.getBoundingClientRect(), mine = R.items.filter(o => o.btn === b), c0 = uilCol(q.left + 1), c1 = uilCol(q.right - 2);
+      if (mine.length && c1 - c0 >= Math.max(...mine.map(o => o.s.length)) + 1 && mine.every(o => o.c > c0 && o.c + o.s.length <= c1)) { const r0 = Math.min(...mine.map(o => o.r)), r1 = Math.max(...mine.map(o => o.r)); R.items.push({ c: c0, r: Math.round((r0 + r1) / 2), s: '', ink: 0, b: 0, a: it.a, brk: [c0, c1], btn: b }); } } }
+  // a panel (a list, a card, the bag): dark ground under the whole of it, so what is in it reads as one thing
+  if (AUID.panels.has(root.id)) R.box = [uilCol(rr.left), uilRow(rr.bottom - 1), uilCol(rr.right - 1), uilRow(rr.top), +cs0.opacity];
+  else R.box = null;
+}
+function auiDom() {
+  if (!AUID.roots.length) auidInit();
+  const now = performance.now(), blink = (time * 2.2) % 1 < 0.6;
+  for (const R of AUID.roots) {
+    if (R.dirty && now - R.t > 120 || now - R.t > 260) auidScan(R);   // (a panel that changes every frame is still only read a few times a second)
+    if (R.box && R.items.length) { const [c0, r0, c1, r1, a] = R.box; uilPlate(c0, r0, c1, r1, 205 * a | 0); uilClear(c0, r0, c1, r1); }   // (nothing of the world's own lettering shows through a panel)
+    for (const it of R.items) {
+      if (it.inp) { const v = uiAsc(it.inp.value), focus = document.activeElement === it.inp, t = v ? (v.length > it.w - 1 ? v.slice(v.length - it.w + 1) : v) : uiAsc(it.inp.placeholder);
+        uilPlate(it.c - 1, it.r, it.c + Math.max(t.length, 8) + 1, it.r, (focus ? 225 : 185) * it.a | 0); uilText(it.c, it.r, t, 0, v ? 245 : 120);
+        if (focus && blink) uilPut(it.c + (v ? t.length : 0), it.r, 95, 2, 255); continue; }
+      const hot = it.btn && (it.btn.matches(':hover') || document.activeElement === it.btn), on = it.btn && it.btn.classList.contains('on') && it.btn.id !== 'flipBtn' && it.btn.id !== 'waveBtn', ba = 255 * it.a | 0;
+      if (it.brk) { const [c0, c1] = it.brk; uilPlate(c0, it.r, c1, it.r, (hot ? 235 : 200) * it.a | 0); uilPut(c0, it.r, 91, hot || on ? 2 : 1, ba); uilPut(c1, it.r, 93, hot || on ? 2 : 1, ba); if (hot) { uilPut(c0 - 1, it.r, 62, 2, 230); uilPut(c1 + 1, it.r, 60, 2, 230); } continue; }
+      uilPlate(it.c - 1, it.r, it.c + it.s.length, it.r, (hot ? 235 : it.btn ? 215 : 195) * it.a | 0);
+      uilText(it.c, it.r, it.s, hot ? 4 : it.btn ? (on ? 2 : it.ink === 0 ? 2 : it.ink) : it.ink, hot ? 255 : it.btn ? Math.max(it.b, 225 * it.a | 0) : it.b);
+    }
+  }
+}
+// ── The marks in the world — another flier, the errand, the places he keeps — are not laid over the picture either: the
+//    cells round the place itself come alive. An errand or a kept place has a ring of sparks going round it and brackets
+//    that close in on it; a flier is bracketed, their name over them in their house's colour; off the screen, a run of
+//    arrows at its edge points the way round to it. Five colours at a time can be a flier's or a god's own.
+const MKI = { cols: [], n: 0 };
+const MK_ARROW = { '→': [1, 0, '>'], '↘': [1, -1, '\\'], '↓': [0, -1, 'v'], '↙': [-1, -1, '/'], '←': [-1, 0, '<'], '↖': [-1, 1, '\\'], '↑': [0, 1, '^'], '↗': [1, 1, '/'] };
+function mkInk(css) {
+  if (!css) return 1; let i = MKI.cols.indexOf(css); if (i >= 0) return 8 + i;
+  if (MKI.cols.length >= 5) return 1; MKI.cols.push(css); i = MKI.cols.length - 1; try { postMat.uniforms.uMk.value[i].set(css); } catch {} return 8 + i;
+}
+function auiMarks() {
+  const box = $('markers'); if (!box || $('hud').classList.contains('hidden')) return;
+  MKI.cols.length = 0;
+  const nx = UIL.nx, ny = UIL.ny, cw = UIL.cw, ch = UIL.ch, ra = ch / cw;
+  for (const el of box.children) {
+    if (el.style.display === 'none' || el.hidden) continue;
+    const x = parseFloat(el.style.left), y = parseFloat(el.style.top); if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const cl = el.classList, wp = cl.contains('wp'), peer = cl.contains('peer') || cl.contains('friend'), edge = cl.contains('edge'), lit = cl.contains('lit');
+    const g = el.firstChild?.textContent || '', label = uiAsc(el.lastChild?.textContent || '').toUpperCase(), op = (el.style.opacity !== '' ? +el.style.opacity : 1) * (cl.contains('dim') || cl.contains('far') ? 0.55 : 1); if (op < 0.05) continue;
+    const ink = el.style.color ? mkInk(el.style.color) : lit ? 2 : 13, br = 255 * Math.min(1, op) | 0, ph = time + (x * 0.013 + y * 0.007);
+    const c = uilCol(x), r = wp ? uilRow(y) : uilRow(y - ch * 1.2), lc = v => clamp(v, 1, nx - 2);
+    const name = (t, row) => { if (!t) return; const c0 = clamp(c - (t.length >> 1), 1, Math.max(1, nx - 1 - t.length)); uilPlate(c0 - 1, row, c0 + t.length, row, 125 * op | 0); uilText(c0, row, t, ink, br); };
+    if (edge && MK_ARROW[g]) {   // off the screen: three arrows running in toward the edge it is beyond, the name beside them
+      const [dx, dy, a] = MK_ARROW[g], c1 = lc(c), r1 = clamp(r, 2, ny - 3);
+      for (let k = 0; k < 4; k++) { const f = ((time * 3 - k * 0.6) % 1 + 1) % 1, cc = c1 - dx * k * 2, rr = r1 - dy * k; uilPut(cc, rr, a.charCodeAt(0), k ? ink : 4, (120 + 135 * (1 - f)) * op | 0); }
+      const t = label.slice(0, 26), side = dx > 0 ? c1 - t.length - 3 : dx < 0 ? c1 + 3 : c1 - (t.length >> 1), rowT = dy > 0 ? r1 - 2 : dy < 0 ? r1 + 2 : r1 + (r1 > ny / 2 ? -1 : 1);
+      { const c0 = clamp(side, 1, Math.max(1, nx - 1 - t.length)); uilPlate(c0 - 1, rowT, c0 + t.length, rowT, 130 * op | 0); uilText(c0, rowT, t, ink, br); }
+      continue; }
+    if (c < -2 || c > nx + 2 || r < 0 || r > ny) continue;
+    if (wp || lit && !peer) {   // the errand, a kept place, a lit goal: a ring of sparks going round, brackets closing in
+      const R = wp ? 3 : 2, spin = ph * 2.2, close = 1 + Math.round(2 * (1 - ((ph * 0.9) % 1)));
+      for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2, cc = c + Math.round(Math.cos(a) * R * ra * 0.62), rr = r + Math.round(Math.sin(a) * R * 0.62), lead = ((Math.round(spin / (Math.PI * 2) * 10) - k) % 10 + 10) % 10;
+        uilPut(cc, rr, lead === 0 ? 42 : lead < 3 ? 43 : 46, lead === 0 ? 4 : ink, (lead === 0 ? 255 : lead < 3 ? 210 : 120) * op | 0); }
+      uilPut(c - R - close, r, 91, ink, br); uilPut(c + R + close, r, 93, ink, br);
+      uilPut(c, r, (ph * 3 % 1) < 0.5 ? 64 : 42, 4, br); uilPut(c - 1, r, 60, ink, br); uilPut(c + 1, r, 62, ink, br);
+      name(label, r - (wp ? 3 : 2)); continue; }
+    if (peer) {   // a flier: their mark beating, brackets either side breathing in and out, their name over them
+      const w = 2 + Math.round(1 + Math.sin(ph * 4)), beat = Math.sin(ph * 7) > 0;
+      uilPut(c, r, beat ? 42 : 43, ink, br); uilPut(c - w, r, 40, ink, 200 * op | 0); uilPut(c + w, r, 41, ink, 200 * op | 0);
+      if (label) name(label, r + 1); continue; }
+    // a god waiting, a beacon, a shrine: a small light that breathes, what it is under it
+    { const f = 0.5 + 0.5 * Math.sin(ph * 2.4); uilPut(c, r, f > 0.6 ? 79 : 111, lit ? 2 : ink, (170 + 85 * f) * op | 0); uilPut(c, r + 1, 46, lit ? 2 : ink, 140 * f * op | 0);
+      if (label) name(label, r - 1); }
+  }
+}
+// ── The map, in the letters: its heading and its help typed at the top and the foot, its two buttons as keys, and every
+//    name the map writes on itself typed into the grid where it would have been written (the lines it draws stay drawn).
+function auiMapChrome() {
+  const nx = UIL.nx, ny = UIL.ny, t = uiAsc($('mapTitle').textContent).toUpperCase(), h = uiAsc($('mapHint').textContent).toUpperCase(), wrap = (s, n) => { const L = ['']; for (const w of s.split(' ')) { const i = L.length - 1, u = L[i] ? L[i] + ' ' + w : w; if (L[i] && u.length > n) L.push(w); else L[i] = u; } return L; };
+  if (t) wrap(t, nx - 30).slice(0, 2).forEach((ln, i) => { const c0 = (nx - ln.length) >> 1, r = ny - 2 - i; uilPlate(c0 - 1, r, c0 + ln.length, r, 190); uilText(c0, r, ln, i ? 0 : 1, i ? 190 : 235); });
+  if (h && !STV.map) wrap(h, nx - 6).slice(0, 2).forEach((ln, i, A) => { const c0 = (nx - ln.length) >> 1, r = 1 + (A.length - 1 - i); uilPlate(c0 - 1, r, c0 + ln.length, r, 180); uilText(c0, r, ln, 0, 175); });
+  for (const [id, lab] of [['mapMode', $('mapMode').textContent.trim()], ['mapNorth', 'N ' + MK_ARROW[['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'][((Math.round(Math.atan2(mapP.s, mapP.c * Math.max(mapP.T, 0.2)) / (Math.PI / 4)) % 8) + 8) % 8]][2]]]) {
+    const b = $(id); if (!b || b.style.display === 'none') continue; const q = rectOf(b, 300); if (q.width < 2) continue;
+    const row = uilRow(q.top + q.height / 2), c0 = uilCol(q.left + q.width / 2) - ((lab.length + 4) >> 1), hot = b.matches(':hover');
+    uilPlate(c0, row, c0 + lab.length + 3, row, hot ? 240 : 205); uilPut(c0, row, 91, hot ? 2 : 1, 255); uilPut(c0 + lab.length + 3, row, 93, hot ? 2 : 1, 255); uilText(c0 + 2, row, lab, hot ? 2 : 1, 240); }
+}
+// ── How big the letters of the interface are: a setting, for whoever finds them small (see UISZ, by resize)
+function uiSizeSet(i, say) {
+  UISZ.i = ((i % UISZ.K.length) + UISZ.K.length) % UISZ.K.length; try { localStorage.setItem('icarus.uisize', UISZ.i); } catch {}
+  document.documentElement.style.setProperty('--uiz', UISZ.K[UISZ.i]); resize(); rectGen++; STV.layKey = ''; for (const R of AUID.roots) R.dirty = true;
+  if (say) toast(`TEXT SIZE · ${UISZ.N[UISZ.i]}`);
 }
 const MFX = { t: 0, strip: null, mark: null, still: matchMedia('(prefers-reduced-motion: reduce)').matches };
 function updateMenuFx() {
@@ -8421,7 +8851,8 @@ const CMD_HELP = [
   ['COLOUR', '/vivid (the world in full colour, which is how it comes, or in its plainer colours)'],
   ['HAMLET', '/hamlet (your own AI agents: who lives there, what they are building, the way to it) · /hamlet connect (bring your Claude, Codex and other agents in) · /hamlet key (the key, by hand)'],
   ['FIGHT', '/fly · /fly party · /fly NAME (or cpu) · /accept · /decline · /cpu N (birds that fly themselves) · /warsim N (watch N of them) · /fly watch · /leave · /forfeit'],
-  ['SET', '/sound on|off · /mic on|off · /hands on|off · /quality up|down · /letters up|down · /clear'],
+  ['SET', '/sound on|off · /mic on|off · /hands on|off · /quality up|down · /letters up|down · /text bigger|smaller (the size of the words) · /clear'],
+  ['RECORD', '/stats (your numbers, written in the sky · Z)'],
   ['ASK', '/ask ANYTHING: she answers, and does it if she can'],
 ];
 // ── The keeper. A traveller called ANDRES whose travel code the server lists may give orders: send someone home (/kick),
@@ -8476,6 +8907,8 @@ function chatCommand(text) {
   if (['kick', 'ban', 'ipban', 'unban', 'noclip', 'speed', 'spawn', 'summon', 'agent'].includes(c) && !MOD.admin) { sys(AUTH.s ? 'THAT IS NOT YOURS TO DO' : 'THAT IS NOT YOURS TO DO · THE KEEPER SIGNS IN FIRST'); return true; }
   if (c === 'watch' && (MATCH.phase || MATCH.seen && Date.now() < MATCH.seen.until)) { matchGhost(); return true; }   // (while a fight is on, /watch is the fight; otherwise Crete)
   switch (c) {
+    case 'stats': case 'record': if (state === 'stats') statsClose(); else statsOpen(); return true;
+    case 'text': case 'textsize': case 'size': { const i = /^(big|bigger|larger|up|\+)$/.test(low) ? UISZ.i + 1 : /^(small|smaller|down|-)$/.test(low) ? UISZ.i - 1 : /^(normal|reset|default)$/.test(low) ? 0 : /^[1-4]$/.test(low) ? +low - 1 : UISZ.i + 1; uiSizeSet(clamp(i, 0, 3), true); return true; }
     case 'help': case 'h': case 'commands': case '?': for (const [k, v] of CMD_HELP) sys(`${k} · ${v}`); if (MOD.admin) sys('KEEPER · /studio (every mission, the clock, scenes) · /agent ANYTHING · /noclip · /speed N · /spawn GOD · /kick NAME · /ban NAME · /ipban NAME · /unban NAME'); return true;
     case 'agent': agentAsk(arg); return true;
     case 'mission': case 'quest': case 'errand': qlGo(); return true;
@@ -9731,7 +10164,7 @@ function fellApply(group, cx, cz) {   // a chunk built again: the trees that are
 }
 function fellStart(T, fx, fz, net) {   // over it goes, away from whoever cut it
   if (T.plant) { const P = T.plant; P.fall = { fx, fz, t: 0 }; return; }
-  const t = T.t; if (t.fell) return; treeKeep(T); t.fell = true; t.torn = true;
+  const t = T.t; if (t.fell) return; treeKeep(T); t.fell = true; t.torn = true; if (!net) STATS.d.felled = (STATS.d.felled || 0) + 1;
   const sol = T.g.userData.solids || []; t.sy = []; for (let k = t.s0; k < t.s1; k++) { const q = sol[k]; if (q) { t.sy.push([k, q.y1]); q.y1 = -1e9; } }
   const K = t.keep; let px = t.x, py = 1e9, pz = t.z; for (let j = 1; j < K.length; j += 3) py = Math.min(py, K[j]);
   FELL.anim.push({ T, fx, fz, px, py, pz, t: 0, dur: 1.5, net });
@@ -20624,7 +21057,7 @@ const trailJoin = () => { for (const P of NET.peers.values()) if (P.trail && P.s
 const nextHoop = () => hoops.find(h => h.alive && h.burn < 0 && h.miss < 0);
 function passHoop(h, perfect) {
   const p = player;
-  h.burn = 0; trail.left--; trail.got++; questEvent.hoops = (questEvent.hoops || 0) + 1;
+  h.burn = 0; trail.left--; trail.got++; questEvent.hoops = (questEvent.hoops || 0) + 1; STATS.d.rings = (STATS.d.rings || 0) + 1;
   p.surge = (p.surge || 0) + (perfect ? 48 : 32); p.flame = Math.min(1, p.flame + (perfect ? 0.1 : 0.06));
   const last = trail.left <= 0 && trail.got === trail.n;
   audio.sfx.ring(trail.got - 1, perfect, last); netFx('ring'); ringPassed(h);
@@ -21299,7 +21732,7 @@ function qlUpdate() {
   if (!T) { QL.line = QL.line2 = ''; if (el && el.textContent) el.textContent = ''; } else {
     const head = `${T.name.toUpperCase()}${T.step ? ' ' + T.step : ''}`;
     QL.line = `${head} · ${T.goal}`; QL.god = T.god;
-    QL.line2 = [T.v >= 0 ? `${qlBar(T.v)} ${T.n >= 1 && T.n <= 30 ? `${Math.floor(T.v * T.n + 1e-6)}/${T.n}` : Math.round(T.v * 100) + '%'}` : '', qlDist(T.to || qlWhere(T)), flags.morphed ? (TOUCH ? 'TAP · GO THERE' : 'SHIFT+J · GO THERE') : ''].filter(Boolean).join(' · ');
+    QL.line2 = [T.v >= 0 ? `${qlBar(T.v)} ${T.n >= 1 && T.n <= 30 ? `${Math.floor(T.v * T.n + 1e-6)}/${T.n}` : Math.round(T.v * 100) + '%'}` : '', qlDist(T.to || qlWhere(T)), flags.morphed ? (TOUCH ? 'TAP HERE TO GO THERE' : 'SHIFT+J TO GO THERE') : ''].filter(Boolean).join(' · ');
     if (el) { const h = `<b style="color:${PATRONS[T.god]?.[0] || '#ffd9a8'}">◆ ${head}</b> · ${T.goal}${QL.line2 ? `<br><i>${QL.line2}</i>` : ''}`; if (el._h !== h) { el._h = h; el.innerHTML = h; } }
   }
   if (!QL.mk) { const m = QL.mk = document.createElement('div'); m.className = 'mk wp'; m.innerHTML = '<b>◆</b><span></span>'; m.style.display = 'none'; $('markers').appendChild(m); }
@@ -22221,6 +22654,18 @@ function mapHint() {
     : mapV.relief ? 'drag or W A S D to fly · right-drag turns and tips · scroll zooms · click a place to go there' : 'click a bird, or anywhere anyone has been, and the gods will carry you there · M to close';
 }
 $('mapMode').textContent = mapV.relief ? 'FLAT' : '3D'; $('mapNorth').style.display = mapV.relief ? '' : 'none';
+// (with the letters on, every name the map writes on itself is typed into the grid instead, where it would have been: see auiMapChrome)
+{ const orig = mapX.fillText.bind(mapX);
+  mapX.fillText = (t, x, y, w) => {
+    if (!UIL.on || !UIL.buf || !mapV.open) return orig(t, x, y, w);
+    const s = uiAsc(t).replace(/^\*$/, '*'); if (!s.trim()) return;
+    const al = mapX.textAlign, c = uilCol(al === 'center' ? x - s.length * UIL.cw / 2 : al === 'right' || al === 'end' ? x - s.length * UIL.cw : x), r = uilRow(y - (mapX.textBaseline === 'alphabetic' ? 4 : 0));
+    let f = String(mapX.fillStyle); if (f[0] === '#') { if (f.length === 4) f = '#' + f[1] + f[1] + f[2] + f[2] + f[3] + f[3]; f = `rgb(${parseInt(f.slice(1, 3), 16)},${parseInt(f.slice(3, 5), 16)},${parseInt(f.slice(5, 7), 16)})`; }
+    const [ink, br] = auidInk(f), a = clamp(mapX.globalAlpha * (+(/rgba\([^)]*,\s*([\d.]+)\)/.exec(f)?.[1] ?? 1)), 0, 1);
+    if (s.length === 1 && c >= 0 && r >= 0 && c < UIL.nx && r < UIL.ny && UIL.buf[(r * UIL.nx + c) * 4] > 32) return;   // (a speck of weather never writes over a name)
+    if (s.length > 1) uilPlate(c - 1, r, c + s.length, r, 120 * a | 0);
+    uilText(c, r, s, ink, Math.max(110, br * a) | 0); postMat.uniforms.uUiOn.value = 1; if (UIL.tex) UIL.tex.needsUpdate = true;
+  }; }
 $('mapMode').addEventListener('click', e => { e.stopPropagation(); mapMode(); $('mapMode').blur(); audio.sfx.ui?.(); });
 $('mapNorth').addEventListener('click', e => { e.stopPropagation(); mapNorth(); $('mapNorth').blur(); });
 for (const id of ['mapMode', 'mapNorth']) for (const ev of ['pointerdown', 'pointerup', 'touchstart']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
@@ -22729,6 +23174,7 @@ function updateCamera(dt) {
   const p = player;
   if (MATCH.intro && MATCH.phase === 'count' && (state === 'play' && MATCH.me.alive || state === 'watch')) return matchIntroCam(dt);
   if (state === 'watch') return camWatch(dt);
+  if (state === 'stats') return statsCam(dt);   // (his record in the sky: a wide shot of where he is)
   if (state === 'photo') { camera.position.copy(photo.pos); camera.rotation.set(photo.pitch, photo.yaw, photo.roll, 'YXZ'); camera.fov = photo.fov; camera.updateProjectionMatrix(); return; }
   if (xrFP()) { camera.position.copy(XR.eye || xrEye(_v)); camera.quaternion.copy(XR.rig.quaternion).multiply(XR.cam.quaternion); camera.fov = 70; camera.updateProjectionMatrix(); return; }   // (in the headset the game's camera is his eyes)
   if (state === 'title' && titleFly.on) return;   // (the title flies its own lens: updateTitle)
@@ -24326,7 +24772,7 @@ $('authIn').addEventListener('click', () => authDo('in'));
 $('authUp').addEventListener('click', () => authDo('up'));
 $('authLink').addEventListener('click', () => authDo('link'));
 $('authOut').addEventListener('click', () => authDo('out'));
-$('authStats').addEventListener('click', () => { statsSend(false); open('/stats/', '_blank', 'noopener'); });
+$('authStats').addEventListener('click', () => { authShow(false); statsOpen(); });   // (the record is in the game now; /stats/ still works for whoever is sent a link to it)
 $('backBtn').addEventListener('click', e => { e.stopPropagation(); nameAsked = true; menuGo('back'); });
 const isPlus = e => e.key === '+' || e.key === '=' || e.code === 'NumpadAdd';
 addEventListener('keydown', e => {
@@ -24399,6 +24845,7 @@ addEventListener('keydown', e => {
     case 'BracketLeft': lettersSet(cellIdx - 1); break;
     case 'BracketRight': lettersSet(cellIdx + 1); break;
     case 'KeyM': openMap(); break;
+    case 'KeyZ': if (state === 'play') statsOpen(); break;   // his record, written in the sky
     case 'KeyJ': if (e.shiftKey) qlGo(); else qlShow(!QL.open); break;
     case 'KeyF': openPhoto(); break;
     case 'KeyX': if (!e.repeat) throwBolt(); break;
@@ -25284,6 +25731,7 @@ function tick(dt) {
   } else if (state === 'dead') updateDeath(dt);
   else if (state === 'photo') { if (photo.live && player.form === 'phoenix' && !player.perch && !player.sub) flyWings(dt, { boost: false, dive: 0, climb: 0.7 }); }   // (held in the air where he was, wings beating)
   else if (state === 'end') updateEnding(dt);
+  else if (state === 'stats') statsStep(dt);
   else if (state === 'warp') updateWarp(dt);
   carryOn();    // (and then to where it has stood off to, if a bird is passing through it)
   updateTail(dt); updateSmall(dt); updateCourier(dt); xfTick(dt); flipTick(dt); agentsWatch(dt); woodTick(dt); waveTick(dt, false); keeperTick(dt); wreathTick(dt); keeperSizeTick(dt); eyeStep(dt);
@@ -28626,6 +29074,7 @@ setTimeout(() => {
   warmPrograms();
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
+  if (window.__icarus) Object.assign(window.__icarus, { STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
   if (window.__icarus) Object.assign(window.__icarus, { crash, cpuShow, matchGhost, matchQuit, matchView, matchWhere, matchParty, matchRegulars, matchGlide, matchPractice, matchGoLive, matchSlot, BLAST, matchBlast, GHOST_U, NPCS, OLY_R, PARTY_R, chatCommand, cpuFly });
   if (window.__icarus) Object.assign(window.__icarus, { STU, stuOpen, stuClose, stuTab, stuMissions, stuProSeek, stuPlay, stuWatch, stuFetch, stuTest, stuBack, stuGo, stuStep, stuPP, stuRate, sceneClean, stuDone });
