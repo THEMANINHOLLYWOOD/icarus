@@ -5269,6 +5269,7 @@ function deathFly() {
   toast('INTO THE FIRE AGAIN');
 }
 function pressSpace() {
+  if (COSMOS.on) return cosmosBeat();
   if (deathCanFly()) return deathFly();
   if (player.mount && state === 'play') return gflyLeap();
   const p = player, act = spaceAction();
@@ -10748,7 +10749,7 @@ function updatePhoenix(dt) {
   } else if (p.flapCD < -(2.4 + glide * 3.4) && !diving) { p.flapCD = 0; p.flapPhase = 0; p.vy += 4; audio.sfx.flap(0.4); if (WR.A < 0.25) WR.th = 0; WR.beat = Math.max(WR.beat, 0.55); }   // one lazy beat to hold the glide
 
   // the sky limit: linger above it and the sun takes your wings
-  const roof = SKY_LIMIT + perks.sun * 320;
+  const roof = SKY_LIMIT + perks.sun * 320 + (cosmosOpen() ? 1e7 : 0);   // (the keeper, with the god in him: no roof at all, see COSMOS)
   heat = p.riding ? 0 : smoothstep(roof - 260, roof, p.pos.y);
   p.skyT = p.pos.y > roof && !p.riding ? p.skyT + dt : Math.max(0, p.skyT - dt);
   updateHoops(dt);
@@ -21883,6 +21884,7 @@ function mapTile(tx, tz) {
   return t;
 }
 function openMap() {
+  if (COSMOS.on) return cosmosMap(true);   // (out in space, the map is the map of the heavens)
   if (state !== 'play' || player.cine || player.sub || mapV.open) return;
   state = 'map'; mapV.open = true; mapV.pull = 0; mapV.hover = null; mapV.down = null; audio.sfx.mapOpen?.();
   for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
@@ -25224,6 +25226,7 @@ function tick(dt) {
     if (player.ferry || player.mount) heat = 0;   // (in the boat, or on a god's back: he is carried)
     else if (player.cine) updateCine(dt);
     else if (player.form === 'human') { heat = lerp(heat, 0, damp(3, dt)); updateHuman(dt); }
+    else if (COSMOS.on) cosmosFly(dt);   // (out in space)
     else if (BIRD.auto && birdStep(dt)) {}   // (the bird has the air)
     else updatePhoenix(dt);
     if (state === 'play') updateStory(dt);
@@ -25281,7 +25284,8 @@ function tick(dt) {
     postMat.uniforms.uRays.value = lerp(postMat.uniforms.uRays.value, want, damp(2, dt)); }
   if (CAMB.T) camBlend(dt);
   if (window.__icarus?.testCam) window.__icarus.testCam(camera);   // (tests only: look from wherever a test says)
-  if (M3.on && mapV.open && state === 'map') m3Present(); else present(scene, camera);
+  cosmosStep(dt);
+  if (COSMOS.on || COSMOS.fadeT > 0) cosmosPresent(); else if (M3.on && mapV.open && state === 'map') m3Present(); else present(scene, camera);
   if (DP.grab) { const r = DP.grab; DP.grab = null; r(dpFrame()); }
   if (photo.snap) {   // the picture is taken straight off the frame that was just drawn
     photo.snap = false;
@@ -27390,6 +27394,614 @@ function areaFc(P, t) {
     return true; }
   return false;
 }
+
+// ───────────────────────── space ─────────────────────────
+// ── For now the keeper's alone (MOD.admin, as the server vouches for him), and only with the god in him. Past the sky limit
+//    the sun does not take his wings, and climbing on, the blue goes out of the sky, the stars come through by day and the
+//    world falls away under him. Out there it is a globe: the country wrapped round a sphere a kilometre for a kilometre,
+//    Olympus at its pole, every square anyone has charted in the map's own colours and the rest a dark shape, the sea, a
+//    thin rim of air. Round it turn great rings of many bands, and over Olympus a crown of rings of its own, spinning on
+//    every axis; and the moons, each a world of its own kind — rock, ice, fire, a giant of gas, ocean, desert, forest,
+//    crystal. Past them there is no end: the dark is cut into cells, and what is in a cell comes from where it is, so it is
+//    the same for everyone; worlds are made as he comes near and let go when he has gone. Near one, its face comes up out
+//    of the blur a finer layer at a time, and he can skim it. M opens the map of the heavens, all of it in three dimensions,
+//    to be turned right round any point. Diving back down into the air puts him back in the world where he left it.
+//    (It is a scene of its own, drawn round its own eye like the standing map: everything is placed relative to that eye and,
+//    past a few kilometres, drawn nearer and smaller in proportion, which leaves the picture the same and the depth buffer
+//    room to spare. Everyone else keeps the sky limit; in the headset there is no way up.)
+const CZ_RG = 12000, CZ_TOP = SKY_LIMIT + 1500, CZ_ALT = CZ_TOP - WATER, CZ_D0 = 3000, CZ_CELL = 600000, CZ_FADE = 0.9, CZ_TW = 512, CZ_TH = 256;
+const CZ_SUN = new THREE.Vector3(0.5, 0.55, 0.67).normalize();
+const CZ_KINDS = ['rock', 'ice', 'fire', 'gas giant', 'ocean', 'desert', 'forest', 'crystal', 'poison'];
+const CZ_SAY = ['A WORLD OF ROCK', 'A WORLD OF ICE', 'A WORLD OF FIRE', 'A GIANT OF GAS', 'A WORLD OF OCEAN', 'A WORLD OF SAND', 'A WORLD OF FOREST', 'A WORLD OF CRYSTAL', 'A WORLD OF POISON'];
+const CZ_PAL = [   // the colours each kind is painted in (four, for the shader to mix), and the colour of its air
+  [['#8a8580', '#c9c2b8', '#4a4744', '#6d6258'], null], [['#dfeefc', '#9cc8f0', '#2e6fb4', '#ffffff'], '#a8d4ff'], [['#2a1a14', '#4b2a1e', '#ff6a1a', '#ffd25a'], '#ff7a3a'],
+  [['#d8b98a', '#a8744c', '#efe0c0', '#c4583a'], '#e8c89a'], [['#1a4f9a', '#3e8a3a', '#d8c890', '#ffffff'], '#7ab8ff'], [['#e0b070', '#b8743a', '#6a3a20', '#f0d8a8'], '#f0b878'],
+  [['#14506a', '#2f7a2a', '#7aa63a', '#ffffff'], '#8ad0ff'], [['#5a2a8a', '#2ac8c8', '#d8a0ff', '#ffffff'], '#b890ff'], [['#a8b02a', '#5a7a1a', '#e0e070', '#ffffff'], '#c8e060']];
+const CZ_AMP = [0.04, 0.02, 0.03, 0, 0.015, 0.025, 0.02, 0.05, 0];
+const COSMOS = { on: false, up: 0, cool: 0, fadeT: 0, built: false, told: false, scene: null, cam: null, sys: null, globe: null, pos: new THREE.Vector3(), q: new THREE.Quaternion(), v: 0, pv: 0,
+  exit: null, home: null, camPos: new THREE.Vector3(), camOff: null, camQ: new THREE.Quaternion(), rush: 0, bodies: [], near: [], deep: new Map(), cell: '', dots: null, found: new Set(), nearB: null, nearD: 1e9,
+  dNear: 1e9, beatT: 0, ringL: new THREE.Vector3(), ringR: 0, ringY: 1e9, tex: { data: null, tex: null, job: null, upT: 0, at: -1e9, n: -1 }, map: { on: false, piv: new THREE.Vector3(), q: new THREE.Quaternion(), d: 600, td: 60000, pid: 'me', keys: {}, hits: [] }, hudT: 0, trail: null };
+const _czC = new THREE.Color(), _czv = new THREE.Vector3(), _czw = new THREE.Vector3(), _czf = new THREE.Vector3(), _czu = new THREE.Vector3(), _czq = new THREE.Quaternion(), _czm = new THREE.Matrix4(), _cz0 = new THREE.Vector3(), _czX = new THREE.Vector3(1, 0, 0), _czY = new THREE.Vector3(0, 1, 0), _czZ = new THREE.Vector3(0, 0, 1);
+// whether the way up is open to him now
+function cosmosOpen() { const p = player; return !!MOD.admin && GODM.on && realm === 'over' && !XR.on && p.form === 'phoenix' && !p.cine && !p.sub && !p.perch && !p.mount && !p.ferry; }
+// past a few kilometres, nearer and smaller in proportion (everything out to the end of space fits in twice that)
+const czK = d => d <= CZ_D0 ? 1 : CZ_D0 * (2 - CZ_D0 / d) / d;
+// where a place in the world is on the globe: as far from the pole as it is from Olympus, in the same direction. The unit
+// normal there, and the ways the world's x and z run along it
+function czFrame(x, z, n, tx, tz) {
+  const dx = x - MOUNT.x, dz = z - MOUNT.z, th = Math.min(Math.hypot(dx, dz) / CZ_RG, Math.PI * 0.97), ph = Math.atan2(dx, dz), st = Math.sin(th), ct = Math.cos(th), sp = Math.sin(ph), cp = Math.cos(ph);
+  n.set(st * sp, ct, st * cp);
+  const ex = ct * sp, ey = -st, ez = ct * cp;   // (away from the pole, and round it)
+  tx.set(sp * ex + cp * cp, sp * ey, sp * ez - cp * sp); tz.set(cp * ex - sp * cp, cp * ey, cp * ez + sp * sp);
+  return n;
+}
+// a quaternion that looks along f with its top toward up (forward is -Z, for the bird and the eye alike)
+function czLook(q, f, up) { _czm.lookAt(_cz0, f, up); return q.setFromRotationMatrix(_czm); }
+const czHexC = new Map();
+function czHex(s) { let c = czHexC.get(s); if (!c) { const n = parseInt(s.slice(1), 16); c = [n >> 16, (n >> 8) & 255, n & 255]; czHexC.set(s, c); } return c; }
+// the globe's picture: the map's own colours where anyone has been, a dark shape of the land and sea where no one has; the
+// height in the fourth channel (the globe stands up out of it). Laid down a few rows a frame, from Olympus outward
+function czGlobeStart() { const T = COSMOS.tex; T.job = { j: 0 }; T.n = mapCells.over.size + WORLD.cells.over.size; T.at = performance.now(); }
+function czGlobeStep(budget) {
+  const T = COSMOS.tex, J = T.job; if (!J) return;
+  const D = T.data, t0 = performance.now();
+  while (J.j < CZ_TH && performance.now() - t0 < budget) {
+    const j = J.j++, d = (j + 0.5) / CZ_TH * Math.PI * CZ_RG;
+    for (let i = 0; i < CZ_TW; i++) {
+      const ph = (i + 0.5) / CZ_TW * TAU_ - Math.PI, x = MOUNT.x + Math.sin(ph) * d, z = MOUNT.z + Math.cos(ph) * d, o = (j * CZ_TW + i) * 4, h = height(x, z);
+      let c;
+      if (mapKnown(x, z)) c = czHex(cellLook(x, z)[1]);
+      else c = h < WATER ? [16, 34, 66] : h < WATER + 6 ? [72, 68, 54] : h > 760 ? [150, 156, 168] : h > 360 ? [74, 71, 66] : noise2(x / 650 + 91.7, z / 650 - 37.3) > 0.22 ? [30, 52, 30] : [44, 62, 34];
+      D[o] = c[0]; D[o + 1] = c[1]; D[o + 2] = c[2]; D[o + 3] = h > WATER ? Math.round(clamp((h - WATER) / 2400, 0, 1) * 255) : 0;
+    }
+  }
+  const now = performance.now();
+  if (J.j >= CZ_TH || now - T.upT > 450) { T.tex.needsUpdate = true; T.upT = now; }
+  if (J.j >= CZ_TH) T.job = null;
+}
+// the height of the globe's ground under a direction (from the same picture the globe is drawn from)
+function czGlobeH(n) {
+  const D = COSMOS.tex.data, i = clamp(Math.floor((Math.atan2(n.x, n.z) / TAU_ + 0.5) * CZ_TW), 0, CZ_TW - 1), j = clamp(Math.floor(Math.acos(clamp(n.y, -1, 1)) / Math.PI * CZ_TH), 0, CZ_TH - 1);
+  return D[(j * CZ_TW + i) * 4 + 3] / 255 * 2400;
+}
+// a name for a world, from its seed
+const CZ_SYL = ['AR', 'THE', 'ON', 'I', 'PHO', 'LY', 'KRA', 'MOS', 'NE', 'TA', 'RI', 'DES', 'EU', 'KAL', 'XA', 'MNE', 'ZO', 'PER', 'SE', 'ORM', 'AI', 'TYR', 'HE', 'LIA', 'DRO', 'GE', 'NOS', 'SIA', 'KTE', 'BA'];
+function czName(r) { let s = ''; const n = 2 + (r() < 0.45 ? 1 : 0); for (let i = 0; i < n; i++) s += CZ_SYL[Math.floor(r() * CZ_SYL.length)]; return s; }
+
+// the noise every world's face is made of (value noise, stacked a layer at a time; the last layer eased in, so a finer one never pops)
+const CZ_GLSL = `
+  float czH(vec3 p) { p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419)); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+  float czN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(czH(i), czH(i + vec3(1.0, 0.0, 0.0)), f.x), mix(czH(i + vec3(0.0, 1.0, 0.0)), czH(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+               mix(mix(czH(i + vec3(0.0, 0.0, 1.0)), czH(i + vec3(1.0, 0.0, 1.0)), f.x), mix(czH(i + vec3(0.0, 1.0, 1.0)), czH(i + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z); }
+  float czF(vec3 p, float oct) { float a = 0.5, s = 0.0; for (int i = 0; i < 11; i++) { float w = clamp(oct - float(i), 0.0, 1.0); if (w <= 0.0) break; s += a * w * (czN(p) * 2.0 - 1.0); p = p * 2.03 + vec3(1.7, 9.2, 3.1); a *= 0.5; } return s; }
+  vec3 czBump(vec3 pos, vec3 n, float h) { vec3 dx = dFdx(pos), dy = dFdy(pos), r1 = cross(dy, n), r2 = cross(n, dx); float det = dot(dx, r1); vec3 g = sign(det) * (dFdx(h) * r1 + dFdy(h) * r2); return normalize(abs(det) * n - g); }`;
+const CZ_VS = `varying vec3 vObj, vW, vN; void main() { vObj = position; vN = normalize(mat3(modelMatrix) * position); vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
+// a world, any of the kinds: what its ground is, lit by the sun, with clouds and the edge of its air where it has them
+const CZ_FS = `
+  uniform float uKind, uOct, uAmp, uScale, uTime, uAtm; uniform vec3 uSun, uA, uB, uC, uD, uSeed, uAtmC; varying vec3 vObj, vW, vN;
+  ${CZ_GLSL}
+  void main() {
+    vec3 n = normalize(vObj), p = n * 1.7 + uSeed, N = normalize(vN), col, glow = vec3(0.0); float h = 0.0, spec = 0.0, cloud = 0.0, k = uKind;
+    if (k < 0.5) { h = czF(p, uOct); float m = smoothstep(0.05, 0.25, czF(p * 0.6 + 3.0, 3.0)), cr = czN(p * 7.0), rim = smoothstep(0.7, 0.74, cr) * (1.0 - smoothstep(0.76, 0.82, cr)), pit = smoothstep(0.8, 0.88, cr);
+      h += rim * 0.25 - pit * 0.3; col = mix(mix(uA, uB, h * 0.9 + 0.5), uC, m * 0.6) * (1.0 - pit * 0.35); }
+    else if (k < 1.5) { h = czF(p, uOct) * 0.6; float line = 1.0 - smoothstep(0.0, 0.025, abs(czN(p * 3.0 + 7.0) - 0.5)); col = mix(mix(uA, uB, h + 0.5), uC, line * 0.8); h -= line * 0.15; spec = 0.35; }
+    else if (k < 2.5) { h = czF(p, uOct); float crack = 1.0 - smoothstep(0.0, 0.07, abs(czF(p * 1.3 + 5.0, max(uOct - 1.0, 2.0))));
+      col = mix(uA, uB, h * 0.5 + 0.5) * (1.0 - crack); glow = mix(uC, uD, crack) * crack * (1.5 + 0.35 * sin(uTime * 2.0 + h * 9.0)); h -= crack * 0.2; }
+    else if (k < 3.5) { float w = czF(p * 2.2, uOct) * 0.22, lat = n.y + w, b = sin(lat * 19.0 + uSeed.x) * 0.5 + 0.5, b2 = sin(lat * 47.0 + uSeed.y) * 0.5 + 0.5;
+      col = mix(mix(uA, uB, b), mix(uC, uD, b2), 0.35 + 0.3 * sin(lat * 7.0 + uSeed.z)); float sp = distance(n, normalize(vec3(0.6, 0.25, 0.75)));
+      col = mix(col, uD, (1.0 - smoothstep(0.07, 0.15, sp + w * 0.3)) * 0.85); }
+    else if (k < 4.5) { h = czF(p, uOct); float land = smoothstep(0.24, 0.27, h); col = mix(uA * (0.8 + 0.4 * h), mix(uC, uB, smoothstep(0.27, 0.42, h)), land); spec = 1.0 - land; h = max(h - 0.25, 0.0) * land; cloud = 1.0; }
+    else if (k < 5.5) { h = czF(p, uOct); float dn = sin(dot(n, vec3(31.0, 7.0, 19.0)) * 3.0 + h * 9.0 + czN(p * 40.0) * 2.0), cy = 1.0 - smoothstep(0.0, 0.04, abs(czF(p * 0.8 + 11.0, 4.0)));
+      col = mix(mix(uA, uB, h * 0.5 + 0.5 + dn * 0.12), uC, cy * 0.7); h += dn * 0.04 - cy * 0.2; }
+    else if (k < 6.5) { h = czF(p, uOct); float land = smoothstep(-0.02, 0.02, h); col = mix(uA, mix(uB, uC, smoothstep(0.1, 0.4, h)), land);
+      col = mix(col, vec3(0.92), smoothstep(0.78, 0.88, abs(n.y) + h * 0.2)); spec = (1.0 - land) * 0.8; h = max(h, 0.0); cloud = 0.8; }
+    else if (k < 7.5) { vec3 q = p * 3.0 + czF(p, 3.0), c = floor(q); float r = czH(c); h = r * 0.4 + czF(p * 4.0, max(uOct - 2.0, 1.0)) * 0.2; col = mix(uA, uB, r);
+      float e = 1.0 - smoothstep(0.0, 0.08, min(min(fract(q.x), fract(q.y)), fract(q.z))); glow = uC * e * 0.9; spec = 0.6; }
+    else { float w = czF(p * 1.5, uOct); h = w * 0.3; col = mix(uA, uB, sin(n.y * 11.0 + w * 4.0) * 0.5 + 0.5); col = mix(col, uC, smoothstep(0.3, 0.5, czN(p * 5.0 + uTime * 0.05)) * 0.4); cloud = 0.5; }
+    vec3 Nb = uAmp > 0.0 ? czBump(vW, N, h * uAmp * uScale * 2.5) : N, V = normalize(cameraPosition - vW);
+    float d0 = dot(N, uSun), d = max(dot(Nb, uSun), 0.0), day = smoothstep(-0.15, 0.25, d0);
+    if (cloud > 0.0) { float cl = smoothstep(0.55, 0.8, czN(n * 5.0 + vec3(uTime * 0.01, 0.0, 0.0) + uSeed) * 0.65 + czN(n * 13.0 + uSeed) * 0.35) * cloud; col = mix(col, vec3(0.95), cl); spec *= 1.0 - cl; d = mix(d, max(d0, 0.0), cl); }
+    vec3 c = col * (0.06 + 1.1 * d * day) + glow;
+    if (spec > 0.0) c += vec3(1.0, 0.95, 0.85) * pow(max(dot(reflect(-uSun, Nb), V), 0.0), 40.0) * spec * day;
+    c += uAtmC * pow(1.0 - max(dot(N, V), 0.0), 3.0) * uAtm * (0.15 + day);
+    gl_FragColor = vec4(c, 1.0);
+  }`;
+// the globe: the world's picture wrapped round it, standing up out of its heights, with the sea shining and weather going over
+const CZ_GVS = `uniform sampler2D tMap; uniform float uHk; varying vec3 vObj, vW, vN;
+  void main() { vec3 n = normalize(position); vec2 uv = vec2(atan(n.x, n.z) / 6.2831853 + 0.5, acos(clamp(n.y, -1.0, 1.0)) / 3.14159265); float h = texture2D(tMap, uv).a;
+    vObj = n; vN = normalize(mat3(modelMatrix) * n); vec4 w = modelMatrix * vec4(n * (1.0 + h * uHk), 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
+const CZ_GFS = `uniform sampler2D tMap; uniform float uHk, uScale, uTime, uOct; uniform vec3 uSun; varying vec3 vObj, vW, vN;
+  ${CZ_GLSL}
+  void main() {
+    vec3 n = normalize(vObj), N = normalize(vN); vec4 t = texture2D(tMap, vec2(atan(n.x, n.z) / 6.2831853 + 0.5, acos(clamp(n.y, -1.0, 1.0)) / 3.14159265));
+    float sea = 1.0 - step(0.002, t.a), fine = czF(n * 900.0, uOct);
+    vec3 col = t.rgb * (0.9 + 0.22 * fine * (1.0 - sea)), Nb = czBump(vW, N, (t.a * uHk + fine * 0.00004 * (1.0 - sea)) * uScale * 3.0), V = normalize(cameraPosition - vW);
+    float d0 = dot(N, uSun), d = max(dot(Nb, uSun), 0.0), day = smoothstep(-0.12, 0.2, d0);
+    float cl = smoothstep(0.56, 0.82, czN(n * 6.0 + vec3(uTime * 0.006, 0.0, uTime * 0.002)) * 0.6 + czN(n * 17.0 + vec3(0.0, uTime * 0.004, 0.0)) * 0.4) * 0.85;
+    col = mix(col, vec3(0.94), cl); d = mix(d, max(d0, 0.0), cl);
+    vec3 c = col * (0.07 + 1.1 * d * day) + vec3(1.0, 0.95, 0.85) * pow(max(dot(reflect(-uSun, Nb), V), 0.0), 60.0) * sea * (1.0 - cl) * day * 0.9;
+    c += vec3(0.35, 0.6, 1.0) * pow(1.0 - max(dot(N, V), 0.0), 3.0) * (0.12 + day * 0.9);
+    gl_FragColor = vec4(c, 1.0);
+  }`;
+// the edge of a world's air, seen against the dark
+const CZ_AFS = `uniform vec3 uSun, uCol; uniform float uK; varying vec3 vObj, vW, vN;
+  void main() { vec3 N = normalize(vN), V = normalize(cameraPosition - vW); float f = pow(1.0 - abs(dot(N, V)), 2.4), day = smoothstep(-0.35, 0.45, dot(N, uSun)); gl_FragColor = vec4(uCol * f * (0.12 + day) * uK, 1.0); }`;
+// rings: bands read from a strip, clumps in them that go round (the inner faster than the outer), finer ringlets the
+// nearer the eye is, the shadow of the world on them, and lit through from behind when he is on the dark side
+const CZ_RFS = `uniform sampler2D tBand; uniform float uR0, uR1, uTime, uFade, uSeed; uniform vec3 uSun, uN, uG; uniform float uGR; varying vec3 vObj, vW, vN;
+  ${CZ_GLSL}
+  void main() {
+    float r = length(vObj.xz), u = (r - uR0) / (uR1 - uR0); if (u < 0.0 || u > 1.0) discard;
+    vec4 b = texture2D(tBand, vec2(u, 0.5)); float a = atan(vObj.z, vObj.x) - uTime * 0.05 / pow(r, 1.5), dc = length(vW - cameraPosition);
+    vec2 q = vec2(cos(a), sin(a)) * r; float cl = czN(vec3(q * 9.0, r * 31.0 + uSeed)), fine = czN(vec3(r * 2400.0, uSeed, 0.0)) * smoothstep(uFade * 60.0, uFade * 6.0, dc);
+    float d = b.a * (0.7 + 0.6 * cl) * (0.85 + 0.3 * fine) * smoothstep(uFade * 0.5, uFade, dc); if (d < 0.04) discard;
+    vec3 oc = vW - uG; float bb = dot(oc, uSun), cc = dot(oc, oc) - uGR * uGR, sh = bb < 0.0 && bb * bb > cc ? 0.18 : 1.0;
+    float lit = abs(dot(uN, uSun)), same = dot(uN, uSun) * dot(uN, cameraPosition - vW);
+    vec3 c = b.rgb * (same > 0.0 ? 0.35 + 0.85 * lit : 0.2 + 0.7 * (1.0 - b.a) * lit) * sh;
+    gl_FragColor = vec4(c, clamp(d, 0.0, 1.0));
+  }`;
+const CZ_RVS = `varying vec3 vObj, vW, vN; void main() { vObj = position; vN = vec3(0.0, 1.0, 0.0); vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
+// a strip of bands: the density and colour across a ring system, from a seed
+function czBands(seed, cols, gaps) {
+  const r = mulberry32(seed), N = 512, D = new Uint8Array(N * 4), cs = cols.map(c => new THREE.Color(c)), base = new Float32Array(N), col = new THREE.Color();
+  for (let i = 0; i < N; i++) { const u = i / (N - 1); base[i] = smoothstep(0, 0.08, u) * smoothstep(1, 0.86, u) * (0.55 + 0.25 * Math.sin(u * 7 + seed)); }
+  for (let k = 0; k < 70; k++) { const c = r(), w = 0.002 + r() * r() * 0.05, a = (r() - 0.42) * 0.9; for (let i = 0; i < N; i++) { const x = (i / (N - 1) - c) / w; base[i] += a * Math.exp(-x * x); } }
+  for (const [c, w] of gaps) for (let i = 0; i < N; i++) { const x = (i / (N - 1) - c) / w; base[i] *= 1 - Math.exp(-x * x * x * x); }
+  let ci = 0; const cu = [];
+  for (let k = 0; k < 9; k++) cu.push(r());
+  for (let i = 0; i < N; i++) { const u = i / (N - 1); ci = Math.floor((Math.sin(u * 13 + cu[0] * 6) * 0.5 + 0.5) * (cs.length - 1) + 0.5 * Math.sin(u * 41 + cu[1] * 9));
+    col.copy(cs[clamp(ci, 0, cs.length - 1)]).lerp(cs[(clamp(ci, 0, cs.length - 1) + 1) % cs.length], Math.sin(u * 97 + cu[2] * 5) * 0.5 + 0.5);
+    D[i * 4] = col.r * 255; D[i * 4 + 1] = col.g * 255; D[i * 4 + 2] = col.b * 255; D[i * 4 + 3] = clamp(base[i], 0, 1) * 255; }
+  const t = new THREE.DataTexture(D, N, 1, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.LinearFilter; t.wrapS = THREE.ClampToEdgeWrapping; t.needsUpdate = true;
+  return { tex: t, d: i => D[clamp(Math.round(i * (N - 1)), 0, N - 1) * 4 + 3] / 255 };
+}
+function czRing(r0, r1, seed, cols, gaps) {
+  const B = czBands(seed, cols, gaps), m = new THREE.ShaderMaterial({ transparent: true, depthWrite: true, side: THREE.DoubleSide, vertexShader: CZ_RVS, fragmentShader: CZ_RFS,
+    uniforms: { tBand: { value: B.tex }, uR0: { value: r0 }, uR1: { value: r1 }, uTime: { value: 0 }, uFade: { value: 300 }, uSeed: { value: seed % 97 }, uSun: { value: CZ_SUN }, uN: { value: new THREE.Vector3(0, 1, 0) }, uG: { value: new THREE.Vector3() }, uGR: { value: 1 } } });
+  const mesh = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 256, 3).rotateX(-Math.PI / 2), m); mesh.frustumCulled = false; mesh.userData.B = B; return mesh;
+}
+// a world's own material, from its kind and seed
+function czMat(kind, seed, R) {
+  const r = mulberry32(seed), P = CZ_PAL[kind], c = P[0].map(h => new THREE.Color(h).offsetHSL((r() - 0.5) * 0.08, (r() - 0.5) * 0.2, (r() - 0.5) * 0.1));
+  return new THREE.ShaderMaterial({ vertexShader: CZ_VS, fragmentShader: CZ_FS, uniforms: { uKind: { value: kind }, uOct: { value: 3 }, uAmp: { value: CZ_AMP[kind] }, uScale: { value: R }, uTime: COSMOS.uT,
+    uAtm: { value: P[1] ? 1 : 0 }, uSun: { value: CZ_SUN }, uA: { value: c[0] }, uB: { value: c[1] }, uC: { value: c[2] }, uD: { value: c[3] }, uSeed: { value: new THREE.Vector3(r() * 50, r() * 50, r() * 50) }, uAtmC: { value: new THREE.Color(P[1] || '#000') } } });
+}
+const czAtmMat = col => new THREE.ShaderMaterial({ vertexShader: CZ_VS, fragmentShader: CZ_AFS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uSun: { value: CZ_SUN }, uCol: { value: new THREE.Color(col) }, uK: { value: 1 } } });
+// a world: where it is (fixed, or going round the one it belongs to), how big, of what kind; its meshes are made when it is first near
+function czBody(o) {
+  const B = Object.assign({ pos: new THREE.Vector3(), last: new THREE.Vector3(), dp: new THREE.Vector3(), mesh: null, atm: null, ring: null, orbit: null, parent: null, spin: 0.002 }, o);
+  const M = B.mesh = new THREE.Mesh(COSMOS.geoLo, czMat(B.kind, B.seed, B.R)); M.frustumCulled = true; M.rotation.set(B.tilt || 0, 0, (B.tilt || 0) * 0.5); COSMOS.scene.add(M);
+  if (CZ_PAL[B.kind][1]) { B.atm = new THREE.Mesh(COSMOS.geoLo, czAtmMat(CZ_PAL[B.kind][1])); B.atm.renderOrder = 2; COSMOS.scene.add(B.atm); }
+  if (B.rings) { const r = mulberry32(B.seed + 7); B.ring = czRing(1.35 + r() * 0.3, 2.1 + r() * 0.9, B.seed + 11, [CZ_PAL[B.kind][0][0], CZ_PAL[B.kind][0][2], '#e8dcc0', '#9a8a78'], [[0.55 + r() * 0.2, 0.02]]);
+    B.ring.rotation.set(0.25 + r() * 0.5, 0, r() * 0.4); M.add(B.ring); }
+  return B;
+}
+function czDrop(B) { for (const m of [B.mesh, B.atm]) if (m) { COSMOS.scene.remove(m); m.material.dispose(); } if (B.ring) { B.ring.geometry.dispose(); B.ring.material.dispose(); B.ring.userData.B.tex.dispose(); } }
+// where a world going round another is now: by the clock everyone shares, so everyone sees it in the same place
+function czOrbitAt(B, t, out) { const O = B.orbit, a = O.ph + t * O.w; out.copy(O.e1).multiplyScalar(Math.cos(a) * O.r).addScaledVector(O.e2, Math.sin(a) * O.r); if (B.parent) out.add(B.parent.pos); return out; }
+function czOrbitOf(r, inc, node, ph, w) { const e1 = new THREE.Vector3(Math.cos(node), 0, Math.sin(node)), e2 = new THREE.Vector3(-Math.sin(node) * Math.cos(inc), Math.sin(inc), Math.cos(node) * Math.cos(inc)); return { r, e1, e2, ph, w }; }
+// what is in a cell of the dark, if anything (the cells round home are the globe's own)
+function czCell(i, j, k) {
+  const cx = (i + 0.5) * CZ_CELL, cy = (j + 0.5) * CZ_CELL, cz = (k + 0.5) * CZ_CELL;
+  if (Math.hypot(cx, cy, cz) < CZ_CELL * 0.95) return null;
+  const r = mulberry32((Math.imul(i, 73856093) ^ Math.imul(j, 19349663) ^ Math.imul(k, 83492791) ^ 0x5eed1) >>> 0);
+  if (r() > 0.55) return null;
+  const kind = r() < 0.24 ? 3 : Math.floor(r() * 9), R = kind === 3 ? 9000 + r() * 13000 : 1500 + r() * 6500;
+  return { id: `${i},${j},${k}`, name: czName(r), kind, R, seed: (r() * 1e9) >>> 0, x: cx + (r() - 0.5) * 0.6 * CZ_CELL, y: cy + (r() - 0.5) * 0.6 * CZ_CELL, z: cz + (r() - 0.5) * 0.6 * CZ_CELL,
+    rings: kind === 3 ? r() < 0.55 : r() < 0.12, moons: Math.floor(r() * r() * 4), tilt: (r() - 0.5) * 0.8, r };
+}
+// the dark round him: the worlds in the cells next to his made (and their moons), the ones further off kept as points of light, the rest let go
+function czCells() {
+  const C = COSMOS, P = C.pos, ci = Math.floor(P.x / CZ_CELL), cj = Math.floor(P.y / CZ_CELL), ck = Math.floor(P.z / CZ_CELL), key = `${ci},${cj},${ck}`;
+  if (key === C.cell) return; C.cell = key;
+  const want = new Set();
+  for (let k = -1; k <= 1; k++) for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+    const c = czCell(ci + i, cj + j, ck + k); if (!c) continue; want.add(c.id);
+    if (C.deep.has(c.id)) continue;
+    const L = [], B = czBody({ id: c.id, name: c.name, kind: c.kind, R: c.R, seed: c.seed, rings: c.rings, tilt: c.tilt }); B.pos.set(c.x, c.y, c.z); B.last.copy(B.pos); L.push(B);
+    for (let m = 0; m < c.moons; m++) { const r = c.r, kind = [0, 1, 2, 5, 7][Math.floor(r() * 5)], M = czBody({ id: `${c.id}m${m}`, name: `${c.name} ${['I', 'II', 'III', 'IV'][m]}`, kind, R: 500 + r() * 1400, seed: (r() * 1e9) >>> 0, parent: B });
+      M.orbit = czOrbitOf(c.R * (3 + m * 1.8 + r()), (r() - 0.5) * 0.6, r() * TAU_, r() * TAU_, 0.002 + r() * 0.006); czOrbitAt(M, Date.now() / 1000, M.pos); M.last.copy(M.pos); L.push(M); }
+    C.deep.set(c.id, L); for (const B2 of L) { C.bodies.push(B2); C.found.add(B2.id); }
+  }
+  for (const [id, L] of C.deep) if (!want.has(id)) { for (const B of L) { czDrop(B); C.bodies.splice(C.bodies.indexOf(B), 1); } C.deep.delete(id); }
+  // the points of light: every world three cells out
+  const D = C.dots.geometry.attributes.position, A = C.dotAt; let n = 0;
+  for (let k = -3; k <= 3; k++) for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) { if (Math.abs(i) <= 1 && Math.abs(j) <= 1 && Math.abs(k) <= 1) continue; const c = czCell(ci + i, cj + j, ck + k); if (!c || n >= A.length) continue; A[n++] = [c.x, c.y, c.z, c.kind, c.R, c.name]; }
+  C.dotN = n; C.dots.geometry.setDrawRange(0, n);
+  const col = C.dots.geometry.attributes.color; for (let q = 0; q < n; q++) { const cc = new THREE.Color(CZ_PAL[A[q][3]][0][0]).lerp(new THREE.Color(1, 1, 1), 0.4); col.setXYZ(q, cc.r * 1.4, cc.g * 1.4, cc.b * 1.4); } col.needsUpdate = true;
+  D.needsUpdate = true;
+}
+// the scene, made the first time he comes up near it
+function cosmosInit() {
+  const C = COSMOS; if (C.built) return; C.built = true;
+  const S = C.scene = new THREE.Scene(); S.background = new THREE.Color(0x000000);
+  C.cam = new THREE.PerspectiveCamera(66, innerWidth / innerHeight, 2, 200000);
+  C.uT = { value: 0 }; C.geoLo = new THREE.SphereGeometry(1, 40, 24); C.geoHi = new THREE.SphereGeometry(1, 128, 80);
+  S.add(new THREE.AmbientLight(0x3a4458, 0.7)); { const L = new THREE.DirectionalLight(0xfff2dc, 2.4); L.position.copy(CZ_SUN); S.add(L); }
+  // the dark itself: faint clouds of colour, a river of stars across it, and the stars
+  C.back = new THREE.Mesh(new THREE.SphereGeometry(30000, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false, vertexShader: `varying vec3 vD; void main() { vD = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `varying vec3 vD; ${CZ_GLSL}
+      void main() { vec3 d = normalize(vD); float band = exp(-pow(dot(d, normalize(vec3(0.35, 0.5, 0.79))) * 3.2, 2.0)), n = czF(d * 2.4, 4.0) * 0.5 + 0.5, m = czF(d * 5.0 + 4.0, 3.0) * 0.5 + 0.5;
+        vec3 c = mix(vec3(0.16, 0.05, 0.3), vec3(0.03, 0.2, 0.32), m) * smoothstep(0.5, 0.9, n) * 1.3 + vec3(0.22, 0.2, 0.26) * band * (0.4 + m) * smoothstep(0.35, 0.7, n + 0.2);
+        gl_FragColor = vec4(c, 1.0); }` }));
+  C.back.renderOrder = -4; S.add(C.back);
+  { const r = mulberry32(31), p = [], c = [], z = [], T = [[1, 1, 1], [0.8, 0.88, 1], [1, 0.93, 0.8], [1, 0.8, 0.6], [0.85, 0.9, 1]];
+    for (let i = 0; i < 4200; i++) { const u = r() * TAU_, v = Math.acos(1 - 2 * r()), b = Math.pow(r(), 6), t = T[Math.floor(r() * T.length)], k = 0.8 + b * 0.9; p.push(Math.sin(v) * Math.cos(u) * 28000, Math.cos(v) * 28000, Math.sin(v) * Math.sin(u) * 28000); c.push(t[0] * k, t[1] * k, t[2] * k); z.push(1.6 + b * 4.2, 1.2 + r() * 4.5); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('aCol', new THREE.Float32BufferAttribute(c, 3)); g.setAttribute('aSz', new THREE.Float32BufferAttribute(z, 2));
+    C.starM = starMat.clone(); C.starM.uniforms.uK.value = 1; C.stars = new THREE.Points(g, C.starM); C.stars.frustumCulled = false; C.stars.renderOrder = -3; S.add(C.stars); }
+  // the sun: a white coal with a wide glow round it
+  C.sun = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexShader: `varying vec2 vU; void main() { vU = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `varying vec2 vU; void main() { float r = length(vU); vec3 c = vec3(3.2, 2.9, 2.4) * smoothstep(0.12, 0.09, r) + vec3(1.0, 0.75, 0.45) * pow(max(1.0 - r, 0.0), 3.0) * 0.9; gl_FragColor = vec4(c, 1.0); }` }));
+  C.sun.renderOrder = -2; S.add(C.sun);
+  // the globe, its air, its rings, and the crown over Olympus
+  const sys = C.sys = new THREE.Group(); S.add(sys);
+  { const D = C.tex.data = new Uint8Array(CZ_TW * CZ_TH * 4); for (let i = 0; i < D.length; i += 4) { D[i] = 16; D[i + 1] = 34; D[i + 2] = 66; D[i + 3] = 0; }
+    const t = C.tex.tex = new THREE.DataTexture(D, CZ_TW, CZ_TH, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.LinearFilter; t.wrapS = THREE.RepeatWrapping; t.needsUpdate = true; }
+  C.globe = new THREE.Mesh(new THREE.SphereGeometry(1, 256, 192), new THREE.ShaderMaterial({ vertexShader: CZ_GVS, fragmentShader: CZ_GFS,
+    uniforms: { tMap: { value: C.tex.tex }, uHk: { value: 2400 / CZ_RG }, uScale: { value: CZ_RG }, uTime: C.uT, uOct: { value: 1 }, uSun: { value: CZ_SUN } } }));
+  C.globe.scale.setScalar(CZ_RG); C.globe.frustumCulled = false; sys.add(C.globe);
+  C.gAtm = new THREE.Mesh(C.geoHi, czAtmMat('#6aa8ff')); C.gAtm.scale.setScalar(CZ_RG * 1.07); C.gAtm.renderOrder = 2; C.gAtm.frustumCulled = false; sys.add(C.gAtm);
+  C.rings = new THREE.Group(); C.rings.rotation.set(0.42, 0, 0.18); sys.add(C.rings);
+  C.ringA = czRing(1.48, 3.3, 4401, ['#d8c6a0', '#b89a70', '#e8dcc0', '#9a8a78', '#c9a0a0', '#a0b8d0'], [[0.62, 0.03], [0.88, 0.008], [0.3, 0.012]]); C.ringA.scale.setScalar(CZ_RG); C.rings.add(C.ringA);
+  C.ringB = czRing(3.7, 4.5, 9127, ['#a8c8f0', '#e0f0ff', '#7090c0', '#c0a0e8'], [[0.4, 0.05]]); C.ringB.scale.setScalar(CZ_RG); C.ringB.rotation.set(0.9, 0, -0.5); C.rings.add(C.ringB);
+  C.crown = []; { const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.6, 0.7) }), m2 = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 0.8, 2.0) });
+    for (let i = 0; i < 6; i++) { const T = new THREE.Mesh(new THREE.TorusGeometry(1, 0.018 + (i % 2) * 0.012, 8, 180), i % 3 === 2 ? m2 : m); T.scale.setScalar(1500 + i * 420); T.position.set(0, CZ_RG + 3300, 0); T.userData.ax = new THREE.Vector3(Math.sin(i * 2.1), Math.cos(i * 1.3), Math.sin(i * 0.7 + 1)).normalize(); T.userData.w = (i % 2 ? -1 : 1) * (0.15 + i * 0.05); sys.add(T); C.crown.push(T); } }
+  // the moons: each its own kind, each on its own path round the globe
+  C.orbits = new THREE.Group(); C.orbits.visible = false; sys.add(C.orbits);
+  { const r = mulberry32(777), L = [['SELENE', 0, 2200], ['CHIONE', 1, 1800], ['HEPHAESTIA', 2, 2600], ['NEPHELE', 3, 7200], ['THALASSA', 4, 3200], ['PSAMMOS', 5, 2800], ['DRYAS', 6, 3000], ['KRYSTALLOS', 7, 1500], ['MIASMA', 8, 2400]];
+    L.forEach(([name, kind, R], i) => { const B = czBody({ id: 'n' + i, name, kind, R, seed: 1000 + i * 131, rings: kind === 3, tilt: (r() - 0.5) * 0.6 }); B.orbit = czOrbitOf(CZ_RG * (5 + i * 1.9 + r() * 0.8), (r() - 0.5) * 0.5, r() * TAU_, r() * TAU_, 0.012 / Math.pow(1 + i * 0.4, 1.5));
+      czOrbitAt(B, Date.now() / 1000, B.pos); B.last.copy(B.pos); C.bodies.push(B); C.near.push(B); C.found.add(B.id);
+      const g = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 129 }, (_, k) => { const a = k / 128 * TAU_; return B.orbit.e1.clone().multiplyScalar(Math.cos(a) * B.orbit.r).addScaledVector(B.orbit.e2, Math.sin(a) * B.orbit.r); }));
+      C.orbits.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: new THREE.Color(CZ_PAL[kind][0][kind === 2 ? 2 : 0]).multiplyScalar(1.3), transparent: true, opacity: 0.6, depthWrite: false }))); }); }
+  // the points of light further out
+  { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(343 * 3), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(343 * 3), 3));
+    C.dots = new THREE.Points(g, new THREE.PointsMaterial({ size: 4, sizeAttenuation: false, vertexColors: true, depthWrite: false, transparent: true })); C.dots.frustumCulled = false; C.dots.renderOrder = -1; S.add(C.dots); C.dotAt = new Array(343); C.dotN = 0; }
+  // the stones of the rings, round him when he is in among them
+  C.rocks = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0xffffff }), 420); C.rocks.count = 0; C.rocks.frustumCulled = false; S.add(C.rocks);
+  // his trail: sparks left hanging in the dark behind him
+  { const n = 140, g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    C.trail = { pts: new THREE.Points(g, new THREE.PointsMaterial({ size: 3, sizeAttenuation: false, vertexColors: true, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending })), at: Array.from({ length: n }, () => ({ p: new THREE.Vector3(), age: 9 })), i: 0 };
+    C.trail.pts.frustumCulled = false; S.add(C.trail.pts); }
+  // him, on the map of the heavens
+  C.me = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.2, 0.4) })); C.me.visible = false; S.add(C.me);
+  czUI();
+  renderer.compileAsync?.(S, C.cam).catch(() => {});   // (its programs made ahead, while he is still climbing)
+}
+// going up: past the sky limit the blue goes out of the sky and the stars come through, by day
+const CZ_BLACK = new THREE.Color(0x01020a), CZ_DEEP = new THREE.Color(0x060c22);
+function cosmosSky(k) {
+  if (k < 0.002) return;
+  k = Math.pow(k, 0.6);   // (the blue goes early, the last of it slowly)
+  const U = skyMat.uniforms; U.zen.value.lerp(CZ_BLACK, k); U.hor.value.lerp(CZ_DEEP, k * 0.9); U.mist.value *= 1 - k;
+  starMat.uniforms.uK.value = Math.max(starMat.uniforms.uK.value, smoothstep(0.15, 0.8, k));
+  for (const m of HEAVEN.mats) m.opacity = Math.max(m.opacity, smoothstep(0.2, 0.9, k) * (m.side === THREE.DoubleSide ? 0.75 : 1));
+  scene.fog.color.lerp(CZ_DEEP, k * 0.75);
+}
+// every frame, before the picture is drawn (see tick)
+function cosmosStep(dt) {
+  const C = COSMOS, p = player;
+  if (C.fadeT > 0) C.fadeT = Math.max(0, C.fadeT - dt);
+  if (!C.on) {
+    const can = state === 'play' && cosmosOpen(), want = can || C.cool > 0 ? smoothstep(SKY_LIMIT - 300, CZ_TOP, p.pos.y) : 0;
+    C.up = lerp(C.up, want, damp(want > C.up ? 3 : 1.2, dt)); if (C.cool > 0) C.cool -= dt;
+    if (!can && C.up < 0.002) return;
+    if (can && p.pos.y > SKY_LIMIT - 400) { cosmosInit(); if (!C.tex.job && C.tex.at < 0) czGlobeStart(); czGlobeStep(TOUCH ? 1.5 : 2.5); }
+    if (can && p.pos.y > SKY_LIMIT - 200 && p.pitch > 0.25 && C.cool <= 0) {   // the air lets go of him: the higher, the faster he goes up
+      const k = smoothstep(SKY_LIMIT - 200, CZ_TOP, p.pos.y); p.pos.y += (30 + 950 * k * k) * Math.sin(p.pitch) * dt;
+      postMat.uniforms.uSpeed.value = Math.max(postMat.uniforms.uSpeed.value, k * 0.8);
+      if (!C.told && p.pos.y > SKY_LIMIT) { C.told = true; toast('THE SKY THINS · KEEP CLIMBING'); }
+    }
+    cosmosSky(C.up);
+    if (can && p.pos.y >= CZ_TOP && p.pitch > 0.1 && C.cool <= 0) cosmosEnter();
+    return;
+  }
+  if (state !== 'play' || !cosmosOpen()) { cosmosLeave(state !== 'play'); return; }
+  cosmosFrame(dt);
+}
+function cosmosEnter() {
+  const C = COSMOS, p = player; cosmosInit();
+  if (C.tex.job) czGlobeStep(60);   // (the rest of the globe's picture, now: a breath, once)
+  C.exit = { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw };
+  czFrame(p.pos.x, p.pos.z, _czu, _czv, _czw);
+  C.pos.copy(_czu).multiplyScalar(CZ_RG + p.pos.y - WATER);
+  { const hx = -Math.sin(p.yaw), hz = -Math.cos(p.yaw), e = clamp(p.pitch, 0.25, 0.7); _czf.copy(_czv).multiplyScalar(hx).addScaledVector(_czw, hz).normalize().multiplyScalar(Math.cos(e)).addScaledVector(_czu, Math.sin(e)).normalize(); }   // (the way he was heading, climbing: never straight up, so his top is always the world's)
+  czLook(C.q, _czf, _czu); C.revealT = 4; C.v = Math.max(300, p.speed * 2); C.pv = 0; C.camOff = null; C.on = true; C.fadeT = CZ_FADE; C.cell = ''; C.nearB = null;
+  C.home = phoenix.group.parent; C.scene.add(phoenix.group); phoenix.group.visible = true; trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
+  for (const T of C.trail.at) T.age = 9;
+  document.body.classList.add('cosmos'); czBar(true);
+  toast(TOUCH ? 'SPACE · THE WORLD IS A GLOBE BELOW YOU · ◎ FOR THE MAP OF THE HEAVENS · DIVE BACK TO GO HOME' : 'SPACE · THE WORLD IS A GLOBE BELOW YOU · M FOR THE MAP OF THE HEAVENS · DIVE BACK INTO THE AIR TO GO HOME');
+  audio.sfx.whoosh?.(true); flash = Math.max(flash, 0.25);
+}
+// back into the air: where he left the world, coming down the way he is going (quiet: something else has taken him, and
+// he is left where the world has put him)
+function cosmosLeave(quiet = false) {
+  const C = COSMOS, p = player; if (!C.on) return;
+  C.on = false; if (C.map.on) cosmosMap(false);
+  (C.home || scene).add(phoenix.group); C.home = null; trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
+  document.body.classList.remove('cosmos'); czBar(false); C.rocks.count = 0;
+  if (quiet) return;
+  const E = C.exit; czFrame(E.x, E.z, _czu, _czv, _czw); _czf.set(0, 0, -1).applyQuaternion(C.q);
+  const dx = _czf.dot(_czv), dz = _czf.dot(_czw), yaw = Math.hypot(dx, dz) > 0.05 ? Math.atan2(-dx, -dz) : E.yaw;
+  p.pos.set(E.x, cosmosOpen() ? CZ_TOP - 80 : SKY_LIMIT - 160, E.z); p.yaw = yaw; p.pitch = -0.8; p.speed = 240; p.vy = 0; p.turn = 0; p.bank = 0; p.flame = 1; p.skyT = 0; p.fallTop = p.pos.y;
+  dir3.set(-Math.sin(yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(yaw) * Math.cos(p.pitch));
+  camera.position.set(p.pos.x + Math.sin(yaw) * phxDist, p.pos.y + phxDist * 0.5, p.pos.z + Math.cos(yaw) * phxDist); camYawOff = 0;
+  C.cool = 6; C.fadeT = CZ_FADE; C.up = 1;
+  toast('THE WORLD AGAIN'); audio.sfx.whoosh?.(false);
+}
+// flying in space (in place of updatePhoenix): he turns and climbs about himself, his wings come level with whatever world
+// he is nearest, and the further he is from any of them the faster he goes — slow enough to skim one, fast enough to cross
+// the dark between them in a few breaths. Their surfaces hold him off: he slides along them.
+function cosmosFly(dt) {
+  const C = COSMOS, p = player, M = C.map.on;
+  const [ax, pin] = M || state !== 'play' ? [0, 0] : axes(), boost = !M && (boosting() || C.beatT > 0);
+  C.beatT = Math.max(0, C.beatT - dt);
+  p.turn = lerp(p.turn, -ax, damp(4, dt)); C.pv = lerp(C.pv, pin, damp(4, dt));
+  C.q.multiply(_czq.setFromAxisAngle(_czY, p.turn * 1.15 * dt)).multiply(_czq.setFromAxisAngle(_czX, C.pv * 1.3 * dt));
+  const f = _czf.set(0, 0, -1).applyQuaternion(C.q), u = _czu.set(0, 1, 0).applyQuaternion(C.q);
+  // level with the nearest world
+  { const B = C.nearB, c = B ? B.pos : _cz0; _czv.subVectors(C.pos, c).normalize(); const s = _czv.dot(f); _czw.copy(_czv).addScaledVector(f, -s);
+    if (_czw.lengthSq() > 0.04) { _czw.normalize(); const a = Math.atan2(_czv.crossVectors(u, _czw).dot(f), u.dot(_czw)); C.q.premultiply(_czq.setFromAxisAngle(f, a * damp(0.9, dt) * (1 - Math.min(1, Math.abs(ax) * 1.5)))); } }
+  C.q.normalize();
+  const base = (boost ? 320 : 150) * MOD.speed * (1 + 0.15 * perks.swift), want = Math.min(base * (1 + Math.max(0, C.dNear) / 700), 3e6);
+  C.v = lerp(C.v, M ? 0 : want, damp(want < C.v || M ? 4 : 0.45, dt));   // (slow to gather speed, quick to shed it near a world)
+  f.set(0, 0, -1).applyQuaternion(C.q);
+  C.pos.addScaledVector(f, C.v * dt);
+  if (C.nearB && C.nearD < C.nearB.R * 3) C.pos.add(C.nearB.dp);   // (carried along with the world he is near)
+  // the ground of any world holds him off
+  const P = C.pos, gl = P.length();
+  if (gl > 1) { _czv.copy(P).divideScalar(gl); const floor = CZ_RG + czGlobeH(_czv) + 30;
+    if (gl < floor) { P.copy(_czv).multiplyScalar(floor); czSlide(_czv); }
+    else if (gl - CZ_RG < CZ_ALT - 250 && f.dot(_czv) < -0.05 && !M) { cosmosLeave(false); return; } }   // down into the air: home
+  for (const B of C.bodies) { _czv.subVectors(P, B.pos); const d = _czv.length(), floor = B.R * (1 + CZ_AMP[B.kind] * 0.7) + 25; if (d < floor && d > 1) { _czv.divideScalar(d); P.copy(B.pos).addScaledVector(_czv, floor); czSlide(_czv); } }
+  // the wings: beating as he climbs or hurries, folded back at a great speed
+  p.speed = clamp(C.v, 40, 300); p.bank = lerp(p.bank, p.turn * 0.75, damp(3, dt)); p.pitch = 0; heat = 0; p.danger = 0; p.skyT = 0; p.flame = Math.min(1, p.flame + dt * 0.02);
+  flyWings(dt, { boost, dive: 0, climb: clamp(Math.abs(C.pv), 0, 1) * 0.6, tuck: smoothstep(1500, 40000, C.v) * 0.8, flutter: 0, pull: 0 });
+}
+// sliding along a surface whose outward normal is n: what was going into it goes along it
+function czSlide(n) { const f = _czf.set(0, 0, -1).applyQuaternion(COSMOS.q), into = f.dot(n); if (into >= 0) return; _czw.copy(f).addScaledVector(n, -into * 1.15).normalize(); COSMOS.q.premultiply(_czq.setFromUnitVectors(f, _czw)); }
+// a wingbeat (Space, or a tap): a burst of speed
+function cosmosBeat() { const C = COSMOS; C.beatT = 0.9; C.v *= 1.25; WR.beat = 1; audio.sfx.flap?.(1); }
+// the frame in space: the worlds moved on, the eye placed, everything put where the eye sees it
+function cosmosFrame(dt) {
+  const C = COSMOS, p = player, t = Date.now() / 1000; C.uT.value = time;
+  czGlobeStep(TOUCH ? 1 : 1.6);
+  if (!C.tex.job && performance.now() - C.tex.at > 120000 && Math.abs(mapCells.over.size + WORLD.cells.over.size - C.tex.n) > 4) czGlobeStart();   // (refreshed now and then, if more has been charted)
+  czCells();
+  for (const B of C.bodies) if (B.orbit) { B.last.copy(B.pos); czOrbitAt(B, t, B.pos); B.dp.subVectors(B.pos, B.last); } else B.dp.set(0, 0, 0);
+  // the nearest world, and how far he is from anything (rings included)
+  let nb = null, nd = 1e12, dn = C.pos.length() - CZ_RG - 400;
+  for (const B of C.bodies) { const d = C.pos.distanceTo(B.pos) - B.R; if (d < nd) { nd = d; nb = B; } }
+  if (dn < nd) { nb = null; nd = dn; }
+  C.nearB = nb; C.nearD = nb ? C.pos.distanceTo(nb.pos) : C.pos.length();
+  { _czv.copy(C.pos).applyQuaternion(_czq.copy(C.rings.quaternion).invert()); const rr = Math.hypot(_czv.x, _czv.z) / CZ_RG; C.ringY = _czv.y; C.ringR = rr; C.ringL.copy(_czv);
+    C.dNear = Math.min(nd, rr > 1.45 && rr < 3.32 ? Math.abs(_czv.y) + 30 : 1e12); }
+  C.rush = lerp(C.rush, smoothstep(300, 30000, C.v), damp(3, dt));
+  cosmosCam(dt);
+  cosmosPlace(dt);
+  if ((C.hudT -= dt) <= 0) { C.hudT = 0.25; czBar(true); }
+  if (C.map.on) czLabels();
+}
+// the eye: behind him and a little above, along his own up (in the director's hands, wider shots that go round him; on the
+// map, wherever it has been turned to)
+function cosmosCam(dt) {
+  const C = COSMOS, cam = C.cam, f = _czf.set(0, 0, -1).applyQuaternion(C.q), u = _czu.set(0, 1, 0).applyQuaternion(C.q);
+  cam.aspect = innerWidth / innerHeight;
+  if (C.map.on) { const M = C.map;
+    czMapKeys(dt);
+    const T = M.pid === 'me' ? C.pos : M.pid === 'globe' ? _cz0 : (C.bodies.find(B => B.id === M.pid) || {}).pos || C.pos;
+    M.piv.lerp(T, damp(4, dt)); M.d = Math.exp(lerp(Math.log(M.d), Math.log(M.td), damp(5, dt)));
+    C.camPos.set(0, 0, M.d).applyQuaternion(M.q).add(M.piv); C.camQ.copy(M.q); cam.fov = 50;
+  } else {
+    const K = 1 + (birdK() - 1) * 0.6, cd = phxDist * K * (1 - 0.25 * C.rush);
+    if (C.revealT > 0) {   // just out of the air: the eye stands back over him and looks down past him at the world falling away
+      C.revealT -= dt; const e = smoothstep(4, 1.5, C.revealT); _czw.copy(C.pos).normalize(); _czv.copy(_czw).multiplyScalar(1.25).addScaledVector(f, -1).normalize().multiplyScalar(cd * (1.3 + 2.2 * e)); u.copy(_czw);
+      cam.fov = lerp(cam.fov, 70 * fovK(), damp(2, dt));
+    } else if (cinema.on) {   // three shots, in turn: from his side as it goes round him, from ahead looking back, and from far off on a long lens
+      const k = Math.floor(time / 9) % 3, a = time * 0.16, r = _czw.crossVectors(f, u).normalize();
+      if (k === 0) _czv.copy(r).multiplyScalar(Math.cos(a) * cd * 2.1).addScaledVector(f, Math.sin(a) * cd * 2.1).addScaledVector(u, cd * 0.35);
+      else if (k === 1) _czv.copy(f).multiplyScalar(cd * 1.7).addScaledVector(u, cd * 0.15).addScaledVector(r, cd * 0.4);
+      else _czv.copy(r).multiplyScalar(cd * 5).addScaledVector(f, -cd * 2.5).addScaledVector(u, cd * 3);
+      cam.fov = lerp(cam.fov, (k === 2 ? 34 : 60) * fovK(), damp(2, dt));
+    } else {
+      _czv.copy(f).multiplyScalar(-cd).addScaledVector(u, cd * 0.3).applyAxisAngle(u, camYawOff);
+      cam.fov = lerp(cam.fov, (68 + C.rush * 34) * fovK(), damp(2.4, dt));
+    }
+    const first = !C.camOff; if (first) C.camOff = _czv.clone(); else C.camOff.lerp(_czv, damp(cinema.on ? 1.5 : 5, dt));
+    C.camPos.copy(C.pos).add(C.camOff);
+    _czw.copy(f).multiplyScalar(14 + C.rush * 20).sub(C.camOff); czLook(_czq, _czw.normalize(), u); C.camQ.slerp(_czq, first ? 1 : damp(8, dt));
+    if (C.rush > 0.5) { const k = (C.rush - 0.5) * 0.1; C.camPos.x += rnd(k); C.camPos.y += rnd(k); }
+  }
+  cam.quaternion.copy(C.camQ); cam.position.set(0, 0, 0); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+}
+// put a thing where the eye sees it: relative to the eye, and (past CZ_D0, and not when the eye is down near it) nearer and
+// smaller in proportion
+function czPlace(obj, pos, R, size = R) {
+  _czv.subVectors(pos, COSMOS.camPos); const d = _czv.length(), s = lerp(1, czK(d), smoothstep(900, 2600, d - R));
+  obj.position.copy(_czv).multiplyScalar(s); obj.scale.setScalar(size * s); return s;
+}
+function cosmosPlace(dt) {
+  const C = COSMOS, M = C.map.on, H = innerHeight;
+  C.back.position.set(0, 0, 0); C.stars.position.set(0, 0, 0); C.starM.uniforms.uTime.value = time;
+  C.sun.position.copy(CZ_SUN).multiplyScalar(25000); C.sun.quaternion.copy(C.camQ); C.sun.scale.setScalar(3200);
+  // the globe and everything that goes with it, as one
+  const s = czPlace(C.sys, _cz0, CZ_RG + 300, 1), gd = C.camPos.length(), galt = Math.max(1, gd - CZ_RG);
+  C.globe.material.uniforms.uOct.value = clamp(Math.log2(40 * CZ_RG / galt) - 4.5, 0, 6); C.globe.material.uniforms.uScale.value = CZ_RG * s;
+  C.gAtm.material.uniforms.uK.value = 0.55 + 0.45 * smoothstep(CZ_RG * 0.5, CZ_RG * 3, galt);
+  for (const T of C.crown) T.quaternion.setFromAxisAngle(T.userData.ax, time * T.userData.w).multiply(_czq.setFromAxisAngle(_czX, Math.PI / 2));
+  for (const R of [C.ringA, C.ringB]) { const U = R.material.uniforms; U.uTime.value = t0z(); U.uFade.value = 320 * s; U.uG.value.copy(C.sys.position); U.uGR.value = CZ_RG * s; U.uN.value.set(0, 1, 0).applyQuaternion(R.getWorldQuaternion(_czq)); }
+  C.orbits.visible = M;
+  // the worlds: each at its distance, its face as fine as the eye is near, its finer mesh when it is big in the frame
+  for (const B of C.bodies) {
+    const sB = czPlace(B.mesh, B.pos, B.R), d = Math.max(1, B.pos.distanceTo(C.camPos)), alt = Math.max(1, d - B.R), U = B.mesh.material.uniforms, px = B.R / d * H / (2 * Math.tan(C.cam.fov * Math.PI / 360));
+    U.uOct.value = clamp(Math.log2(120 * B.R / alt), 1.5, 10.5); U.uScale.value = B.R * sB;
+    B.mesh.geometry = px > 120 ? C.geoHi : C.geoLo; B.mesh.rotation.y = time * B.spin + B.seed % 7;
+    B.mesh.visible = px > 0.25; if (B.atm) { B.atm.visible = B.mesh.visible; B.atm.position.copy(B.mesh.position); B.atm.scale.copy(B.mesh.scale).multiplyScalar(B.kind === 3 ? 1.025 : 1.05); B.atm.geometry = B.mesh.geometry; }
+    if (B.ring) { const U2 = B.ring.material.uniforms; U2.uTime.value = t0z(); U2.uFade.value = 300 * sB; U2.uG.value.copy(B.mesh.position); U2.uGR.value = B.R * sB; U2.uN.value.set(0, 1, 0).applyQuaternion(B.ring.getWorldQuaternion(_czq)); }
+  }
+  // the points of light
+  { const A = C.dotAt, D = C.dots.geometry.attributes.position; for (let i = 0; i < C.dotN; i++) { _czw.set(A[i][0], A[i][1], A[i][2]); _czv.subVectors(_czw, C.camPos); const k = czK(_czv.length()); D.setXYZ(i, _czv.x * k, _czv.y * k, _czv.z * k); } D.needsUpdate = true; C.dots.material.size = M ? 5 : 3; }
+  // him
+  const G = phoenix.group; _czv.subVectors(C.pos, C.camPos); G.position.copy(_czv); G.quaternion.copy(C.q).multiply(_czq.setFromAxisAngle(_czZ, player.bank)); G.visible = !M || C.map.d < 3000;
+  C.me.visible = M; if (M) { const d = _czv.length(), k = czK(d); C.me.position.copy(_czv).multiplyScalar(k); C.me.scale.setScalar(d * k * 0.018); C.me.quaternion.copy(C.q); }
+  czTrail(dt); czRocks();
+}
+const t0z = () => (Date.now() / 1000) % 100000;   // (the rings go round by the shared clock too)
+// sparks off him, left hanging where he passed
+function czTrail(dt) {
+  const C = COSMOS, T = C.trail, P = T.pts.geometry.attributes.position, Q = T.pts.geometry.attributes.color, f = _czf.set(0, 0, -1).applyQuaternion(C.q);
+  for (let k = 0; k < 2; k++) { const a = T.at[T.i = (T.i + 1) % T.at.length]; a.p.copy(C.pos).addScaledVector(f, -3 * birdK() - Math.random() * 4).add(_czw.set(rnd(1.5), rnd(1.5), rnd(1.5))); a.age = 0; }
+  for (let i = 0; i < T.at.length; i++) { const a = T.at[i]; a.age += dt; const k = Math.max(0, 1 - a.age / 1.6); _czv.subVectors(a.p, C.camPos);
+    if (k <= 0 || _czv.lengthSq() > 4e6) { P.setXYZ(i, 0, 0, -1e5); continue; } P.setXYZ(i, _czv.x, _czv.y, _czv.z); Q.setXYZ(i, 2.4 * k, (1.2 + GODM.k) * k * k, 0.3 * k * k * k); }
+  P.needsUpdate = true; Q.needsUpdate = true; T.pts.visible = !C.map.on;
+}
+// in among the rings: the stones they are made of, each where its seed puts it (the same for everyone), as many as the band is thick
+function czRocks() {
+  const C = COSMOS, R = C.rocks, L = C.ringL; R.count = 0;
+  if (!L || C.ringR < 1.46 || C.ringR > 3.3 || Math.abs(C.ringY) > 1500 || C.map.on) return;
+  const B = C.ringA.userData.B, G = 46, cx = Math.floor(L.x / G), cz = Math.floor(L.z / G), n = 9, rq = C.rings.quaternion;
+  let i = 0;
+  for (let b = -n; b <= n; b++) for (let a = -n; a <= n; a++) {
+    const gx = cx + a, gz = cz + b, x0 = gx * G, z0 = gz * G, rr = Math.hypot(x0, z0) / CZ_RG, dens = B.d((rr - 1.48) / (3.3 - 1.48));
+    const r = mulberry32((Math.imul(gx, 7919) ^ Math.imul(gz, 104729)) >>> 0), h = r(); if (h > dens * 0.95 || i >= 420) continue;
+    const sz = 1.2 + Math.pow(r(), 5) * 22, y = (r() - 0.5) * 40 * dens;
+    _czw.set(x0 + r() * G, y, z0 + r() * G).applyQuaternion(rq); _czv.subVectors(_czw, C.camPos);
+    _czq.setFromAxisAngle(_czw.set(r() - 0.5, r() - 0.5, r() - 0.5).normalize(), time * (r() - 0.5) * 0.4 + r() * 6);
+    _mat.compose(_czv, _czq, _s.set(sz, sz * (0.6 + r() * 0.5), sz * (0.7 + r() * 0.4))); R.setMatrixAt(i, _mat);
+    R.setColorAt(i, _czC.setRGB(0.6 + h * 0.3, 0.55 + h * 0.25, 0.48 + h * 0.2)); i++;
+  }
+  R.count = i; R.instanceMatrix.needsUpdate = true; if (R.instanceColor) R.instanceColor.needsUpdate = true;
+}
+// drawn in place of the world (and the dip into the dark and out again at either end of the way up)
+function cosmosPresent() {
+  const C = COSMOS, U = postMat.uniforms, f0 = U.uFade.value, k = C.fadeT > 0 ? 1 - 0.9 * Math.pow(C.fadeT / CZ_FADE, 1.5) : 1;
+  if (!C.on) { U.uFade.value = f0 * k; if (M3.on && mapV.open && state === 'map') m3Present(); else present(scene, camera); U.uFade.value = f0; return; }
+  const n0 = U.uNear.value, fa = U.uFar.value, r0 = U.uRays.value, s0 = U.uSpeed.value, h0 = U.uHeat.value, b0 = U.uDof.value;
+  _czv.copy(CZ_SUN).multiplyScalar(25000).project(C.cam); const face = _czf.set(0, 0, -1).applyQuaternion(C.camQ).dot(CZ_SUN);
+  if (Number.isFinite(_czv.x)) U.uSunUV.value.set(_czv.x * 0.5 + 0.5, _czv.y * 0.5 + 0.5);
+  U.uNear.value = C.cam.near; U.uFar.value = C.cam.far; U.uRays.value = _czv.z < 1 && !C.map.on ? smoothstep(0.3, 0.9, face) * 0.45 : 0; U.uSpeed.value = C.map.on ? 0 : C.rush * 0.7; U.uHeat.value = 0; U.uDof.value = 0; U.uFade.value = f0 * k;   // (no blur for distance out here: everything is far, and all of it should be sharp)
+  present(C.scene, C.cam);
+  U.uNear.value = n0; U.uFar.value = fa; U.uRays.value = r0; U.uSpeed.value = s0; U.uHeat.value = h0; U.uDof.value = b0; U.uFade.value = f0;
+}
+
+// ── The map of the heavens. The same scene, from an eye that goes round a point: drag (or two fingers on the trackpad)
+//    turns it any way at all, right over and round; pinch, or scroll, pushes in and pulls back; fingers drawn round in a
+//    circle (or twisted, on glass) turn it like a dial. Every world is named on it; one chosen is the point it goes round.
+function cosmosMap(on) {
+  const C = COSMOS, M = C.map; if (on === M.on) return;
+  if (on) { if (!C.on) return; M.on = true; M.piv.copy(C.pos); M.q.copy(C.camQ); M.d = 300; M.td = Math.max(CZ_RG * 9, C.nearD * 3); M.pid = 'me'; M.keys = {};
+    for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+    C.mapEl.classList.add('on'); document.body.classList.add('czmap'); czMapText(); audio.sfx.mapOpen?.(); }
+  else { M.on = false; C.mapEl.classList.remove('on'); document.body.classList.remove('czmap'); C.camOff = null; audio.sfx.mapClose?.(); }
+}
+function czOrbit(dx, dy) { const M = COSMOS.map; M.q.multiply(_czq.setFromAxisAngle(_czY, -dx * 0.006)).multiply(_czq.setFromAxisAngle(_czX, -dy * 0.006)).normalize(); }
+function czDial(a) { const M = COSMOS.map; M.q.multiply(_czq.setFromAxisAngle(_czZ, a)).normalize(); }
+function czZoom(f) { const M = COSMOS.map; M.td = clamp(M.td * f, 25, 4e8); }
+function czMapKeys(dt) { const K = COSMOS.map.keys;
+  if (K.KeyA || K.ArrowLeft) czOrbit(-260 * dt, 0); if (K.KeyD || K.ArrowRight) czOrbit(260 * dt, 0); if (K.KeyW || K.ArrowUp) czOrbit(0, -260 * dt); if (K.KeyS || K.ArrowDown) czOrbit(0, 260 * dt);
+  if (K.KeyQ) czDial(1.4 * dt); if (K.KeyE) czDial(-1.4 * dt); if (K.Equal || K.NumpadAdd) czZoom(Math.pow(0.3, dt)); if (K.Minus || K.NumpadSubtract) czZoom(Math.pow(3.3, dt)); }
+function czFocus(id) { const C = COSMOS, M = C.map, B = C.bodies.find(B => B.id === id); M.pid = id; M.td = id === 'me' ? 260 : id === 'globe' ? CZ_RG * 7 : B ? B.R * 6 : M.td; audio.sfx.mapPick?.(); }
+function czMapText() {
+  const C = COSMOS, km = Math.max(0, (C.pos.length() - CZ_RG) / 1000);
+  C.mapT.textContent = `THE HEAVENS · ${C.found.size} WORLDS FOUND · ${km < 100 ? km.toFixed(1) : Math.round(km).toLocaleString()} KM FROM THE WORLD`;
+  C.mapH.textContent = TOUCH ? 'drag to turn it round · pinch to zoom · twist to dial · tap a world to go round it' : 'drag, or two fingers, to turn it round · fingers round in a circle dial it · pinch or scroll to zoom · click a world to go round it · H you · G the world · M to close';
+}
+// the names, written over it where the eye sees each world
+function czLabels() {
+  const C = COSMOS, cv = C.mapC, x = C.mapX, W = innerWidth, H = innerHeight, dpr = Math.min(devicePixelRatio, 2);
+  if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H); x.font = '10px "IBM Plex Mono", Menlo, monospace'; x.textAlign = 'center'; x.lineWidth = 1;
+  const hits = C.map.hits = [], cam = C.cam, tanH = Math.tan(cam.fov * Math.PI / 360);
+  const put = (pos, R, name, sub, col, id) => {
+    _czv.subVectors(pos, C.camPos); const d = _czv.length(); _czw.copy(_czv).applyQuaternion(_czq.copy(C.camQ).invert()); if (_czw.z > -1) return;
+    const k = H / 2 / (tanH * -_czw.z), sx = W / 2 + _czw.x * k, sy = H / 2 - _czw.y * k, pr = R * k; if (sx < -60 || sx > W + 60 || sy < -60 || sy > H + 60 || pr > H * 0.45) return;
+    const r = Math.max(4, pr + 3); x.strokeStyle = col; x.globalAlpha = 0.8; x.beginPath(); x.arc(sx, sy, r, 0, TAU_); x.stroke();
+    x.globalAlpha = 1; x.fillStyle = col; x.fillText(name, sx, sy - r - 6); if (sub) { x.fillStyle = 'rgba(244,234,210,.6)'; x.fillText(sub, sx, sy + r + 13); }
+    hits.push({ x: sx, y: sy, r: Math.max(r, 14), id, d });
+  };
+  put(_cz0, CZ_RG, 'THE WORLD', 'OLYMPUS AT ITS POLE', '#ffd890', 'globe');
+  for (const B of C.bodies) put(B.pos, B.R, B.name, CZ_KINDS[B.kind], '#' + new THREE.Color(CZ_PAL[B.kind][0][B.kind === 2 ? 2 : 0]).lerp(new THREE.Color(1, 1, 1), 0.35).getHexString(), B.id);
+  for (let i = 0; i < C.dotN; i++) { const A = C.dotAt[i]; _czw.set(A[0], A[1], A[2]); const d = _czw.distanceTo(C.camPos); if (d < C.map.d * 6) put(_czw.clone(), A[4], d < C.map.d * 2.5 ? A[5] : '', '', 'rgba(200,210,230,.55)', null); }
+  { _czv.subVectors(C.pos, C.camPos); _czw.copy(_czv).applyQuaternion(_czq.copy(C.camQ).invert());   // him
+    if (_czw.z < -1) { const k = H / 2 / (tanH * -_czw.z), sx = W / 2 + _czw.x * k, sy = H / 2 - _czw.y * k; x.fillStyle = '#ffb060'; x.font = 'bold 11px "IBM Plex Mono", Menlo, monospace'; x.fillText('YOU', sx, sy - 16); hits.push({ x: sx, y: sy, r: 16, id: 'me', d: 0 }); } }
+}
+// the page parts: the line at the top while he is out there, and the map's own layer
+function czUI() {
+  const C = COSMOS, st = document.createElement('style');
+  st.textContent = `#czBar { position:fixed; left:50%; top:calc(var(--st, 0px) + 96px); transform:translateX(-50%); z-index:7; text-align:center; pointer-events:none; opacity:0; transition:opacity .5s; white-space:nowrap; text-shadow:0 0 8px #000, 0 0 2px #000; }
+    #czBar.on { opacity:1; } #czBar b { display:block; font-weight:600; font-size:10px; letter-spacing:.3em; color:#cfe0ff; } #czBar i { display:block; font-style:normal; font-size:9px; letter-spacing:.18em; margin-top:4px; color:var(--dim); }
+    #czBar button { pointer-events:auto; margin-top:8px; padding:6px 14px; border:1px solid rgba(160,190,255,.45); border-radius:16px; background:rgba(5,7,13,.55); color:#cfe0ff; font:inherit; font-size:10px; letter-spacing:.22em; cursor:pointer; display:none; }
+    .touch #czBar button { display:inline-block; } .touch #czBar { top:calc(var(--st, 0px) + 112px); }
+    body.cosmos #markers, body.cosmos #areaBar { visibility:hidden; }
+    #czMap { position:fixed; inset:0; z-index:8; opacity:0; pointer-events:none; transition:opacity .4s; touch-action:none; cursor:grab; background:radial-gradient(ellipse at 50% 50%, rgba(2,3,8,0) 60%, rgba(2,3,8,.55) 100%); }
+    #czMap.on { opacity:1; pointer-events:auto; } body.czmap #modeBar, body.czmap #tut, body.czmap #dialog, body.czmap #hud, body.czmap #health, body.czmap #toast { visibility:hidden; } #czMap canvas { position:absolute; inset:0; width:100%; height:100%; }
+    #czMapT, #czMapH { position:absolute; left:0; right:0; text-align:center; font-size:10px; letter-spacing:.3em; color:var(--dim); pointer-events:none; text-shadow:0 0 6px #000; padding:0 84px; line-height:1.7; box-sizing:border-box; }
+    #czMapT { top:calc(var(--st, 0px) + 18px); } #czMapH { bottom:calc(var(--sb, 0px) + 18px); }
+    #czMapX { position:absolute; right:calc(var(--sr, 0px) + 14px); top:calc(var(--st, 0px) + 10px); min-height:40px; padding:8px 14px; border:1px solid rgba(160,190,255,.4); border-radius:20px; background:rgba(5,7,13,.5); color:#cfe0ff; font:inherit; font-size:10px; letter-spacing:.22em; cursor:pointer; }
+    @media (max-width: 900px), (max-height: 520px) { #czMapT, #czMapH { font-size:9px; letter-spacing:.14em; line-height:1.5; } }`;
+  document.head.appendChild(st);
+  const bar = C.barEl = document.createElement('div'); bar.id = 'czBar'; bar.innerHTML = '<b></b><i></i><button type="button">◎ MAP</button>'; document.body.appendChild(bar);
+  bar.querySelector('button').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); cosmosMap(true); });
+  const el = C.mapEl = document.createElement('div'); el.id = 'czMap'; el.innerHTML = '<canvas></canvas><div id="czMapT"></div><div id="czMapH"></div><button id="czMapX" type="button">CLOSE</button>'; document.body.appendChild(el);
+  C.mapC = el.querySelector('canvas'); C.mapX = C.mapC.getContext('2d'); C.mapT = el.querySelector('#czMapT'); C.mapH = el.querySelector('#czMapH');
+  el.querySelector('#czMapX').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); cosmosMap(false); });
+  const pts = new Map(); let tw = null, dn = null, gs = 1, gr = 0;
+  el.addEventListener('contextmenu', e => e.preventDefault());
+  el.addEventListener('pointerdown', e => { e.stopPropagation(); try { el.setPointerCapture(e.pointerId); } catch {} pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (pts.size === 1) dn = { x: e.clientX, y: e.clientY, moved: false }; else { dn = null; tw = null; } });
+  el.addEventListener('pointermove', e => { const pt = pts.get(e.pointerId); if (!pt) return; e.stopPropagation(); const dx = e.clientX - pt.x, dy = e.clientY - pt.y; pt.x = e.clientX; pt.y = e.clientY;
+    if (pts.size >= 2) {   // two fingers: pinch to push in, twist to dial, move together to turn it
+      const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y), ang = Math.atan2(b.y - a.y, b.x - a.x), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      if (tw && d > 0 && tw.d > 0) { czZoom(tw.d / d); czDial(wrapAngle(ang - tw.ang)); czOrbit((mx - tw.mx) * 0.5, (my - tw.my) * 0.5); }
+      tw = { d, ang, mx, my }; return; }
+    if (dn && Math.hypot(e.clientX - dn.x, e.clientY - dn.y) > 6) dn.moved = true;
+    czOrbit(dx * (e.pointerType === 'touch' ? 1.3 : 1), dy * (e.pointerType === 'touch' ? 1.3 : 1)); });
+  const up = e => { pts.delete(e.pointerId); tw = null; const d = dn; dn = null; if (!d || d.moved || e.type !== 'pointerup') return;
+    let best = null, bd = 1e9; for (const h of COSMOS.map.hits) { const q = Math.hypot(h.x - e.clientX, h.y - e.clientY); if (q < h.r + (e.pointerType === 'touch' ? 14 : 6) && q < bd) { bd = q; best = h; } }
+    if (best && best.id) czFocus(best.id); };
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  // the trackpad: two fingers swiped turn it; drawn round in a circle, the way they are going turns steadily one way, and
+  // that turns it like a dial; a pinch (or a mouse wheel) pushes in and pulls back
+  const Wh = { a: null, run: 0, n: 0, t: 0, dial: false };
+  el.addEventListener('wheel', e => { e.preventDefault(); e.stopPropagation();
+    const k = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1, dx = e.deltaX * k, dy = e.deltaY * k, now = performance.now();
+    if (e.ctrlKey) return czZoom(Math.exp(clamp(dy, -60, 60) * 0.012));
+    if (e.shiftKey || e.deltaMode !== 0 || (Math.abs(e.deltaX) < 0.01 && Math.abs(e.deltaY) >= 50)) return czZoom(Math.exp(clamp(dy || dx, -260, 260) * 0.0016));
+    if (now - Wh.t > 160) { Wh.a = null; Wh.run = 0; Wh.n = 0; Wh.dial = false; } Wh.t = now;
+    const m = Math.hypot(dx, dy); if (m < 0.4) return;
+    const a = Math.atan2(dy, dx);
+    if (Wh.a !== null) { const da = wrapAngle(a - Wh.a);
+      if (Math.abs(da) > 0.012 && Math.abs(da) < 1.3 && (Wh.run === 0 || Math.sign(da) === Math.sign(Wh.run))) { Wh.run += da; Wh.n++; } else if (Math.abs(da) >= 0.012) { Wh.run = 0; Wh.n = 0; Wh.dial = false; }
+      if (Wh.n >= 4 && Math.abs(Wh.run) > 0.45) Wh.dial = true;
+      if (Wh.dial) { Wh.a = a; return czDial(da); } }
+    Wh.a = a; czOrbit(-dx * 0.7, -dy * 0.7); }, { passive: false });
+  // Safari: the trackpad's own pinch and rotation
+  el.addEventListener('gesturestart', e => { e.preventDefault(); e.stopPropagation(); gs = 1; gr = 0; });
+  el.addEventListener('gesturechange', e => { e.preventDefault(); e.stopPropagation(); if (e.scale > 0) czZoom(gs / e.scale); gs = e.scale || gs; czDial(((e.rotation || 0) - gr) * Math.PI / 180); gr = e.rotation || 0; });
+  el.addEventListener('gestureend', e => { e.preventDefault(); e.stopPropagation(); });
+}
+// the line at the top: how far out he is, how many worlds he has found, which one he is near
+function czBar(on) {
+  const C = COSMOS, el = C.barEl; if (!el) return;
+  el.classList.toggle('on', on && !C.map.on); if (!on) return;
+  const km = Math.max(0, (C.pos.length() - CZ_RG) / 1000), B = C.nearB, near = B && C.nearD < B.R * 8 ? `NEAR ${B.name} · ${CZ_SAY[B.kind]}` : C.ringR > 1.45 && C.ringR < 3.3 && Math.abs(C.ringY || 1e9) < 3000 ? 'IN THE RINGS' : '';
+  el.firstChild.textContent = `IN SPACE · ${km < 100 ? km.toFixed(1) : Math.round(km).toLocaleString()} KM OUT · ${C.found.size} WORLDS FOUND`;
+  el.children[1].textContent = near || (TOUCH ? 'dive back into the air to go home' : 'M · the map of the heavens · dive back into the air to go home');
+  if (C.map.on) czMapText();
+}
+// keys out there: M is the map of the heavens, Space a wingbeat; the ones that would do something down in the world wait
+addEventListener('keydown', e => {
+  const C = COSMOS; if (!C.on || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.metaKey || e.ctrlKey) return;
+  if (C.map.on) { e.preventDefault(); e.stopPropagation();
+    if (e.code === 'KeyM' || e.code === 'Escape') return cosmosMap(false);
+    if (e.code === 'KeyH') return czFocus('me'); if (e.code === 'KeyG') return czFocus('globe');
+    C.map.keys[e.code] = true; return; }
+  if (state !== 'play') return;
+  if (e.code === 'KeyM') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) cosmosMap(true); }
+  else if (e.code === 'Space') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) cosmosBeat(); }
+  else if (['KeyH', 'KeyQ', 'KeyX', 'KeyR', 'KeyF', 'KeyB', 'KeyL', 'KeyK'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); }
+}, true);
+addEventListener('keyup', e => { COSMOS.map.keys[e.code] = false; }, true);
+setTimeout(() => { if (window.__icarus) Object.assign(window.__icarus, { COSMOS, cosmosOpen, cosmosEnter, cosmosLeave, cosmosMap, cosmosStep, czFrame, czCell, czOrbit, czDial, czZoom, czFocus, CZ_TOP, CZ_RG }); }, 200);
 
 // build the summit and its surroundings before showing the title
 setTimeout(() => {
