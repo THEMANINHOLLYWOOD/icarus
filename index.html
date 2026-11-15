@@ -28884,7 +28884,7 @@ function miEnd() { const M = MATCH; pwPeek(0); if (!M.intro) return; M.intro = f
 const MD = { id: '', plan: null, ids: [], rng: null, q: 0, skip: false, cam: false, ask: '', askT: 0, rdy: false, said: false, busy: false, card: '', cueLine: null, side: 1,
   fromP: new THREE.Vector3(), fromQ: new THREE.Quaternion(), fromF: 60, A: { p: new THREE.Vector3(), l: new THREE.Vector3(), f: 60, up: new THREE.Vector3(0, 1, 0), roll: 0 }, B: { p: new THREE.Vector3(), l: new THREE.Vector3(), f: 60, up: new THREE.Vector3(0, 1, 0), roll: 0 },
   s: [0, 1, 2, 3].map(() => ({ x: 0, y: 0, z: 0, yaw: 0, K: 1 })), k: { x: 0, y: 0, z: 0, yaw: 0, K: 1 }, slots: new Map(), g: {},
-  qA: new THREE.Quaternion(), qB: new THREE.Quaternion(), qC: new THREE.Quaternion(), m4: new THREE.Matrix4(), cp: new THREE.Vector3(), cpV: new THREE.Vector3(), lastCut: '', glass: null, lift: 0, shotN: -1 };
+  qA: new THREE.Quaternion(), qB: new THREE.Quaternion(), qC: new THREE.Quaternion(), qS: new THREE.Quaternion(), qInit: false, m4: new THREE.Matrix4(), cp: new THREE.Vector3(), cpV: new THREE.Vector3(), lastCut: '', glass: null, lift: 0, shotN: -1 };
 // how a shot is come to (ms): cut; a whip of the lens; a turn from one frame into the next; a crane (the same, lifted over)
 const MD_TR = { cut: 0, whip: 460, blend: 1250, crane: 1900 };
 // how long each shot wants (ms; the fly-in and the count are fitted to their own time), and how big the bird is in it: the
@@ -29049,7 +29049,7 @@ function mdTurn(qa, qb, w, out) {
 }
 function mdCam(dt) {
   const now = Date.now(), A = MD.A, B = MD.B;
-  if (!MD.cam) { MD.cam = true; MD.cp.copy(camera.position); MD.cpV.set(0, 0, 0); MD.lastCut = ''; MD.shotA = -1; }
+  if (!MD.cam) { MD.cam = true; MD.cp.copy(camera.position); MD.cpV.set(0, 0, 0); MD.lastCut = ''; MD.shotA = -1; MD.qInit = false; }
   const X = mdShotAt(now); if (!X) return;
   const fresh = MD.shotA !== X.cur.a; if (fresh) { MD.shotA = X.cur.a; MD.fromP.copy(camera.position); MD.fromQ.copy(camera.quaternion); MD.fromF = camera.fov / fovK(); }   // (each shot is come to from where the lens was as it began: his own, for the first)
   mdEval(X.cur, now, A); MD.lift = MD.shotN === X.cur.a ? lerp(MD.lift, A.raise, damp(A.raise > MD.lift ? 4 : 1.5, dt)) : A.raise; MD.shotN = X.cur.a; A.p.y += MD.lift; mdQuat(A, MD.qA);
@@ -29072,8 +29072,9 @@ function mdCam(dt) {
   { const g = Math.max(groundAt(MD.cp.x, MD.cp.z, MD.cp.y + 40), WATER) + 5; if (MD.cp.y < g) { MD.cp.y = g; if (MD.cpV.y < 0) MD.cpV.y = 0; } }
   for (const id of MATCH.roster.keys()) { const at = id === NET.id ? (MATCH.me.alive ? player.pos : null) : NET.peers.get(id)?.pos; if (!at) continue;   // (and out of any bird as it is drawn, on the way from one shot to the next too)
     const rm = 16 * mdK(id), d = MD.cp.distanceTo(at); if (d < rm && d > 0.01) MD.cp.sub(at).multiplyScalar(rm / d).add(at); }
-  camera.position.copy(MD.cp); camera.quaternion.copy(MD.qC); camera.up.set(0, 1, 0);
-  lookAt.copy(camera.position).add(_n.set(0, 0, -1).applyQuaternion(MD.qC).multiplyScalar(Math.max(20, A.p.distanceTo(A.l))));
+  if (cut || !MD.qInit) { MD.qS.copy(MD.qC); MD.qInit = true; } else MD.qS.slerp(MD.qC, 1 - Math.exp(-Math.min(dt, 0.05) * (tr === 'whip' && k < 1 ? 22 : 9)));   // (and on where it looks: a bird gone past close is panned after, not snapped to)
+  camera.position.copy(MD.cp); camera.quaternion.copy(MD.qS); camera.up.set(0, 1, 0);
+  lookAt.copy(camera.position).add(_n.set(0, 0, -1).applyQuaternion(MD.qS).multiplyScalar(Math.max(20, A.p.distanceTo(A.l))));
   camera.fov = clamp(f, 3, 100) * fovK(); camera.updateProjectionMatrix();
 }
 function mdCamOff() { MD.cam = false; camera.up.set(0, 1, 0); pwPeek(0); if (state === 'play' && player.form === 'phoenix') camBlendFrom(1.7); }   // (his lens again, eased down out of the wide and in behind him)
