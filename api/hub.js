@@ -14,8 +14,9 @@ import * as mcp from './_mcp.js';
 import * as oauth from './_oauth.js';
 import * as dad from './_dad.js';
 import * as npc from './_npc.js';
+import * as fly from './_fly.js';
 
-const R = { admin, account, stats, areas, agent, dp, mcp, oauth, dad, npc };   // (dad: what Daedalus says back, on the tower; npc: what one of the regulars types back in chat)
+const R = { admin, account, stats, areas, agent, dp, mcp, oauth, dad, npc, fly };   // (dad: what Daedalus says back, on the tower; npc: what one of the regulars types back in chat)
 const pick = req => { const n = new URL(req.url).searchParams.get('fn'); return Object.hasOwn(R, n) ? R[n] : null; };
 export function GET(req) { const m = pick(req); return m && m.GET ? m.GET(req) : json({ error: 'not found' }, 404); }
 export function POST(req) { const m = pick(req); return m && m.POST ? m.POST(req) : json({ error: 'not found' }, 404); }
