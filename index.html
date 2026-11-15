@@ -7566,7 +7566,7 @@ function netJoin() {
   ch.on('broadcast', { event: 'dm' }, ({ payload: m }) => gotDm(m)); ch.on('broadcast', { event: 'fc' }, ({ payload: m }) => gotFc(m)); ch.on('broadcast', { event: 'fi' }, ({ payload: m }) => gotFi(m));
   ch.on('broadcast', { event: 'god' }, ({ payload: m }) => gotGod(m)); ch.on('broadcast', { event: 'eye' }, ({ payload: m }) => gotEye(m));
   ch.on('broadcast', { event: 'npc' }, ({ payload: m }) => gotNpc(m)); ch.on('broadcast', { event: 'nq' }, ({ payload: m }) => gotNq(m)); ch.on('broadcast', { event: 'nr' }, ({ payload: m }) => gotNr(m));
-  ch.on('broadcast', { event: 'burn' }, ({ payload: m }) => gotBurn(m));
+  ch.on('broadcast', { event: 'burn' }, ({ payload: m }) => gotBurn(m)); ch.on('broadcast', { event: 'fan' }, ({ payload: m }) => gotFan(m));
   ch.on('broadcast', { event: 'tear' }, ({ payload: m }) => gotTear(m)); ch.on('broadcast', { event: 'crater' }, ({ payload: m }) => gotCrater(m)); ch.on('broadcast', { event: 'died' }, ({ payload: m }) => gotDied(m)); ch.on('broadcast', { event: 'kick' }, ({ payload: m }) => gotKick(m)); ch.on('broadcast', { event: 'look' }, ({ payload: m }) => gotLook(m));
   ch.on('broadcast', { event: 'ring' }, ({ payload: m }) => gotRing(m));
   ch.on('broadcast', { event: 'arena' }, ({ payload: m }) => gotArena(m));
@@ -11817,12 +11817,12 @@ function updatePhoenix(dt) {
     p.flapCD = brk > 0.5 ? 0.42 : boost ? 0.5 : 0.72; p.flapPhase = 0;
     if (WR.A < 0.25) WR.th = 0; WR.beat = 1;   // (a beat from still air starts at the top of the stroke)
     p.speed += 12 * (1 - brk); p.vy = Math.min(p.vy + 8 * (1 - 0.75 * brk), 16); p.flame -= 0.005;
-    audio.sfx.flap(boost ? 1 : 0.75); netFx('flap');
+    audio.sfx.flap(boost ? 1 : 0.75); netFx('flap'); fanFlap(boost ? 1 : 0.6);
     for (const side of [-1, 1]) {
       _v.set(side * 7.5, 0, 0.8).multiplyScalar(birdK()).applyEuler(phoenix.group.rotation).add(p.pos);
       for (let i = 0; i < 8; i++) emit(_v.x, _v.y, _v.z, rnd(5), -4 - Math.random() * 6, rnd(5), 0.5 + Math.random() * 0.4, pick(EMBER));
     }
-  } else if (p.flapCD < -(2.4 + glide * 3.4) && !diving) { p.flapCD = 0; p.flapPhase = 0; p.vy += 4; audio.sfx.flap(0.4); if (WR.A < 0.25) WR.th = 0; WR.beat = Math.max(WR.beat, 0.55); }   // one lazy beat to hold the glide
+  } else if (p.flapCD < -(2.4 + glide * 3.4) && !diving) { p.flapCD = 0; p.flapPhase = 0; p.vy += 4; audio.sfx.flap(0.4); fanFlap(0.2); if (WR.A < 0.25) WR.th = 0; WR.beat = Math.max(WR.beat, 0.55); }   // one lazy beat to hold the glide
 
   // the sky limit: linger above it and the sun takes your wings
   const roof = SKY_LIMIT + perks.sun * 320 + (cosmosOpen() ? 1e7 : 0);   // (the keeper, with the god in him: no roof at all, see COSMOS)
@@ -16967,7 +16967,7 @@ function burnInLava(y) {
 // burns for twenty seconds, its leaves shrivel to nothing and it stands black. Rain puts it out. Lightning starts it
 // too. A few minutes later the green comes back, from the branches out. Everyone near sees it: where a fire starts is
 // sent to the other fliers.
-const BLAZE = { list: [], key: new Set(), scanT: 0, seen: false, light: new THREE.PointLight(0xff7a2a, 0, 220, 0), burning: 0 };
+const BLAZE = { list: [], key: new Set(), scanT: 0, seen: false, light: new THREE.PointLight(0xff7a2a, 0, 220, 0), burning: 0, maxB: 90, maxL: TOUCH ? 260 : 420 };
 scene.add(BLAZE.light);
 const F_CATCH = 3, F_SHRIVEL = [9, 21], F_BLACK = 21, F_REGROW = 170, F_GREEN = 196;
 const F_CHAR = [0.07, 0.055, 0.05], F_FLAME = [2.0, 0.62, 0.1];   // (flame: orange that stays orange, not burned out to white)
@@ -16987,7 +16987,7 @@ function treesNear(x, z, r, fn) {
   }
 }
 function ignite(ck, i, net) {
-  const k = ck + ':' + i; if (BLAZE.key.has(k) || BLAZE.burning > 90 || BLAZE.list.length > 260) return false;
+  const k = ck + ':' + i; if (BLAZE.key.has(k) || BLAZE.burning > BLAZE.maxB || BLAZE.list.length > BLAZE.maxL) return false;   // (no more than so many alight at once; and the black ones, still growing back, count too)
   const g = chunks.get(ck), t = g?.userData.trees?.[i]; if (!t || t.fell) return false;
   BLAZE.key.add(k); BLAZE.list.push({ ck, i, k, x: t.x, z: t.z, t: 0, g: null, nextSpread: 1 + Math.random(), upd: 0 });
   if (net) netBurn(t.x, t.z);
@@ -17031,7 +17031,7 @@ function paintFire(f) {
       }
       if (leaf) {
         P[o] = lerp(O[jj], cx, shr); P[o + 1] = lerp(O[jj + 1], cy, shr) - drop; P[o + 2] = lerp(O[jj + 2], cz, shr);
-        if (q === top && lick) { P[o] += (cx - P[o]) * 0.35 + WIND.x * lick * 0.35; P[o + 1] += lick; P[o + 2] += (cz - P[o + 2]) * 0.35 + WIND.z * lick * 0.35; }   // (the top corner drawn up into a point, leaning downwind)
+        if (q === top && lick) { P[o] += (cx - P[o]) * 0.35 + (WIND.x + (f.gx || 0)) * lick * 0.35; P[o + 1] += lick; P[o + 2] += (cz - P[o + 2]) * 0.35 + (WIND.z + (f.gz || 0)) * lick * 0.35; }   // (the top corner drawn up into a point, leaning downwind)
       }
       else { P[o] = O[jj]; P[o + 1] = O[jj + 1]; P[o + 2] = O[jj + 2]; }
     }
@@ -17045,9 +17045,11 @@ function paintFire(f) {
 function updateFire(dt) {
   const p = player;
   updateSkid(dt);   // (low enough, and the ground under him is scorched: see SKID)
+  updateFan(dt);   // (and his wings fan whatever is burning: see FAN)
   // the bird sets fire to what he flies through
   if ((BLAZE.scanT -= dt) < 0) {
     BLAZE.scanT = 0.1;
+    fanPass(0.1);
     if (realm === 'over' && state === 'play' && p.form === 'phoenix' && !p.sub && !p.cine && !SH.def && !p.perch)
       treesNear(p.pos.x, p.pos.z, 30, (g, ck, i, t) => {
         if ((t.x - p.pos.x) ** 2 + (t.z - p.pos.z) ** 2 < (t.rad + 3) ** 2 && p.pos.y > t.y0 - 2 && p.pos.y < t.top + 5) ignite(ck, i, true);
@@ -17063,6 +17065,7 @@ function updateFire(dt) {
     if (wet > 0.45 && f.t > F_CATCH && f.t < F_BLACK) f.t = Math.min(F_BLACK, f.t + dt * 6 * wet);   // rain beats it down
     const burning = f.t < F_BLACK;
     if (burning) BLAZE.burning++;
+    if (f.gx || f.gz) { const e = Math.exp(-dt * 1.3); f.gx *= e; f.gz *= e; if (Math.abs(f.gx) + Math.abs(f.gz) < 0.02) f.gx = f.gz = 0; }   // (a gust's lean goes out of the flames)
     // now and then a tree flares: a gust into it, a pocket of resin; the flames double and throw sparks high
     if (f.flare) f.flare = Math.max(0, f.flare - dt * 0.8); else if (burning && f.t > F_CATCH + 1 && f.t < F_BLACK - 4 && Math.random() < dt * 0.07 * (1 - wet)) { f.flare = 1; f.flared = false; }
     const g = chunks.get(f.ck);
@@ -17109,6 +17112,123 @@ function updateFire(dt) {
   }
   BLAZE.light.intensity = near && nd < 400 ? (2.2 + Math.sin(time * 13) * 0.4 + Math.sin(time * 31) * 0.3 + flareK * 1.6) * smoothstep(400, 120, nd) : 0;
   if (near) BLAZE.light.position.set(near.x, near.top + 4, near.z);
+}
+// The bird is a bellows. Every beat of his wings near a fire drives a gust into it: the flames lean away from him and
+// flare up, sparks and burning leaves blow off downwind, the smoke is shoved aside, and the fire jumps to the trees the
+// gust is going toward. A slow low pass fans it a little; a fast one, or a dive through, drags a wall of fire along after
+// him; past a certain speed (or as a god) the air he tears through sets the forest under his whole path alight. Fast and
+// low over a dry wood, with no fire anywhere, he can start one. The world's wind, and the winds players have blown, carry
+// the spread too. Everyone sees roughly the same fire: a gust is sent as one small message (where, which way, how hard,
+// and the dice it was thrown with) and every page fans its own copy of the fire the same way. What catches is queued and
+// set alight a few to a frame, outward from him at the speed of the gust, and the fire's own limits on how much can burn
+// at once still hold. Only trees catch: nobody's building, and never on the mountain of the gods.
+const FAN = { q: [], sendT: 0, passT: 0, last: null, carry: 0, smoke: 0, smokeT: 0, fanned: 0, ms: 0 };
+const FAN_Q = TOUCH ? 50 : 120;
+const fanSafe = (x, z) => (x - MOUNT.x) ** 2 + (z - MOUNT.z) ** 2 < MOUNT.R * MOUNT.R;   // (the mountain of the gods does not burn on purpose)
+// a gust at x, z going dx, dz, of strength k (0 a breath, 1 a hard beat, 2 a bird going flat out), reaching R; seed: the dice
+function fanAt(x, z, dx, dz, k, R, seed) {
+  const rand = mulberry32(seed | 0), L = Math.hypot(dx, dz) || 1, c = camera.position; dx /= L; dz /= L;
+  let bursts = 0, sparks = TOUCH ? 30 : 70;
+  for (const f of BLAZE.list) {
+    if (f.t < 0.5 || f.t >= F_BLACK) continue;
+    const d = Math.hypot(f.x - x, f.z - z); if (d > R) continue;
+    const a = k * (1 - d / R) ** 0.7, rx = (f.x - x) / (d || 1), rz = (f.z - z) / (d || 1);
+    let ux = dx + rx * 0.6, uz = dz + rz * 0.6; const ul = Math.hypot(ux, uz) || 1; ux /= ul; uz /= ul;   // (away from him, and on the way the air is going)
+    f.gx = clamp((f.gx || 0) + ux * a * 2.2, -4, 4); f.gz = clamp((f.gz || 0) + uz * a * 2.2, -4, 4);
+    const was = f.flare || 0; f.flare = Math.min(1.6, Math.max(was, 0.45 + a)); if (was < 0.3 && bursts < 6) { f.flared = false; bursts++; } else f.flared = true;   // (a few of them throw the column of sparks; the rest just burn up brighter)
+    f.upd = 0; FAN.fanned++;
+    const g = chunks.get(f.ck), t = g?.userData.trees?.[f.i];
+    if (t && sparks > 0 && (t.x - c.x) ** 2 + (t.z - c.z) ** 2 < 700 * 700) for (let e = 0, n = Math.min(sparks, 3 + (a * 8 | 0)); e < n; e++, sparks--)
+      emit(t.x + rnd(t.rad * 0.6), lerp(t.y0, t.top, 0.4 + Math.random() * 0.6), t.z + rnd(t.rad * 0.6), ux * (8 + a * 22) + rnd(3) + WIND.x * 3, 1 + Math.random() * 5, uz * (8 + a * 22) + rnd(3) + WIND.z * 3, 0.8 + Math.random() * 1.2, pick(EMBER), 1.2, 0.6 + Math.random() * 1.1);
+    // the fire goes where the gust goes: the trees that way catch, sooner and further the harder it blew
+    if (!t || a < 0.18) continue;
+    const reach = t.rad + 6 + 22 * Math.min(a, 1.8), spd = 9 + 26 * Math.min(k, 2);
+    treesNear(t.x, t.z, reach, (g2, ck2, i2, t2) => {
+      if (FAN.q.length >= FAN_Q || BLAZE.key.has(ck2 + ':' + i2) || t2.fell || fanSafe(t2.x, t2.z)) return;
+      const ex = t2.x - t.x, ez = t2.z - t.z, e = Math.hypot(ex, ez) || 1; if (e > reach + t2.rad) return;
+      const al = (ex * ux + ez * uz) / e, w = (ex * WIND.x + ez * WIND.z) / e * 0.25;
+      if (rand() < clamp(a * (0.1 + 0.9 * Math.max(0, al + w)) * 0.65, 0, 0.9)) FAN.q.push({ ck: ck2, i: i2, at: time + e / spd + rand() * 0.3 });
+    });
+  }
+  // and the smoke is pushed aside
+  const S = SMOKE, R2 = (R * 1.3) ** 2;
+  for (let i = 0; i < S.N; i++) { if (!(S.age[i] < S.life[i])) continue; const ex = S.x[i] - x, ez = S.z[i] - z, e2 = ex * ex + ez * ez; if (e2 > R2) continue; const e = Math.sqrt(e2) || 1, a = k * (1 - e / (R * 1.3)) * 7; S.vx[i] += (dx + ex / e * 0.7) * a; S.vz[i] += (dz + ez / e * 0.7) * a; }
+}
+// a stretch of forest set alight all at once, along a line flown flat out: every tree within w of it, near enough all of them
+function fanBlaze(x0, z0, x1, z1, w, seed, pr = 0.8) {
+  const rand = mulberry32((seed | 0) ^ 0x5bd1e995), dx = x1 - x0, dz = z1 - z0, L2 = dx * dx + dz * dz || 1, L = Math.sqrt(L2);
+  for (let s = 0; s <= L; s += 40) { const t = s / L, cx = x0 + dx * t, cz = z0 + dz * t;
+    treesNear(cx, cz, w + 20, (g, ck, i, tr) => {
+      if (FAN.q.length >= FAN_Q || BLAZE.key.has(ck + ':' + i) || tr.fell || fanSafe(tr.x, tr.z)) return;
+      const u = clamp(((tr.x - x0) * dx + (tr.z - z0) * dz) / L2, 0, 1), ex = tr.x - x0 - dx * u, ez = tr.z - z0 - dz * u;
+      if (ex * ex + ez * ez < (w + tr.rad) ** 2 && rand() < pr && !FAN.q.some(q => q.ck === ck && q.i === i)) FAN.q.push({ ck, i, at: time + u * 0.4 + rand() * 0.5 });
+    }); }
+}
+function fanSend(x, z, dx, dz, k, R, s, b) {
+  if (!(NET.on && NET.ch) || realm !== 'over') return;
+  const L = Math.hypot(dx, dz) || 1;
+  NET.ch.send({ type: 'broadcast', event: 'fan', payload: { i: NET.id, x: Math.round(x), z: Math.round(z), d: [+(dx / L).toFixed(2), +(dz / L).toFixed(2)], k: +k.toFixed(2), r: Math.round(R), s, b: b ? b.map(v => Math.round(v * 100) / 100) : undefined } });
+}
+function gotFan(m) {
+  if (!m || !ok(m.i) || realm !== 'over' || state === 'title') return;
+  const P = peerOf(m.i); if (flood(P) || SHUN.block.has(P.name) || !Array.isArray(m.d)) return;
+  const x = num(m.x, -1e6, 1e6), z = num(m.z, -1e6, 1e6), c = camera.position; if ((x - c.x) ** 2 + (z - c.z) ** 2 > 2600 * 2600) return;
+  const k = num(m.k, 0, 2.5), R = num(m.r, 4, 160), s = num(m.s, 0, 2 ** 31) | 0;
+  fanAt(x, z, num(m.d[0], -1, 1), num(m.d[1], -1, 1), k, R, s);
+  if (Array.isArray(m.b) && m.b.length >= 5) { const b = m.b.map(v => num(v, -1e6, 1e6)); if (Math.hypot(b[2] - b[0], b[3] - b[1]) < 600) fanBlaze(b[0], b[1], b[2], b[3], clamp(b[4], 2, 60), s, clamp(b[5] ?? 0.8, 0, 0.8)); }
+}
+// a beat of his wings: is there fire near enough to fan?
+function fanFlap(hard) {
+  const p = player; if (!BLAZE.burning || realm !== 'over' || p.form !== 'phoenix') return;
+  const K = birdK(), R = 38 * K * (GODM.on ? 1.5 : 1); let near = 1e9;
+  for (const f of BLAZE.list) if (f.t < F_BLACK && f.t > 0.5) { const d = Math.hypot(f.x - p.pos.x, f.z - p.pos.z); if (d < near) near = d; }
+  if (near > R) return;
+  const g = Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER), up = clamp(1 - (p.pos.y - g - 20 * K) / (60 * K), 0, 1);   // (from high above, a beat is felt less)
+  const k = (0.1 + 0.25 * hard + clamp(p.speed / 220, 0, 1)) * up * (GODM.on ? 1.4 : 1); if (k < 0.08) return;
+  const s = (Math.random() * 2 ** 31) | 0;
+  fanAt(p.pos.x, p.pos.z, dir3.x, dir3.z, k, R, s);
+  if (FAN.sendT <= 0) { FAN.sendT = 0.5; fanSend(p.pos.x, p.pos.z, dir3.x, dir3.z, k, R, s); }
+}
+// every tenth of a second, from the scan in updateFire: the air of his passing
+function fanPass(dt) {
+  const p = player, K = birdK(), sp = p.speed || 0, god = GODM.on;
+  if (realm !== 'over' || state !== 'play' || p.form !== 'phoenix' || p.sub || p.cine || p.perch || SH.def) { FAN.last = null; return; }
+  // how far above the treetops he is, if there are trees under him
+  let top = -1e9; treesNear(p.pos.x, p.pos.z, 10 + 6 * K, (g, ck, i, t) => { if (!t.fell && (t.x - p.pos.x) ** 2 + (t.z - p.pos.z) ** 2 < (t.rad + 6 * K) ** 2) top = Math.max(top, t.top); });
+  const g = groundAt(p.pos.x, p.pos.z, p.pos.y), alt = p.pos.y - Math.max(top, g), wet = g < WATER + 0.3 || WX.rain > 0.45;
+  const low = smoothstep(26 * K * (god ? 1.6 : 1), 6 * K, alt), fast = clamp((sp - 35) / 110, 0, 2) * (god ? 1.4 : 1);
+  // a fire near him gets fanned by the air he drags, beat or no beat
+  if (BLAZE.burning && low > 0.05 && fast > 0.1) { const R = (24 + 26 * Math.min(fast, 1.6)) * K, k = fast * low;
+    let any = false; for (const f of BLAZE.list) if (f.t < F_BLACK && f.t > 0.5 && (f.x - p.pos.x) ** 2 + (f.z - p.pos.z) ** 2 < R * R) { any = true; break; }
+    if (any && (FAN.passT -= 0.1) <= 0) { FAN.passT = 0.3; const s = (Math.random() * 2 ** 31) | 0; fanAt(p.pos.x, p.pos.z, dir3.x, dir3.z, k, R, s); if (FAN.sendT <= 0) { FAN.sendT = 0.5; fanSend(p.pos.x, p.pos.z, dir3.x, dir3.z, k, R, s); } }
+    // through the thick of it, fast: he comes out the other side carrying it, and for a moment the wood under him catches as he goes
+    if (k > 0.35) for (const f of BLAZE.list) if (f.t < F_BLACK && f.t > F_CATCH && (f.x - p.pos.x) ** 2 + (f.z - p.pos.z) ** 2 < (14 * K) ** 2) { FAN.carry = Math.max(FAN.carry, Math.min(2.2, 0.5 + k)); break; } }
+  FAN.carry = Math.max(0, FAN.carry - 0.1);
+  // flat out and low over the wood (or a god, fast): the whole stretch under him goes up
+  const blaze = top > -1e9 && !wet && low > 0.4 && (sp > 125 || god && sp > 70), drag = !blaze && FAN.carry > 0 && top > -1e9 && !wet && low > 0.3;
+  if (blaze || drag) { if (!FAN.last) FAN.last = FAN.sent = { x: p.pos.x, z: p.pos.z, t: time };
+    else if (Math.hypot(p.pos.x - FAN.last.x, p.pos.z - FAN.last.z) > 45 || time - FAN.last.t > 0.5) { const L = FAN.last, w = (blaze ? 7 + 5 * Math.min(fast, 2) : 3 + 3 * Math.min(fast, 1.5)) * K, pr = blaze ? 0.8 : 0.55, s = (Math.random() * 2 ** 31) | 0;
+      fanBlaze(L.x, L.z, p.pos.x, p.pos.z, w, s, pr); if (FAN.sendT <= 0.25) { const F = FAN.sent || L; FAN.sendT = 0.5; fanSend(p.pos.x, p.pos.z, dir3.x, dir3.z, 0, 4, s, [F.x, F.z, p.pos.x, p.pos.z, w, pr]); FAN.sent = { x: p.pos.x, z: p.pos.z }; }   // (sent from where the last one he sent ended, so the others miss none of it)
+      FAN.last = { x: p.pos.x, z: p.pos.z, t: time }; } }
+  else FAN.last = null;
+  // fast and low over a dry wood, nothing burning yet: the heat of him may be enough to start it
+  if (!blaze && top > -1e9 && !wet && low > 0.3 && Math.random() < fireStart(low, sp) * 3) igniteNear(p.pos.x, p.pos.z, 5 + 4 * K, true);
+}
+// the chance, at one look, that the heat of him starts a fire under him (the scorch trail over grass asks the same)
+const fireStart = (heat, speed) => heat * clamp((speed - 45) / 80, 0, 1.5) * 0.02;
+function updateFan(dt) {
+  const t0 = performance.now(); FAN.sendT -= dt;
+  // what the gusts have set going catches a few to a frame, in the order it reaches them
+  if (FAN.q.length) { FAN.q.sort((a, b) => a.at - b.at); let n = 0;
+    while (FAN.q.length && FAN.q[0].at <= time && n < (TOUCH ? 3 : 6)) { const q = FAN.q.shift(); n++; if (realm === 'over' && !(WX.rain > 0.6)) ignite(q.ck, q.i, false); } }
+  // through the smoke: the air goes close and dark
+  if ((FAN.smokeT -= dt) < 0) { FAN.smokeT = 0.15; const S = SMOKE, c = camera.position; let k = 0;
+    if (realm === 'over' && S.live !== 0) for (let i = 0; i < S.N; i++) { if (!(S.age[i] < S.life[i])) continue; const u = S.age[i] / S.life[i], r = lerp(S.s0[i], S.s1[i], u), dx = S.x[i] - c.x, dy = S.y[i] - c.y, dz = S.z[i] - c.z, d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < r * r) k += (1 - Math.sqrt(d2) / r) * (S.a0[i] || 0.6) * (1 - 0.6 * u); }
+    FAN.smokeW = clamp(k * 0.6, 0, 0.85); }
+  FAN.smoke = lerp(FAN.smoke, FAN.smokeW || 0, damp(3, dt));
+  if (FAN.smoke > 0.01) { const k = FAN.smoke, f = (1 - k) * (1 - k); scene.fog.color.lerp(SOOT.fog, k * 0.7); scene.fog.near = Math.min(scene.fog.near, scene.fog.near * f + 2 * (1 - f)); scene.fog.far = Math.min(scene.fog.far, scene.fog.far * f + 160 * (1 - f)); }   // (thick smoke closes in fast: half of it and the far hills are gone)
+  FAN.ms = FAN.ms * 0.95 + (performance.now() - t0) * 0.05;
 }
 // What fire leaves on the ground: a black mark, ragged at the edge, with a line of embers still alive round it for a few
 // seconds. Under a tree that burned, along the grass where the bird flew low enough to singe it, where he set down,
@@ -17266,7 +17386,7 @@ function skidFrom(src, x, y, z, K, speed, god, hx, hz, mine) {
   if (d2 < 900 * 900 && Math.random() < heat * 0.12) smokePuff(x - hx * 3, g + 0.6, z - hz * 3, 1.2 * K, Math.sqrt(d2), 0);
   if (mine && realm === 'over' && (kind === 'grass' || kind === 'leaves')) {
     if (heat > 0.45 && flowerAt(x, z) > 0.15 && Math.random() < 0.35 * heat) scorchFlowers(x, z, 2.5 * K);
-    if (heat > 0.6 && Math.random() < 0.012 * heat) igniteNear(x, z, 4 + 3 * K, true);   // (not every time: a tree he grazes may go up)
+    if (Math.random() < fireStart(heat, speed) * 0.6) igniteNear(x, z, 4 + 3 * K, true);   // (not every time: a tree he grazes may go up; the same odds as over a wood, see fireStart)
   }
 }
 // every frame: him, and whoever else is flying low near enough to be seen doing it
@@ -33514,7 +33634,7 @@ setTimeout(() => {
   titleStart();
   warmPrograms();
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
-    camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
+    camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { NEWB, newbHear, newbHeard, newbTyped, newbTalk, newbFallback, newbArrive });
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
