@@ -183,7 +183,7 @@ export function createAudio() {
     // (They wrap round the end of the buffer, so it loops without a seam.)
     const crk = (d, at, amp, small) => {
       const big = !small && amp > 0.45, len = Math.floor(sr * (big ? 0.07 : 0.022)), N = d.length;
-      const sn = Math.max(2, Math.floor(sr * (small ? rnd(0.00005, 0.0002) : rnd(0.00008, 0.0005)))), lk = 1 - Math.exp(-2 * Math.PI * rnd(small ? 4000 : 2500, small ? 8000 : 6500) / sr);
+      const sn = Math.max(4, Math.floor(sr * (small ? rnd(0.0001, 0.0002) : rnd(0.0001, 0.0005)))), lk = 1 - Math.exp(-2 * Math.PI * rnd(small ? 3500 : 2500, small ? 5500 : 5000) / sr);   // (never quicker than four samples, never brighter than 5.5 kHz: quicker and brighter measured as a step, a click)
       const f = rnd(700, 2800), r = Math.exp(-1 / (rnd(0.0005, 0.0028) * sr)), c1 = 2 * r * Math.cos(2 * Math.PI * f / sr), c2 = -r * r;
       const tf = rnd(110, 320), tt = rnd(0.004, 0.012), th = big ? rnd(0.3, 0.7) : 0, ring = small ? 0.15 : rnd(0.3, 0.8);
       const a = new Float32Array(len), b = new Float32Array(len); let lp = 0, y1 = 0, y2 = 0, pa = 1e-9, pb = 1e-9;
@@ -291,11 +291,11 @@ export function createAudio() {
     subF = biq('lowpass', 20000, 0.5);   // closes when his head is under water
     glue = comp(-14, 12, 2.2, 0.02, 0.3);
     limiter = comp(-3, 0, 20, 0.002, 0.1);
-    post = chain(master, biq('highpass', 22, 0.7), subF, glue, limiter);   // (what is under 22 Hz is not sound: it only uses up the room the limiter has)
+    post = chain(master, biq('highpass', 22, 0.7), subF, glue, limiter, gain(0.82));   // (what is under 22 Hz is not sound: it only uses up the room the limiter has. The two compressors add back gain of their own, so the limiter's output is taken down 1.7 dB: in the busiest scene it still peaks under the soft clip's knee.)
     if (ctx.createWaveShaper) {
       const n = 2049, c = new Float32Array(n), sh = ctx.createWaveShaper();
       for (let i = 0; i < n; i++) { const x = (i / (n - 1) * 2 - 1) * 2, a = Math.abs(x); c[i] = Math.sign(x) * (a < 0.7 ? a : 0.7 + 0.28 * Math.tanh((a - 0.7) / 0.28)); }
-      sh.curve = c; post = chain(post, gain(0.5), sh);
+      sh.curve = c; sh.oversample = low() ? '2x' : '4x'; post = chain(post, gain(0.5), sh);   // (worked out at a higher rate: when something does reach the curve, it bends without throwing fizz back down into what is heard)
     }
     chain(post, muteGain, ctx.destination);
     // Six speakers, where there are six. What is in front stays in front; the middle speaker carries a little of both
@@ -356,14 +356,17 @@ export function createAudio() {
     // his fire: the roar (its waver is in the recording of it, never two oscillators beating), and the crackle of it on
     // each side — sparse, and dark enough to be wood and not static
     W.fire = band(roar, 1, [biq('lowpass', 480, 0.5)], 0, airBus);
-    W.crackle = [band(crackle, 0.72, [biq('lowpass', 5200, 0.5)], low() ? 0 : -0.35, airBus)];
-    if (!low()) W.crackle.push(band(crackle, 0.83, [biq('lowpass', 6000, 0.5)], 0.35, airBus));
+    W.crackle = [band(crackle, 0.72, [biq('lowpass', 3800, 0.5)], low() ? 0 : -0.35, airBus)];
+    if (!low()) W.crackle.push(band(crackle, 0.83, [biq('lowpass', 4200, 0.5)], 0.35, airBus));
     // his feathers: what the air does to them when it is not smooth
-    if (low()) W.ruf = [band(ruffle, 1, [biq('bandpass', 2400, 0.6)], 0, airBus)];
-    else W.ruf = [band(ruffle, 1, [biq('bandpass', 2400, 0.6)], -0.6, airBus), band(ruffle, 1.13, [biq('bandpass', 2600, 0.6)], 0.6, airBus)];
+    // (and nothing of them above about 4 kHz: at speed, over half of them was up there, and it read as fizz)
+    if (low()) W.ruf = [band(ruffle, 1, [biq('bandpass', 2400, 0.6), biq('lowpass', 4200, 0.5)], 0, airBus)];
+    else W.ruf = [band(ruffle, 1, [biq('bandpass', 2400, 0.6), biq('lowpass', 4200, 0.5)], -0.6, airBus), band(ruffle, 1.13, [biq('bandpass', 2600, 0.6), biq('lowpass', 4200, 0.5)], 0.6, airBus)];
     W.water = band(pink, 0.8, [biq('bandpass', 700, 0.6)], 0, ambBus);
-    W.foam = band(white, 1, [biq('highpass', 2600, 0.5), biq('lowpass', 6500, 0.5)], 0, ambBus);
-    W.rain = band(white, 1, [biq('highpass', 1400, 0.4), biq('lowpass', 8000, 0.5)], 0, ambBus);
+    // (the spray and the rain: pink, in a band, and never at a steady level. They used to be white noise high-passed —
+    //  two thirds of their energy over 4 kHz, flat, constant — and that is what static is.)
+    W.foam = band(pink, 1, [biq('bandpass', 2600, 0.8), biq('lowpass', 5000, 0.5)], 0, ambBus);
+    W.rain = band(pink, 1, [biq('bandpass', 2000, 0.45), biq('lowpass', 5500, 0.5)], 0, ambBus);
     W.rainLow = band(pink, 1, [biq('bandpass', 420, 0.5)], 0, ambBus);
     // wings buffeting (a man's, or his own in another bird's wake): low noise fluttered by an LFO
     {
@@ -486,8 +489,10 @@ export function createAudio() {
     const L = samples[name]; if (!L || !L.length || !ctx || live > cap() || !(vol > 0)) return false;
     let k = Math.floor(Math.random() * L.length); if (L.length > 1 && k === lastTake[name]) k = (k + 1 + Math.floor(Math.random() * (L.length - 1))) % L.length;
     lastTake[name] = k;
-    const S = L[k], s = ctx.createBufferSource(), g = gain(vol * trim * S.gain * rnd(0.88, 1.06));
+    const S = L[k], s = ctx.createBufferSource(), g = gain(0), v = vol * trim * S.gain * rnd(0.88, 1.06);
     s.buffer = S.buf; s.playbackRate.value = rate * rnd(0.97, 1.03) * dop;
+    { const t0 = t ?? ctx.currentTime, end = t0 + (S.buf.duration - S.off) / s.playbackRate.value;   // (in over 4 ms and out over the last 12: a take begun mid-wave, or cut off at its end, is a click)
+      g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(v, t0 + 0.004); g.gain.setValueAtTime(v, Math.max(t0 + 0.004, end - 0.012)); g.gain.linearRampToValueAtTime(0, end); }
     if (pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); chain(s, g, p, dest || sfxBus); done(s, [s, g, p]); }
     else { chain(s, g, dest || sfxBus); done(s, [s, g]); }
     s.start(t ?? ctx.currentTime, S.off);
@@ -502,9 +507,10 @@ export function createAudio() {
     const peak = analyse(buf)?.gain || 1; buf = seamless(buf);
     const s = ctx.createBufferSource(), g = gain(0);
     s.buffer = buf; s.loop = true; s.playbackRate.value = 1;
-    chain(s, g, name === 'rainloop' || name === 'waterloop' ? ambBus : airBus);
+    const head = name === 'rainloop' ? biq('lowpass', 5200, 0.5) : g;   // (the recorded rain had two thirds of itself above 4 kHz: a hiss over everything in a storm)
+    if (head !== g) chain(s, head, g, ambBus); else chain(s, g, name === 'waterloop' ? ambBus : airBus);
     s.start(ctx.currentTime, Math.random() * buf.duration);
-    loops[name] = { s, g, peak, head: g, on: true, off: 0 };
+    loops[name] = { s, g, peak, head, on: true, off: 0 };
   }
   // (A recording looped end to start jumps where it comes round: the fall and the rain by half their own loudness, every
   //  nine seconds — a tick. Its last tenth of a second is laid over its first instead, so it goes round without a seam.)
@@ -1774,15 +1780,15 @@ export function createAudio() {
   //   at full level (ref), how far it carries (max), and whether passing it at speed is worth a sound of its own
   const EMK = {
     // (a fire: the roar of it, and the wood crackling — dark, so that it is fire and not static; nothing high-passed)
-    fire: { a: ['roar', 'lowpass', 900, 0.5, 0.28, 1], b: ['crackle', 'lowpass', 7000, 0.5, 0.85, 0.95], ref: 14, max: 280, pass: 'fire' },
+    fire: { a: ['roar', 'lowpass', 900, 0.5, 0.28, 1], b: ['crackle', 'lowpass', 5200, 0.5, 0.85, 0.95], ref: 14, max: 280, pass: 'fire', dense: true },
     torch: { a: ['roar', 'lowpass', 1200, 0.5, 0.12, 1.25], b: ['crackle', 'lowpass', 7000, 0.5, 0.5, 1.3], ref: 5, max: 80 },
     ring: { a: ['roar', 'lowpass', 1000, 0.6, 0.26, 1.1], b: ['crackle', 'lowpass', 6500, 0.5, 0.55, 1.05], tone: ['sine', 196, 0.03], ref: 14, max: 320, pass: 'fire' },
     bird: { a: ['brown', 'lowpass', 760, 0.6, 0.36, 1.4], b: ['pink', 'bandpass', 950, 0.7, 0.4, 1], ref: 9, max: 240, pass: 'bird' },
-    waterfall: { a: ['brown', 'lowpass', 950, 0.5, 0.56, 1], b: ['pink', 'highpass', 2600, 0.5, 0.1, 1], ref: 34, max: 600 },
-    storm: { a: ['brown', 'lowpass', 150, 0.5, 1, 0.5], b: ['white', 'bandpass', 2600, 0.4, 0.08, 1], ref: 320, max: 2800 },
+    waterfall: { a: ['brown', 'lowpass', 950, 0.5, 0.56, 1], b: ['pink', 'bandpass', 2600, 0.6, 0.1, 1], ref: 34, max: 600 },
+    storm: { a: ['brown', 'lowpass', 150, 0.5, 1, 0.5], b: ['pink', 'bandpass', 2200, 0.6, 0.08, 1], ref: 320, max: 2800 },
     god: { a: ['pink', 'bandpass', 1900, 7, 0.07, 1], tone: ['sine', 73.42, 0.16], ref: 40, max: 700 },
     twister: { a: ['brown', 'lowpass', 190, 0.6, 1, 0.7], b: ['pink', 'bandpass', 720, 1.4, 0.28, 1], ref: 70, max: 1000 },
-    sea: { a: ['brown', 'lowpass', 320, 0.5, 0.7, 0.8], b: ['pink', 'highpass', 1900, 0.5, 0.1, 1], ref: 40, max: 500 },
+    sea: { a: ['brown', 'lowpass', 320, 0.5, 0.7, 0.8], b: ['pink', 'bandpass', 1900, 0.6, 0.1, 1], ref: 40, max: 500 },
     lava: { a: ['brown', 'lowpass', 230, 0.6, 0.9, 0.8], b: ['crackle', 'bandpass', 900, 0.8, 0.7, 0.6], ref: 30, max: 420 },
     wind: { a: ['pink', 'bandpass', 620, 0.6, 0.5, 1], ref: 30, max: 400 },
     hum: { a: ['brown', 'lowpass', 260, 0.6, 0.3, 1], tone: ['triangle', 82, 0.06], ref: 12, max: 260 },
@@ -1791,8 +1797,10 @@ export function createAudio() {
   const tnow = () => offline || typeof performance === 'undefined' ? (ctx ? ctx.currentTime : 0) : performance.now() / 1000;
   function emitDrop(E) {
     const V = E.V; if (!V) return; E.V = null; EM.n--;
-    for (const L of [V.a, V.b]) if (L) { try { L.s.stop(); } catch {} lastP.delete(L.s.playbackRate); lastP.delete(L.f.frequency); }
-    if (V.o) { try { V.o.stop(); } catch {} lastP.delete(V.o.frequency); }
+    // (faded out over a few milliseconds before anything stops: a source stopped while it is still heard is a click)
+    const n = ctx.currentTime; try { V.g.gain.cancelScheduledValues(n); V.g.gain.setTargetAtTime(0, n, 0.012); } catch {}
+    for (const L of [V.a, V.b]) if (L) { try { L.s.stop(n + 0.1); } catch {} lastP.delete(L.s.playbackRate); lastP.delete(L.f.frequency); lastP.delete(L.g.gain); }
+    if (V.o) { try { V.o.stop(n + 0.1); } catch {} lastP.delete(V.o.frequency); }
     if (V.h) V.h.stop(0.05);
     lastP.delete(V.g.gain); if (V.pn.positionX) { lastP.delete(V.pn.positionX); lastP.delete(V.pn.positionY); lastP.delete(V.pn.positionZ); }
     setTimeout(() => { try { V.g.disconnect(); V.pn.disconnect(); } catch {} }, 250);
@@ -1802,7 +1810,7 @@ export function createAudio() {
     pn.panningModel = low() || surround || offline || LEAN.on ? 'equalpower' : 'HRTF'; pn.distanceModel = 'linear'; pn.rolloffFactor = 0;   // (how loud it is at this distance is worked out here, not by the panner)
     if (pn.positionX) { pn.positionX.value = E.x; pn.positionY.value = E.y; pn.positionZ.value = E.z; } else pn.setPosition(E.x, E.y, E.z);
     chain(g, pn, worldBus);
-    const layer = L => { const s = loop(BUF[L[0]] || pink, L[5]), f = biq(L[1], L[2], L[3]); chain(s, f, gain(L[4]), g); return { s, f }; };
+    const layer = L => { const s = loop(BUF[L[0]] || pink, L[5]), f = biq(L[1], L[2], L[3]), lg = gain(L[4]); chain(s, f, lg, g); return { s, f, g: lg }; };
     if (K.a) V.a = layer(K.a); if (K.b) V.b = layer(K.b);
     if (K.tone) { const o = ctx.createOscillator(); o.type = K.tone[0]; o.frequency.value = K.tone[1]; o.start(); chain(o, gain(K.tone[2]), g); V.o = o; }
     if (E.kind === 'thing') { const R = E.recipe ? recipe({ ...pickKeys(E.recipe), kind: 'loop' }) : voiceFor(E.thing || { name: E.id }).idle; V.h = makeLoop(R, { dest: g, life: Infinity }); }
@@ -1830,14 +1838,17 @@ export function createAudio() {
       if (gone && !E.V) EM.all.delete(E.id); else list.push(E);
     }
     list.sort((a, b) => b.score - a.score);
+    // (a forest on fire is many fires: each one's crackle is drawn back by how many are sounding, so together they are
+    //  as dense as about one, and do not add up to a wall of snaps)
+    let dense = 0; for (let i = 0; i < Math.min(maxV, list.length); i++) if (EMK[list[i].kind].dense && list[i].aud > 0.004) dense++;
     for (let i = 0; i < list.length; i++) {
       const E = list[i], want = i < maxV && E.aud > 0.004;
       if (want && !E.V && live < cap() - 10) emitVoice(E);
       const V = E.V; if (!V) continue;
-      const K = V.K, behind = Math.max(0, -E.fwd), rear = 1 - 0.4 * behind, dp = E.dop * E.pitch, target = want ? E.aud * (1 - 0.25 * behind) : 0;
+      const K = V.K, behind = Math.max(0, -E.fwd), rear = 1 - 0.4 * behind, dp = E.dop * E.pitch, target = want && !V.retire ? E.aud * (1 - 0.25 * behind) : 0;
       P(V.g.gain, target, target > V.last ? 0.08 : 0.12); V.last = target;
       if (V.a) { P(V.a.s.playbackRate, K.a[5] * dp, 0.06); P(V.a.f.frequency, Math.min(16000, K.a[2] * dp * rear), 0.06); }
-      if (V.b) { P(V.b.s.playbackRate, K.b[5] * dp, 0.06); P(V.b.f.frequency, Math.min(16000, K.b[2] * dp * rear), 0.06); }
+      if (V.b) { P(V.b.s.playbackRate, K.b[5] * dp, 0.06); P(V.b.f.frequency, Math.min(16000, K.b[2] * dp * rear), 0.06); if (K.dense) P(V.b.g.gain, K.b[4] / Math.sqrt(Math.max(1, dense)), 0.3); }
       if (V.o) P(V.o.frequency, K.tone[1] * dp, 0.06);
       if (V.h && Math.abs(dp - (V.dp || 1)) > 0.002) { V.dp = dp; V.h.bend(dp); }
       if (V.pn.positionX) { Pabs(V.pn.positionX, E.x, 0.04, 0.02); Pabs(V.pn.positionY, E.y, 0.04, 0.02); Pabs(V.pn.positionZ, E.z, 0.04, 0.02); } else { try { V.pn.setPosition(E.x, E.y, E.z); } catch {} }
@@ -1871,7 +1882,12 @@ export function createAudio() {
     if (!ctx) return;
     { const w = typeof performance !== 'undefined' ? performance.now() / 1000 : 0, raw = LEAN.w ? Math.min(1, w - LEAN.w) : 0; LEAN.w = w;   // (how the frames are really going, by the wall clock: see LEAN)
       if (raw > 0.05) { LEAN.slow += raw; LEAN.quick = 0; } else { LEAN.quick += raw; if (LEAN.quick > 1) LEAN.slow = Math.max(0, LEAN.slow - raw); }
-      if (!LEAN.on && LEAN.slow > 2.5 && !offline) { LEAN.on = true; for (const E of EM.all.values()) if (E.V) try { E.V.pn.panningModel = 'equalpower'; } catch {} }
+      // (and the sound's own thread: where the browser says how often it had nothing ready in time — each of those is a
+      //  crackle — three in a few seconds is reason enough to go lean, whatever the frames are doing)
+      if (!offline && (LEAN.pt = (LEAN.pt || 0) - raw) <= 0) { LEAN.pt = 0.5; const ps = ctx.playoutStats, f = ps && ps.fallbackFramesEvents;
+        if (Number.isFinite(f)) { if (LEAN.fb !== undefined && f > LEAN.fb) LEAN.glitch = (LEAN.glitch || 0) + Math.min(5, f - LEAN.fb); LEAN.fb = f; }
+        LEAN.glitch = Math.max(0, (LEAN.glitch || 0) - 0.15); if (LEAN.glitch >= 3) { LEAN.slow = Math.max(LEAN.slow, 3); LEAN.quick = 0; } }
+      if (!LEAN.on && LEAN.slow > 2.5 && !offline) { LEAN.on = true; for (const E of EM.all.values()) if (E.V) E.V.retire = true; }   // (a panner changed while it sounds jumps: the voices fade out instead, and come back plain)
       else if (LEAN.on && LEAN.quick > 30) { LEAN.on = false; LEAN.slow = 0; } }
     dt = clamp(+dt || 0, 0, 0.25); clock += dt; tAcc += dt;
     const now = ctx.currentTime, st = s.state || 'play', form = s.form || 'human';
@@ -2009,15 +2025,17 @@ export function createAudio() {
     W.ruf.forEach((m, k) => {
       const side = W.ruf.length > 1 ? (k ? 1 : -1) : 0;
       bed(m, plume * fl.turb * (0.75 + 0.25 * (k ? g1 : g2)) * (1 + side * bank * 0.35) * 0.9, 0.05);
-      P(m.f.frequency, (wings ? 1300 : 1700) + sp * 1000 + fl.turb * 500, 0.2);   // (no higher than about 4 kHz: above that a flutter is a fizz)
-      P(m.s.playbackRate, m.rate * (0.8 + sp * 0.45 + fl.turb * 0.35), 0.2);
+      P(m.f.frequency, Math.min(2900, (wings ? 1300 : 1700) + sp * 1000 + fl.turb * 500), 0.2);   // (no higher than about 3 kHz: above that, at speed, a flutter was a fizz: over half of it above 4 kHz)
+      P(m.s.playbackRate, m.rate * Math.min(1.45, 0.8 + sp * 0.45 + fl.turb * 0.35), 0.2);
     });
     // ── fire: his own. It roars with speed, is torn harder the faster he goes, gasps on every wingbeat, and takes a
     //    mouthful whenever it finds something to burn
     const fireOn = !title && !dead, kf = kick.flap * 0.5 + kick.fire;
     bed(W.fire, (!fireOn ? 0 : s.burning ? 0.5 : phoenix ? 0.07 + flame * 0.1 + sp * 0.09 + kf * 0.1 : wings && air ? 0.04 : 0) * kX * 0.4, 0.2);
     if (W.fire.on) { P(W.fire.f.frequency, 360 + sp * 480 + (s.burning ? 500 : 0) + kf * 260, 0.3); P(W.fire.s.playbackRate, 0.9 + Math.min(sp, 1.4) * 0.3 + kf * 0.1, 0.4); }   // (torn faster, the faster he goes)
-    const fc = !fireOn ? 0 : s.burning ? 0.5 : phoenix ? 0.09 + flame * 0.12 + kf * 0.05 : wings ? 0.05 : 0;
+    // (his own crackle is heard when the fire is worked — a wingbeat, the boost, something caught — and hardly between: on
+    //  all the time, twenty snaps a second, it was the static heard all through a flight)
+    const fc = !fireOn ? 0 : s.burning ? 0.4 : phoenix ? 0.025 + flame * 0.03 + kf * 0.16 + (s.boost ? 0.04 : 0) : wings ? 0.03 : 0;
     W.crackle.forEach((m, k) => { bed(m, fc * (k ? 1.1 : 1.4), 0.3); if (m.on) P(m.s.playbackRate, m.rate * (0.92 + sp * 0.25), 0.5); });
     // ── wings as a man; and his own, as a bird, in the broken air behind another
     if (now > WK.until) WK.tgt = 0; WK.cur += (WK.tgt - WK.cur) * (1 - Math.exp(-dtT / 0.25)); if (WK.cur < 0.003) WK.cur = 0;
@@ -2030,9 +2048,9 @@ export function createAudio() {
     const skim = title || dead ? 0 : clamp((+s.skim || 0) / 2), sub = clamp(+s.sub || 0);
     bed(W.water, Math.max(wet * (0.2 + 0.5 * wave) * kA, skim * 0.5, sub * 0.6), 0.3);
     P(W.water.f.frequency, sub > 0.5 ? 240 : 560 + wave * 380 + skim * 900, 0.4);
-    bed(W.foam, wet * wave * 0.05 + skim * 0.16, 0.2);
+    bed(W.foam, (wet * wave * 0.05 + skim * 0.11) * (0.4 + 0.6 * wander(clock * 3.7, 131)), 0.12);   // (spray comes in bursts)
     const rain = title || dead ? 0 : clamp(+s.rain || 0);   // a storm coming down on stone
-    bed(W.rain, rain * (0.3 + 0.08 * g1) * kR, 0.4); bed(W.rainLow, rain * 0.22 * kR, 0.4);
+    bed(W.rain, rain * (0.17 + 0.09 * g1) * (0.7 + 0.3 * wander(clock * 1.7, 141)) * kR, 0.3); bed(W.rainLow, rain * 0.22 * kR, 0.4);   // (heavier and lighter as the wind drives it)
     // ── the recorded beds: wind round him (harder, and higher, the faster he goes), the dive's roar, the rush of a fall,
     //    his fire, the storm's rain, water lapping nearby. Pitch rides speed so a recording never sounds like a recording.
     const muffle = sub > 0.5 ? 0.25 : 1;
@@ -2348,7 +2366,7 @@ export function createAudio() {
       if (!ctx || !(px + py + pz + fx + fy + fz === px + py + pz + fx + fy + fz)) return;   // (a lens with no place yet has no ears)
       const L = ctx.listener, t = ctx.currentTime;
       if (L.positionX) { L.positionX.setTargetAtTime(px, t, 0.04); L.positionY.setTargetAtTime(py, t, 0.04); L.positionZ.setTargetAtTime(pz, t, 0.04);
-        L.forwardX.setTargetAtTime(fx, t, 0.04); L.forwardY.setTargetAtTime(fy, t, 0.04); L.forwardZ.setTargetAtTime(fz, t, 0.04); L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }
+        L.forwardX.setTargetAtTime(fx, t, 0.04); L.forwardY.setTargetAtTime(fy, t, 0.04); L.forwardZ.setTargetAtTime(fz, t, 0.04); if (!ear.up) { ear.up = true; L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; } }   // (up is set once: set every frame, it was three more events a frame on the ears)
       else { try { L.setPosition(px, py, pz); L.setOrientation(fx, fy, fz, 0, 1, 0); } catch {} }
     },
     // a sound made once, at a place: o: { vol, ref, max, roll, life, vx, vy, vz (how the thing that made it is moving), doppler: false (leave its pitch alone) }
@@ -2416,7 +2434,8 @@ export function createAudio() {
       make(V.call, { t: t + d * 0.92 });
       return V;
     },
-    stats: () => ({ lean: LEAN.on, live, made, intensity, mode, step: stepN, samples: Object.keys(samples), loops: Object.keys(loops), claims: [...claims.keys()], duck: duckV.slice(), turb: fl.turb, turn: fl.turn, brush: BR.amt || 0, emitters: EM.all.size, voices: EM.n, things: things.loops.size }),
+    _debug: () => ({ W, loops, master, glue, limiter, post, EM }),   // (tests only: the insides, to listen at each layer of the mix)
+    stats: () => ({ lean: LEAN.on, glitches: +(LEAN.glitch || 0).toFixed(2), live, made, intensity, mode, step: stepN, samples: Object.keys(samples), loops: Object.keys(loops), claims: [...claims.keys()], duck: duckV.slice(), turb: fl.turb, turn: fl.turn, brush: BR.amt || 0, emitters: EM.all.size, voices: EM.n, things: things.loops.size }),
   };
   return api;
 }
