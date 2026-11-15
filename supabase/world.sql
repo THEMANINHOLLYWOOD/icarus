@@ -208,3 +208,19 @@ alter table public.world_areas
   add column if not exists wy real,
   add column if not exists wz real,
   add column if not exists wyaw real;
+
+-- ── The keeper's scenes (api/_story.js, /api/hub?fn=story): the campaign he writes in the studio. body is the scene as the
+-- page and the server both clean it (words, a place, a trigger, a few effects from a safe list: never code). Published ones
+-- are read by every player's page through the server; drafts only by him. Nobody reaches the table but the server's key.
+create table if not exists public.story_scenes (
+  id text primary key check (id ~ '^[a-z0-9_-]{2,40}$'),
+  body jsonb not null check (pg_column_size(body) <= 16384),
+  published boolean not null default false,
+  ord integer not null default 0,
+  by_email text not null default '',
+  at timestamptz not null default now()
+);
+create index if not exists story_scenes_published on public.story_scenes (published, ord);
+alter table public.story_scenes enable row level security;
+revoke all on public.story_scenes from anon, authenticated;
+grant select, insert, update, delete on public.story_scenes to service_role;

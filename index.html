@@ -655,6 +655,48 @@
   #qlog .ql-q span { color:#f4ead2; } #qlog i { font-style:normal; color:#9c958b; } #qlog u { text-decoration:none; color:#d8c8a0; }
   #qlog .ql-i, #qlog .ql-d, #qlog .ql-e, #qlog .ql-tot { margin:3px 0; padding:0 8px; } #qlog .ql-e { color:#7d776e; } #qlog .ql-tot { color:#ffd8a8; }
   .touch #qlog { font-size:11px; } .touch #qlog .ql-q { padding:8px; }
+  /* the keeper's studio: every mission, a clock for the story, the scene editor. Dark, monospace, ember; nothing dim to read */
+  #stu { position:fixed; left:50%; top:50%; transform:translate(-50%, -50%); z-index:31; width:min(840px, calc(100vw - 20px)); max-height:min(86vh, calc(100vh - var(--st, 0px) - var(--sb, 0px) - 20px)); display:none; flex-direction:column;
+    background:rgba(4,5,10,.95); border:1px solid rgba(255,190,130,.34); border-radius:4px; color:#f4ead2; font-family:ui-monospace, Menlo, Consolas, monospace; font-size:12px; letter-spacing:.03em; line-height:1.5; box-shadow:0 0 40px rgba(0,0,0,.65); pointer-events:auto; -webkit-tap-highlight-color:transparent; }
+  #stu.on { display:flex; }
+  #stu.dock { top:calc(var(--st, 0px) + 8px); transform:translateX(-50%); max-height:min(52vh, 440px); } #stu.dock .sc-now { max-height:8.2em; overflow-y:auto; min-height:0; }   /* (the clock keeps to the top: the words of the story are at the bottom) */
+  #stu.mini { width:min(720px, calc(100vw - 20px)); } #stu.mini nav, #stu.mini .st-test, #stu.mini .st-note, #stu.mini .sc-now { display:none; } #stu.mini .st-body { padding-bottom:6px; }
+  #stu .st-top { display:flex; align-items:center; gap:6px; padding:7px 10px; border-bottom:1px solid rgba(255,190,130,.2); color:#ffd8a8; letter-spacing:.2em; flex:none; }
+  #stu .st-top b { font-weight:400; margin-right:6px; white-space:nowrap; } #stu nav { display:flex; gap:4px; flex:1; flex-wrap:wrap; }
+  #stu button, #stu select, #stu input, #stu textarea { font:inherit; color:#f4ead2; background:rgba(255,190,130,.07); border:1px solid rgba(255,190,130,.32); border-radius:6px; }
+  #stu option { background:#0b0c12; color:#f4ead2; }
+  #stu button { min-height:32px; padding:0 10px; cursor:pointer; letter-spacing:.06em; white-space:nowrap; } #stu button:hover { border-color:#fff; color:#fff; }
+  #stu button:focus-visible, #stu input:focus-visible, #stu select:focus-visible, #stu textarea:focus-visible { outline:2px solid #ffb070; outline-offset:1px; }
+  #stu nav button.on, #stu .sc-sp button.on, #stu .ss-l button.on { background:rgba(255,176,112,.24); border-color:#ffb070; color:#fff; }
+  #stu button.sure { border-color:#ff8a6a; color:#ffc0a8; }
+  #stu .st-body { overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; padding:4px 12px 12px; overscroll-behavior:contain; }
+  #stu section { display:none; } #stu section.on { display:block; }
+  #stu .st-test { display:none; align-items:center; justify-content:space-between; gap:10px; padding:6px 12px; background:rgba(255,120,60,.14); color:#ffd8a8; border-bottom:1px solid rgba(255,150,90,.3); flex:none; } body.stutest #stu .st-test { display:flex; }
+  #stu .st-note, #stu .dim { color:#d6ccbb; font-size:11px; margin:8px 0 4px; } #stu .st-sum { color:#ffe6b0; margin:8px 0 2px; }
+  #stu .st-h { margin:14px 0 4px; color:#ffb070; letter-spacing:.16em; font-size:11px; }
+  #stu .st-m { display:grid; grid-template-columns:1fr auto; column-gap:12px; padding:6px 8px; margin:3px 0; background:rgba(255,255,255,.035); border-left:2px solid transparent; }
+  #stu .st-m:hover, #stu .st-m:focus-within { border-left-color:#ffb070; background:rgba(255,190,130,.08); }
+  #stu .st-m b { font-weight:400; color:#fff3dc; } #stu .st-m i { font-style:normal; color:#d6ccbb; font-size:11px; grid-column:1; } #stu .st-m em { font-style:normal; color:#ffd27a; font-size:11px; grid-column:1; }
+  #stu .st-m p { grid-row:1 / span 3; grid-column:2; margin:0; display:flex; gap:6px; align-items:center; }
+  #stu .sc-head { display:flex; justify-content:space-between; gap:10px; margin:8px 0 0; color:#ffd8a8; letter-spacing:.14em; } #stu .sc-head b { font-weight:400; } #stu .sc-t { color:#fff; letter-spacing:.06em; }
+  #stu .sc-bar { width:100%; margin:8px 0 0; padding:0; height:26px; accent-color:#ffb070; background:none; border:0; cursor:pointer; }
+  #stu .sc-marks { position:relative; height:36px; margin:0 9px; } #stu .sc-marks s { position:absolute; top:0; transform:translateX(-1px); text-decoration:none; font-size:10px; color:#f0e4cf; white-space:nowrap; cursor:pointer; padding:0 4px 0 3px; border-left:1px solid #ffb070; line-height:16px; }
+  #stu .sc-marks s.lo { top:18px; } #stu .sc-marks s.ln { top:-7px; height:7px; padding:0; border-left:2px solid #a9dcff; } #stu .sc-marks s:hover { color:#fff; border-color:#fff; }
+  #stu .sc-ctl { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0; } #stu .sc-sp { display:flex; gap:4px; margin-left:6px; } #stu .sc-pp { min-width:92px; }
+  #stu label.chk { display:inline-flex; gap:6px; align-items:center; color:#ffe6b0; cursor:pointer; } #stu label.chk input { width:18px; height:18px; accent-color:#ffb070; }
+  #stu .sc-now { margin:6px 0 0; padding:8px 10px; background:rgba(0,0,0,.5); border:1px solid rgba(255,190,130,.16); white-space:pre-wrap; overflow-wrap:anywhere; color:#f4ead2; font:inherit; font-size:11.5px; min-height:6em; }
+  #stu .ss-bar { margin:8px 0 0; } #stu .msg { color:#ffd27a; min-height:1.5em; margin:6px 0; }
+  #stu .ss { display:grid; grid-template-columns:minmax(180px, 32%) 1fr; gap:14px; align-items:start; } @media (max-width:640px) { #stu .ss { grid-template-columns:1fr; } }
+  #stu .ss-l button { display:block; width:100%; text-align:left; margin:0 0 4px; border-radius:4px; padding:6px 8px; white-space:normal; line-height:1.35; } #stu .ss-l button u { display:block; text-decoration:none; color:#d6ccbb; font-size:10.5px; }
+  #stu .ss-f > label { display:block; margin:10px 0 3px; color:#ffd8a8; font-size:11px; letter-spacing:.1em; } #stu .ss-f > label.chk { margin:10px 0 0; }
+  #stu .ss-f input[type=text], #stu .ss-f input[type=number], #stu .ss-f textarea, #stu .ss-f select { width:100%; box-sizing:border-box; padding:5px 8px; min-height:34px; }
+  #stu .ss-f textarea { min-height:150px; resize:vertical; line-height:1.45; }
+  #stu .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; } #stu .ss-f .row > select, #stu .ss-f .row > input { flex:1 1 120px; width:auto; } #stu .row.acts { margin-top:10px; }
+  #stu .fx { padding:6px; margin:0 0 6px; border:1px solid rgba(255,190,130,.18); border-radius:6px; } #stu .fx input[type=number] { flex:0 1 90px !important; }
+  .touch #stu button { min-height:42px; } .touch #stu .ss-f input, .touch #stu .ss-f select { min-height:42px; }
+  #stuBadge { position:fixed; left:50%; top:calc(var(--st, 0px) + 6px); transform:translateX(-50%); z-index:32; display:none; gap:8px; align-items:center; padding:5px 8px 5px 12px; background:rgba(20,8,4,.92); border:1px solid rgba(255,150,90,.5); border-radius:6px; color:#ffd8a8; font:11px ui-monospace, Menlo, monospace; letter-spacing:.16em; pointer-events:auto; }
+  #stuBadge button { font:inherit; letter-spacing:.06em; color:#f4ead2; background:rgba(255,190,130,.1); border:1px solid rgba(255,190,130,.4); border-radius:5px; min-height:30px; padding:0 9px; cursor:pointer; } #stuBadge button:hover { border-color:#fff; }
+  body.stutest #stuBadge { display:flex; } body.stutest:has(#stu.on) #stuBadge { display:none; }
   #modWall { position:fixed; inset:0; z-index:60; display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:#05070d; color:#ffb070; font-family:ui-monospace, Menlo, monospace; letter-spacing:.3em; text-align:center; padding:24px; }
   #modWall.on { display:flex; } #modWall b { font-size:15px; } #modWall span { font-size:11px; color:#9c958b; letter-spacing:.2em; }
   .asciiui #bars { display:none; }   /* (the film's black bars are drawn in the grid too, so what is typed there is not under them) */
@@ -5540,7 +5582,7 @@ function updateCine(dt) {
 // what the gods see him do — they bring it up later
 function witness(text, local = false) {
   story.events.push({ t: Date.now(), text });
-  if (!local) netShare(text);   // (what someone actually said is remembered here, never sent round the world)
+  if (!local && !STU?.test) netShare(text);   // (what someone actually said is remembered here, never sent round the world; nor what happens in a test)
   if (story.events.length > 40) story.events.shift();
   saveSoon();
 }
@@ -7303,7 +7345,8 @@ function updateWho(dt) {
   else if (flags.morphed) h += `<div class="none">${TOUCH ? 'tap a name to be carried to them · ➤ go · ◎ track · ⇢ follow · ♦ friend' : 'click a name and the gods will carry you to them'}</div>`;
   if (MOD.admin) { const kb = (k, t, title) => `<s data-n="__k" data-k="${k}" title="${title}">${t}</s>`, off = Date.now() < DECREE.until && DECREE.npcs === '00000000';
     h += `<div class="kp"><h4>THE KEEPER</h4><p>regulars ${kb(off ? 'npcon' : 'npcoff', off ? 'bring them back' : 'send all away', 'The game\'s own fliers')} ${kb('npcadd', '+ one more', 'Call up another regular')} ${kb('npcon', 'as they like', 'Let them come and go by themselves')}</p>`
-      + `<p>olympus ${['clear', 'storm', 'rain', 'mist', 'day', 'night'].map(w => kb('wx:' + w, w, 'Over Olympus, for everyone')).join(' ')}</p><p>everyone ${kb('go:me', 'to me', 'Carry everyone flying to you')} ${kb('go:oly', 'to the summit', 'Carry everyone to the top of Olympus')} ${kb('go:crete', 'to crete', 'Carry everyone to Crete')}</p></div>`; }
+      + `<p>olympus ${['clear', 'storm', 'rain', 'mist', 'day', 'night'].map(w => kb('wx:' + w, w, 'Over Olympus, for everyone')).join(' ')}</p><p>everyone ${kb('go:me', 'to me', 'Carry everyone flying to you')} ${kb('go:oly', 'to the summit', 'Carry everyone to the top of Olympus')} ${kb('go:crete', 'to crete', 'Carry everyone to Crete')}</p>`
+      + `<p>studio ${kb('studio', '◇ every mission · the clock · scenes', 'Your studio: go to and play any mission, drive the story clock, write scenes (/studio)')}</p></div>`; }
   el.innerHTML = h;
 }
 $('whoBtn').addEventListener('click', e => { e.stopPropagation(); who.pinned = !who.pinned; who.t = 0; });
@@ -8336,7 +8379,7 @@ function chatCommand(text) {
   if (globalThis.DAIMON?.command(c, arg)) return true;   // (his agents: /agents · /a NAME … · /yes · /no · /bless · /share · /send — see daimon/icarus.js)
   if (['kick', 'ban', 'ipban', 'unban', 'noclip', 'speed', 'spawn', 'summon', 'agent'].includes(c) && !MOD.admin) { sys(AUTH.s ? 'THAT IS NOT YOURS TO DO' : 'THAT IS NOT YOURS TO DO · THE KEEPER SIGNS IN FIRST'); return true; }
   switch (c) {
-    case 'help': case 'h': case 'commands': case '?': for (const [k, v] of CMD_HELP) sys(`${k} · ${v}`); if (MOD.admin) sys('KEEPER · /agent ANYTHING · /noclip · /speed N · /spawn GOD · /kick NAME · /ban NAME · /ipban NAME · /unban NAME'); return true;
+    case 'help': case 'h': case 'commands': case '?': for (const [k, v] of CMD_HELP) sys(`${k} · ${v}`); if (MOD.admin) sys('KEEPER · /studio (every mission, the clock, scenes) · /agent ANYTHING · /noclip · /speed N · /spawn GOD · /kick NAME · /ban NAME · /ipban NAME · /unban NAME'); return true;
     case 'agent': agentAsk(arg); return true;
     case 'god': case 'godmode': godMode(arg ? !off : !GODM.on); return true; case 'mortal': godMode(false); return true;
     case 'challenge': case 'duel': if (/^(end|stop|quit|leave|off)$/i.test((arg || '').trim())) matchStop(); else if (/^again$/i.test((arg || '').trim())) matchAgain(); else matchChallenge(arg); return true;
@@ -8366,6 +8409,7 @@ function chatCommand(text) {
     case 'all': case 'everyone': CH.cur = 'pub'; chShow(); if (arg) sendChat(arg); return true;
     case 'gather': case 'summonall': keeperAct(/^(olympus|summit|top)$/.test(low) ? 'go:oly' : /^crete$/.test(low) ? 'go:crete' : 'go:me'); return true;
     case 'weather': case 'wx': if (['clear', 'storm', 'rain', 'mist', 'day', 'night'].includes(low)) keeperAct('wx:' + low); else sys('/weather clear · storm · rain · mist · day · night'); return true;
+    case 'studio': if (!MOD.admin) { sys('THE STUDIO IS THE KEEPER\'S · SIGN IN FIRST'); return true; } stuOpen(/^(missions|clock|scenes)$/.test(low) ? low : ''); return true;
     case 'regulars': keeperAct(/^(off|away|none|0)$/.test(low) ? 'npcoff' : /^(more|add|\+)$/.test(low) ? 'npcadd' : 'npcon'); return true;
     case 'sky': case 'announce': if (!(KEEP_ON || MOD.admin)) { sys('THAT IS THE KEEPER\'S'); return true; } if (arg) { if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'god', payload: { i: NET.id, n: heroName, t: cleanText(arg) } }); skyWord(cleanText(arg), true); } return true;
     case 'small': case 'shrink': case 'tiny': case 'hawk': small(SMALL.want >= 1 || /^(on|yes)$/i.test(arg || ''), true); return true;
@@ -9997,6 +10041,7 @@ function decreeDo(kind, arg, mine, exp) {
 }
 const npcMask = i => Date.now() < DECREE.until ? DECREE.npcs[i] || 'a' : 'a';
 function keeperAct(k) {
+  if (k === 'studio') return stuOpen();
   const m = (Date.now() < DECREE.until ? DECREE.npcs : 'aaaaaaaa').split('');
   if (k === 'npcoff') return decree('npcs', '00000000');
   if (k === 'npcon') return decree('npcs', 'aaaaaaaa');
@@ -19886,7 +19931,7 @@ const SAVE_KEY = 'icarus.save.v3';
 let saveT = 20, resumed = false;
 function saveSoon() { saveT = Math.min(saveT, 1.5); }
 function saveGame() {
-  if (state === 'loading' || state === 'title' || WIPE.on) return;
+  if (state === 'loading' || state === 'title' || WIPE.on || STU?.test) return;   // (STU.test: a test in the keeper's studio; his own game is put aside)
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(saveData())); } catch {}
 }
 function saveData() {
@@ -20590,6 +20635,7 @@ const codeShow = c => c.replace(/(.{4})(?=.)/g, '$1-');
 const agoISO = t => { const s = (Date.now() - Date.parse(t)) / 1000; return !(s >= 0) ? '' : s < 120 ? 'just now' : s < 7200 ? `${Math.round(s / 60)} min ago` : s < 172800 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} days ago`; };
 const nameId = n => { if (!WORLD.nameIx.has(n)) { WORLD.nameIx.set(n, WORLD.names.length); WORLD.names.push(n); } return WORLD.nameIx.get(n); };
 function worldPost(body, beacon) {
+  if (STU?.test && body.op !== 'chart') return beacon ? null : Promise.resolve(null);   // (a test in the keeper's studio: the world is not told, and his journey is not overwritten)
   const s = JSON.stringify({ code: WORLD.code, name: heroName, realm, ...body });
   if (beacon) { try { navigator.sendBeacon?.('/api/world', new Blob([s], { type: 'application/json' })); } catch {} return null; }
   return fetch('/api/world', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: s }).then(r => r.ok ? r.json() : null).catch(() => null);
@@ -24058,13 +24104,13 @@ function frame() {
   HEALTH.frames++; if (raw > HEALTH.worst) HEALTH.worst = raw;
   adaptQuality(raw);
   if (state === 'photo') updatePhoto(Math.min(raw, 0.05));
-  tick(Math.min(raw, 0.05) * timeK);
+  tick(stuDt(Math.min(raw, 0.05) * timeK));   // (stuDt: the studio's clock, when the keeper has it stopped, slowed or hurried)
   finishPrograms();
 }
 function tick(dt) {
   time += dt;
   carryOff();   // (back to where the stone he is on was built: he does his own moving from there)
-  if (state === 'prologue') return updatePrologue(dt);
+  if (state === 'prologue') return updatePrologue(stuPro(dt));   // (stuPro: the keeper's studio, watching the opening)
   if (pro.waitMic) { pro.waitMic = false; $('primer').classList.remove('on'); }   // (the voice is only ever asked for over the black before the story)
   if (flags.flapHintT > 0) flags.flapHintT -= dt;
   if ((saveT -= dt) <= 0) { saveT = 20; saveGame(); }
@@ -24117,6 +24163,7 @@ function tick(dt) {
   updateLessons(dt); updateExplainer(dt); updatePrayPrompt(dt); updateTitleSync(); updateGodWorld(dt);
   chart(dt); try { updateWorld(dt); } catch (e) { if (!WORLD.err) { WORLD.err = String(e); console.warn('world', e); } } updateQuests(dt); updateGreat(dt); updateMap(dt); updateRemoteBeams(dt); updateNewcomer();
   updateAudio(dt);
+  stuTick(dt);   // (the keeper's studio, and the scenes he has published playing by their triggers)
   sky.position.copy(camera.position); stars.position.copy(camera.position);
   water.position.x = camera.position.x; water.position.z = camera.position.z;
   flash = Math.max(0, flash - (timeK > 0 ? dt / timeK : dt) * 1.6);
@@ -25909,6 +25956,533 @@ function areaFc(P, t) {
   return false;
 }
 
+// ───────────────────────── the keeper's studio ─────────────────────────
+// His alone (MOD.admin: a signed-in email the server lists, never a name), opened from his part of the players panel or
+// with /studio, closed with Esc. Three pages. MISSIONS: every beat of the story and every errand the game has, each a
+// button away: "go" carries him to where it happens, "play" sets the world up as it is at its start and begins it (again
+// and again, as often as he likes). CLOCK: the opening's own clock (and the ending's, and the day's) to stop, run back and
+// forward and run slower or faster, with what is happening written out under it; the speed is the whole game's while the
+// studio is open. SCENES: the story editor. Scenes of his own (words, who says them, where, what sets them off, what they
+// do), kept on this device, sent out and taken in as a file, and published through the server (api/_story.js) so that
+// they reach every player, whose pages play them by their triggers.
+// A test never touches his own game: the first "play" puts it aside (saveData(), and every icarus.* key that is progress
+// rather than a setting), nothing is saved or told to the world while the test runs, and "back to my own game" puts it all
+// back and starts the page again. (If the page is reloaded in the middle of one, it is put back as the page opens.)
+var STU = { open: false, tab: 'missions', test: false, snap: null, rate: 1, paused: false, auto: true, letEnd: false, mini: false, el: null, uiT: 0, mT: 0, sel: '', scenes: [], pub: [], seen: new Set(), fired: new Set(),
+  inside: new Set(), done: null, talkG: '', phase: '', started: false, fetchAt: 0, checkT: 0, after: [], afterT: 0, q: [], failY: null, srv: new Map(), liveLocal: false, ck: '', drag: false, M: new Map() };
+const STU_KEY = 'icarusStudio.scenes', STU_SEEN = 'icarus.scenes.seen', STU_SNAP = 'icarusStudio.snap';   // (his scenes are kept under a name a new epoch does not sweep away)
+const STU_LEAVE = /^icarus\.(auth|sent|pid|epoch|code|name|muted|ctl|cell|tier|upright|look|looks|map3d|shun|vivid|explained|npcmem|faction)$/;   // (who he is and how he likes it set: a test does not put those aside, so it cannot hand them back stale)
+const STU_ON = ['hand', 'start', 'enter', 'quest', 'talk', 'phase'], STU_FX = ['quest', 'gift', 'toast', 'title', 'god'], STU_RATES = [0.25, 0.5, 1, 2, 4], STU_PRO_END = PRO_FAIL + 7;
+const stuKinds = () => Object.keys(KINDS).filter(k => k !== 'go' && k !== 'meet');   // (the two that need a place or a person named by the server)
+const stuWhoList = () => ['narrator', 'icarus', 'daedalus', 'hades', 'prometheus', ...gods.map(g => g.id)];
+const stuName = id => id === 'narrator' ? '' : id === 'icarus' ? heroName : id === 'daedalus' ? 'Daedalus' : id === 'hades' ? 'Hades' : id === 'prometheus' ? 'Prometheus' : godById[id]?.name || '';
+const stuLabel = id => id === 'narrator' ? 'the narrator' : id === 'icarus' ? 'Icarus (his own thoughts)' : stuName(id) || id;
+const stuWhoOf = n => { const k = String(n).trim().toLowerCase(); return stuWhoList().find(id => id === k || stuName(id).toLowerCase() === k) || ''; };
+const stuIsGod = id => typeof id === 'string' && Object.hasOwn(godById, id);
+const stuHas = (o, k) => typeof k === 'string' && Object.hasOwn(o, k);
+// A scene, cleaned: the page and the server (api/_story.js) clean it the same way, and nothing else is ever played
+function sceneClean(s) {
+  const num = (v, lo, hi, d = 0) => Number.isFinite(+v) && v !== '' && v != null ? clamp(Math.round(+v), lo, hi) : d, str = (v, n) => typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n) : '';
+  if (!s || typeof s !== 'object' || !/^[a-z0-9_-]{2,40}$/.test(String(s.id || ''))) return null;
+  const W = s.where, w = W && typeof W === 'object' && Number.isFinite(+W.x) && Number.isFinite(+W.z) ? { realm: W.realm === 'under' ? 'under' : 'over', x: num(W.x, -99999, 99999), z: num(W.z, -99999, 99999), y: num(W.y, -2000, 9000), r: num(W.r, 20, 3000, 150), label: str(W.label, 40) } : null;
+  const on = { k: STU_ON.includes(s.on?.k) ? s.on.k : 'hand', v: /^[a-z_]{0,20}$/.test(String(s.on?.v || '')) ? String(s.on?.v || '') : '' };
+  const fx = (Array.isArray(s.fx) ? s.fx : []).slice(0, 8).map(f => {
+    if (!f || !STU_FX.includes(f.k)) return null;
+    if (f.k === 'quest') return stuIsGod(f.god) && stuKinds().includes(f.kind) && stuHas(PERKS, f.perk) ? { k: 'quest', god: f.god, kind: f.kind, n: num(f.n, 0, 5000, 1), perk: f.perk } : null;
+    if (f.k === 'gift') return stuHas(PERKS, f.perk) ? { k: 'gift', perk: f.perk, god: stuIsGod(f.god) ? f.god : '' } : null;
+    if (f.k === 'toast') { const text = str(f.text, 90); return text ? { k: 'toast', text } : null; }
+    if (f.k === 'title') { const big = str(f.big, 26); return big ? { k: 'title', big, small: str(f.small, 70) } : null; }
+    return stuIsGod(f.god) ? { k: 'god', god: f.god, at: f.at === 'here' ? 'here' : 'me' } : null;
+  }).filter(Boolean);
+  return { id: s.id, v: 1, title: str(s.title, 60) || 'A scene', who: stuWhoList().includes(s.who) ? s.who : 'narrator', lines: (Array.isArray(s.lines) ? s.lines : []).slice(0, 24).map(l => str(l, 300)).filter(Boolean), where: w, on, once: s.once !== false, fx, ord: num(s.ord, 0, 99999) };
+}
+function stuLoad() {
+  try { const a = JSON.parse(localStorage.getItem(STU_KEY) || '[]'); STU.scenes = (Array.isArray(a) ? a : []).map(sceneClean).filter(Boolean); } catch { STU.scenes = []; }
+  try { const a = JSON.parse(localStorage.getItem(STU_SEEN) || '[]'); STU.seen = new Set(Array.isArray(a) ? a.filter(x => typeof x === 'string') : []); } catch {}
+}
+function stuKeep() { try { localStorage.setItem(STU_KEY, JSON.stringify(STU.scenes)); } catch { stuMsg('THIS DEVICE IS FULL · EXPORT YOUR SCENES TO A FILE'); } }
+// ── a test: his own game put aside, and given back
+function stuRestore(S) {
+  try {
+    const keep = S.keys || {};   // (what was there is put back; what a test added is left, since a missing key can mean "never been here" to the page)
+    for (const k in keep) if (!STU_LEAVE.test(k)) localStorage.setItem(k, keep[k]);
+    if (S.save) localStorage.setItem(SAVE_KEY, JSON.stringify(S.save));
+  } catch {}
+}
+function stuTest() {
+  if (STU.test) return;
+  try { saveGame(); } catch {}
+  const keys = {}; try { for (const k of Object.keys(localStorage)) if (k.startsWith('icarus.') && !STU_LEAVE.test(k)) keys[k] = localStorage.getItem(k); } catch {}
+  const S = STU.snap = { at: Date.now(), save: JSON.parse(JSON.stringify(saveData())), keys };   // (a copy: saveData() hands out some of the live game itself, the quests among it)
+  try { sessionStorage.setItem(STU_SNAP, JSON.stringify(S)); } catch { try { sessionStorage.setItem(STU_SNAP, JSON.stringify({ at: S.at, save: S.save, keys: {} })); } catch {} }   // (too big for the tab's own store: the save alone)
+  STU.test = true; document.body.classList.add('stutest'); toast('A TEST · YOUR OWN GAME IS PUT ASIDE');
+}
+function stuBack() {
+  let S = STU.snap; if (!S) try { S = JSON.parse(sessionStorage.getItem(STU_SNAP) || 'null'); } catch {}
+  STU.test = true;   // (still: nothing of the test may be saved on the way out)
+  if (S) stuRestore(S);
+  try { sessionStorage.removeItem(STU_SNAP); } catch {}
+  try { sessionStorage.setItem('icarusStudio.reopen', '1'); } catch {}
+  toast('BACK TO YOUR OWN GAME'); setTimeout(() => location.reload(), 250);
+}
+{ let S = null; try { S = JSON.parse(sessionStorage.getItem(STU_SNAP) || 'null'); } catch {}   // (a test the page was reloaded in the middle of: his game back first)
+  if (S && S.save) { try { sessionStorage.removeItem(STU_SNAP); } catch {} let gone = false; try { gone = !sessionStorage.getItem(STU_SNAP); } catch {} if (gone) { STU.test = true; stuRestore(S); location.reload(); } } }
+// ── getting there
+function stuReady() {   // (in the middle of something: out of it first)
+  if (state === 'talk') endTalk(); if (state === 'map') closeMap(); if (state === 'photo') closePhoto();
+  if (state === 'play' && !player.cine) return true;
+  toast(state === 'prologue' ? 'IN THE OPENING · ITS CLOCK, OR BACK TO YOUR OWN GAME' : 'NOT NOW · A MOMENT'); return false;
+}
+function stuDry(x, z, H) { for (let r = 0; r < 2400; r += 40) for (let k = 0, n = r ? 12 : 1; k < n; k++) { const a = k / n * 6.2832, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r; if (H(px, pz) > WATER + 3) return [px, pz]; } return [x, z]; }
+function stuGo(x, z, o = {}) {   // carried there by the light: on his feet (or o.foot false: high over it, flying); o.realm: into the other world
+  if (!stuReady()) return false;
+  const R = o.realm || realm, y = o.y ?? Math.max(R === 'under' ? underHeight(x, z) : overHeight(x, z), WATER);
+  if (!flags.morphed && STU.test) flags.morphed = true;
+  if (!flags.morphed) { toast('YOU HAVE NO WINGS YET'); return false; }
+  if (o.foot !== false || R !== realm) warp.exact = { x, y, z, realm: R };
+  startWarp(x, z, o.foot === false && R === realm ? null : y + 8);
+  if (state !== 'warp') { warp.exact = null; return false; }
+  STU.after.length = 0; return true;
+}
+const stuThen = f => STU.after.push(f);   // (once he is set down)
+function stuBeside(g, d = 9) { const P = player.pos, a = player.form === 'human' ? human.group.rotation.y : player.yaw; spawnGod(g, P.x - Math.sin(a) * d, P.z - Math.cos(a) * d, true); g.pinned = true; g.place = g.name.toUpperCase(); }
+function stuOver(f) { if (realm === 'over') return f(); if (stuGo(START.x, START.z, { realm: 'over', y: SUMMIT })) stuThen(f); }
+function stuUnder(f) {
+  if (realm === 'under') return f && f();
+  const A = UNDER.arrive || { x: player.pos.x, z: player.pos.z }, [x, z] = stuDry(A.x, A.z, underHeight);
+  if (stuGo(x, z, { realm: 'under', y: underHeight(x, z) }) && f) stuThen(f);
+}
+// ── the missions, as they stand
+const STU_SAGA = { title: 'The Test of Arrivals', why: 'Athena wants to know whether he can land as well as he falls.', reward: 'feather', steps: [
+  { kind: 'perfect', n: 1, say: 'Land on your feet, once, as if you meant it. I will be watching.' },
+  { kind: 'meet', to: 'hermes', say: 'Now go to Hermes, and tell him Athena says he still owes her a feather.' },
+  { kind: 'dive', n: 700, say: 'And now fall as if you meant that too. Faster than seven hundred.' }] };
+function stuMissions() {
+  const M = [], h = t => M.push({ h: t }), qs = id => { const q = questOf(id); return q ? (q.done ? 'done' : `on it · ${goalOf(q)}`) : ''; }, G = GREAT;
+  const play = f => () => { if (!stuReady()) return; stuTest(); f(); };
+  h('THE OPENING');
+  M.push({ id: 'crete', name: 'CRETE · THE OPENING', what: 'the tower and the talk with his father, the jump, the maze, the warning, the climb, the wax, the fall · its clock opens with it', st: state === 'prologue' ? 'playing now' : flags.homeWish ? `seen · he meant to “${flags.homeWish}” first` : '', go: () => stuGo(CRETE.x + 320, CRETE.z, { foot: false, realm: 'over' }), play: play(stuCrete), pl: 'play ◷' });
+  M.push({ id: 'night', name: 'THE FIRST NIGHT', what: 'the storm on the summit; he comes down out of it and the thunder tells him to get up', st: '', play: play(() => { if (realm === 'under') setRealm('over', START.x, START.z); story.phase = 'summit'; dlg.queue.length = 0; dlg.cur = null; firstNight(false); }) });
+  M.push({ id: 'leap', name: 'THE SUMMIT · PRAYER AND THE LEAP', what: 'a man on the summit: pray at a throne, walk to the north lip, let go, burn, and come out of the fire a phoenix', st: story.phase === 'summit' || story.phase === 'leap' ? 'here now' : 'behind him', go: () => stuGo(START.x, START.z, { realm: 'over', y: SUMMIT }), play: play(() => { story.phase = 'summit'; if (stuGo(START.x, START.z, { realm: 'over', y: SUMMIT })) stuThen(() => toast(PATRON.id ? 'THE NORTH LIP · LET GO' : 'PRAY FIRST · THEN THE NORTH LIP')); }) });
+  M.push({ id: 'gods', name: 'THE GODS · THE CHAIN OF THE TWELVE', what: 'after the leap: the gods in the country, each passing him to the next, the last one Zeus', st: `${story.phase} · ${story.met.size} of ${gods.length} met${chainInfo() ? ` · next ${chainInfo().g.name}, ${fmtDist(chainInfo().d)} ${chainInfo().dir}` : ''}`,
+    go: () => { const c = chainInfo(); if (c) stuGo(c.g.x + 5, c.g.z + 5); else toast('NOBODY IS WAITING IN THE CHAIN RIGHT NOW'); }, play: play(() => { story.phase = 'gods'; if (stuGo(START.x, START.z, { realm: 'over', y: SUMMIT })) stuThen(() => say(GODS_INTRO, '', true)); }) });
+  h('HERMES');
+  M.push({ id: 'rings', name: 'HERMES’S RINGS', what: FIXED_SAY.hermes, st: qs('hermes') || (story.met.has('hermes') ? 'met' : 'not met'), go: () => stuGo(MYKONOS.x, MYKONOS.z, { realm: 'over', y: MYKONOS.top }),
+    play: play(() => stuOver(() => { const g = godById.hermes; if (stuGo(MYKONOS.x + 6, MYKONOS.z + 10, { y: MYKONOS.top })) stuThen(() => { spawnGod(g, MYKONOS.x, MYKONOS.z + 5, true, true); g.pinned = true; g.place = 'HERMES'; story.met.add('hermes'); setQuest(g, 'arena', 1, 'swift'); say([{ text: FIXED_SAY.hermes, title: g.name }], '', true); }); })) });
+  h('THE ERRANDS OF THE TWELVE · what each asks when nothing else comes to mind');
+  for (const g of gods) { const F = FIXED[g.id]; if (!F) continue;
+    M.push({ id: 'q:' + g.id, name: `${g.name.toUpperCase()} · ${KINDS[F[0]](F[1])}`, what: `“${FIXED_SAY[g.id]}” · a gift: ${PERKS[F[2]][0].toLowerCase()}`, st: qs(g.id) || (story.met.has(g.id) ? 'met' : 'not met'),
+      go: () => g.active && realm === 'over' ? stuGo(g.x + 5, g.z + 5) : toast(`${g.name.toUpperCase()} IS NOT OUT IN THE WORLD · PLAY PUTS THEM BESIDE YOU`), play: play(() => stuOver(() => stuErrand(g))) }); }
+  h('SAGAS · a god draws him into something in two or three parts');
+  M.push({ id: 'saga', name: `A SAGA · ATHENA, “${STU_SAGA.title.toUpperCase()}”`, what: 'a sample in three parts (land well; carry a word to Hermes; dive), the way the gods make them up as they talk', st: story.saga ? `on “${story.saga.title}” · part ${story.saga.i + 1} of ${story.saga.steps.length}` : `${(story.sagasDone || []).length} finished`,
+    go: () => { const g = story.saga && godById[story.saga.god]; if (g && g.active) stuGo(g.x + 5, g.z + 5); else toast('NO SAGA UNDER WAY · PLAY STARTS ONE'); }, play: play(() => stuOver(stuSaga)) });
+  h('THE THREE GREAT LABOURS');
+  const gs = v => ({ 0: 'not offered', 1: 'asked', 2: 'under way', 9: 'done' })[v] || String(v);
+  M.push({ id: 'fire', name: 'PROMETHEUS · STEAL THE FIRE', what: 'a brand from the hearth of Zeus on the summit, carried down to the chained man with Zeus hunting him', st: gs(G.fire), go: () => { const o = otherById.prometheus; if (o.active) stuGo(o.x + 5, o.z + 5); else toast('THE CHAINED MAN IS NOT OUT · PLAY FINDS HIM A ROCK'); }, play: play(() => stuLabour('fire')) });
+  M.push({ id: 'bolt', name: 'HEPHAESTUS · FORGE A THUNDERBOLT', what: 'iron fallen from the sky, fire from a burning mountain, a piece of the storm; then his island', st: `${gs(G.bolt)}${G.bolt === 1 ? ` · iron ${G.got.iron ? '✓' : '·'} lava ${G.got.lava ? '✓' : '·'} storm ${G.got.storm ? '✓' : '·'}` : ''}`, go: () => { const I = isleOf('hephaestus'); stuGo(I.x, I.z, { realm: 'over', y: I.top }); }, play: play(() => stuLabour('bolt')) });
+  M.push({ id: 'race', name: 'APOLLO · RACE THE SUN', what: 'once round the mountain through his gates against the chariot, from the gold ring over his island', st: `${gs(G.race)}${G.best ? ` · best ${Math.round(G.best)} s` : ''}`, go: () => { const I = isleOf('apollo'); stuGo(I.x, I.z, { realm: 'over', y: I.top }); }, play: play(() => stuLabour('race')) });
+  h('HEPHAESTUS’S AXE');
+  M.push({ id: 'axe', name: 'AN AXE FIRST · A BRANCH AND A FLINT', what: 'a straight branch off any tree and a flint from the shore, taken to Hephaestus; the axe fells trees and builds', st: ({ 0: 'not given', 1: `gathering · branch ${INV.branch ? '✓' : '·'} flint ${INV.flint ? '✓' : '·'}`, 2: 'take them to him', 9: 'the axe is made' })[INV.q] || '', go: () => stuGo(FORGE.x, FORGE.z, { realm: 'over', y: MYKONOS.top }), play: play(stuAxe) });
+  h('BELOW');
+  M.push({ id: 'under', name: 'THE UNDERWORLD', what: 'under the sea: the grey country, the dead, the house of Hades a long way off', st: realm === 'under' ? 'here now' : UNDER.arrive ? 'been' : 'not yet', go: () => stuUnder(), play: play(() => stuUnder(() => toast('THE UNDERWORLD'))) });
+  M.push({ id: 'styx', name: 'THE STYX · THE FERRY', what: 'the black river round the house of Hades, and Charon’s boat at the crossing', st: STYX.on ? 'the river is there' : 'not found yet (it is made the first time he comes down)', go: () => stuStyx(), play: play(stuStyx) });
+  M.push({ id: 'ending', name: 'THE ENDING', what: 'Hades tells him who is dead; he goes to his knees; someone far above calls his name', st: UNDER.done ? 'seen' : 'not yet', play: play(stuEnd) });
+  return M;
+}
+function stuCrete() {
+  if (realm === 'under') setRealm('over', START.x, START.z);
+  dlg.queue.length = 0; dlg.cur = null; try { stopVoice(); } catch {}
+  Object.assign(STU, { letEnd: false, failY: null, paused: false }); $('hud').classList.add('hidden');
+  startPrologue(); stuTab('clock');
+}
+function stuErrand(g) {
+  const F = FIXED[g.id];   // (beside him, unless it is one who keeps to his own house: then he is asked from where he stands, and "go" takes him there)
+  if (!(g.home && g.active)) stuBeside(g);
+  setQuest(g, F[0], F[1], F[2]); say([{ text: FIXED_SAY[g.id], title: g.name }], '', true); const q = questOf(g.id); if (q) toast(`${g.name} · ${goalOf(q)}`.toUpperCase());
+}
+function stuSaga() {
+  const g = godById.athena; story.saga = null; stuBeside(g);
+  if (!sagaStart(g, STU_SAGA)) { toast('THE SAGA DID NOT TAKE'); return; }
+  say([{ text: STU_SAGA.steps[0].say, title: `${g.name} · ${STU_SAGA.title} · 1 of ${STU_SAGA.steps.length}` }], '', true);
+}
+function stuLabour(id) {
+  const G = GREAT; G[id] = 0; G.focus = id;
+  if (id === 'bolt') { G.got = { iron: 0, lava: 0, storm: 0 }; if (INV.q < 9) INV.q = 9; }   // (Hephaestus offers it only once the axe is made)
+  if (id === 'fire') return stuOver(() => { G.promT = 0; const o = findPrometheus(); if (!o) { toast('NO ROCK FOR HIM HERE · TRY AGAIN ELSEWHERE'); return; } if (stuGo(o.x + 5, o.z + 5)) stuThen(() => greatBegin('fire')); });
+  const I = isleOf(id === 'bolt' ? 'hephaestus' : 'apollo');
+  if (stuGo(I.x, I.z, { realm: 'over', y: I.top })) stuThen(() => greatBegin(id));
+}
+function stuAxe() {
+  Object.assign(INV, { q: 0, branch: 0, flint: 0, axe: 0 }); invDirty();
+  if (stuGo(FORGE.x, FORGE.z, { realm: 'over', y: MYKONOS.top })) stuThen(() => { const g = godById.hephaestus; if (!g.active) stuBeside(g, 7); axeBegin(); });
+}
+function stuStyx() {
+  const go = () => { if (!STYX.on) { toast('THE RIVER IS NOT MADE YET'); return; } const L = STYX.lands[0]; stuGo(L.x, L.z, { realm: 'under', y: underHeight(L.x, L.z) }); };
+  if (realm === 'under') go(); else stuUnder(go);
+}
+function stuEnd() {
+  UNDER.done = false;
+  const go = () => { const H = UNDER.hades; if (!H) { toast('NO HOUSE OF HADES YET'); return; } if (stuGo(hades.x, hades.z + 6, { realm: 'under', y: hades.gy })) stuThen(() => { if (!UNDER.done) startEnding(); }); };   // (if Hades has him talking first, it is his own words that end it, and this is not needed)
+  if (realm === 'under') go(); else stuUnder(go);
+}
+// ── the clock: the opening's, the ending's, or the day's; and the whole game's speed
+function stuDt(dt) { if (!STU?.open) return dt; if (STU.paused) return 1e-4; return Math.min(dt * STU.rate, 0.12); }   // (stopped is a hair above nothing: the cloth and the voices divide by it)
+function stuPro(dt) {   // before each frame of the opening, while he watches it: the waits played for him, and the end held. Gives back the frame's time
+  stuUi(); if (!STU.open || !pro.on) return dt;
+  if (pro.waitMic) { pro.waitMic = false; $('primer').classList.remove('on', 'asking'); }
+  if (pro.falling && STU.failY == null) STU.failY = pro.pos.y;
+  if (pro.hitT && !STU.letEnd && pro.t > pro.hitT + 0.2) { pro.t = Math.min(pro.t, pro.hitT + 0.3); STU.paused = true; return 1e-4; }   // (held on the sea, short of where it ends: run it back, or play on into the first night)
+  if (!STU.auto || STU.paused) return dt;
+  const K = pro.talk, C = K && K.cur;
+  if (C && C.ask != null && !C.done && C.t > 2.4) proAnswer(0);
+  if (!pro.jumped && pro.t >= PRO_JUMP - 0.05 && !(K && K.on && !K.done)) { proPress(true); proPress(false); }
+  const L = pro.lines[pro.li]; if (L && L.speak && !L.spoken && pro.t >= L.t) L.spoken = L.said = true;
+  if (pro.pov && !pro.falling) {
+    if (pro.rt - (pro.lastBeat ?? -9) > 0.55 && (pro.pos.y < (pro.dY || 60) + 6 || pro.t >= PRO_CLIMB - 1)) proBeat(true);
+    if (pro.pos.y < 30) pro.pos.y = 30;   // (never into the sea)
+    if (pro.t >= PRO_CLIMB - 1 && pro.t < PRO_FAIL && pro.base != null) { const y = pro.base + clamp((pro.t + dt - (PRO_CLIMB - 1)) / (PRO_FAIL - PRO_CLIMB + 1), 0, 1) * PRO_RISE + 0.4; if (pro.pos.y < y) pro.pos.y = y; }   // (the climb's clock is his height: he is lifted with it)
+  }
+  return dt;
+}
+function stuProRestart() {
+  proHush(); proTalkEnd();
+  try { pro.sc.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } catch {}
+  startPrologue(); STU.failY = null;
+}
+function stuProSeek(t) {
+  if (!pro.on) return;
+  t = clamp(t, 0, STU_PRO_END);
+  if (t < PRO_TA && pro.pov) stuProRestart();
+  proHush(); $('proSub').classList.remove('show'); pro.subT = 0; pro.dead = 0; pro.slow = 1; flash = 0;
+  if (!pro.pov && t <= PRO_TALK_AT + 0.05) { proTalkEnd(); pro.talk = { on: false, done: false, wait: false, t: 2.6, q: [], cur: null }; pro.jumped = false; }
+  else { if (pro.talk && !pro.talk.done) proTalkEnd(); pro.jumped = pro.pov || t > PRO_JUMP + 0.01; }
+  pro.li = pro.lines.findIndex(l => l.t >= t - 0.001); if (pro.li < 0) pro.li = pro.lines.length;
+  for (const l of pro.lines) l.spoken = l.said = l.t < t;
+  if (pro.pov) {
+    if (t < PRO_FAIL) {
+      if (pro.falling || pro.hitT) { Object.assign(pro, { falling: false, hitT: 0, dPass: 0, vy: 0, vyP: 2, pitch: 0.05, roll: 0, speed: 38 }); pro.pos.y = Math.max(pro.pos.y, 160); pro.dPos.set(pro.pos.x - 6, pro.pos.y - 2, pro.pos.z + 12); STU.failY = null; postMat.uniforms.uSpeed.value = 0; }
+      const k = clamp((t - (PRO_CLIMB - 1)) / (PRO_FAIL - PRO_CLIMB + 1), 0, 1);
+      pro.base = t >= PRO_CLIMB - 1 ? pro.pos.y - k * PRO_RISE : null;
+      if (pro.base != null && pro.base < 40) { pro.pos.y += 40 - pro.base; pro.base = 40; }
+    } else {   // (into the fall: where a body dropped from the top of the climb would be by now)
+      const u = t - PRO_FAIL, Y = STU.failY ?? Math.max(pro.pos.y, (pro.base ?? 60) + PRO_RISE); STU.failY = Y;
+      pro.pos.y = Math.max(6, Y - 23 * u * u); pro.vy = -Math.min(46 * u, 150); pro.hitT = 0; if (u < 0.6) pro.dPass = 0;
+      if (!pro.dPass) pro.dPos.set(pro.pos.x - 3, pro.pos.y - 30, pro.pos.z);
+    }
+  }
+  if (!pro.hitT) STU.letEnd = false;
+  pro.t = t;
+}
+const STU_CLK = {
+  crete: { name: 'CRETE · THE OPENING', max: () => Math.max(STU_PRO_END, pro.t), get: () => pro.t, set: stuProSeek, step: 1, fmt: v => `${v.toFixed(2)} s`,
+    marks: () => [[0, 'morning'], [PRO_TALK_AT, 'talk'], [PRO_JUMP, 'jump'], [PRO_TA, 'his eyes'], [8.9, 'the maze'], [PRO_CLIMB - 1, 'the climb'], [29.8, 'the wax'], [PRO_FAIL, 'the fall']],
+    ticks: () => PRO_LINES.map(l => [l.t, `${l.hero ? 'Icarus' : l.who}: ${l.text}`]) },
+  end: { name: 'THE ENDING', max: () => Math.max(40, ending.t + 5), get: () => ending.t, set: v => { ending.t = v; }, step: 1, fmt: v => `${v.toFixed(2)} s`, marks: () => [[0, 'he understands'], [1.7, 'his knees go'], [2.9, 'weeping']], ticks: () => [] },
+  day: { name: 'THE DAY', max: () => 1, get: () => dayT, set: v => { dayT = (v % 1 + 1) % 1; }, step: 1 / 48, fmt: v => { const h = v * 24; return `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor(h % 1 * 60)).padStart(2, '0')} · ${dayName()}`; },
+    marks: () => [[0, 'midnight'], [0.17, 'dawn'], [0.42, 'day'], [0.7, 'dusk'], [0.85, 'night']], ticks: () => [] },
+};
+const stuClk = () => state === 'prologue' && pro.on ? 'crete' : state === 'end' ? 'end' : 'day';
+function stuStep(n) { const C = STU_CLK[stuClk()]; C.set(clamp(C.get() + n * C.step, 0, C.max())); stuClockUI(true); }
+function stuPP() {
+  if (STU.paused && state === 'prologue' && pro.hitT) STU.letEnd = true;   // (held on the sea: on, into the first night)
+  STU.paused = !STU.paused; stuClockUI(true);
+}
+function stuRate(v) { STU.rate = clamp(v, 0.25, 4); stuClockUI(true); }
+function stuProNow() {
+  const t = pro.t, K = pro.talk, L = [...pro.lines].reverse().find(l => l.t <= t + 0.001 && (l.spoken || !l.speak)), C = K && K.cur;
+  const now = pro.hitT ? 'the sea' : pro.falling ? 'the fall' : !pro.jumped ? (K && K.on && !K.done ? 'on the tower · father and son talking' : t >= PRO_JUMP - 0.4 ? 'on the parapet · the jump' : 'the tower in the morning')
+    : !pro.pov ? (t < 3.9 ? 'the leap' : 'over the walls') : t < 8.9 ? 'his eyes · out over the Labyrinth' : t < 13.5 ? 'the maze turning under his wing' : t < PRO_CLIMB - 1 ? 'out to sea · his father’s warning' : t < 29.8 ? 'the climb · toward the sun' : 'the wax going';
+  const wait = pro.waitMic ? 'the microphone question' : C && C.ask != null && !C.done ? 'his answer to his father' : !pro.jumped && t >= PRO_JUMP - 0.4 && !(K && K.on && !K.done) ? 'the jump (Space)' : pro.lines[pro.li]?.speak && !pro.lines[pro.li].spoken && t >= pro.lines[pro.li].t ? 'his line, said aloud or Space' : pro.pov && !pro.falling && t >= PRO_CLIMB - 1 && t < PRO_FAIL ? 'him to climb (the clock is his height)' : pro.dead > 0 ? 'the sea to give him back' : '—';
+  return [`now      ${now}`, `said     ${C && C.text ? `${C.me ? 'Icarus' : 'Daedalus'} — ${C.text}` : L ? `${L.hero ? 'Icarus' : L.who} — ${L.text}` : '—'}`, `waits    ${wait}${STU.auto ? '   (played for you)' : ''}`,
+    `him      ${pro.pov ? `height ${Math.round(pro.pos.y)} m · speed ${Math.round(pro.speedNow || pro.speed)} · rising ${(pro.vyNow || 0).toFixed(1)} m/s · wax ${Math.round((pro.fx?.uMelt.value || 0) * 100)}% · tries ${pro.tries | 0}` : 'on the tower, seen from outside'}${pro.pov && pro.dd < 999 ? ` · his father ${Math.round(pro.dd)} m off` : ''}`];
+}
+function stuClockUI(force) {
+  if (!STU.el || !STU.open || STU.tab !== 'clock') return;
+  const E = STU.el, k = stuClk(), C = STU_CLK[k], bar = E.querySelector('.sc-bar'), max = C.max(), v = C.get();
+  if (STU.ck !== k || force === 'marks') {   // (the marks along it: the beats, and each line where it is said)
+    STU.ck = k; const box = E.querySelector('.sc-marks'); box.textContent = ''; bar.step = k === 'day' ? 0.001 : 0.05;
+    C.marks().forEach(([t, lab], i) => { const s = document.createElement('s'); s.textContent = lab; s.className = i % 2 ? 'lo' : ''; s.style.left = `${t / max * 100}%`; s.dataset.at = t; s.title = `${lab} · ${C.fmt(t)}`; box.appendChild(s); });
+    for (const [t, lab] of C.ticks()) { const s = document.createElement('s'); s.className = 'ln'; s.style.left = `${t / max * 100}%`; s.dataset.at = t; s.title = `${C.fmt(t)} · ${lab}`; box.appendChild(s); }
+  }
+  bar.max = max; if (!STU.drag) bar.value = v;
+  E.querySelector('.sc-what').textContent = C.name;
+  const held = k === 'crete' && pro.hitT && STU.paused && !STU.letEnd;
+  E.querySelector('.sc-t').textContent = `${C.fmt(v)}${k === 'day' ? '' : ` of ${C.fmt(max)}`}   ·   ${STU.rate}×   ·   ${held ? 'held on the sea' : STU.paused ? 'stopped' : 'running'}`;
+  E.querySelector('.sc-pp').textContent = held ? '▶ on' : STU.paused ? '▶ play' : '❚❚ stop';
+  for (const b of E.querySelectorAll('.sc-sp button')) b.classList.toggle('on', +b.dataset.v === STU.rate);
+  E.querySelector('.sc-auto').style.display = k === 'crete' ? '' : 'none';
+  const P = player.pos, q = story.track && questOf(story.track) || quests.find(q => !q.done);
+  const lines = [...(k === 'crete' ? stuProNow() : k === 'end' ? [`now      ${ending.t < 1.7 ? 'he understands' : ending.t < 2.9 ? 'his knees go' : 'weeping on the floor of the house of Hades'}${ending.up > 0.3 ? ' · someone is calling him from above' : ''}`] : [`now      ${dayName()} · storm ${storm.toFixed(2)}`]),
+    `the game ${state} · ${realm === 'under' ? 'the Underworld' : 'the living world'} · story ${story.phase} · ${player.form === 'phoenix' ? 'the bird' : 'on foot'} at ${Math.round(P.x)}, ${Math.round(P.y)}, ${Math.round(P.z)}`,
+    `errand   ${q ? `${q.name} · ${goalOf(q)}${q.done ? ' · done' : ''}` : '—'}${story.saga ? ` · saga “${story.saga.title}” ${story.saga.i + 1}/${story.saga.steps.length}` : ''}`,
+    `saying   ${dlg.cur ? `${dlg.cur.title ? dlg.cur.title + ' — ' : ''}${String(dlg.cur.text || '').slice(0, 140)}` : '—'}${dlg.queue.length ? ` (+${dlg.queue.length})` : ''}`];
+  const pre = E.querySelector('.sc-now'), txt = lines.join('\n'); if (pre.textContent !== txt) pre.textContent = txt;
+}
+// ── the scenes, played: his own while he writes them (and, if he says so, by their triggers), everyone's once published
+function stuPlay(S, preview = false) {
+  const base = stuName(S.who), lines = S.lines.map(t => { const m = /^([A-Za-z][A-Za-z' ]{1,22}):\s*(.+)$/.exec(t), id = m && stuWhoOf(m[1]); return id ? { text: m[2], title: stuName(id) } : { text: t, title: base }; });
+  if (lines.length) say(lines, '', preview);
+  for (const f of S.fx) try { stuFx(f, S); } catch (e) { console.warn('scene', e); }
+  if (!preview) { STU.fired.add(S.id); if (S.once) { STU.seen.add(S.id); try { localStorage.setItem(STU_SEEN, JSON.stringify([...STU.seen].slice(-400))); } catch {} } }
+}
+function stuFx(f, S) {   // (the safe list, and nothing else)
+  const g = f.god ? godById[f.god] : null;
+  if (f.k === 'toast') toast(f.text.toUpperCase());
+  else if (f.k === 'title') worldTitle(f.big, f.small, 2600);
+  else if (f.k === 'gift') grantPerk(f.perk, g ? g.name : 'The gods');
+  else if (f.k === 'quest' && g && realm === 'over') { setQuest(g, f.kind, f.n, f.perk); const q = questOf(g.id); if (q) toast(`${g.name} · ${goalOf(q)}`.toUpperCase()); }
+  else if (f.k === 'god' && g && realm === 'over') { const w = S.where; if (f.at === 'here' && w && w.realm === 'over') { spawnGod(g, w.x, w.z, true); g.pinned = true; g.place = g.name.toUpperCase(); } else stuBeside(g, 10); }
+}
+const stuChanges = S => S.fx.some(f => f.k === 'quest' || f.k === 'gift' || f.k === 'god');
+function stuFetch() {
+  STU.fetchAt = performance.now() + 15 * 60e3;
+  fetch('/api/hub?fn=story').then(r => r.ok ? r.json() : null).then(j => { if (j && Array.isArray(j.scenes)) STU.pub = j.scenes.map(sceneClean).filter(Boolean); }).catch(() => {});
+}
+function stuDone() {   // (what has been finished, as marks that only ever grow: a new one is a quest just done)
+  const s = new Set(); for (const d of story.qlog || []) if (d && d.god) s.add(`q:${d.god}:${d.at}`);
+  for (const k of ['fire', 'bolt', 'race']) if (GREAT[k] === 9) s.add(k); if (INV.q === 9) s.add('axe'); if (UNDER.done) s.add('ending'); return s;
+}
+function stuWatch(now) {
+  if (now < STU.checkT) return; STU.checkT = now + 500;
+  if (!STU.started && state === 'play') { STU.started = true; stuFetch(); } else if (STU.started && now > STU.fetchAt) stuFetch();
+  const mine = STU.liveLocal && MOD.admin ? STU.scenes : [], ids = new Set(mine.map(S => S.id)), list = [...mine, ...STU.pub.filter(S => !ids.has(S.id))];
+  const done = stuDone(), was = STU.done; STU.done = done; const fresh = was ? [...done].filter(k => !was.has(k)) : [];
+  const ph = story.phase, phWas = STU.phase; STU.phase = ph;
+  let talked = ''; if (state === 'talk' && talk.god) STU.talkG = talk.god.id; else if (state === 'play' && STU.talkG) { talked = STU.talkG; STU.talkG = ''; }
+  const P = player.pos;
+  for (const S of list) {
+    if (S.once && STU.seen.has(S.id) || STU.q.includes(S)) continue;
+    const o = S.on, w = S.where; let go = false;
+    if (o.k === 'start') go = state === 'play' && !STU.fired.has(S.id);
+    else if (o.k === 'enter') { const inn = !!w && w.realm === realm && Math.hypot(P.x - w.x, P.z - w.z) < w.r; if (inn && !STU.inside.has(S.id)) go = true; if (inn) STU.inside.add(S.id); else STU.inside.delete(S.id); }
+    else if (o.k === 'quest') go = fresh.some(k => o.v === 'any' ? k.startsWith('q:') : k === o.v || k.startsWith(`q:${o.v}:`));
+    else if (o.k === 'talk') go = !!talked && (o.v === 'any' || o.v === talked);
+    else if (o.k === 'phase') go = ph === o.v && phWas !== ph;
+    if (go) STU.q.push(S);
+  }
+  if (STU.q.length && state === 'play' && !player.cine && !dlg.cur && !dlg.queue.length) stuPlay(STU.q.shift());   // (one at a time, and never over somebody talking)
+}
+function stuUi() {   // (the open page kept up to date, a few times a second)
+  const now = performance.now(); if (!STU.open || now - STU.uiT < 120) return; STU.uiT = now;
+  if (STU.tab === 'clock' || STU.mini) stuClockUI(); if (STU.tab === 'missions' && now - STU.mT > 1500) { STU.mT = now; stuStatus(); }
+}
+function stuTick(dt) {
+  const now = performance.now(); stuUi();
+  if (STU.after.length && state === 'play' && !player.cine) { if (!STU.afterT) STU.afterT = now + 600; else if (now > STU.afterT) { STU.afterT = 0; const f = STU.after.shift(); try { f(); } catch (e) { console.warn('studio', e); } } }
+  else if (state !== 'play') STU.afterT = 0;
+  if (state === 'play' || state === 'talk') stuWatch(now);
+}
+// ── the panel
+function stuMsg(t) { STU.msg = t; const m = STU.el?.querySelector('.msg'); if (m) m.textContent = t; else if (t) toast(t); }
+function stuBuild() {
+  if (STU.el) return STU.el;
+  const el = STU.el = document.createElement('div'); el.id = 'stu'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'The keeper’s studio');
+  el.innerHTML = `<div class="st-top"><b>◇ STUDIO</b><nav>${['missions', 'clock', 'scenes'].map(t => `<button type="button" data-t="${t}">${t}</button>`).join('')}</nav><button type="button" data-a="mini" title="Only the clock, out of the way">▁</button><button type="button" data-a="x" title="Close · Esc">✕</button></div>
+<div class="st-test"><span title="Nothing is saved or told to the world while it runs">A TEST · your own game is put aside</span><button type="button" data-a="back">back to my own game</button></div>
+<div class="st-body"><section data-p="missions"></section>
+<section data-p="clock"><div class="sc-head"><b class="sc-what"></b><span class="sc-t"></span></div><input class="sc-bar" type="range" min="0" max="1" step="0.05" value="0" aria-label="Where in it"><div class="sc-marks"></div>
+<div class="sc-ctl"><button type="button" data-c="-5" title="Back five (Shift ←)">«</button><button type="button" data-c="-1" title="Back one (←)">‹</button><button type="button" class="sc-pp" data-c="pp" title="Play or stop (Space)">❚❚ stop</button><button type="button" data-c="1" title="On one (→)">›</button><button type="button" data-c="5" title="On five (Shift →)">»</button>
+<span class="sc-sp">${STU_RATES.map(v => `<button type="button" data-c="r" data-v="${v}">${v}×</button>`).join('')}</span><label class="chk sc-auto"><input type="checkbox" checked> play the waits for me</label></div>
+<pre class="sc-now"></pre><p class="st-note">Space play/stop · ← → back/on (Shift: 5) · [ ] slower/faster · the speed is the whole game’s until the studio closes · the opening is held on the sea at its end: run it back, or ▶ on</p></section>
+<section data-p="scenes"></section></div>`;
+  document.body.appendChild(el);
+  const badge = document.createElement('div'); badge.id = 'stuBadge'; badge.innerHTML = '<span>STUDIO · A TEST</span><button type="button" data-a="open">studio</button><button type="button" data-a="back">back to my own game</button>'; document.body.appendChild(badge);
+  for (const ev of ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'wheel', 'keyup', 'contextmenu', 'dblclick']) { el.addEventListener(ev, e => e.stopPropagation(), { passive: true }); badge.addEventListener(ev, e => e.stopPropagation(), { passive: true }); }
+  badge.addEventListener('click', e => { e.stopPropagation(); const a = e.target.closest('[data-a]')?.dataset.a; if (a === 'open') stuOpen(); else if (a === 'back') stuBack(); });
+  el.addEventListener('click', e => { e.stopPropagation(); stuClick(e); });
+  el.addEventListener('keydown', e => {
+    e.stopPropagation();   // (typing here is not flying)
+    const t = e.target, typing = t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.tagName === 'INPUT' && !['range', 'checkbox'].includes(t.type);
+    if (typing || e.metaKey || e.ctrlKey || e.altKey || STU.tab !== 'clock' && !STU.mini) return;
+    if (e.code === 'Space' && t.tagName !== 'BUTTON') { e.preventDefault(); stuPP(); }
+    else if ((e.code === 'ArrowLeft' || e.code === 'ArrowRight') && t.type !== 'range') { e.preventDefault(); stuStep((e.code === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 5 : 1)); }
+    else if (e.key === '[' || e.key === ']') { const i = STU_RATES.indexOf(STU.rate); stuRate(STU_RATES[clamp((i < 0 ? 2 : i) + (e.key === ']' ? 1 : -1), 0, STU_RATES.length - 1)]); }
+  });
+  const bar = el.querySelector('.sc-bar');
+  bar.addEventListener('pointerdown', () => { STU.drag = true; });
+  for (const ev of ['pointerup', 'pointercancel', 'change', 'blur']) bar.addEventListener(ev, () => { STU.drag = false; });
+  bar.addEventListener('input', () => { STU_CLK[stuClk()].set(+bar.value); stuClockUI(true); });
+  el.querySelector('.sc-auto input').addEventListener('change', e => { STU.auto = e.target.checked; });
+  el.addEventListener('input', e => { if (e.target.closest('.ss-f')) stuEdit(e); });
+  el.addEventListener('change', e => { if (e.target.closest('.ss-f')) stuEdit(e); else if (e.target.dataset.s === 'livelocal') { STU.liveLocal = e.target.checked; STU.inside.clear(); } else if (e.target.type === 'file') stuImport(e.target); });
+  return el;
+}
+function stuOpen(tab) {
+  if (!MOD.admin) { toast('THE STUDIO IS THE KEEPER’S'); return; }
+  stuBuild(); STU.open = true; STU.el.classList.add('on'); who.pinned = who.open = false;
+  stuTab(tab || (state === 'prologue' || state === 'end' ? 'clock' : STU.tab));
+  setTimeout(() => STU.el?.querySelector(`nav [data-t="${STU.tab}"]`)?.focus({ preventScroll: true }), 30);
+}
+function stuClose() {
+  if (!STU.open) return; STU.open = false; STU.el.classList.remove('on', 'mini'); STU.mini = false;
+  STU.rate = 1; STU.paused = false; STU.drag = false;
+  if (state === 'prologue' && pro.hitT) STU.letEnd = true;
+  if (STU.el.contains(document.activeElement)) document.activeElement.blur();
+}
+function stuTab(t) {
+  STU.tab = t; const E = STU.el;
+  for (const b of E.querySelectorAll('nav button')) b.classList.toggle('on', b.dataset.t === t);
+  for (const s of E.querySelectorAll('section')) s.classList.toggle('on', s.dataset.p === t);
+  E.classList.toggle('dock', t === 'clock'); if (t !== 'clock') { E.classList.remove('mini'); STU.mini = false; }
+  if (t === 'missions') stuMissionsRender(); else if (t === 'scenes') stuScenesRender(); else { STU.ck = ''; stuClockUI(true); }
+}
+function stuMissionsRender() {
+  const box = STU.el.querySelector('[data-p=missions]'); box.textContent = '';
+  const add = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; box.appendChild(e); return e; };
+  add('p', 'st-note', 'go · carried to where it happens.   play · the world set up as it is at its start, and begun; play it again for a replay. Every play is a test: your own game is put aside first, and “back to my own game” gives it back.');
+  STU.sum = add('p', 'st-sum', ''); STU.rows = new Map(); STU.M.clear();
+  for (const m of stuMissions()) {
+    if (m.h) { add('div', 'st-h', m.h); continue; }
+    STU.M.set(m.id, m); const r = add('div', 'st-m'); r.innerHTML = '<b></b><p></p><i></i><em></em>';
+    r.querySelector('b').textContent = m.name; r.querySelector('i').textContent = m.what || ''; r.querySelector('em').textContent = m.st || '';
+    const p = r.querySelector('p'); for (const k of ['go', 'play']) if (m[k]) { const b = document.createElement('button'); b.type = 'button'; b.dataset.m = m.id; b.dataset.k = k; b.textContent = k === 'play' ? m.pl || 'play' : 'go'; b.title = k === 'play' ? 'Set it up at its start and begin it (a test)' : 'Be carried to where it happens'; p.appendChild(b); }
+    STU.rows.set(m.id, r.querySelector('em'));
+  }
+  stuStatus();
+}
+function stuStatus() {
+  if (!STU.rows) return;
+  for (const m of stuMissions()) if (!m.h) { STU.M.set(m.id, m); const em = STU.rows.get(m.id); if (em && em.textContent !== (m.st || '')) em.textContent = m.st || ''; }
+  if (STU.sum) STU.sum.textContent = `now · ${state} · ${realm === 'under' ? 'the Underworld' : 'the living world'} · story ${story.phase} · ${story.met.size} of ${gods.length} met · might ${might()} (${rankOf().toLowerCase()})${STU.test ? ' · A TEST' : ''}`;
+}
+function stuClick(e) {
+  const b = e.target.closest('button, s[data-at]'); if (!b) return;
+  const d = b.dataset;
+  if (d.t) return stuTab(d.t);
+  if (d.a === 'x') return stuClose();
+  if (d.a === 'back') return stuBack();
+  if (d.a === 'mini') { STU.mini = !STU.mini; if (STU.mini) stuTab('clock'); STU.el.classList.toggle('mini', STU.mini); return; }
+  if (d.m) { const m = STU.M.get(d.m); if (m && m[d.k]) { m[d.k](); setTimeout(stuStatus, 50); } return; }
+  if (d.at != null && b.tagName === 'S') { STU_CLK[stuClk()].set(+d.at); stuClockUI(true); return; }
+  if (d.c) { if (d.c === 'pp') stuPP(); else if (d.c === 'r') stuRate(+d.v); else stuStep(+d.c); return; }
+  if (d.s) stuSceneAct(d.s, b);
+}
+// ── the scene editor
+const stuSel = () => STU.scenes.find(S => S.id === STU.sel) || null;
+const stuOnSay = S => { const o = S.on, v = o.v === 'any' ? 'anyone' : stuName(o.v) || o.v; return o.k === 'hand' ? 'only when you play it' : o.k === 'start' ? 'when the game starts' : o.k === 'enter' ? `entering ${S.where ? S.where.label || 'the place' : '(no place set)'}` : o.k === 'quest' ? `after ${o.v === 'any' ? 'any errand' : `${v}’s errand`}` : o.k === 'talk' ? `after talking with ${v}` : `when the story reaches “${o.v}”`; };
+function stuOpts(sel, list, v) { sel.textContent = ''; for (const [val, lab] of list) { const o = document.createElement('option'); o.value = val; o.textContent = lab; sel.appendChild(o); } sel.value = v != null && list.some(([x]) => x === v) ? v : list[0]?.[0] ?? ''; }
+const STU_PLACES = () => [['', 'nowhere in particular'], ['summit', 'the summit of Olympus'], ['crete', 'Crete, the Labyrinth'], ['mykonos', 'Hermes’s island'], ...(UNDER.hades ? [['hades', 'the house of Hades']] : []), ['keep', 'as set (where you were)']];
+function stuPlace(k) {
+  if (k === 'summit') return { realm: 'over', x: Math.round(START.x), z: Math.round(START.z), y: Math.round(SUMMIT), r: 120, label: 'the summit of Olympus' };
+  if (k === 'crete') return { realm: 'over', x: Math.round(CRETE.x), z: Math.round(CRETE.z), y: Math.round(WATER + PRO_C.y), r: 600, label: 'Crete' };
+  if (k === 'mykonos') return { realm: 'over', x: MYKONOS.x, z: MYKONOS.z, y: Math.round(MYKONOS.top), r: 260, label: 'Hermes’s island' };
+  if (k === 'hades' && UNDER.hades) return { realm: 'under', x: Math.round(hades.x), z: Math.round(hades.z), y: Math.round(hades.gy), r: 200, label: 'the house of Hades' };
+  return null;
+}
+function stuScenesRender() {
+  const box = STU.el.querySelector('[data-p=scenes]');
+  box.innerHTML = `<div class="row ss-bar"><button type="button" data-s="new">+ a new scene</button><button type="button" data-s="export" title="All your scenes, to a file">export</button><button type="button" data-s="import" title="Scenes from a file (the same names are replaced)">import…</button><button type="button" data-s="pull" title="Every scene on the server, drafts too">from the server</button><label class="chk" title="Your own scenes play here by their triggers, as they would for everyone"><input type="checkbox" data-s="livelocal"> mine play by their triggers here</label><input type="file" accept="application/json,.json" hidden></div><p class="msg"></p><div class="ss"><div class="ss-l"></div><div class="ss-f"></div></div>`;
+  box.querySelector('[data-s=livelocal]').checked = STU.liveLocal; box.querySelector('.msg').textContent = STU.msg || '';
+  if (!stuSel() && STU.scenes.length) STU.sel = STU.scenes[0].id;
+  stuList(); stuForm();
+}
+function stuList() {
+  const L = STU.el.querySelector('.ss-l'); if (!L) return; L.textContent = '';
+  if (!STU.scenes.length) { const p = document.createElement('p'); p.className = 'dim'; p.textContent = 'No scenes yet. A scene is a few lines, who says them, where, what sets them off, and what they do: a quest, a gift, a word on the screen or on the sky, a god brought.'; L.appendChild(p); }
+  for (const S of STU.scenes) { const b = document.createElement('button'); b.type = 'button'; b.dataset.s = 'sel'; b.dataset.id = S.id; b.classList.toggle('on', S.id === STU.sel);
+    b.textContent = S.title; const u = document.createElement('u'); u.textContent = `${stuOnSay(S)} · ${S.lines.length} line${S.lines.length === 1 ? '' : 's'}${S.fx.length ? ` · ${S.fx.length} effect${S.fx.length === 1 ? '' : 's'}` : ''} · ${STU.srv.get(S.id) || 'on this device'}`; b.appendChild(u); L.appendChild(b); }
+}
+function stuForm() {
+  const F = STU.el.querySelector('.ss-f'), S = stuSel(); if (!F) return;
+  if (!S) { F.textContent = ''; return; }
+  F.innerHTML = `<label>title</label><input type="text" data-f="title" maxlength="60">
+<label>who speaks</label><select data-f="who"></select>
+<label>the lines · one to a line · begin one with a name and a colon (Zeus: …) to give it to someone else</label><textarea data-f="lines" rows="7" spellcheck="true"></textarea>
+<label>where</label><div class="row"><select data-f="place"></select><button type="button" data-s="here" title="Here, where you are now">where I am</button></div>
+<div class="row"><span class="dim" data-f="wsay"></span><label class="chk">within <input type="number" data-f="r" min="20" max="3000" step="10" style="width:90px"> m</label></div>
+<label>what sets it off</label><div class="row"><select data-f="on"></select><select data-f="onv"></select></div>
+<label class="chk"><input type="checkbox" data-f="once"> once for each player</label>
+<label>what it does</label><div class="fxs"></div><button type="button" data-s="fx+">+ an effect</button>
+<div class="row acts"><button type="button" data-s="play" title="Play it here, now">▶ play it now</button><button type="button" data-s="there" title="Go to its place, then play it">▶ there</button><button type="button" data-s="dup">copy</button><button type="button" data-s="del">delete</button></div>
+<div class="row acts"><button type="button" data-s="pub" title="Every player’s page will play it by its trigger">publish to every player</button><button type="button" data-s="unpub" title="Kept on the server as a draft: nobody plays it">draft on the server</button><button type="button" data-s="sdel">delete from the server</button></div>
+<p class="dim">on the server: <span data-f="srv"></span> · its name: <span data-f="id"></span></p>`;
+  const q = k => F.querySelector(`[data-f="${k}"]`);
+  q('title').value = S.title; stuOpts(q('who'), stuWhoList().map(id => [id, stuLabel(id)]), S.who); q('lines').value = S.lines.join('\n');
+  STU.where = S.where; stuOpts(q('place'), STU_PLACES(), S.where ? 'keep' : ''); q('r').value = S.where ? S.where.r : 150;
+  stuOpts(q('on'), [['hand', 'only when I play it'], ['start', 'when the game starts'], ['enter', 'on entering the place above'], ['quest', 'after a quest is done'], ['talk', 'after talking with'], ['phase', 'when the story reaches']], S.on.k);
+  stuOnv(S.on.v); q('once').checked = S.once; q('srv').textContent = STU.srv.get(S.id) || 'not sent'; q('id').textContent = S.id;
+  stuWhereSay(); const X = F.querySelector('.fxs'); S.fx.forEach((f, i) => X.appendChild(stuFxRow(f, i)));
+}
+function stuOnv(v) {
+  const F = STU.el.querySelector('.ss-f'), k = F.querySelector('[data-f="on"]').value, s = F.querySelector('[data-f="onv"]'), G = gods.map(g => [g.id, g.name]);
+  const L = k === 'quest' ? [['any', 'any errand'], ...G.map(([id, n]) => [id, `${n}’s errand`]), ['fire', 'the stolen fire'], ['bolt', 'the thunderbolt'], ['race', 'the race with the sun'], ['axe', 'the axe'], ['ending', 'the ending']]
+    : k === 'talk' ? [['any', 'anyone'], ...G, ['hades', 'Hades'], ['prometheus', 'Prometheus']] : k === 'phase' ? [['gods', 'the gods (after the leap)'], ['free', 'free (after the ending)'], ['summit', 'the summit (a new life)']] : [];
+  s.style.display = L.length ? '' : 'none'; stuOpts(s, L.length ? L : [['', '']], v);
+}
+function stuWhereSay() { const w = STU.where, el = STU.el.querySelector('[data-f="wsay"]'); if (el) el.textContent = w ? `${w.label || 'a place'} · ${w.realm === 'under' ? 'below' : 'above'} · ${w.x}, ${w.z}` : 'no place: it plays wherever he is'; }
+function stuFxRow(f, i) {
+  const d = document.createElement('div'); d.className = 'fx row'; d.dataset.i = i;
+  const sel = (x, list, v) => { const s = document.createElement('select'); s.dataset.x = x; stuOpts(s, list, v); return s; };
+  const inp = (x, v, ph, type = 'text', max = 90) => { const s = document.createElement('input'); s.type = type; s.dataset.x = x; s.value = v ?? ''; s.placeholder = ph; s.setAttribute('aria-label', ph); if (type === 'text') s.maxLength = max; else { s.min = 0; s.max = 5000; } return s; };
+  const G = gods.map(g => [g.id, g.name]), P = Object.keys(PERKS).map(k => [k, PERKS[k][0].toLowerCase()]);
+  d.append(sel('k', [['quest', 'give a quest'], ['gift', 'give a gift'], ['toast', 'a word on the screen'], ['title', 'a title on the sky'], ['god', 'bring a god']], f.k));
+  if (f.k === 'quest') d.append(sel('god', G, f.god), sel('kind', stuKinds().map(k => [k, KINDS[k](RANGE[k] ? f.kind === k ? f.n : RANGE[k][0] : 1)]), f.kind), inp('n', f.n, 'how much', 'number'), sel('perk', P, f.perk));
+  else if (f.k === 'gift') d.append(sel('perk', P, f.perk), sel('god', [['', 'from the gods'], ...G.map(([id, n]) => [id, `from ${n}`])], f.god));
+  else if (f.k === 'toast') d.append(inp('text', f.text, 'what it says', 'text', 90));
+  else if (f.k === 'title') d.append(inp('big', f.big, 'the title (26)', 'text', 26), inp('small', f.small, 'under it (70)', 'text', 70));
+  else d.append(sel('god', G, f.god), sel('at', [['me', 'beside him'], ['here', 'at the scene’s place']], f.at));
+  const x = document.createElement('button'); x.type = 'button'; x.dataset.s = 'fx-'; x.textContent = '✕'; x.title = 'Take this effect away'; d.append(x); return d;
+}
+const STU_FX0 = { quest: { k: 'quest', god: 'zeus', kind: 'climb', n: 1, perk: 'sun' }, gift: { k: 'gift', perk: 'ember', god: '' }, toast: { k: 'toast', text: 'SOMETHING HAS CHANGED' }, title: { k: 'title', big: 'ICARUS', small: '' }, god: { k: 'god', god: 'hermes', at: 'me' } };
+function stuRead() {   // the form, as a scene
+  const S = stuSel(), F = STU.el.querySelector('.ss-f'); if (!S || !F) return null; const q = k => F.querySelector(`[data-f="${k}"]`);
+  const w = STU.where ? { ...STU.where, r: +q('r').value || STU.where.r } : null;
+  const fx = [...F.querySelectorAll('.fx')].map(d => { const o = {}; for (const e of d.querySelectorAll('[data-x]')) o[e.dataset.x] = e.type === 'number' ? +e.value : e.value; return o; });
+  return sceneClean({ ...S, title: q('title').value, who: q('who').value, lines: q('lines').value.split('\n'), where: w, on: { k: q('on').value, v: q('onv').value }, once: q('once').checked, fx });
+}
+function stuEdit(e) {
+  const t = e.target, S = stuSel(); if (!S) return;
+  if (t.dataset.f === 'place') { if (t.value !== 'keep') STU.where = stuPlace(t.value); if (STU.where) STU.el.querySelector('[data-f="r"]').value = STU.where.r; stuWhereSay(); }
+  if (t.dataset.f === 'on') stuOnv('');
+  if (t.dataset.x === 'k' && e.type === 'change') { const d = t.closest('.fx'); d.replaceWith(stuFxRow({ ...STU_FX0[t.value] }, +d.dataset.i)); }
+  const N = stuRead(); if (!N) return;
+  const i = STU.scenes.indexOf(S); STU.scenes[i] = N; stuKeep();
+  clearTimeout(STU.listT); STU.listT = setTimeout(stuList, 300);
+}
+function stuSceneAct(a, b) {
+  const S = stuSel(), sure = () => { if (b.classList.contains('sure')) return true; b.classList.add('sure'); b.dataset.was = b.textContent; b.textContent = 'sure? press again'; setTimeout(() => { if (b.isConnected) { b.classList.remove('sure'); b.textContent = b.dataset.was; } }, 3500); return false; };
+  if (a === 'sel') { STU.sel = b.dataset.id; stuList(); stuForm(); return; }
+  if (a === 'new') { const id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); STU.scenes.push(sceneClean({ id, title: 'A new scene', who: 'narrator', lines: ['…'], on: { k: 'hand' }, once: true, fx: [], ord: STU.scenes.length })); STU.sel = id; stuKeep(); stuList(); stuForm(); STU.el.querySelector('[data-f="title"]')?.select(); return; }
+  if (a === 'export') { const blob = new Blob([JSON.stringify({ icarus: 'scenes', v: 1, at: new Date().toISOString(), scenes: STU.scenes }, null, 1)], { type: 'application/json' }), u = URL.createObjectURL(blob), l = document.createElement('a'); l.href = u; l.download = `icarus-scenes-${new Date().toISOString().slice(0, 10)}.json`; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); stuMsg(`${STU.scenes.length} SCENES TO A FILE`); return; }
+  if (a === 'import') { STU.el.querySelector('[data-p=scenes] input[type=file]').click(); return; }
+  if (a === 'pull') { stuPull(); return; }
+  if (!S) return;
+  if (a === 'here') { const P = player.pos; STU.where = { realm, x: Math.round(P.x), z: Math.round(P.z), y: Math.round(P.y), r: +STU.el.querySelector('[data-f="r"]').value || 150, label: 'where you stood' }; stuOpts(STU.el.querySelector('[data-f="place"]'), STU_PLACES(), 'keep'); stuWhereSay(); stuEdit({ target: b }); return; }
+  if (a === 'fx+') { if (S.fx.length >= 8) { stuMsg('EIGHT EFFECTS AT MOST'); return; } S.fx.push({ ...STU_FX0.toast }); stuKeep(); stuForm(); return; }
+  if (a === 'fx-') { b.closest('.fx').remove(); stuEdit({ target: b }); stuForm(); return; }
+  if (a === 'play') { if (stuChanges(S)) { if (!stuReady()) return; stuTest(); } stuPlay(S, true); stuMsg('PLAYING · IN THE GAME'); return; }
+  if (a === 'there') { const w = S.where; if (!w) { stuMsg('IT HAS NO PLACE · ▶ PLAY IT NOW INSTEAD'); return; } if (stuChanges(S)) { if (!stuReady()) return; stuTest(); } if (stuGo(w.x, w.z, { realm: w.realm, y: w.y || undefined })) stuThen(() => stuPlay(S, true)); return; }
+  if (a === 'dup') { const id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); STU.scenes.push(sceneClean({ ...S, id, title: `${S.title} (copy)`.slice(0, 60) })); STU.sel = id; stuKeep(); stuList(); stuForm(); return; }
+  if (a === 'del') { if (!sure()) return; STU.scenes = STU.scenes.filter(x => x !== S); STU.sel = STU.scenes[0]?.id || ''; stuKeep(); stuList(); stuForm(); stuMsg('DELETED FROM THIS DEVICE'); return; }
+  if (a === 'pub' || a === 'unpub') { stuSrv('put', { scene: S, pub: a === 'pub' }).then(j => { if (j && j.ok) { STU.srv.set(S.id, a === 'pub' ? 'published' : 'a draft'); stuMsg(a === 'pub' ? `“${S.title.toUpperCase()}” · PUBLISHED TO EVERY PLAYER` : 'KEPT ON THE SERVER AS A DRAFT'); stuList(); stuForm(); } }); return; }
+  if (a === 'sdel') { if (!sure()) return; stuSrv('del', { id: S.id }).then(j => { if (j && j.ok) { STU.srv.delete(S.id); stuMsg('DELETED FROM THE SERVER · STILL ON THIS DEVICE'); stuList(); stuForm(); } }); }
+}
+async function stuSrv(op, body) {
+  if (!MOD.admin || !AUTH.s) { stuMsg('SIGN IN AS THE KEEPER FIRST'); return null; }
+  try { const r = await fetch('/api/hub?fn=story', { method: 'POST', headers: authH({ 'Content-Type': 'application/json' }), body: JSON.stringify({ op, ...body }) }), j = await r.json().catch(() => null);
+    if (!j || !j.ok) stuMsg(String(j && j.error || `the server said ${r.status}`).toUpperCase()); return j; } catch { stuMsg('THE SERVER DID NOT ANSWER'); return null; }
+}
+async function stuPull() {
+  if (!MOD.admin || !AUTH.s) { stuMsg('SIGN IN AS THE KEEPER FIRST'); return; }
+  try { const r = await fetch('/api/hub?fn=story&all=1', { headers: authH() }), j = await r.json().catch(() => null);
+    if (!j || !Array.isArray(j.scenes)) { stuMsg(String(j && j.error || `the server said ${r.status}`).toUpperCase()); return; }
+    if (j.missing) { stuMsg('THE SERVER HAS NO STORY TABLE YET · supabase/world.sql'); return; }
+    let n = 0; for (const x of j.scenes) { const S = sceneClean(x); if (!S) continue; STU.srv.set(S.id, x.pub ? 'published' : 'a draft'); if (!STU.scenes.some(L => L.id === S.id)) { STU.scenes.push(S); n++; } }
+    stuKeep(); stuList(); stuForm(); stuMsg(`${j.scenes.length} ON THE SERVER · ${n} NEW HERE`);
+  } catch { stuMsg('THE SERVER DID NOT ANSWER'); }
+}
+function stuImport(input) {
+  const f = input.files && input.files[0]; input.value = ''; if (!f) return;
+  if (f.size > 2e6) { stuMsg('THAT FILE IS TOO BIG FOR SCENES'); return; }
+  f.text().then(t => { let j; try { j = JSON.parse(t); } catch { stuMsg('THAT IS NOT A SCENES FILE'); return; }
+    const L = (Array.isArray(j) ? j : Array.isArray(j?.scenes) ? j.scenes : []).map(sceneClean).filter(Boolean); if (!L.length) { stuMsg('NO SCENES IN THAT FILE'); return; }
+    for (const S of L) { const i = STU.scenes.findIndex(x => x.id === S.id); if (i >= 0) STU.scenes[i] = S; else STU.scenes.push(S); }
+    STU.sel = L[0].id; stuKeep(); stuList(); stuForm(); stuMsg(`${L.length} SCENE${L.length === 1 ? '' : 'S'} IN`); }).catch(() => stuMsg('THAT FILE COULD NOT BE READ'));
+}
+addEventListener('keydown', e => { if (!STU.open || e.key !== 'Escape') return; e.preventDefault(); e.stopImmediatePropagation(); stuClose(); }, true);   // (Esc is the studio's while it is open, before anything else hears it)
+stuLoad();
+try { if (sessionStorage.getItem('icarusStudio.reopen')) { sessionStorage.removeItem('icarusStudio.reopen'); setTimeout(() => toast('YOUR OWN GAME · AS YOU LEFT IT'), 4000); } } catch {}
+
 // build the summit and its surroundings before showing the title
 setTimeout(() => {
   resumed = loadGame(); loadMap(); camUI(); codeUI();
@@ -25934,6 +26508,7 @@ setTimeout(() => {
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
+  if (window.__icarus) Object.assign(window.__icarus, { STU, stuOpen, stuClose, stuTab, stuMissions, stuProSeek, stuPlay, stuWatch, stuFetch, stuTest, stuBack, stuGo, stuStep, stuPP, stuRate, sceneClean, stuDone });
   frame();
 }, 30);
 </script>
