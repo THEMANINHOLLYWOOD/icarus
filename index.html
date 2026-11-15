@@ -5548,7 +5548,7 @@ function landWinged(hs, vy, water) {
   if (water) { audio.sfx.splash(false); ripple(p.pos.x, p.pos.z, 1.4); } else { audio.sfx.land(clamp(Math.hypot(hs, vy) / 30, 0.2, 1)); netFx('land'); }
   if (hs < 13 && vy > -6.5) {
     stats.perfect++; p.flame = Math.min(1, p.flame + 0.2);
-    chime([783.99, 1174.66], 0.07); toast('PERFECT LANDING');
+    if (audio.sfx.perfect) audio.sfx.perfect(); else chime([783.99, 1174.66], 0.07); toast('PERFECT LANDING');
     witness('touched down light as a feather — a perfect landing');
   }
   saveSoon();
@@ -8696,7 +8696,7 @@ const STOOP = { on: false, roll: 0, side: 1, tuck: 0, fast: 0, pull: 0, peak: 0,
 function stoopStep(dt, diving, dive) {
   const p = player, D = STOOP, K = birdK();
   D.fast = lerp(D.fast, smoothstep(130, 290, p.speed) * dive, damp(4, dt));
-  if (diving && !D.on && dive > 0.15 && state === 'play') { D.on = true; D.roll = 1; D.side = Math.abs(p.turn) > 0.08 ? Math.sign(p.turn) : -D.side; D.peak = p.speed; D.boomed = false; D.t = 0; audio.sfx.whoosh?.(false); }
+  if (diving && !D.on && dive > 0.15 && state === 'play') { D.on = true; D.roll = 1; D.side = Math.abs(p.turn) > 0.08 ? Math.sign(p.turn) : -D.side; D.peak = p.speed; D.boomed = false; D.t = 0; (audio.sfx.stoop || audio.sfx.whoosh)?.(false); }
   if (D.on) { D.t += dt; D.peak = Math.max(D.peak, p.speed); }
   if (D.on && (!diving || dive < 0.05)) { D.on = false; if (D.peak > 150 && D.t > 0.8 && state === 'play') stoopPull(D.peak); }
   D.roll = Math.max(0, D.roll - dt / 0.8);
@@ -8706,7 +8706,7 @@ function stoopStep(dt, diving, dive) {
   // the air breaking: once a dive, the first time past the speed of it
   if (D.on && !D.boomed && p.speed > 250) { D.boomed = true;
     shock(p.pos.x, p.pos.y, p.pos.z, 0xfff1d0, 16 * K, 0.45, false); shock(p.pos.x - dir3.x * 8 * K, p.pos.y - dir3.y * 8 * K, p.pos.z - dir3.z * 8 * K, 0xff9a40, 26 * K, 0.7, false);
-    audio.sfx.whoomph?.(); camShake = Math.max(camShake, 0.35 + 0.15 * (K - 1)); netFx?.('flap'); }
+    (audio.sfx.boom || audio.sfx.whoomph)?.(1); camShake = Math.max(camShake, 0.35 + 0.15 * (K - 1)); netFx?.('flap'); }
   // a meteor: white heat off his breast streaming back the length of him
   if (D.fast > 0.25 && (D.glowT -= dt) <= 0) { D.glowT = 0.016;
     for (let i = 0, n = Math.round(1 + D.fast * 3 * Math.sqrt(K)); i < n; i++) {
@@ -8719,7 +8719,7 @@ function stoopPull(peak) {
   D.pull = 1; WR.beat = 1; WR.th = 0; D.roll = 0;
   _v.copy(p.pos).addScaledVector(dir3, -10 * K);
   shock(_v.x, _v.y, _v.z, 0xffd8a0, (14 + 18 * k) * K, 0.55, false);
-  audio.sfx.whoosh?.(true); audio.sfx.flap?.(1); if (k > 0.4) audio.sfx.whoomph?.();
+  if (audio.sfx.pullOut) audio.sfx.pullOut(k); else { audio.sfx.whoosh?.(true); audio.sfx.flap?.(1); if (k > 0.4) audio.sfx.whoomph?.(); }
   camShake = Math.max(camShake, (0.2 + 0.25 * k) * (1 + 0.25 * (K - 1)));
   for (const w of phoenix.wings) { w.tip.getWorldPosition(_p); for (let i = 0; i < Math.round((14 + 20 * k) * Math.sqrt(K)); i++) emit(_p.x + rnd(K), _p.y + rnd(K), _p.z + rnd(K), rnd(14) - dir3.x * 20, rnd(10), rnd(14) - dir3.z * 20, 0.5 + Math.random() * 0.5, pick(EMBER), 1, (0.7 + Math.random()) * K); }
   netFx?.('flap');
@@ -8858,7 +8858,7 @@ function updatePhoenix(dt) {
       p.flame = Math.min(1, p.flame + dt * 0.05);
       p.jetOut = Math.abs(ax) > 0.6 || pin < -0.6 ? (p.jetOut || 0) + dt : 0;
       if (p.jetOut > 0.45) { p.jetCool = 4; p.jetOut = 0; }   // steer hard and he drops out of it
-      if (!p.wasRiding) { audio.sfx.whoosh(true); toast('JETSTREAM'); }
+      if (!p.wasRiding) { (audio.sfx.jetstream || audio.sfx.whoosh)(true); toast('JETSTREAM'); }
       if (t > 0.9) questEvent.jet = true;
     }
   }
@@ -8872,7 +8872,7 @@ function updatePhoenix(dt) {
       p.flame = Math.min(1, p.flame + dt * 0.04);
       p.jetOut = Math.abs(ax) > 0.6 || pin < -0.6 ? (p.jetOut || 0) + dt : 0;
       if (p.jetOut > 0.45) { p.gustCool = 3; p.jetOut = 0; }   // steer hard and he drops out of it
-      if (!p.wasRiding) { audio.sfx.whoosh(true); toast(R.g.mine ? 'YOUR WIND' : `${R.g.by}'S WIND`); }
+      if (!p.wasRiding) { (audio.sfx.jetstream || audio.sfx.whoosh)(true); toast(R.g.mine ? 'YOUR WIND' : `${R.g.by}'S WIND`); }
     }
   }
   p.wasRiding = p.riding;
@@ -9033,7 +9033,7 @@ function die(how, kmh) {
   stopVoice(); dlg.queue.length = 0; dlg.cur = null;
   const thru = how !== 'lava';   // (every death but the blue fire is the same one: the world stops holding him, and he goes on down through it)
   if (thru) {   // (a fall does not end in a hit: the ground lets him through. No blow, no sting, nothing to say he died)
-    audio.sfx.whoosh?.(false); netFx('land'); shock(p.pos.x, p.pos.y + 0.3, p.pos.z, 0xcfe0ff, 16, 0.9);
+    (audio.sfx.fallThrough || audio.sfx.whoosh)?.(false); netFx('land'); shock(p.pos.x, p.pos.y + 0.3, p.pos.z, 0xcfe0ff, 16, 0.9);
     const kind = groundKind(p.pos.x, p.pos.z, p.pos.y);
     death.veilCol = ({ grass: '#3f5a2c', leaves: '#3c4226', sand: '#a89868', snow: '#c4ccd8', rock: '#5f5b54', ash: '#33323a', stone: '#7f7a70', water: '#1c4a78' })[kind] || '#3a3a30'; death.veil = 0;
   } else {
@@ -9135,7 +9135,7 @@ function updateDeath(dt) {
       H.armL.rotation.set(lerp(H.armL.rotation.x, 0, k), 0, lerp(H.armL.rotation.z, -1.0, k)); H.armR.rotation.set(lerp(H.armR.rotation.x, 0, k), 0, lerp(H.armR.rotation.z, 1.0, k));
       H.legL.rotation.set(lerp(H.legL.rotation.x, 0.25, k), 0, 0); H.legR.rotation.set(lerp(H.legR.rotation.x, -0.1, k), 0, 0); H.shinL.rotation.x = lerp(H.shinL.rotation.x, -0.5, k); H.shinR.rotation.x = lerp(H.shinR.rotation.x, -0.3, k);
       for (let i = 0; i < 3; i++) if (Math.random() < catchK) emit(p.pos.x + rnd(5), p.pos.y - 3 - Math.random() * 8, p.pos.z + rnd(5), rnd(2), 9 + Math.random() * 12, rnd(2), 0.7 + Math.random() * 0.6, [1, 1, 1], 2, 0.8);
-      if (!death.windS && catchK > 0.05) { death.windS = true; audio.sfx.whoosh?.(true); }
+      if (!death.windS && catchK > 0.05) { death.windS = true; (audio.sfx.catchWind || audio.sfx.whoosh)?.(true); }
     }
     const g = groundAt(p.pos.x, p.pos.z, p.pos.y);
     if (soft && p.pos.y <= g) {
@@ -12034,7 +12034,7 @@ function updateVultures(dt) {
     } else if (v.st === 'stoop') {   // wings folded, straight at where he is going to be
       const lead = clamp(d / 85, 0.1, 0.9); tx = P.x + pvx * lead; ty = P.y + pvy * lead + (p.form === 'human' ? 1.2 : 0); tz = P.z + pvz * lead; top = Math.min(104, Math.max(74, Math.hypot(pvx, pvy, pvz) * 1.08 + 12)); turn = 3.3;
       if (d < 3.4 && time > VULT.hurtT) {   // it has him: a piece of his fire goes with it
-        VULT.hurtT = time + 0.7; p.flame = Math.max(0, p.flame - 0.085); camShake = Math.max(camShake, 0.6); flash = Math.max(flash, 0.12); audio.sfx.thud?.();
+        VULT.hurtT = time + 0.7; p.flame = Math.max(0, p.flame - 0.085); camShake = Math.max(camShake, 0.6); flash = Math.max(flash, 0.12); if (audio.sfx.hurt) audio.sfx.hurt(0.7); else audio.sfx.thud?.();
         for (let k = 0; k < 34; k++) emit(P.x + rnd(0.8), P.y + rnd(0.8), P.z + rnd(0.8), rnd(6) + v.vx * 0.2, rnd(5), rnd(6) + v.vz * 0.2, 0.7 + Math.random() * 0.5, k % 3 ? pick(EMBER) : [0.07, 0.06, 0.08], 1, 0.5);
         if (p.form === 'phoenix') { p.vy = (p.vy || 0) - 9; p.speed *= 0.86; } else { p.vel.x += v.vx * 0.12; p.vel.z += v.vz * 0.12; if (p.flame <= 0 && p.grounded) { die('undead'); return; } }
         v.st = 'away'; v.t = 0;
@@ -14642,7 +14642,7 @@ function updateCrownLife(dt) {
     const P = mineP, m = P.m;
     bm.visible = true; bm.position.set(P.x, P.top + 240, P.z); bm.material.color.set(P.hex); bm.material.opacity = m * (0.6 + 0.16 * Math.sin(time * 7)); bm.rotation.y = time * 0.6; bm.scale.set(1 + m * 0.5, 1, 1 + m * 0.5);
     if (m > 0.35) {
-      if (time - CROWN.mineT > 40) { toast(`${(godById[P.id]?.name || P.id).toUpperCase()} KNOWS YOU · YOUR FIRE IS FULL`); audio.sfx.halo?.(); p.flame = 1; flash = Math.max(flash, 0.25); }
+      if (time - CROWN.mineT > 40) { toast(`${(godById[P.id]?.name || P.id).toUpperCase()} KNOWS YOU · YOUR FIRE IS FULL`); (audio.sfx.blessing || audio.sfx.halo)?.(); p.flame = 1; flash = Math.max(flash, 0.25); }
       CROWN.mineT = time; p.flame = Math.min(1, p.flame + dt * 0.4);
       if ((CROWN.t -= dt) < 0) { CROWN.t = 1.15; shock(P.x, clamp(pl.y, P.g + 20, P.top), P.z, new THREE.Color(P.hex).getHex(), 60 + m * 50, 1.1); }
       if (P.id === 'zeus') {   // the sky itself answers him
@@ -15170,7 +15170,7 @@ const FASK = { P: null, until: 0, seen: new Set() };
 function gotFriend(m) {
   if (!m || !ok(m.i) || m.to !== NET.id || aloneNow()) return;
   const P = peerOf(m.i); if (flood(P) || !P.s || SHUN.block.has(P.name) || FRIENDS.has(P.name) || FASK.seen.has(P.id)) return;
-  FASK.seen.add(P.id); FASK.P = P; FASK.until = time + 40; audio.sfx.newcomer?.();
+  FASK.seen.add(P.id); FASK.P = P; FASK.until = time + 40; (audio.sfx.friendAsk || audio.sfx.newcomer)?.();
 }
 function updateFriendAsk() {
   const el = $('friendAsk'), P = FASK.P;
@@ -16777,7 +16777,7 @@ function giveGift() { if (talk.gift) { const [id, from] = talk.gift; talk.gift =
 function applyAct(g, j) {
   if (story.sagaOwed && story.sagaOwed.god === g.id) story.sagaOwed = null;   // (they have had their say about how it went)
   if (j.act === 'join') { if (houseJoin(g.id)) { godSound(g, 'choir', 'high'); g.mood = 'proud'; } }
-  else if (j.act === 'saga') { if (sagaStart(g, j.saga)) { talk.quest = { id: g.id, name: g.name, saga: true }; toast(`A STORY BEGINS · ${story.saga.title.toUpperCase()}`); audio.sfx.chime?.(); } }
+  else if (j.act === 'saga') { if (sagaStart(g, j.saga)) { talk.quest = { id: g.id, name: g.name, saga: true }; toast(`A STORY BEGINS · ${story.saga.title.toUpperCase()}`); (audio.sfx.questBegin || audio.sfx.chime)?.(); } }
   else if (j.act === 'quest' && !(story.saga && story.saga.god === g.id)) setQuest(g, j.kind, j.n, j.reward);
   else if (j.act === 'scare') scare(g);
   else if (j.act === 'gift') { talk.gift = [j.gift, g.name]; talk.after = giveGift; }
@@ -16862,7 +16862,7 @@ function scare(g) {
  camShake = Math.max(camShake, 0.5);
   if (!g.fixed && g.forms.length > 1 && !g.morph) { g.wantForm = g.forms.length - 1; reveal(g); }   // no more pretending to be a bird
   if (loud) { const a = Math.random() * 6.28; strike(p.pos.x + Math.cos(a) * 7, p.pos.y, p.pos.z + Math.sin(a) * 7, 1); }
-  else { dreadT = 2.6; audio.sfx.thud(); }
+  else { dreadT = 2.6; (audio.sfx.dread || audio.sfx.thud)(); }
   witness(`flinched when ${g.name} ${loud ? 'split the air beside him' : 'put the light out'}`);
 }
 function depart(g) {
@@ -16964,7 +16964,7 @@ function leaveTalk() {
   g.mood = kind === 'hurt' ? 'hurt' : kind === 'loud' ? 'angry' : 'annoyed'; g.coolUntil = time + 14;
   setTimeout(() => { if (state !== 'play') return; say([`${name}: “${SLIGHT[kind][Math.min(SLIGHT[kind].length - 1, M.n - 1)]}”`]);
     if (kind === 'loud' || M.n >= 3) { const a = Math.random() * 6.28, p = player; strike(p.pos.x + Math.cos(a) * (M.n >= 3 ? 5 : 11), Math.max(terrainAt(p.pos.x, p.pos.z), WATER), p.pos.z + Math.sin(a) * (M.n >= 3 ? 5 : 11), M.n >= 3 ? 1 : 0.6); }
-    else { dreadT = 1.6; audio.sfx.thud?.(); } }, 650);
+    else { dreadT = 1.6; (audio.sfx.dread || audio.sfx.thud)?.(); } }, 650);
   witness(`turned his back on ${g.name} and walked off without a goodbye or a word of thanks`);
 }
 $('talkInput').addEventListener('blur', () => $('talk').classList.remove('typing'));
@@ -17635,7 +17635,7 @@ function gustBlow() {
   const head = flying ? _v.copy(p.pos).addScaledVector(dir3, 2.5) : _v.set(p.pos.x, p.pos.y + 1.6, p.pos.z);
   const fx = flying ? dir3.x : -Math.sin(human.group.rotation.y), fz = flying ? dir3.z : -Math.cos(human.group.rotation.y), fy = flying ? dir3.y : 0;
   for (let i = 0; i < (flying ? 110 : 50); i++) { const v = (flying ? 50 + p.speed * 0.6 : 14) * (0.6 + Math.random() * 0.6); emit(head.x + rnd(0.3), head.y + rnd(0.3), head.z + rnd(0.3), fx * v + rnd(v * 0.18), fy * v + rnd(v * 0.18), fz * v + rnd(v * 0.18), 0.5 + Math.random() * 0.5, [0.8, 0.88, 1.0], 0, 0.8); }
-  audio.sfx.whoosh?.(true); netFx('swoop');
+  (audio.sfx.dash || audio.sfx.whoosh)?.(true); netFx('swoop');
   if (!flying) { toast('WHOOSH'); return; }
   p.speed = Math.max(p.speed, Math.min(p.speed + 70 * birdK(), 320 + 80 * (birdK() - 1))); WR.beat = 1; camShake = Math.max(camShake, 0.25);
   p.flame = Math.max(0.02, p.flame - 0.04);
@@ -17828,7 +17828,7 @@ function trailAdopt(P, force = false) {
   left.forEach((q, i) => Object.assign(hoops[i], { alive: true, x: q.x, y: q.y, z: q.z, yaw: q.yaw, pop: -i * 0.1, burn: -1, miss: -1, nextK: 0 }));
   for (let i = left.length; i < HOOP_N; i++) hoops[i].alive = false;
   trail.left = left.length; trail.got = 0; trail.n = left.length; trail.prevOk = false; trail.from = P.id; trail.away = 0; trail.coolT = 3;
-  updateHoopTint(); toast(`${P.name}’S RINGS · FLY THEM TOGETHER`); audio.sfx.whoosh?.(false);
+  updateHoopTint(); toast(`${P.name}’S RINGS · FLY THEM TOGETHER`); if (audio.sfx.ringsAppear) audio.sfx.ringsAppear(trail.n || 5); else audio.sfx.whoosh?.(false);
   return true;
 }
 const trailJoin = () => { for (const P of NET.peers.values()) if (P.trail && P.s && performance.now() - P.s.t < 8000 && trailAdopt(P)) return true; return false; };
@@ -18382,7 +18382,7 @@ function placeQuestGods() {
 function grantPerk(id, from) {
   if (!PERKS[id]) return;
   perks[id] = Math.min(3, perks[id] + 1);
-  toast(`GIFT · ${PERKS[id][0]}`); audio.sting('godMet'); flash = Math.max(flash, 0.25);
+  toast(`GIFT · ${PERKS[id][0]}`); if (audio.sfx.gift) audio.sfx.gift(); else audio.sting('godMet'); flash = Math.max(flash, 0.25);
   say([{ text: PERKS[id][1], title: from }]);
   witness(`was given ${PERKS[id][0].toLowerCase()} by ${from}`);
   rankCheck(); saveSoon();
@@ -18579,7 +18579,7 @@ const G_SHARED = { get ico() { return G.ico0; }, get box() { return G.unitBox; }
 const RANKS = ['A BOY WITH WAX ON HIS BACK', 'FLEDGLING', 'WINGED', 'SUN-TOUCHED', 'STORM-RIDER', 'THUNDER-BEARER', 'HALF A GOD'];
 const might = () => Object.values(perks).reduce((a, b) => a + b, 0) + (GREAT.fire === 9 ? 2 : 0) + (GREAT.bolt === 9 ? 2 : 0) + (GREAT.race === 9 ? 2 : 0);
 const rankOf = () => RANKS[Math.min(RANKS.length - 1, Math.floor(might() / 3.4))];
-function rankCheck() { const r = rankOf(); if (GREAT.rank && r !== GREAT.rank && RANKS.indexOf(r) > RANKS.indexOf(GREAT.rank)) setTimeout(() => { toast(`YOU ARE STRONGER · ${r}`); audio.sting?.('godMet'); witness(`is called ${r.toLowerCase()} now`); }, 3800); GREAT.rank = r; }
+function rankCheck() { const r = rankOf(); if (GREAT.rank && r !== GREAT.rank && RANKS.indexOf(r) > RANKS.indexOf(GREAT.rank)) setTimeout(() => { toast(`YOU ARE STRONGER · ${r}`); if (audio.sfx.rankUp) audio.sfx.rankUp(); else audio.sting?.('godMet'); witness(`is called ${r.toLowerCase()} now`); }, 3800); GREAT.rank = r; }
 const isleOf = id => PANTHEON.isles.find(I => I.id === id) || { x: MOUNT.x, z: MOUNT.z, top: SUMMIT, r: 60, far: true };
 function zeusHearth() { const T = temples.find(T => T.name === 'zeus'), f = T && T.fires[0]; return f ? { x: T.x + f.x, y: T.y + f.y, z: T.z + f.z } : { x: MOUNT.x, y: SUMMIT + 2, z: MOUNT.z + 30 }; }
 function findPrometheus() {
@@ -18738,12 +18738,12 @@ function runRace(dt) {
     if (!G.ring) { const a0 = Math.atan2(I.x - MOUNT.x, I.z - MOUNT.z); G.ring = new THREE.Mesh(new THREE.TorusGeometry(34, 1.1, 6, 48), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); G.ring.frustumCulled = false; G.ring.userData.a0 = a0; scene.add(G.ring); }
     G.ring.visible = !I.far; G.ring.position.set(gx, gy, gz); G.ring.lookAt(gx + Math.cos(G.ring.userData.a0), gy, gz - Math.sin(G.ring.userData.a0)); G.ring.material.opacity = 0.55 + 0.25 * Math.sin(time * 3);
     const dr = (P.x - gx) ** 2 + (P.y - gy) ** 2 + (P.z - gz) ** 2; if (dr > 160 * 160) G.armed = true;   // (he has to come at the ring from outside it: finishing a race in it does not start another)
-    if (state === 'play' && !I.far && G.armed !== false && p.form === 'phoenix' && !p.perch && dr < 46 * 46) { raceBuild(); toast('THREE'); audio.sfx.newcomer?.(); }
+    if (state === 'play' && !I.far && G.armed !== false && p.form === 'phoenix' && !p.perch && dr < 46 * 46) { raceBuild(); toast('THREE'); if (audio.sfx.countdown) audio.sfx.countdown(3); else audio.sfx.newcomer?.(); }
     else { if (state === 'play' && !I.far && Math.hypot(P.x - gx, P.z - gz) < 900 && Math.random() < 0.5) emit(gx + Math.cos(time * 2) * 34, gy + Math.sin(time * 2) * 34, gz, rnd(1), rnd(1), rnd(1), 0.9, EMBER[0], 0.5, 1.6); return { x: gx, y: gy, z: gz, label: 'THE GOLD RING OVER APOLLO’S ISLAND · FLY THROUGH IT' }; }
   }
   const R = G.R, N = R.N; if (G.ring) G.ring.visible = false;
   if (state === 'dead' || p.form !== 'phoenix' || p.sub) { raceEnd(false); return null; }
-  if (R.go < 0) { const was = Math.ceil(-R.go); R.go += dt; const now = Math.ceil(-R.go); if (now !== was && now > 0) { toast(now === 2 ? 'TWO' : 'ONE'); audio.sfx.ui?.(); } if (R.go >= 0) { toast('GO'); audio.sting?.('godMet'); R.s = 70; } }
+  if (R.go < 0) { const was = Math.ceil(-R.go); R.go += dt; const now = Math.ceil(-R.go); if (now !== was && now > 0) { toast(now === 2 ? 'TWO' : 'ONE'); if (audio.sfx.countdown) audio.sfx.countdown(now); else audio.sfx.ui?.(); } if (R.go >= 0) { toast('GO'); if (audio.sfx.countdown) audio.sfx.countdown(0); else audio.sting?.('godMet'); R.s = 70; } }
   else {
     R.t += dt;
     // his place on the course: the gate he is making for, and how near it he is
@@ -18751,7 +18751,7 @@ function runRace(dt) {
     R.lead = me - R.s;
     // the horses do not wait, but they are not out of sight either: they ease when far ahead and reach when he passes them
     R.s += (94 + 24 * smoothstep(-160, 260, R.lead) - 14 * smoothstep(-260, -700, R.lead)) * (1 + 0.05 * perks.swift) * dt;
-    if (P.distanceToSquared(g.P) < 50 * 50) { g.m.material.opacity = 0.12; R.gi++; chime([523.25 * (1 + (R.gi % 4) * 0.125), 783.99], 0.06); flash = Math.max(flash, 0.08); p.flame = Math.min(1, p.flame + 0.05);
+    if (P.distanceToSquared(g.P) < 50 * 50) { g.m.material.opacity = 0.12; R.gi++; if (audio.sfx.gate) audio.sfx.gate(R.gi); else chime([523.25 * (1 + (R.gi % 4) * 0.125), 783.99], 0.06); flash = Math.max(flash, 0.08); p.flame = Math.min(1, p.flame + 0.05);
       if (R.gi > N) { raceEnd(R.s < R.L); return null; } }
     if (R.s >= R.L + 40 && R.gi <= N) { raceEnd(false); return null; }
     if (P.distanceTo(g.P) > 3200) { raceEnd(false); return null; }
@@ -21972,7 +21972,7 @@ function xrMode(m) {
   if (m !== 'bird' && m !== 'rider') m = XR.mode === 'rider' ? 'bird' : 'rider';
   if (m === XR.mode) return; XR.mode = m; try { localStorage.setItem('icarus.xrmode', m); } catch {}
   if (BIRD.auto === 'cruise') birdAuto('', ''); XR.cr = null; XR.eyeOff = null; XR.hudKey = ''; NET.lastSent = null;
-  toast(m === 'rider' ? 'RIDING · THE REINS ARE IN YOUR HANDS' : 'YOU ARE THE BIRD · ARMS OUT TO FLY · REST THEM AND IT HOLDS ITS HEIGHT'); audio.sfx.halo?.();
+  toast(m === 'rider' ? 'RIDING · THE REINS ARE IN YOUR HANDS' : 'YOU ARE THE BIRD · ARMS OUT TO FLY · REST THEM AND IT HOLDS ITS HEIGHT'); (audio.sfx.modeSwitch || audio.sfx.halo)?.();
 }
 // what is said in the room about the room itself
 function xrHear(low) {
@@ -23471,7 +23471,7 @@ function matchChallenge(arg, game = 'tron') {
 function matchAnswer(yes) {
   const I = MATCH.inv; if (!I || I.mine) return; MATCH.inv = null; $('matchAsk').classList.remove('on');
   if (yes && !matchFree()) { toast('NOT NOW'); yes = false; }
-  matchSend({ k: yes ? 'acc' : 'dec', id: I.id, to: I.from }); if (yes) toast(`YOU FIGHT ${I.name}`);
+  matchSend({ k: yes ? 'acc' : 'dec', id: I.id, to: I.from }); if (yes) { toast(`YOU FIGHT ${I.name}`); audio.sfx.challengeAccept?.(); } else audio.sfx.challengeDecline?.();
 }
 // called on everyone
 function matchWar(cpus = 0, sim = false, game = 'tron') {
@@ -23501,15 +23501,15 @@ function matchGo(m, mine = false, sim = false) {
     if (JSON.stringify(c) !== JSON.stringify(WAR_DEF)) chatLine('', warSay(c), 'sys'); }
   if (kind === 'duel') { ids.forEach((id, k) => MATCH.roster.set(id, { id, name: cleanName((m.names || [])[k]) || matchName(id), alive: true })); MATCH.me.in = MATCH.roster.has(NET.id); }
   else if (!sim && matchFreeNow()) { MATCH.roster.set(NET.id, { id: NET.id, name: heroName, alive: true }); MATCH.me.in = true; if (!mine) matchSend({ k: 'join', id: m.id }); else setTimeout(() => MATCH.id === m.id && matchSend({ k: 'join', id: m.id }), 300); }
-  if (kind === 'war') { const what = MATCH.game === 'rings' ? 'A RING RACE' : 'THE WARZONE'; toast(mine ? `${what} IS CALLED` : `${cleanName(m.n)} CALLS ${what}`); audio.sfx.thunder?.(); }
-  audio.sfx.halo?.(); modeBarSet();
+  if (kind === 'war') { const what = MATCH.game === 'rings' ? 'A RING RACE' : 'THE WARZONE'; toast(mine ? `${what} IS CALLED` : `${cleanName(m.n)} CALLS ${what}`); (audio.sfx.matchCalled || audio.sfx.thunder)?.(); }
+  if (kind !== 'war') (audio.sfx.challengeAccept || audio.sfx.halo)?.(); else if (!audio.sfx.matchCalled) audio.sfx.halo?.(); modeBarSet();   // (a fight called over everyone; or a duel taken up)
 }
 const matchFreeNow = () => state === 'play' && realm === 'over' && flags.morphed && !player.cine && !player.sub;
 function gotMatch(m) {
   if (!m || typeof m !== 'object' || !ok(m.i) || typeof m.id !== 'string') return;
   const P = NET.peers.get(m.i), nm = cleanName(m.n || P?.name);
   if (m.k === 'inv') { if (m.to !== NET.id || MATCH.phase || MATCH.inv || SHUN.block.has(nm)) return;
-    MATCH.inv = { id: m.id, from: m.i, name: nm, until: performance.now() + 20000, game: m.game === 'rings' ? 'rings' : 'tron' }; const el = $('matchAsk'); el.textContent = `${nm} CHALLENGES YOU TO ${m.game === 'rings' ? 'A RING RACE' : 'A DUEL OF FIRE'} · ${TOUCH ? 'TAP' : 'CLICK'} TO FIGHT`; el.classList.add('on'); audio.sfx.newcomer?.(); chatLine('', `${nm} CHALLENGES YOU · /accept OR /decline`, 'sys'); return; }
+    MATCH.inv = { id: m.id, from: m.i, name: nm, until: performance.now() + 20000, game: m.game === 'rings' ? 'rings' : 'tron' }; const el = $('matchAsk'); el.textContent = `${nm} CHALLENGES YOU TO ${m.game === 'rings' ? 'A RING RACE' : 'A DUEL OF FIRE'} · ${TOUCH ? 'TAP' : 'CLICK'} TO FIGHT`; el.classList.add('on'); (audio.sfx.challenge || audio.sfx.newcomer)?.(); chatLine('', `${nm} CHALLENGES YOU · /accept OR /decline`, 'sys'); return; }
   if (m.k === 'acc' || m.k === 'dec') { const I = MATCH.inv; if (!I || !I.mine || I.id !== m.id || m.i !== I.to) return; MATCH.inv = null;
     if (m.k === 'dec') { toast(`${I.name} WILL NOT FIGHT`); return; }
     const g = { k: 'go', id: I.id, kind: 'duel', t0: Date.now() + 5000 + miLen('duel'), ids: [NET.id, I.to], names: [heroName, I.name], host: NET.id, cfg: MATCH.cfg, cx: Math.round(player.pos.x), cz: Math.round(player.pos.z), game: I.game || 'tron' }; matchSend(g); matchGo(g, true); MATCH.last = { kind: 'duel', vs: I.name, game: I.game || 'tron' }; return; }
@@ -23623,7 +23623,7 @@ function miCard(id, k, n) {
   const el = $('fightCard'), R = MATCH.roster.get(id), P = id === NET.id ? null : NET.peers.get(id), pat = id === NET.id ? PATRON.id : P?.patron, col = matchCol(id);
   el.innerHTML = `<i>${k + 1} / ${n}</i><b></b><span></span>`; el.children[1].textContent = R?.name || matchName(id); el.children[1].style.color = col; el.children[1].style.textShadow = `0 0 26px ${col}, 0 0 70px ${col}, 0 2px 0 rgba(0,0,0,.5)`;
   el.children[2].textContent = (id === NET.id ? 'YOU · ' : '') + (PATRONS[pat] ? `OF THE HOUSE OF ${(godById[pat]?.name || pat).toUpperCase()}` : 'FLIES FOR NO GOD');
-  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); audio.sfx.halo?.();
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); if (audio.sfx.fightCard) audio.sfx.fightCard(k); else audio.sfx.halo?.();
   const at = id === NET.id ? player.pos : P?.pos; if (at) { shock(at.x, at.y, at.z, new THREE.Color(col).getHex(), 70, 0.9, true); burst(at.x, at.y, at.z, TOUCH ? 50 : 110, 18, 1.2); }
 }
 // the opening, each frame of it, on this screen: his own bird and the ones that fly themselves are put where the figure
@@ -23732,7 +23732,7 @@ function matchEnd(win) {
       W.last = { at: statsIso(), kind: M.kind, won: true, place: 1, of: M.roster.size, secs: Math.round(secs), kills: M.kills }; }
     setTimeout(() => { if (MATCH.id === M.id && MATCH.phase === 'over') toast('THE SKY IS YOURS · WRITE YOUR NAME ON IT · IT STAYS'); }, 4300); }
   try { localStorage.setItem('icarus.stats', JSON.stringify(STATS.d)); } catch {}
-  audio.sfx.halo?.(); modeBarSet();
+  if (mine && audio.sfx.victory) audio.sfx.victory(); else if (!mine && M.me.in && audio.sfx.defeat) audio.sfx.defeat(); else audio.sfx.halo?.(); modeBarSet();   // (won; lost; or only watched)
 }
 // A house has won: its pillar on Olympus burns from its foot to its crown, and goes on burning a while.
 function pylonBlaze(house, who) {
@@ -23835,7 +23835,7 @@ function updateMatch(dt) {
       if (M.roster.size < 2) { toast(M.kind === 'war' ? 'NOBODY ELSE CAME' : 'THE DUEL IS OFF'); matchLeave(); return; }
       matchPlace(); }
     if (M.placed && now < M.t0 - 3000) miUpdate(now);
-    else if (M.placed) { miEnd(); const s = Math.ceil((M.t0 - now) / 1000); if (s !== M.lastS && s > 0 && s <= 3) { M.lastS = s; matchBig(String(s)); audio.sfx.ui?.(); }
+    else if (M.placed) { miEnd(); const s = Math.ceil((M.t0 - now) / 1000); if (s !== M.lastS && s > 0 && s <= 3) { M.lastS = s; matchBig(String(s)); if (audio.sfx.countdown) audio.sfx.countdown(s); else audio.sfx.ui?.(); }
       if (M.me.alive && M.slot) { p.pos.set(M.slot.x, M.slot.y, M.slot.z); p.yaw = M.slot.yaw; p.pitch = 0; p.bank = 0; p.speed = 30; p.vy = 0; p.fallTop = p.pos.y; p.flame = 1; }
       for (const C of M.cpus) cpuShow(C, true); }
     if (now >= M.t0 && M.placed) { miEnd(); for (const id of M.roster.keys()) { const T = TRON.trails.get(id); if (T) tronClear(T); } trailRib.key = null; M.phase = 'live'; M.lastS = 0; M.liveAt = performance.now(); matchBig('FLY', 1100); audio.sfx.rebirth?.(); if (M.game === 'rings') ringsInit(); if (M.me.alive) { p.speed = 70 * M.spd; M.prev.copy(p.pos); M.has = true; const W = warStat(); if (M.game === 'rings') W.rn = (W.rn || 0) + 1; else if (M.kind === 'duel') W.duels++; else W.n++; }
