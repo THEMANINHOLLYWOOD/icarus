@@ -9404,7 +9404,7 @@ function chatCommand(text) {
     case 'challenge': case 'duel': if (/^(end|stop|quit|leave|off)$/i.test((arg || '').trim())) matchStop(); else if (/^again$/i.test((arg || '').trim())) matchAgain(); else matchChallenge(arg); return true;
     case 'again': case 'rematch': matchAgain(); return true;
     case 'rings': case 'ringrace': ringsCmd(arg); return true;
-    case 'race': if (/^(end|stop|quit|leave|off)$/i.test((arg || '').trim())) matchStop(); else matchChallenge(arg, 'rings'); return true;
+    case 'race': if (/^(end|stop|quit|leave|off)$/i.test((arg || '').trim())) matchStop(); else { const tm = teamParse((arg || '').trim().toLowerCase().split(/\s+/).filter(Boolean)); if (tm) teamCmd(tm, 'rings'); else matchChallenge(arg, 'rings'); } return true;   // (/race 2v2, /race A B vs C D: a ring race in sides)
     case 'bird': if (!arg) birdSay(); else if (!birdHear(String(arg).toLowerCase(), String(arg).trim().split(/\s+/).length)) chatLine('', 'IT DOES NOT KNOW THAT ONE · /bird ALONE SAYS WHAT IT DOES', 'sys'); return true;
     case 'pet': if (player.form === 'phoenix') birdPet(1); else chatLine('', 'THERE IS NO BIRD TO STROKE', 'sys'); return true;
     case 'loop': case 'immelmann': case 'splits': case 'split-s': case 'barrel': case 'knife': case 'knife-edge': case 'stall': case 'hammerhead': case 'roll': {   // the aerobatics, flown for him (see FLIP for flying them by hand)
@@ -30516,7 +30516,7 @@ function matchUnqueue() { const M = MATCH; if (!M.queue) return chatLine('', 'YO
 function matchFire() {   // the one he waited for is over: his is called
   const M = MATCH, Q = M.queue; M.queue = null; M.qGo = 0; if (!Q) return; M.cool = 0;
   chatLine('', 'YOUR TURN · THE FIGHT YOU ASKED FOR IS CALLED', 'sys');
-  if (Q.kind === 'duel') matchChallenge(Q.vs, Q.game, Q.at); else matchWar(Q.cpus || 0, !!Q.sim, Q.game, Q.party, Q.at, Q.near);
+  if (Q.kind === 'duel') matchChallenge(Q.vs, Q.game, Q.at); else matchWar(Q.cpus || 0, !!Q.sim, Q.game, Q.party, Q.at, Q.near, Q.tm || null);
 }
 function matchQueueStep(dt) {   // every second or so, while he waits and nothing of his is on
   const M = MATCH; if (!M.queue || M.phase || (M.qT = (M.qT || 0) - dt) > 0) return; M.qT = 1; modeBarSet();
@@ -30674,7 +30674,7 @@ function matchWar(cpus = 0, sim = false, game = 'tron', party = false, at = 0, n
   if (MATCH.phase) return sys('ONE FIGHT AT A TIME');
   if (!sim && !matchFree()) return sys(flags.morphed ? 'NOT NOW' : 'YOU HAVE TO HAVE FLOWN FIRST');
   if (sim && (state !== 'play' || realm !== 'over')) return sys('NOT NOW');
-  { const B = matchBusy(); if (B) return matchWait(B, { kind: 'war', cpus, sim, game, party, near, at }); }
+  { const B = matchBusy(); if (B) return matchWait(B, { kind: 'war', cpus, sim, game, party, near, at, tm }); }   // (sides and all, for when it is called)
   if (performance.now() < MATCH.cool && !at) return sys(`THE WARZONE IS RESTING · ${Math.ceil((MATCH.cool - performance.now()) / 1000)} S`);
   const named = Array.isArray(party) ? [...new Set(party.map(x => peerNamed(String(x).replace(/^@/, '').toLowerCase())).filter(P => P && P.s && P.id !== NET.id).map(P => P.id))].slice(0, 23) : null;
   if (named && !named.length) return sys('NOBODY BY THOSE NAMES IS FLYING');
