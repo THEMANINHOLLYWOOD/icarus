@@ -8367,7 +8367,8 @@ function auiToast() {
   const now = performance.now(); if (now > TOAST.until || !TOAST.msg) return;
   const nx = UIL.nx, k = Math.min(1, (now - TOAST.t0) / 160, (TOAST.until - now) / 320), max = nx - 6, words = TOAST.msg.split(' '), lines = [''];
   for (const w of words) { const L = lines.length - 1, t = lines[L] ? lines[L] + ' ' + w : w; if (lines[L] && t.length > max) lines.push(w); else lines[L] = t; }
-  const mr = Math.max(MENU.open ? rectOf($('menu'), 250).bottom : 0, document.body.classList.contains('moding') ? rectOf($('modeBar'), 250).bottom + 4 : 0), top = Math.min(UIL.ny - 2 - (QL.rows && !MENU.open ? QL.rows + 1 : 0), uilRow(Math.max(mr + UIL.ch * 1.2, UIL.ch * 1.6)));   // (under the quest at the top left, not across it)
+  let mr = Math.max(MENU.open ? rectOf($('menu'), 250).bottom : 0, document.body.classList.contains('moding') ? rectOf($('modeBar'), 250).bottom + 4 : 0), top = Math.min(UIL.ny - 2 - (QL.rows && !MENU.open ? QL.rows + 1 : 0), uilRow(Math.max(mr + UIL.ch * 1.2, UIL.ch * 1.6)));   // (under the quest at the top left, not across it)
+  if (AREA.barA > 0.05 && AREA.barRow) top = Math.min(top, AREA.barRow - (document.querySelector('#areaBar.acts') ? 5 : 3));   // (and under the name of the place, not across it)
   lines.slice(0, 3).forEach((ln, i) => { const shown = ln.slice(0, Math.ceil(ln.length * Math.min(1, (now - TOAST.t0) / 220 + 0.25))), c0 = (nx - ln.length) >> 1, tag = i === 0 && TOAST.tag ? TOAST.tag : ''; uilPlate(c0 - 2, top - i, c0 + ln.length + 1 + (tag ? tag.length + 2 : 0), top - i, 205 * k | 0); uilText(c0, top - i, shown, 0, 245 * k | 0); uilPut(c0 - 2, top - i, 42, 1, 220 * k | 0);
     if (tag) uilText(c0 + ln.length + 2, top - i, tag, 1, 150 * k | 0); });   // (which of how many: there is more coming, or this is the last of it)
 }
@@ -8884,7 +8885,7 @@ function auiArea(dt) {
   const nx = UIL.nx, b = el.querySelector('b'), r = rectOf(b, 250); if (r.width < 1) return;
   const title = uiAsc(b.textContent).toUpperCase().slice(0, nx - 6), sub = uiAsc(el.querySelector('i').textContent).slice(0, nx - 6), row = uilRow(r.top + r.height / 2), cx = nx >> 1;
   const w = Math.max(title.length, sub.length), c0 = cx - (w >> 1) - 2, c1 = cx + ((w + 1) >> 1) + 1, btns = el.classList.contains('acts') ? [...el.querySelectorAll('span button')] : [];
-  let bottom = sub ? row - 1 : row; const keys = btns.map(B => { const q = rectOf(B, 250), lab = uiAsc(B.textContent).toUpperCase(); if (q.width < 1) return null; const kr = uilRow(q.top + q.height / 2); bottom = Math.min(bottom, kr); return { B, q, lab, kr }; }).filter(Boolean);
+  let bottom = sub ? row - 1 : row; AREA.barRow = row; const keys = btns.map(B => { const q = rectOf(B, 250), lab = uiAsc(B.textContent).toUpperCase(); if (q.width < 1) return null; const kr = uilRow(q.top + q.height / 2); bottom = Math.min(bottom, kr); return { B, q, lab, kr }; }).filter(Boolean);
   uilPlate(c0, row, c1, row, 175 * A | 0); if (sub) uilPlate(c0, row - 1, c1, row - 1, 175 * A | 0);
   uilText(cx - (title.length >> 1), row, title, 2, 250 * A | 0);
   if (sub) uilText(cx - (sub.length >> 1), row - 1, sub, 0, 175 * A | 0);
