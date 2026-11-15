@@ -216,7 +216,7 @@ He: "I don't trust you." — A guide: "Fair. Most people don't. But I'm the only
   const system = [
     who, hades ? '' : RULES, hades ? '' : TONE,
     `BACKGROUND (yours to know; bring it up only if it matters to what he says):\n${WORLD}`,
-    `WHO YOU ARE: ${god.persona}\nBackground: ${god.years || ''}\nWhat has been on your mind lately (only if it comes up): ${god.asks}\n${god.feuds ? `Feuds: ${god.feuds}\n` : ''}Secret: ${god.secret || 'none'}\nDeep down you want (never say it outright): ${god.wants}\nHow you sound: ${god.delivery || ''}`,
+    `WHO YOU ARE: ${god.persona}\nBackground: ${god.years || ''}\nThings you have opinions about (only if they come up, and then as a plain opinion of yours — never as a deep question put to him): ${god.asks}\n${god.feuds ? `Feuds: ${god.feuds}\n` : ''}Secret: ${god.secret || 'none'}\nDeep down you want (never say it outright): ${god.wants}\nHow you sound: ${god.delivery || ''}`,
     where,
     hades && first ? '' : first ? `This is your first meeting. Say your name once, in passing. If he came to you with something, respond to that first.`
       : `You have spoken before — the earlier conversation is below and you remember all of it. Do not reintroduce yourself.`,
