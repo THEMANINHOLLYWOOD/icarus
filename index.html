@@ -7545,7 +7545,7 @@ function circleStart() {
   if (!nearCrete()) { if (!watchCrete()) return false; CIRC.pending = true; return true; }   // (not there yet: go, and begin on arriving)
   if (p.form !== 'phoenix' || p.perch) { toast('YOU HAVE TO BE FLYING'); return false; }
   if (!birdAuto('circle', 'THE BIRD CIRCLES · YOU WATCH · STEER TO TAKE IT BACK')) return false;
-  LIVE.q.length = 0; LIVE.mv = null; if (!CIRC.on) CIRC.dist0 = phxDist; CIRC.on = true;
+  LIVE.q.length = 0; LIVE.mv = null; if (!CIRC.on) CIRC.dist0 = phxDist; CIRC.on = true; CIRC.alt = null; CIRC.want = 0;
   CIRC.close = true;   // (he goes in whole, at a bird's pace, and makes himself small as he gets there: see the circle itself, and SMALL)
   return true;
 }
@@ -19736,7 +19736,7 @@ function updateCinemaState(dt) {
   const alt = p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER);
   const want = flying && (cinema.manual || cinema.autoT > 0 || cinema.idle > 6 && TUT.cineOpen) && !(alt < ROLL_ALT * 1.5 && !cinema.manual && cinema.autoT <= 0);
   const on = want || foot;
-  if (on && cinema.on && (cinema.sc < 1) !== (p.form === 'human')) newShot();   // (he changed shape: the shots change size)
+  if (on && cinema.on && (cinema.sc < 0.2) !== (p.form === 'human')) newShot();   // (he changed shape: the shots change size; on foot they are sized 0.085, and a bird made small is never under a quarter, so a hawk over Crete is not taken for a man and cut every frame)
   if (on && !cinema.on) { cinema.on = true; cinema.last = ''; newShot(); }
   if (!on && cinema.on) cinema.on = false;
   document.body.classList.toggle('cinema', cinema.on || state === 'talk' || state === 'end');
@@ -24183,8 +24183,9 @@ function updateCamera(dt) {
     lookAt.copy(camTarget); camera.lookAt(camTarget);
     camera.fov = lerp(camera.fov, (62 + (p.perch ? 8 * smoothstep(0, 1.6, p.perchT || 0) : 0)) * fovK(), damp(2.2, dt));
   } else {
-    if (!dragging) { let want = 0; if (CIRC.on && BIRD.auto === 'circle') { const T = circleAim(); want = wrapAngle(Math.atan2(-(T.x - p.pos.x), -(T.z - p.pos.z)) - p.yaw); }   // (circling: the lens looks in past the bird at whoever is being watched)
-      camYawOff = lerp(camYawOff, want, damp(1.5, dt)); }
+    if (!dragging) { let want = 0; if (CIRC.on && BIRD.auto === 'circle') { const T = circleAim(), d = Math.hypot(T.x - p.pos.x, T.z - p.pos.z);   // (circling: the lens looks in past the bird at whoever is being watched)
+        want = d > 4 * Math.max(1, birdK()) ? wrapAngle(Math.atan2(-(T.x - p.pos.x), -(T.z - p.pos.z)) - p.yaw) : CIRC.want || 0; CIRC.want = want; }   // (right over them the way in has no direction: hold the last one)
+      camYawOff = wrapAngle(camYawOff + wrapAngle(want - camYawOff) * damp(1.5, dt)); }   // (the short way round, never the long way through the back of his head)
     const y = p.yaw + camYawOff;
     // The faster he goes, the more the camera gets down behind his tail and opens the lens: the bird stays the same size
     // while the world stretches past it. It leans with him, and at full speed it shakes.
@@ -27248,11 +27249,16 @@ function birdStep(dt) {
     M.pitch = lerp(M.pitch, clamp((BIRD.alt - P.y) / 160, -0.55, 0.5), damp(1.8, dt)); M.speed = lerp(M.speed, BIRD.v, damp(0.9, dt));
   } else if (M.mv.k === 'circle') {   // round and round what there is to see, a wing down toward it
     // (small, it goes round close: twenty paces off and a little above whoever it is watching, slowly; and keeps up with him when he flies)
-    const T = circleAim(), st = smallT(), cl = CIRC.close ? 0 : 1, cr = CIRC.r * lerp(0.07, 1, Math.min(st, cl)), chh = CIRC.h * lerp(0.1, 1, Math.min(st, cl)), Q = st < 1 ? cretePeer() : null, qv = Q && Q.s ? Math.hypot(Q.s.vx || 0, Q.s.vy || 0, Q.s.vz || 0) : 0;
-    if (CIRC.close && SMALL.want >= 1 && Math.hypot(P.x - T.x, P.z - T.z) < 125 && player.form === 'phoenix' && state === 'play') { SMALL.want = SMALL.MIN; SMALL.free = false; audio.sfx.morph?.(); }
+    // (and all of it in proportion to his own bird: the keeper's, three times any other, goes round three times as wide and high, so it never has to turn harder than it can)
+    const T = circleAim(), st = smallT(), cl = CIRC.close ? 0 : 1, m = Math.min(st, cl), sK = Math.max(1, BIG.k || bigName(heroName)), v = M.speed * (SMALL.k < 1 ? smallV() : 1), Q = st < 1 ? cretePeer() : null, qv = Q && Q.s ? Math.hypot(Q.s.vx || 0, Q.s.vy || 0, Q.s.vz || 0) : 0;
+    const cr = Math.max(CIRC.r * lerp(Math.min(1, 0.07 * sK), 1, m), v / 0.6), chh = CIRC.h * lerp(Math.min(1, 0.1 * sK), 1, m), dT = Math.hypot(P.x - T.x, P.z - T.z);   // (never a ring tighter than it can fly at the speed it is going)
+    if (CIRC.close && SMALL.want >= 1 && dT < Math.max(125, CIRC.r * 0.07 * sK * 2.5) && player.form === 'phoenix' && state === 'play') { SMALL.want = SMALL.MIN; SMALL.free = false; audio.sfx.morph?.(); }
     const a = Math.atan2(P.x - T.x, P.z - T.z) + lerp(0.6, 0.34, st), tx = T.x + Math.sin(a) * cr, tz = T.z + Math.cos(a) * cr;
-    const turn = clamp(wrapAngle(Math.atan2(-(tx - P.x), -(tz - P.z)) - M.yaw) * 1.6, -0.9, 0.9); M.yaw += turn * dt; M.roll = lerp(M.roll, clamp(turn * 1.4 + 0.22, -1.0, 1.0), damp(2.6, dt));
-    const alt = clamp(T.y + chh, menuSafe(P) + 40 * K, menuRoof(P.x, P.z) - 30); M.pitch = lerp(M.pitch, clamp((alt - P.y) / lerp(26, 160, st), -0.5, 0.45), damp(1.8, dt)); M.speed = lerp(M.speed, lerp(24 + qv * 1.25 / 0.3, 50, st), damp(0.9, dt));
+    const turn = clamp(wrapAngle(Math.atan2(-(tx - P.x), -(tz - P.z)) - M.yaw) * 1.6, -0.9, 0.9); M.yaw = wrapAngle(M.yaw + turn * dt); M.roll = lerp(M.roll, clamp(turn * 1.4 + 0.22, -1.0, 1.0), damp(2.6, dt));
+    const aw = clamp(T.y + chh, menuSafe(P, [0, 0.8, 1.6]) + 40 * K, menuRoof(P.x, P.z) - 30);   // (the height it means to hold, eased: what the ground ahead does as it goes round must not jerk its nose up and down each lap)
+    CIRC.alt = CIRC.alt == null || Math.abs(CIRC.alt - aw) > 600 ? aw : lerp(CIRC.alt, aw, damp(aw > CIRC.alt ? 2.5 : 0.6, dt));
+    const alt = Math.max(CIRC.alt, menuFloor(P.x, P.z, P.y) + 12 * Math.max(1, K)), hi = smoothstep(40, 220, (P.y - alt) / Math.max(1, K));   // (far above where it should be, after a big bird has made itself small: down steeper, and quicker)
+    M.pitch = lerp(M.pitch, clamp((alt - P.y) / lerp(26, 160, st), lerp(-0.5, -0.8, hi), 0.45), damp(1.8, dt)); M.speed = lerp(M.speed, lerp(24 + qv * 1.25 / 0.3, 50, st) * (1 + 1.6 * hi), damp(0.9, dt));
   } else menuMove(M.mv, dt);
   const cp = Math.cos(M.pitch);
   dir3.set(-Math.sin(M.yaw) * cp, Math.sin(M.pitch), -Math.cos(M.yaw) * cp);
