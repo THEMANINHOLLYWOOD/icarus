@@ -30887,7 +30887,7 @@ function updateBooms(dt) {
 //    middle at once — down and in, wing over wing, up the same column of air in a braid of fire, with the sky splitting
 //    where they meet — and are thrown back out to their own places; then the count, and the glide in. Every one of them
 //    flies the same figure from the same clock and the fight's own name, so it is the same opening on every screen.
-const MINTRO = { roll: { duel: 3400, war: 6800 }, hold: 20000, clash: 3600, card: '', shown: -1, hit: false, clashed: false, seed: 1, drift: 0.5, style: 0,
+const MINTRO = { roll: { duel: 3400, war: 6800 }, hold: 24000, clash: 3600, card: '', shown: -1, hit: false, clashed: false, seed: 1, drift: 0.5, style: 0,
   pose: { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, bank: 0, sp: 60 }, a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3(), d: new THREE.Vector3() };
 const miRoll = (kind = MATCH.kind) => MINTRO.roll[kind === 'duel' ? 'duel' : 'war'];
 const miLen = kind => miRoll(kind) + MINTRO.hold + MINTRO.clash;   // (the longest it can be: the wait for "good to start?" is cut short by the answer)
@@ -31000,7 +31000,7 @@ function mdPlan() {
   for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
   const cpu = id => M.roster.get(id)?.cpu ? 1 : 0, boss = M.hostId && M.roster.has(M.hostId) ? M.hostId : sorted[0];
   ids.sort((a, b) => (b === boss) - (a === boss) || cpu(a) - cpu(b));   // (whoever called it first; then the others who came; then the house's own birds)
-  Object.assign(MD, { id: M.id, ids, q: 0, skip: false, ask: '', askT: 0, rdy: false, said: false, busy: false, card: '', cueLine: null, cueWant: '', lastCut: '', side: R() < 0.5 ? -1 : 1, glass: null }); MD.slots.clear();
+  Object.assign(MD, { id: M.id, ids, q: 0, skip: false, ask: '', askT: 0, rdy: false, said: false, trim: false, busy: false, card: '', cueLine: null, cueWant: '', lastCut: '', side: R() < 0.5 ? -1 : 1, glass: null }); MD.slots.clear();
   const n = ids.length, duel = n <= 2, G = Math.max(1, Math.ceil(n / 3)), three = g => sorted.slice(g * 3, g * 3 + 3), other = k => ids[k % n];
   // the fly-in: the first shot craned up out of his own lens; the rest whipped or turned to
   let roll;
@@ -31220,6 +31220,8 @@ const ARES_L = {
   ask: ['Anyone have any questions?', 'Questions? Now\'s the time.', 'Anything you don\'t get? Ask me.', 'Any questions before we start?'],
   ready: n => [`${n}, you good to start?`, `${n}. Ready?`, `You good to start, ${n}?`, `Well, ${n}? Good to go?`],
   go: ['Good. Let\'s go.', 'That\'s what I like.', 'Then fight.', 'Go on, then.'],
+  rings: ['No fire this time. Gold rings come in chains: be first through them.', 'A whole chain is worth three more. Most rings when the clock stops wins.'],   // (a ring race: nothing puts anyone out of it)
+  rvet: ['Rings, not fire. Most rings when the clock stops wins.', 'You know this one. Chains of gold. Take the most.'],
 };
 const ARES_CTX = 'You are Ares, opening a fight of fire in the sky over Olympus, and one of the fighters asks you something before it starts. The rules: every bird leaves a wall of fire behind it; touching any wall, even your own, puts you out; the ring closes in over four minutes and its edge burns; glass rings in the air give one extra life and a few seconds of smashing through walls (not the ground); F (or FIRE) throws a fireball that hunts the nearest enemy, flies faster than a bird but turns slower, so a hard turn, dive or loop shakes it, one every four seconds; R (or WIND) once a life is a burst of speed that blows any fireball off you; the first half minute is a warm-up when nothing counts; the last one flying wins, and at four minutes the one with the most fires wins it. Answer in one or two short, plain sentences, in your own voice.';
 function aresSay(text, cut = false, cue = '') { if (!matchSees()) return; say([{ text, voice: 'ares', title: 'Ares', cue }], 'Ares', cut); }   // (cue: what the line is about, for the lens: see mdHoldTo)
@@ -31228,11 +31230,13 @@ function aresStep(now) {
   const M = MATCH, pk = a => a[Math.floor(Math.random() * a.length)], idle = !dlg.cur && !dlg.queue.length && !MD.busy;
   if (now >= M.cs) { if (MD.ask && MD.ask !== 'done') MD.ask = 'done'; return; }
   if (!MD.said) { MD.said = true; const W = warStat(), vet = (W.n || 0) + (W.duels || 0) + (W.rn || 0) > 0, lines = [[pk(ARES_L.open), 'open']];
-    if (M.tm) lines.push([`${['', '', 'Two', 'Three', 'Four'][M.tm.n]} sides. Your own side's fire lets you through. Theirs does not.`, 'teams']);   // (sides: who is with whom, first)
-    if (vet) lines.push([pk(ARES_L.vet), 'vet'], [TOUCH ? 'FIRE throws, WIND saves you.' : 'F throws fire. R is your wind.', 'fire']); else { for (const t of ARES_L.rules[0]) lines.push([t, 'walls']); if (M.game !== 'rings') for (const t of ARES_L.fire()) lines.push([t, 'fire']); const k = 1 + Math.floor(Math.random() * 3); for (const t of ARES_L.rules[k].slice(0, 1)) lines.push([t, ARES_CUE[k]]); }   // (the walls, always; the fire and the wind; and one more thing)
+    if (M.tm) lines.push([`${['', '', 'Two', 'Three', 'Four'][M.tm.n]} sides. ${M.game === 'rings' ? 'Every ring your side takes counts for all of it.' : 'Your own side\'s fire lets you through. Theirs does not.'}`, 'teams']);   // (sides: who is with whom, first)
+    if (M.game === 'rings') { if (vet) lines.push([pk(ARES_L.rvet), 'vet']); else for (const t of ARES_L.rings) lines.push([t, 'ring']); }   // (a ring race: no walls, no fire, no glass, no warm-up)
+    else if (vet) lines.push([pk(ARES_L.vet), 'vet'], [TOUCH ? 'FIRE throws, WIND saves you.' : 'F throws fire. R is your wind.', 'fire']); else { for (const t of ARES_L.rules[0]) lines.push([t, 'walls']); if (M.game !== 'rings') for (const t of ARES_L.fire()) lines.push([t, 'fire']); const k = 1 + Math.floor(Math.random() * 3); for (const t of ARES_L.rules[k].slice(0, 1)) lines.push([t, ARES_CUE[k]]); }   // (the walls, always; the fire and the wind; and one more thing)
     for (const [t, c] of lines) aresSay(t, false, c); MD.askT = now; return; }
-  const h = M.lock + miRoll();   // (the questions when they have all arrived and he has said his piece — cutting him short only if he goes on — and then "good to start?")
-  if (!MD.ask && now >= h && (idle || now >= h + 6000)) { MD.ask = 'q'; MD.askT = now; aresSay(pk(ARES_L.ask), !idle, 'ask'); return; }
+  const h = M.lock + miRoll();   // (the questions when they have all arrived and he has said his piece, and then "good to start?")
+  if (!MD.ask && now >= h && !idle && !MD.trim && now >= Math.max(h + 6000, M.cs - 12000)) { MD.trim = true; for (let i = dlg.queue.length - 1; i >= 0; i--) if (dlg.queue[i].title === 'Ares') dlg.queue.splice(i, 1); }   // (going on so long there would be no time left to ask: what he has not begun is let go, and what he is saying he finishes)
+  if (!MD.ask && now >= h && (idle || now >= Math.max(h + 6000, M.cs - 8000))) { MD.ask = 'q'; MD.askT = now; aresSay(pk(ARES_L.ask), !idle, 'ask'); return; }
   if (MD.ask === 'q' && !MD.busy && (idle && now - MD.askT > 4000 || now - MD.askT > 7500)) { MD.ask = 'ready'; MD.askT = now; aresSay(pk(ARES_L.ready(M.host ? heroName : matchName(M.hostId))), !idle, 'ready'); }
 }
 // what he says (or types) while it opens: a yes is a yes; a question goes to Ares
