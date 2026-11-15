@@ -11363,7 +11363,7 @@ function padTick() {
   PAD.x = dz(gp.axes[0]); PAD.y = -dz(gp.axes[1]); PAD.roll = (btn(4) ? 1 : 0) - (btn(5) ? 1 : 0); PAD.brake = val(6); PAD.boost = val(7) > 0.3;
   if (gp.axes.length >= 4 && player.form === 'phoenix' && !dragging) camYawOff = clamp(camYawOff - dz(gp.axes[2]) * 0.04, -Math.PI, Math.PI);
   const was = PAD.b; PAD.b = gp.buttons.map(b => b.pressed);
-  if (state === 'play' && PAD.b[0] && !was[0]) pressSpace();
+  if (state === 'play' && PAD.b[0] && !was[0]) { const M = MATCH; if (M.phase === 'count' && M.placed && MD.id === M.id && Date.now() < M.t0) { if (MD.ask === 'ready') mdReady(); if (mdCamOn()) mdSkip(); } else pressSpace(); }   // (in a fight's opening, A is Space there: a yes when asked, and his own lens)
   if (state === 'play' && PAD.b[3] && !was[3] && player.form === 'phoenix') birdTrick('');
   if (state === 'play' && PAD.b[2] && !was[2] && fbOn()) fbFire();   // (X: fire, in a fight)
   if (state === 'play' && PAD.b[1] && !was[1] && fbOn()) fbWind();   // (B: the wind)
@@ -27926,7 +27926,8 @@ addEventListener('keydown', e => {
     else if (live() && e.code === 'Space' && !e.repeat) staySilent();
     return;
   }
-  if (state === 'watch') { if (!e.repeat && ['Space', 'Enter', 'ArrowRight', 'ArrowLeft', 'Tab'].includes(e.code)) { e.preventDefault(); matchWatchNext(); } return; }
+  if (state === 'watch') { if (!e.repeat && !e.metaKey && !e.ctrlKey && (e.code === 'KeyT' || e.code === 'Slash')) { e.preventDefault(); return openChat(e.code === 'Slash' ? '/' : ''); }   // (out and watching, the chat is still his: /leave, /fly watch)
+    if (!e.repeat && ['Space', 'Enter', 'ArrowRight', 'ArrowLeft', 'Tab'].includes(e.code)) { e.preventDefault(); matchWatchNext(); } return; }
   if (state === 'map') {   // M closes it, R lays it flat or stands it up; the arrows or WASD move over it, Q and E turn it, Z and X tip it, + and - push in and out, N squares it north
     const V = mapV, st = innerHeight * 0.16 / V.ts, mv = (u, v) => { V.tx += (u * mapP.c + v * mapP.s) * st; V.tz += (-u * mapP.s + v * mapP.c) * st; audio.sfx.mapMove?.(); };
     if (M3.on && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyQ', 'KeyE', 'KeyZ', 'KeyX', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract', 'ShiftLeft', 'ShiftRight'].includes(e.code)) { e.preventDefault(); if (!M3.keys[e.code] && !e.code.startsWith('Shift')) audio.sfx.mapMove?.(); M3.keys[e.code] = true; return; }   // (standing: held, they fly it about)
