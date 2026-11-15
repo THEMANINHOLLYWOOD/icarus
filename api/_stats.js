@@ -7,7 +7,7 @@ import { rest, travellerOf, nameOf, LIVE } from './_store.js';
 const MEM = globalThis.__icarusStats ||= { stats: new Map(), pts: [], talk: [], id: 1 };
 const fin = (v, lim) => (Number.isFinite(+v) ? Math.max(-lim, Math.min(lim, +v)) : 0);
 const GOD = /^[a-z]{2,24}$/;
-const TOTALS = ['km', 'air', 'water', 'crashes', 'deaths', 'words', 'typed', 'talks', 'quests', 'flights', 'tricks', 'areas', 'tsunamis', 'dives', 'rings'];
+const TOTALS = ['km', 'air', 'water', 'crashes', 'deaths', 'words', 'typed', 'talks', 'quests', 'flights', 'tricks', 'areas', 'tsunamis', 'dives', 'rings', 'felled'];
 // what the page says, folded into what was kept: totals never go down, the fastest is the fastest
 function merge(old, n) {
   const o = old && typeof old === 'object' ? { ...old } : {};
@@ -80,6 +80,25 @@ export async function POST(req) {
     else { rows = []; for (let page = 0; page < 6; page++) { const r = await rest(`flight_points?select=t,x,y,z,r,v,f&key=eq.${key}&t=gte.${encodeURIComponent(from)}&t=lte.${encodeURIComponent(to)}&order=t.asc`, { range: `${page * 1000}-${page * 1000 + 999}` }); if (!Array.isArray(r.data) || !r.data.length) break; rows.push(...r.data); if (r.data.length < 1000) break; } }
     const step = Math.max(1, Math.ceil(rows.length / 5000));
     return json({ points: rows.filter((_, i) => i % step === 0).map(p => [Date.parse(p.t), Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10, Math.round(p.z * 10) / 10, p.r, Math.round(p.v * 10) / 10, p.f]) });
+  }
+
+  // everyone's together, for the sky of numbers in the game: every traveller's totals added up, how many there are, and
+  // where he stands among them by the distance flown. The rows are read at most every five minutes; his rank is worked
+  // out from them each time he asks.
+  if (b.op === 'world') {
+    if (limited(req, 'stats-world', 20)) return json({ error: 'slow down' }, 429);
+    const W = MEM.world ||= { t: 0, rows: [] };
+    if (Date.now() - W.t > 300_000) {
+      let rows = [];
+      if (!LIVE) rows = [...MEM.stats.entries()].map(([k, s]) => ({ key: k, data: s.data }));
+      else for (let page = 0; page < 5; page++) { const r = await rest('player_stats?select=key,data', { range: `${page * 1000}-${page * 1000 + 999}` }); if (!Array.isArray(r.data) || !r.data.length) break; rows.push(...r.data); if (r.data.length < 1000) break; }
+      W.rows = rows.filter(r => r && r.data && typeof r.data === 'object').map(r => ({ key: r.key, d: r.data })); W.t = Date.now();
+    }
+    const sum = {}; for (const k of TOTALS) sum[k] = 0; let top = 0;
+    for (const r of W.rows) { for (const k of TOTALS) sum[k] += Math.max(0, +r.d[k] || 0); top = Math.max(top, +r.d.top?.v || 0); }
+    const mine = W.rows.find(r => r.key === key), km = Math.max(+mine?.d.km || 0, fin(b.km, 1e9));
+    const rank = 1 + W.rows.filter(r => r.key !== key && (+r.d.km || 0) > km).length;
+    return json({ n: W.rows.length + (mine ? 0 : 1), sum, top, rank, of: W.rows.length + (mine ? 0 : 1) });
   }
 
   // "delete" a line: hidden from him, kept all the same
