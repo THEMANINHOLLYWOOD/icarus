@@ -314,6 +314,10 @@
   #dpExit:hover { background:rgba(40,24,12,.85); } #dpExit:focus-visible { outline:1px solid #ffd8a8; outline-offset:2px; } #dpExit span { opacity:.6; }
   .touch #dpExit { padding:14px 16px; letter-spacing:.16em; } .touch #dpExit span { display:none; } .touch #dpBar { bottom:calc(var(--sb, 0px) + 68px); } .touch #dpBar i { font-size:8px; letter-spacing:.08em; }
   body.dp #dpBar, body.dp #dpExit { display:block; }
+  /* what the director understood: one line, on a dark backing */
+  #dirRead { position:fixed; left:50%; bottom:calc(var(--sb, 0px) + 92px); transform:translateX(-50%); z-index:8; pointer-events:none; display:none; max-width:min(92vw, 760px); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; background:rgba(8,6,6,.74); border:1px solid rgba(255,170,110,.22); border-radius:2px; padding:5px 10px; font-size:9.5px; letter-spacing:.14em; color:#ffe2c0; }
+  .touch #dirRead { bottom:calc(var(--sb, 0px) + 112px); font-size:8.5px; letter-spacing:.08em; } .touch .photo #dirRead { bottom:calc(var(--sb, 0px) + 132px); }
+  body.dp #dirRead.on { display:block; }
   #fightCard { position:fixed; left:50%; bottom:18%; transform:translate(-50%, 16px); z-index:9; pointer-events:none; opacity:0; text-align:center; white-space:nowrap; transition:opacity .25s; }
   #fightCard.on { animation:cardIn .5s cubic-bezier(.2,.9,.2,1) both; }
   #fightCard b { display:block; font-weight:600; font-size:clamp(30px, 7.5vw, 104px); letter-spacing:.2em; padding-left:.2em; line-height:1.05; }
@@ -846,7 +850,7 @@
 </div></div>
 <div id="areaBar" aria-live="polite"><b></b><i></i><span></span></div>
 <div id="modeBar" aria-live="polite"><b></b><i></i></div>
-<div id="dpBar" aria-live="polite"><b></b><i></i></div><button id="dpExit" type="button">✕ exit camera<span> · esc</span></button><div id="matchBig" aria-live="assertive"></div><div id="fightCard" aria-live="polite"></div><button id="matchAsk" type="button"></button>
+<div id="dpBar" aria-live="polite"><b></b><i></i></div><div id="dirRead" aria-live="polite"></div><button id="dpExit" type="button">✕ exit camera<span> · esc</span></button><div id="matchBig" aria-live="assertive"></div><div id="fightCard" aria-live="polite"></div><button id="matchAsk" type="button"></button>
 <div id="title" class="hidden">
   <div class="mark"><h1>ICARUS</h1></div>
   <div class="flyhint" id="flyHint">SPACE TO FLY</div>
@@ -10315,6 +10319,7 @@ function sendChat(raw) {
   if (text[0] === '/') TOURDO.cmd = time; else TOURDO.typed = time;
   if (/^\/(name|rename|call me|i am)\s+\S/i.test(text)) { renameSelf(text.replace(/^\/(name|rename|call me|i am)\s+/i, '')); return; }   // (/name ARIADNE: a new name)
   if (text[0] === '/' && chatCommand(text)) return;
+  if (text[0] !== '/' && dpOn()) { const R = dirParse(text.toLowerCase()); if (R && (R.rich || R.any || R.adj.length && (DIR.s || DIR.next))) { chatLine('', `→ CAMERA · ${text.toUpperCase()}`, 'sys'); dpHear(text, true); return; } }   // (with the camera his, a shot written down is for the camera)
   if (text[0] !== '/' && GFLY.on && state === 'play') { statsWords(text, true); chatLine(heroName, text); airSay(text); return; }   // (with a god beside him, what he writes is for the god: nobody else reads it)
   statsWords(text, true);
   if (text[0] === '/' && !/^\/(become|be|turn into|shape|shift|transform into)\b/i.test(text) && text.slice(1).trim().split(/\s+/).length > 2) {   // (anything else after a slash is a request, in plain words: the keeper's agent does it for him; for anyone else, the gods)
@@ -18263,6 +18268,7 @@ function updatePhoto(dt) {
   const txt = `${mm} MM${sd === null ? '' : Math.abs(sd) < 0.6 ? ' · INTO THE SUN' : Math.abs(sd) > 2.5 ? ' · SUN BEHIND YOU' : sd > 0 ? ' · SUN ON THE LEFT' : ' · SUN ON THE RIGHT'}`;
   if (txt !== photo.txt) { photo.txt = txt; $('photoLens').textContent = txt; }
   if (lv !== photo.lv) { photo.lv = lv; const b = $('photoGrid').lastChild; b.style.transform = `rotate(${-photo.roll}rad)`; b.style.opacity = Math.abs(photo.roll) < 0.012 ? 1 : 0.55; }
+  dirPhoto(dt);   // (a shot he described: the lens flown for him, until he takes it)
 }
 $('diveBtn').textContent = TOUCH ? 'DIVE UNDER' : 'Q · DIVE UNDER';
 $('diveBtn').addEventListener('click', e => { e.stopPropagation(); humanDive(); $('diveBtn').blur(); });
@@ -18350,6 +18356,7 @@ function footShotPos(sh, out) {
   return out;
 }
 function newShot() {
+  if (DIR.s && !XR.on) return dirShot();   // (a shot he described: it carries on)
   const p = player, foot = p.form === 'human', sc = cinema.sc = foot ? 0.085 : (1 + (birdK() - 1) * 0.85) * (1 + GODM.k * 0.3 + smoothstep(220, 700, p.speed) * 0.55), fast = !foot && p.speed > 150;   // (and in god mode, or going very fast, further again, so he stays in the frame)   // (the big bird: every shot stands back for it, a little less than its size, so it still fills more of the frame)
   if (foot && !SH.def) return newFootShot();
   // what he is doing chooses the shot: low over water, the lens goes down to the water; in a dive, over his back; with
@@ -18431,10 +18438,11 @@ function updateCinemaState(dt) {
   if (on && !cinema.on) { cinema.on = true; cinema.last = ''; newShot(); }
   if (!on && cinema.on) cinema.on = false;
   document.body.classList.toggle('cinema', cinema.on || state === 'talk' || state === 'end');
-  dpTick();
+  dpTick(dt);
 }
 function updateCinemaCam(dt) {
   const sh = cinema.shot, p = player;
+  if (sh.type === 'dir') return dirCam(dt);
   if (sh.foot) {   // on foot: the shot follows him smoothly, aims where the frame is composed, and cuts when it has run
     sh.t += dt;
     if (sh.t > sh.dur && DP.hold && p.form === 'human') sh.t = sh.dur;
@@ -18482,7 +18490,7 @@ function updateCinemaCam(dt) {
 //    him), so the camera opens on his kind of shot and leans that way when it is left to choose — it gets to know him.
 const DP = { want: '', first: '', hold: false, k: 1, lens: 1, up: 0, side: 0, slow: false, busy: false, said: '', saidT: -99, was: false, grab: null, mem: { liked: {}, hated: {}, notes: [], fav: null, n: 0 } };
 try { const j = JSON.parse(localStorage.getItem('icarus.dp') || 'null'); if (j && typeof j === 'object') Object.assign(DP.mem, { liked: j.liked || {}, hated: j.hated || {}, notes: (j.notes || []).slice(-8), fav: j.fav || null, n: j.n | 0 }); } catch {}
-const DP_NAMES = { profile: 'WIDE, SIDE-ON', tight: 'TIGHT ON THE WINGS', flyby: 'FLY-BY', orbit: 'ORBIT', low: 'LOW BEHIND', crane: 'CRANE', lead: 'LONG LENS AHEAD', top: 'STRAIGHT DOWN', quarter: 'THREE-QUARTER', along: 'AT THE WINGTIP', headon: 'HEAD-ON', belly: 'FROM UNDERNEATH', wing: 'ON THE SHOULDER', skim: 'ON THE WATER', sun: 'AGAINST THE SUN', dive: 'OVER THE DIVE', face: 'CLOSE ON THE FACE', wide: 'WIDE', side: 'SIDE-ON', back: 'OVER THE SHOULDER' };
+const DP_NAMES = { profile: 'WIDE, SIDE-ON', tight: 'TIGHT ON THE WINGS', flyby: 'FLY-BY', orbit: 'ORBIT', low: 'LOW BEHIND', crane: 'CRANE', lead: 'LONG LENS AHEAD', top: 'STRAIGHT DOWN', quarter: 'THREE-QUARTER', along: 'AT THE WINGTIP', headon: 'HEAD-ON', belly: 'FROM UNDERNEATH', wing: 'ON THE SHOULDER', skim: 'ON THE WATER', sun: 'AGAINST THE SUN', dive: 'OVER THE DIVE', face: 'CLOSE ON THE FACE', wide: 'WIDE', side: 'SIDE-ON', back: 'OVER THE SHOULDER', dir: 'DIRECTED' };
 const dpOn = () => state === 'photo' || state === 'play' && cinema.manual;
 const dpFoot = () => player.form === 'human' && !SH.def;
 const dpSave = () => { try { localStorage.setItem('icarus.dp', JSON.stringify(DP.mem)); } catch {} saveSoon(); };
@@ -18533,7 +18541,7 @@ function dpParse(low, on) {
 }
 // he liked it, or he did not: the shot in hand is remembered, and how it was set
 function dpLike(v) {
-  const sh = cinema.shot, t = sh && cinema.on ? sh.type : ''; if (!t) return;
+  const sh = cinema.shot, t = sh && cinema.on ? sh.type : ''; if (!t || t === 'dir') return;
   const M = DP.mem;
   if (v > 0) { M.liked[t] = (M.liked[t] || 0) + v; if (v >= 1) M.fav = { type: t, side: sh.side || 0, k: +DP.k.toFixed(2), lens: +DP.lens.toFixed(2), up: +DP.up.toFixed(2), foot: !!sh.foot }; if (M.hated[t]) M.hated[t] = Math.max(0, M.hated[t] - 1); }
   else { M.hated[t] = (M.hated[t] || 0) + 1; if (M.liked[t]) M.liked[t] = Math.max(0, M.liked[t] - 1); if (M.fav && M.fav.type === t) M.fav = null; if (DP.want === t) { DP.want = ''; DP.hold = false; } }
@@ -18543,7 +18551,8 @@ function dpExit() { const was = dpOn(); if (state === 'photo') closePhoto(); cin
 // a direction, carried out
 function dpApply(d) {
   if (d.act === 'exit') { dpExit(); return; }
-  if (d.act === 'stop' && !REC.on) d.act = 'next';   // ("cut", with nothing rolling: he means cut to something else)
+  if (d.act === 'stop' && !REC.on) d.act = 'next';
+  if (d.shot || d.act === 'next' || d.reset) { DIR.s = null; DIR.next = null; DIR.ph = null; }   // (a named shot, or "next": the described one is over)   // ("cut", with nothing rolling: he means cut to something else)
   const flying = state === 'play';
   if (flying && !cinema.manual && (d.shot || d.k || d.lens || d.hold !== undefined || d.act === 'next' || d.act === 'record')) { TUT.cineOpen = true; cinema.manual = true; }   // (a direction puts the film camera on)
   if (d.like) dpLike(d.like);
@@ -18567,46 +18576,497 @@ function dpApply(d) {
 }
 // the frame as it is, small: so the one being asked can look at it
 function dpFrame() { try { const w = 384, h = Math.round(w * canvas.height / canvas.width), c = DP.cv || (DP.cv = document.createElement('canvas')); c.width = w; c.height = h; c.getContext('2d').drawImage(canvas, 0, 0, w, h); return c.toDataURL('image/jpeg', 0.6); } catch { return ''; } }
-// what plain words did not cover: asked of the director of photography
-async function dpAsk(text) {
-  if (DP.busy) return; DP.busy = true; DP.said = '…'; DP.saidT = time;
+// what plain words did not cover: asked of the director of photography. Once for each thing said (what is said within
+// a breath of it goes with it), never two at once, and what has been asked lately is answered from memory
+const dpKey = text => `${dpFoot() ? 'f' : ''}${state === 'photo' ? 'p' : ''}:${String(text).toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim()}`;
+function dpAsk(text, refine = false) {
+  const hit = DIR.cache.get(dpKey(text)); if (hit) { dpAnswer(hit, refine); return; }
+  DIR.qRefine = DIR.q ? DIR.qRefine && refine : refine; DIR.q = DIR.q ? `${DIR.q} ${text}` : text;
+  clearTimeout(DIR.qT); DIR.qT = setTimeout(dpSend, 450);
+  if (!refine) { DP.said = '…'; DP.saidT = time; }
+}
+async function dpSend() {
+  if (DP.busy) { DIR.qT = setTimeout(dpSend, 300); return; }
+  const text = DIR.q.slice(0, 300), refine = DIR.qRefine, key = dpKey(text); DIR.q = ''; if (!text) return;
+  DP.busy = true; if (!refine) { DP.said = '…'; DP.saidT = time; }
   const p = player, foot = dpFoot(), sh = cinema.shot, alt = p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER);
-  const ctx = `${foot ? (p.grounded ? 'walking on the ground' : 'in the air on foot') : `flying as the phoenix at ${Math.round(p.speed)} m/s, ${Math.round(alt)} m up${p.pitch < -0.5 ? ', diving' : p.pitch > 0.4 ? ', climbing' : ''}`}, over ${terrainAt(p.pos.x, p.pos.z) < WATER ? 'open sea' : 'land'}${AREA.names.get(AREA.cur)?.name ? `, in ${AREA.names.get(AREA.cur).name}` : ''}; it is ${dayName()}, the sun ${sunDir.y < 0.05 ? 'is down' : sunDir.y < 0.4 ? 'is low' : 'is high'}${storm > 0.3 ? ', a storm is on' : ''}${GFLY.on ? `; ${GFLY.g.name} is flying with him as a giant phoenix` : ''}${MATCH.phase ? '; he is in a fight' : ''}`;
-  const img = cinema.on || state === 'photo' ? await new Promise(r => { DP.grab = r; setTimeout(() => { if (DP.grab === r) { DP.grab = null; r(''); } }, 400); }) : '';
+  const ctx = `${foot ? (p.grounded ? 'walking on the ground' : 'in the air on foot') : `flying as the phoenix at ${Math.round(p.speed)} m/s, ${Math.round(alt)} m up${p.pitch < -0.5 ? ', diving' : p.pitch > 0.4 ? ', climbing' : ''}`}, over ${terrainAt(p.pos.x, p.pos.z) < WATER ? 'open sea' : 'land'}${AREA.names.get(AREA.cur)?.name ? `, in ${AREA.names.get(AREA.cur).name}` : ''}; it is ${dayName()}, the sun ${sunDir.y < 0.05 ? 'is down' : sunDir.y < 0.4 ? 'is low' : 'is high'}${storm > 0.3 ? ', a storm is on' : ''}${GFLY.on ? `; ${GFLY.g.name} is flying with him as a giant phoenix` : ''}${MATCH.phase ? '; he is in a fight' : ''}${state === 'photo' ? '; he is in the still camera, the world all but stopped' : ''}`;
+  const img = !refine && !DIR.s && (cinema.on || state === 'photo') ? await new Promise(r => { DP.grab = r; setTimeout(() => { if (DP.grab === r) { DP.grab = null; r(''); } }, 400); }) : '';
   let j = null;
-  try { const r = await fetch('/api/hub?fn=dp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text.slice(0, 300), foot, ctx, img, shot: { type: sh?.type || '', side: sh?.side || 0, k: DP.k, lens: DP.lens, hold: DP.hold }, mem: { liked: dpTop(DP.mem.liked, 8), hated: dpTop(DP.mem.hated, 8), notes: DP.mem.notes } }) }); j = r.ok ? await r.json() : null; } catch {}
+  try { const r = await fetch('/api/hub?fn=dp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, foot, ctx, img, who: dirWho(), places: dirPlaces(), rig: dirSay(DIR.s || DIR.next), shot: { type: sh?.type || '', side: sh?.side || 0, k: DP.k, lens: DP.lens, hold: DP.hold }, mem: { liked: dpTop(DP.mem.liked, 8), hated: dpTop(DP.mem.hated, 8), notes: DP.mem.notes } }) }); j = r.ok ? await r.json() : null; } catch {}
   DP.busy = false;
-  if (!j || !j.say && !j.shot && j.act === 'none') { DP.said = 'SAY IT ANOTHER WAY'; DP.saidT = time; return; }
+  if (j && (j.say || j.shot || j.rig || j.act && j.act !== 'none')) { DIR.cache.delete(key); DIR.cache.set(key, j); if (DIR.cache.size > 40) DIR.cache.delete(DIR.cache.keys().next().value); }
+  dpAnswer(j, refine);
+}
+function dpAnswer(j, refine) {
+  if (!j || !j.say && !j.shot && !j.rig && (!j.act || j.act === 'none')) { if (!refine) { DP.said = 'SAY IT ANOTHER WAY'; DP.saidT = time; } return; }
   const d = { say: String(j.say || '').toUpperCase(), act: j.act, like: j.like, note: j.note };
+  if (j.rig || refine) {   // (a shot in his own words: the rig is flown; what else was said, done)
+    if (j.rig) dirFromRig(j.rig);
+    if (typeof j.slow === 'boolean') d.slow = j.slow;
+    if (d.act === 'next') d.act = 'none';
+    if (d.act !== 'none' || d.like || d.note || d.slow !== undefined) dpApply(d); else if (d.say) { DP.said = d.say; DP.saidT = time; }
+    return;
+  }
   if (j.shot) { d.shot = j.shot; d.hold = j.hold; } else if (typeof j.hold === 'boolean' && j.hold !== DP.hold) d.hold = j.hold;
   if (j.side) d.side = j.side; if (Math.abs(j.dist - 1) > 0.04 || j.shot) d.kAbs = j.dist; if (Math.abs(j.lens - 1) > 0.04 || j.shot) d.lensAbs = j.lens; if (Math.abs(j.up) > 0.04 || j.shot) d.upAbs = j.up;
   if (typeof j.slow === 'boolean') d.slow = j.slow;
   dpApply(d);
 }
+// the rig the director of photography sent: a new shot, a change to the one in hand, or a correction
+function dirFromRig(g) {
+  const S = DIR.s || DIR.next, fresh = g.subj?.length || g.move || g.bg || g.from || g.when;
+  if (g.adj?.includes('auto') && !fresh) { dirAuto(); return; }
+  if (g.adj?.length && !fresh && S) { if (g.frame || g.angle || g.side) dirMerge(g); dirAdjust(g.adj); return; }
+  if (!fresh && S) { dirMerge(g); return; }
+  dirStart(g);
+}
+// a few words more about the shot in hand ("from below", "wide", "on a 200"): the rest of it stays as it was
+function dirMerge(g) {
+  const s = DIR.s || DIR.next; if (!s) return;
+  for (const k of ['frame', 'angle', 'side', 'move']) if (g[k]) s[k] = g[k];
+  if (g.mm) { s.mm = g.mm; s.lensK = 1; } if (g.dist) s.dist = g.dist; if (g.h !== null && g.h !== undefined) s.h = g.h; if (g.dur) s.dur = g.dur; if (g.speed && g.speed !== 1) { s.speed = g.speed; s.mt = clamp(9 / s.speed, 3, 40); }
+  if (g.angle) s.elK = 0; if (g.frame) s.k = 1; if (g.move) s.held = false; s.cut = !!g.cut;
+  s.init = false; DIR.lift = 0; dirRead(dirSay(s));
+}
+// a shot described, or a word to the one in hand; false if it is for the named shots (or nothing to do with a camera)
+function dirHear(text, low, d) {
+  const R = dirParse(low); if (!R) return false;
+  const S = DIR.s || DIR.next, slowCam = /\bslow(ly|er)?\b(?! ?-?mo)/.test(low);   // ("slowly": the move, not slow motion)
+  const acts = () => { if (d && (d.act && d.act !== 'next' && (d.act !== 'stop' || REC.on) || d.like || d.slow !== undefined && !slowCam)) dpApply({ act: d.act === 'next' ? undefined : d.act, like: d.like, slow: slowCam ? undefined : d.slow }); };
+  if (R.adj.includes('auto') && !R.rich) { dirAuto(); return true; }
+  if (S && !R.rich && (R.adj.length || R.any)) { if (R.any) dirMerge(R.s); if (R.adj.length) dirAdjust(R.adj); acts(); return true; }
+  if (R.rich) { if (dirStart(R.s) !== false) { acts(); if (!R.sure) dpAsk(text, true); } return true; }
+  if (!R.any && !R.adj.length && !R.sure) { dpAsk(text); return true; }
+  return false;
+}
+// ── The director, in his own words. Past the named shots he can describe one the way a director does — "low and wide
+//    from behind as I come over the ridge", "orbit slowly round me and SKYITO", "follow ARIADNE from her left", "from the
+//    water looking up at the mountain with me crossing", "a crane up as we pass the ring of fire" — and the camera works
+//    it out: who is in it (him, anyone flying by name, whoever is nearest or in front, the group, a god, a place), how
+//    big, from how low, from which side, on what lens, how it moves and for how long, cut or eased into. Common shot
+//    language is understood here and at once; what is not goes once to the director of photography (api/_dp.js), whose
+//    answer is the same rig. The page finds everyone and everything in it where they are, frame by frame, and flies the
+//    lens there on springs: never through the ground, never behind a hill for long, and never off whoever it is on.
+//    Short words after that move the shot in hand: "lower", "slower", "closer", "other side", "hold this", "back to auto".
+const DIR = { s: null, next: null, cache: new Map(), q: '', qT: 0, busy: false, read: '', readT: -99, lift: 0, blockT: 0, was: false, ph: null, held: false,
+  pos: new THREE.Vector3(), posV: new THREE.Vector3(), aim: new THREE.Vector3(), aimV: new THREE.Vector3(), fov: 50, c: new THREE.Vector3(), w: new THREE.Vector3(), b: new THREE.Vector3(), t: new THREE.Vector3(), u: new THREE.Vector3(), lastWho: '' };
+const DIR_MOVE = { static: 'LOCKED OFF', follow: 'FOLLOWING', orbit: 'ORBIT', crane_up: 'CRANE UP', crane_down: 'CRANE DOWN', push_in: 'PUSH IN', pull_out: 'PULL OUT', dolly: 'ALONGSIDE', flyby: 'FLY-BY' };
+const DIR_SIDE = { behind: Math.PI, front: 0, left: -Math.PI / 2, right: Math.PI / 2, shoulder: Math.PI - 0.32 };
+const DIR_EL = { low: -0.3, eye: 0.04, high: 0.55, top: 1.42 };
+const DIR_MM = { wide: 28, medium: 50, tight: 85 };
+const DIR_NUM = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12, fifteen: 15, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, hundred: 100, few: 4, couple: 2 };
+const dirN = w => /^\d+(\.\d+)?$/.test(w) ? +w : DIR_NUM[w] ?? NaN;
+// everyone in the sky with him who can be filmed (his regulars among them), and the people of the world who are about
+const dirPeers = () => [...NET.peers.values()].filter(P => peerLive(P) && !P.memory && !P.crete);
+const dirFolk = () => [...gods, ...others].filter(g => g.active && g.name);
+const dirLev = (a, b) => { if (Math.abs(a.length - b.length) > 2) return 9; const d = Array.from({ length: b.length + 1 }, (_, i) => i); for (let i = 1; i <= a.length; i++) { let p = d[0]; d[0] = i; for (let j = 1; j <= b.length; j++) { const t = d[j]; d[j] = Math.min(d[j] + 1, d[j - 1] + 1, p + (a[i - 1] === b[j - 1] ? 0 : 1)); p = t; } } return d[b.length]; };
+// a name said aloud (speech mangles them: "sky eto" for SKYITO), against the names there are
+function dirNameIn(t, name) {
+  const n = name.toLowerCase().replace(/[^a-z0-9]/g, ''); if (n.length < 3) return -1;
+  const i = t.indexOf(' ' + name.toLowerCase() + ' '); if (i >= 0) return i;
+  const flat = t.replace(/[^a-z0-9]/g, ''), j = n.length >= 4 ? flat.indexOf(n) : -1; if (j >= 0) return Math.max(0, t.indexOf(t.trim().split(' ').find(w => n.startsWith(w.replace(/[^a-z0-9]/g, '').slice(0, 3))) || '~'));
+  if (n.length >= 5) { const ws = t.trim().split(' '); for (let k = 0; k < ws.length; k++) for (const w of [ws[k], ws[k] + (ws[k + 1] || '')]) if (w.length >= 4 && dirLev(w.replace(/[^a-z0-9]/g, ''), n) <= (n.length >= 8 ? 2 : 1)) return t.indexOf(' ' + ws[k] + ' '); }
+  return -1;
+}
+// places a shot can be about, stood at, or waited for
+const DIR_PLACES = [
+  [/\bring of fire\b|\bfire ring\b|\bthe ring\b|\bring\b/, () => TORCH.ring && { x: TORCH.ring.x, y: TORCH.ring.y, z: TORCH.ring.z, r: TORCH.ring.R || 40, label: 'THE RING OF FIRE' }],
+  [/\b(olympus|mountain|mount|summit|peak|throne)\b/, () => ({ x: MOUNT.x, y: lerp(WATER, SUMMIT, 0.8), z: MOUNT.z, r: MOUNT.R * 0.55, label: 'THE MOUNTAIN', top: SUMMIT })],
+  [/\b(sun|sunset|sunrise)\b/, () => realm === 'over' && sunDir.y > -0.05 ? { sun: true, r: 0, label: 'THE SUN' } : null],
+  [/\b(crete|labyrinth|tower)\b/, () => ({ x: CRETE.x, y: WATER + 120, z: CRETE.z, r: 600, label: 'CRETE' })],
+  [/\b(volcano|lava|blue fire)\b/, () => { const p = player, v = VOLCANOES.slice().sort((a, b) => Math.hypot(a.x - p.pos.x, a.z - p.pos.z) - Math.hypot(b.x - p.pos.x, b.z - p.pos.z))[0]; return v && { x: v.x, y: groundAt(v.x, v.z) + 40, z: v.z, r: v.R0 || 300, label: 'THE VOLCANO' }; }],
+  [/\b(beacon)\b/, (ph) => { const p = player, B = BEACONS.find(b => ph.includes(b.name.toLowerCase().replace(/^the /, '').replace(/ beacon$/, ''))) || BEACONS.slice().sort((a, b) => Math.hypot(a.x - p.pos.x, a.z - p.pos.z) - Math.hypot(b.x - p.pos.x, b.z - p.pos.z))[0]; return B && { x: B.x, y: groundAt(B.x, B.z) + 6, z: B.z, r: 20, label: B.name.toUpperCase() }; }],
+];
+function dirPlace(ph) {
+  ph = ` ${String(ph || '').toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim()} `; if (ph.trim().length < 3) return null;
+  for (const [re, f] of DIR_PLACES) if (re.test(ph)) { const P = f(ph); if (P) return P; }
+  for (const [k, a] of AREA.names) if (a?.name && a.name.length > 3 && ph.includes(' ' + a.name.toLowerCase() + ' ')) { const [r0, i, j] = k.split(':'); if (r0 !== (realm === 'under' ? 'under' : 'over')) continue; const x = (+i + 0.5) * AREA.S, z = (+j + 0.5) * AREA.S; return { x, y: Math.max(groundAt(x, z), WATER) + 60, z, r: AREA.S * 0.3, label: a.name.toUpperCase() }; }
+  if (/\b(behind|below|above|under|underneath|side|front|left|right|top|down|up|me|him|her|them|us)\b/.test(ph) && ph.trim().split(' ').length < 2) return null;
+  const P = placeNamed(ph.trim()); return P && !P.peer ? { x: P.x, y: P.y + 20, z: P.z, r: 60, label: String(P.label || '').toUpperCase() } : null;
+}
+// one subject said, found: "me" · "nearest" · "front" · "group" · "we" · a flier · a god or one of the people · a place
+function dirFind(tok) {
+  const t = String(tok || '').toLowerCase().trim(), p = player, h = cineHead(), fx = -Math.sin(h), fz = -Math.cos(h); if (!t) return null;
+  if (/^(me|i|myself|you|icarus|him)$/.test(t)) return [{ k: 'me', name: 'YOU' }];
+  const L = dirPeers();
+  if (t === 'group' || t === 'we' || t === 'us') { const near = L.filter(P => P.pos.distanceTo(p.pos) < 900).sort((a, b) => a.pos.distanceToSquared(p.pos) - b.pos.distanceToSquared(p.pos)).slice(0, 6); return [{ k: 'me', name: 'YOU' }, ...near.map(P => ({ k: 'peer', P, name: P.name }))]; }
+  if (t === 'nearest' || t === 'front' || t === 'back') {
+    let best = null, bd = 4000 ** 2;
+    for (const P of L) { const dx = P.pos.x - p.pos.x, dz = P.pos.z - p.pos.z, d = dx * dx + dz * dz + (P.pos.y - p.pos.y) ** 2, fw = (dx * fx + dz * fz) / Math.sqrt(d + 1e-6); if (t === 'front' && fw < 0.5 || t === 'back' && fw > -0.5) continue; if (d < bd) { bd = d; best = P; } }
+    return best ? [{ k: 'peer', P: best, name: best.name }] : null;
+  }
+  const P = peerNamed(t) || L.find(P => dirNameIn(` ${t} `, P.name) >= 0); if (P && peerLive(P)) return [{ k: 'peer', P, name: P.name }];
+  const g = dirFolk().find(g => t.includes(g.id) || t.includes(g.name.toLowerCase())); if (g) return [{ k: 'folk', g, name: g.name.toUpperCase() }];
+  const pl = dirPlace(t); if (pl && !pl.sun) return [{ k: 'place', pl, name: pl.label }];
+  return null;
+}
+// where one of them is this moment: the middle of them, how big, which way they face, how fast they go
+function dirAt0(S, out) {
+  const p = player;
+  if (S.k === 'me') { const foot = p.form === 'human'; out.pos.copy(p.pos); if (foot) out.pos.y += 1.05; out.r = foot ? 1.05 : 6 * birdK(); out.yaw = cineHead(); if (foot) out.vel.copy(p.vel); else out.vel.copy(dir3).multiplyScalar(p.speed); return true; }
+  if (S.k === 'peer') { const P = S.P; if (!peerLive(P) || !NET.peers.has(P.id)) return false; out.pos.copy(P.pos); const bird = P.form === 'p'; if (!bird) out.pos.y += 1.05; out.r = bird ? 6 : 1.05; out.yaw = P.yaw || 0; out.vel.copy(P.vel || _v.set(0, 0, 0)); return true; }
+  if (S.k === 'folk') { const g = S.g; if (!g.active) return false; const H = g.titan ? (g.S || 10) * 2.2 : g.other ? MAN_H : GOD_H; out.pos.set(g.x, (g.gy ?? groundAt(g.x, g.z)) + H * 0.5, g.z); out.r = H * 0.6; out.yaw = g.yaw || 0; out.vel.set(0, 0, 0); return true; }
+  if (S.k === 'place') { const L = S.pl; out.pos.set(L.x, L.y, L.z); out.r = L.r; out.yaw = Math.atan2(-(p.pos.x - L.x), -(p.pos.z - L.z)); out.vel.set(0, 0, 0); return true; }
+  return false;
+}
+function dirAt(S, out) { const ok = dirAt0(S, out); if (ok && !Number.isFinite(out.pos.x + out.pos.y + out.pos.z + out.yaw)) return false; if (ok && !Number.isFinite(out.vel.x + out.vel.y + out.vel.z)) out.vel.set(0, 0, 0); return ok;   // (someone half-arrived over the network is not anywhere yet)
+}
+const DIR_AT = Array.from({ length: 8 }, () => ({ pos: new THREE.Vector3(), vel: new THREE.Vector3(), r: 1, yaw: 0 }));
+// what plain shot language means. Returns the rig (the same one the director of photography answers with), what was
+// adjusted, and whether all of it was understood or the rest should be asked
+function dirParse(low) {
+  let t = ' ' + String(low || '').toLowerCase().replace(/[’`]/g, "'").replace(/(\d)\s*(mm|m)\b/g, '$1 $2').replace(/[^a-z0-9' .-]+/g, ' ').replace(/[.]+(\s|$)/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
+  const raw = t, s = { subj: [], bg: '', when: '', from: '', frame: '', angle: '', side: '', move: '', mm: 0, dist: 0, h: null, speed: 1, dir: 1, dur: 0, cut: false }, adj = [], miss = [];
+  const eat = re => { const m = t.match(re); if (m) t = t.replace(m[0], ' '.repeat(m[0].length)); return m; };   // (understood: taken out, so what is left over can be counted)
+  const placeOf = ph => { const ws = ph.trim().split(' ').filter(w => !/^(the|a|an)$/.test(w)); for (let n = Math.min(4, ws.length); n >= 1; n--) { const P = dirPlace(ws.slice(0, n).join(' ')); if (P) return [P, ws.slice(0, n).join(' ')]; } return [null, ws.slice(0, 2).join(' ')]; };
+  // when: "as I come over the ridge", "as we pass the ring of fire" (the move waits for it)
+  { const m = eat(/ (as|when|once|while|until) (i'm|we're|i|we|he|she|they|you|[a-z]+) ('m |'re |am |are |is )?(come|comes|coming|pass|passes|passing|go|goes|going|fly|flies|flying|cross|crosses|crossing|reach|reaches|get to|gets to|approach|approaches|approaching|near|nears|hit|hits|clear|clears|clearing|round|rounds|crest|crests|cresting|top|tops|head|heads)( over| by| past| through| under| round| around| across| into| to| near| up| down| toward| towards| for| in)?( the)? ([a-z' ]+?)(?= and | then | with | from | looking | low | high | wide | tight | slow| fast| for |$| $)/);
+    if (m) { const [P, w] = placeOf(m[7]); if (P && !P.sun) s.when = w; else miss.push('when:' + w); if (/^(we|us|we're)$/.test(m[2])) s.subj.push('we'); else if (/^(i|i'm|you)$/.test(m[2])) s.subj.push('me'); else if (dirFind(m[2])) s.subj.push(m[2]); } }
+  // in the frame behind them: "looking up at the mountain", "with the ring of fire behind me", "against the sun"
+  { let m = eat(/ looking (up |down |out |back |across )?(at|toward|towards|to|over) (the )?([a-z' ]+?)(?= with | and | as | while | from | then |$| $)/);
+    if (m) { const [P, w] = placeOf(m[4]); if (P) s.bg = w; else miss.push(w); if (m[1] === 'up ' && !s.angle) s.angle = 'low'; if (m[1] === 'down ' && !s.angle) s.angle = 'high'; }
+    m = eat(/ with (the )?([a-z' ]+?) (behind|in the background|in frame|in the frame|in shot|in the shot|in view|in the back) (me|him|her|them|us)?/) || eat(/ (against|framed by|in front of) (the )?(sun|sunset|sunrise|mountain|olympus|summit|ring of fire|volcano|crete|tower)\b/);
+    if (m) { const w = m[1] === 'against' || m[1] === 'framed by' || m[1] === 'in front of' ? m[3] : m[2]; if (placeOf(w)[0]) s.bg = w; } }
+  // where the lens stands
+  { const m = eat(/ from (the )?(water|sea|surface|waves|ocean|water level)\b/) || eat(/ (on|down on|at) the (water|sea|surface)( level)?\b/); if (m) s.from = 'water'; }
+  { const m = eat(/ from (the )?(ground|beach|shore|land|grass|floor)\b/) || eat(/ (on|down on|from down on) the (ground|beach|shore)\b/); if (m) s.from = 'ground'; }
+  { const m = t.match(/ from (the )?(top of )?(the )?([a-z']+( [a-z']+){0,3})/); if (m && !/^(behind|below|beneath|above|under|underneath|side|front|back|left|right|his|her|my|their|our|me|him|them|us|a|far|up|down|over|high|low|close|afar|there|here|this|that)\b/.test(m[4]) && !s.from) { const [P, w] = placeOf(m[4]); if (P && !P.sun) { s.from = w; eat(new RegExp(' from (the )?(top of )?(the )?' + w.split(' ')[0])); } } }
+  // who
+  { const found = [], seen = new Set(), add = (i, k) => { if (i >= 0 && !seen.has(k)) { seen.add(k); found.push([i, k]); } };
+    for (const P of dirPeers()) add(dirNameIn(t, P.name), P.name);
+    for (const C of NPCS.list) if (C && C.name) add(dirNameIn(t, C.name), C.name);   // (a regular who is not up yet: named, so it can be said he is not)
+    for (const g of [...gods, ...others]) if (g.name && (g.revealed || g.active)) add(Math.max(t.indexOf(' ' + g.name.toLowerCase() + ' '), t.indexOf(' ' + g.id + ' ')), g.name);
+    let m;
+    if ((m = t.match(/ (whoever'?s? (is )?(nearest|closest|near(est)?( me)?|next to me)|the (nearest|closest)( one| flier| flyer| bird| player| person)?|nearest|closest)\b/))) { add(m.index, 'nearest'); eat(m[0]); }
+    if ((m = t.match(/ (the (one|bird|flier|flyer|guy|person|player)|whoever'?s?( is)?) (in front|ahead)( of (me|us))?/))) { add(m.index, 'front'); eat(m[0]); }
+    if ((m = t.match(/ (the (one|bird|flier|flyer|guy|person|player)|whoever'?s?( is)?) behind( me| us)?/))) { add(m.index, 'back'); eat(m[0]); }
+    if ((m = t.match(/ (the (whole )?(group|flock|squad|gang|crew|pack|lot of us)|everyone|everybody|all of us|all of them|the others)\b/))) { add(m.index, 'group'); eat(m[0]); }
+    if ((m = t.match(/ (both of us|the two of us|us|we|we're)\b/))) add(m.index, 'we');
+    if ((m = t.match(/ (me|myself)\b/))) add(m.index, 'me');
+    if ((m = t.match(/ (him|her|them)\b/)) && DIR.lastWho && !found.length) add(m.index, DIR.lastWho);   // ("follow her": whoever it was on)
+    found.sort((a, b) => a[0] - b[0]);
+    for (const [, k] of found) if (!s.subj.includes(k)) s.subj.push(k);
+    if (s.subj.includes('we') && s.subj.some(k => k !== 'we' && k !== 'me')) s.subj = s.subj.map(k => k === 'we' ? 'me' : k);
+    for (const [, k] of found) if (!/^(me|we|nearest|front|back|group)$/.test(k)) for (const w of k.toLowerCase().split(' ')) t = t.replace(new RegExp(' ' + w.replace(/[^a-z0-9]/g, '') + '\\b', 'g'), ' '); }
+  // the lens, the distance, the height
+  { let m;
+    if ((m = eat(/ (\d{1,3}) ?(mm|millimet(er|re)s?|mil|mill)\b/))) s.mm = +m[1];
+    else if (eat(/ (fish ?eye|ultra ?wide lens)\b/)) s.mm = 12; else if (eat(/ (wide ?angle( lens)?|wide lens)\b/)) s.mm = 18;
+    else if (eat(/ (long lens|telephoto|long glass|on a long lens|super ?tele)\b/)) s.mm = 200; else if (eat(/ (normal lens|standard lens)\b/)) s.mm = 50;
+    if ((m = eat(/ (\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty|thirty|forty|fifty|sixty|hundred|few|couple) ?(m|metres|meters|feet|ft|yards) (up|above|high|over|higher|below|under|beneath|down|lower)( (me|him|her|them|us))?\b/)) && Number.isFinite(dirN(m[1]))) s.h = dirN(m[1]) * (/feet|ft/.test(m[2]) ? 0.3 : /yard/.test(m[2]) ? 0.9 : 1) * (/below|under|beneath|down|lower/.test(m[3]) ? -1 : 1);
+    if ((m = eat(/ (\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty|thirty|forty|fifty|sixty|hundred|few|couple) ?(m|metres|meters|feet|ft|yards)( away| back| off| out| behind| from| distance)?\b/)) && Number.isFinite(dirN(m[1])) && dirN(m[1]) > 1) s.dist = dirN(m[1]) * (/feet|ft/.test(m[2]) ? 0.3 : /yard/.test(m[2]) ? 0.9 : 1); }
+  // how big
+  if (eat(/ (extreme close ?up|close ?up|closeup|tight( shot| one| on)?|close in on|close on|in close|right in close|go tight)\b/) || eat(/ close\b/)) s.frame = 'tight';
+  else if (eat(/ (medium( shot| one)?|mid ?shot|mid|waist|cowboy)\b/)) s.frame = 'medium';
+  else if (eat(/ (extreme wide|wide( shot| one)?|establishing( shot)?|long shot|go wide|the whole (thing|country|view)|epic|vista)\b(?! lens| angle)/)) s.frame = 'wide';
+  // from how low
+  if (eat(/ (top ?down|overhead|bird'?s ?eye( view)?|straight down|directly above|from straight above|god'?s ?eye|map view)\b/)) s.angle = 'top';
+  else if (eat(/ (low( angle)?|from (below|beneath|underneath|under)|worm'?s ?eye|(under|underneath|beneath|below) (me|him|her|them|us)|down low|looking up)\b/)) s.angle = 'low';
+  else if (eat(/ (high( angle)?|from above|from up high|looking down( on)?|above (me|him|her|them|us)|up high)\b/)) s.angle = 'high';
+  else if (eat(/ (eye ?level|level with (me|him|her|them|us)|straight on|at (my|his|her|their|our) level|dead level)\b/)) s.angle = 'eye';
+  // how it moves
+  if (eat(/ (orbit(ing|s)?|circl(e|es|ing)|go(ing)? (a)?round|revolv(e|ing)|spin(ning)? (a)?round|360|arc(ing)? (a)?round|wheel(ing)? (a)?round)\b/)) s.move = 'orbit';
+  else if (eat(/ (crane down|boom down|jib down|descend(ing)?|come down|sink(ing)?|drop(ping)? down|pedestal down)\b/)) s.move = 'crane_down';
+  else if (eat(/ (crane( up| shot)?|boom up|jib up|rise up|rising|rise|lift(ing)? up|ascend(ing)?|up and over|pedestal up)\b/)) s.move = 'crane_up';
+  else if (eat(/ (push(ing)? in|dolly in|move in slowly|creep in|creeping in|track in|slow zoom|push)\b/)) s.move = 'push_in';
+  else if (eat(/ (pull(ing)? (out|back|away)|dolly (out|back)|reveal|back away|track out|move (out|away))\b/)) s.move = 'pull_out';
+  else if (eat(/ (dolly|track(ing)? (along|beside|with)|alongside|parallel|fly (alongside|beside|with)|side by side|truck(ing)?|beside)\b/)) s.move = 'dolly';
+  else if (eat(/ (fly ?by|fly past|whip (past|by)|let (me|him|her|them|us) (pass|go past|fly past|go by)|pass(es)? (the )?camera|zip past|go(es)? past the (lens|camera))\b/)) s.move = 'flyby';
+  else if (eat(/ (follow(ing|s)?|chase|track(ing)?|stay (with|on)|tail(ing)?|keep (up|pace) with|stick with)\b/)) s.move = 'follow';
+  else if (eat(/ (static|lock(ed)? off|tripod|fixed|still camera|don'?t move( the camera)?|hold position|stationary|planted)\b/)) s.move = 'static';
+  // from which side (theirs: "her left" is her left)
+  if (eat(/ over (the|my|his|her|their|our) shoulders?\b/)) s.side = 'shoulder';
+  else if (eat(/ (from (the )?(behind|back|rear)|behind|chase( cam)?|from the tail)\b/)) s.side = 'behind';
+  else if (eat(/ ((from )?(the )?front|head ?on|ahead of (me|him|her|them|us)|facing (me|him|her|them|us)|in front)\b/)) s.side = 'front';
+  else if (eat(/ (from )?((my|his|her|their|our|the) )?left( side| hand side)?\b/)) s.side = 'left';
+  else if (eat(/ (from )?((my|his|her|their|our|the) )?right( side| hand side)?\b/)) s.side = 'right';
+  if (eat(/ (very slow(ly)?|super slow(ly)?|really slow(ly)?|glacial)\b(?! ?mo)/)) s.speed = 0.3; else if (eat(/ (slow(ly)?|gentle|gently|lazy|lazily|leisurely)\b(?! ?mo(tion)?)/)) s.speed = 0.5; else if (eat(/ (fast|quick(ly)?|rapid(ly)?|whip|speedy|hard)\b/)) s.speed = 1.9;
+  if (eat(/ (counter ?-?clockwise|anti ?-?clockwise)\b/)) s.dir = -1; else if (eat(/ clockwise\b/)) s.dir = 1;
+  { const m = eat(/ for (a |an )?(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty|thirty|forty|fifty|sixty|hundred|few|couple) ?(seconds?|secs?|s)\b/) || eat(/ (\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty|thirty|forty|fifty|sixty|hundred|few|couple) ?(seconds?|secs?) (long|of it)\b/); if (m) { const v = dirN(m[2] || m[1]); if (Number.isFinite(v)) s.dur = clamp(v, 1, 120); } else if (eat(/ for a (bit|while|moment)\b/)) s.dur = 10; else if (eat(/ for a minute\b/)) s.dur = 60; }
+  if (eat(/ (cut (to|straight|right)|hard cut|snap to|jump (to|cut)|smash cut|straight to|cut it to)\b/)) s.cut = true; else eat(/ (ease (in|into|over)?|smooth(ly)?|glide|drift|blend|slide over|transition)\b/);
+  if (eat(/ (and hold|then hold|hold (it|there|on (it|that|this|them|me|him|her)))\b/)) s.hold = true;
+  // what moves the shot in hand
+  const A = [[/ (closer|tighter|nearer|in closer|get closer|come (in )?closer|move in)\b/, 'closer'], [/ (further|farther|back off|back up|more room|give (me|him|her|them|us) (some )?room|wider|pull back a bit)\b/, 'further'],
+    [/ (lower|go down|down a (bit|little|touch)|drop (it|the camera)|get lower|bring it down)\b/, 'lower'], [/ (higher|go up|up a (bit|little|touch)|raise (it|the camera)|get higher|bring it up)\b/, 'higher'],
+    [/ (slower|slow (it )?down|ease off|gentler|not so fast)\b(?! ?mo)/, 'slower'], [/ (faster|speed (it )?up|quicker|more speed)\b/, 'faster'],
+    [/ (other side|switch sides?|flip( it| sides?)?|opposite side|cross (the line|over))\b/, 'flip'], [/ (reverse|other way|the other direction|change direction|backwards)\b/, 'reverse'],
+    [/ (hold (this|that|it|there)|stay (there|on this|like this)|freeze|stop moving|lock it|keep (it|this) (there|like this)|hold)\b/, 'hold'],
+    [/ (back to auto|auto(matic)?( mode| camera| pilot)?|your call|you choose|you decide|let it (go|cut)|cut freely|release( it)?|surprise me|do your thing)\b/, 'auto'],
+    [/ (zoom in|longer lens|tighter lens|punch in)\b/, 'longer'], [/ (zoom out|wider lens|open (it )?up the lens)\b/, 'wider']];
+  for (const [re, a] of A) if (eat(re)) adj.push(a);
+  // what was not understood: if much is left, the director of photography is asked as well
+  const STOP = /^(the|a|an|and|of|to|on|in|at|as|with|from|me|my|i|i'm|we|us|our|you|your|him|his|her|them|their|it|it's|its|this|that|is|are|be|shot|camera|cam|angle|lens|view|frame|framing|please|can|could|would|will|just|get|give|put|make|let|let's|some|bit|little|more|now|then|so|do|take|over|by|up|down|here|there|one|very|really|nice|good|okay|ok|like|want|need|see|show|keep|go|come|coming|pass|passing|fly|flying|crossing|cross|i'll|we'll|while|when|as|onto|into|about|around|round|both|all|way|time|again|start|also|yeah|yes|hey|now|let|pan|look|looking|shoot|film|director|dp|cinematic|mode|degrees?)$/;
+  const left = t.trim().split(' ').filter(w => w && !STOP.test(w) && !/^\d+$/.test(w));
+  const rich = s.subj.some(k => k !== 'me' && k !== 'we') || !!(s.move || s.bg || s.from || s.when || s.mm || s.dist || s.h !== null || s.dur) || [s.frame, s.angle, s.side].filter(Boolean).length >= 2;
+  const any = rich || !!(s.frame || s.angle || s.side);
+  if (!any && !adj.length) return left.length >= 2 && /\b(shot|camera|angle|lens|frame|framing|follow|orbit|track|film|shoot|from|on (her|him|them))\b/.test(raw) ? { s, adj, rich: false, any: false, sure: false, left, miss } : null;
+  const named = left.some(w => new RegExp(` (and|with|follow|following|around|round|on|frame|track|tracking|chase|orbit|circle|of|at|near|watch) ${w.replace(/[^a-z0-9']/g, '')}\\b`).test(raw));   // (a name it does not know: who is that?)
+  return { s, adj, rich, any, sure: left.length <= 2 && !named && !miss.some(m => !/^when:/.test(m)), left, miss };
+}
+// a rig, filled in and begun (or waited for: "as we pass the ring of fire")
+function dirStart(r, how = {}) {
+  if (XR.on && state !== 'photo') { dirRead('IN THE HEADSET THE CAMERA IS YOUR EYES'); return false; }
+  const s = { subj: (r.subj || []).slice(0, 4), bg: r.bg || '', when: r.when || '', from: r.from || '', frame: r.frame || '', angle: r.angle || '', side: r.side || '', move: r.move || '', mm: +r.mm || 0, dist: +r.dist || 0, h: r.h ?? null, speed: +r.speed || 1, dir: r.dir < 0 ? -1 : 1, dur: +r.dur || 0, cut: !!r.cut, hold: !!r.hold,
+    t: 0, k: r.k || 1, lensK: r.lensK || 1, elK: r.elK || 0, init: false, miss: [], lost: '' };
+  if (!s.subj.length) s.subj = ['me'];
+  // who, found now; whoever cannot be found is said, and the shot goes on without them
+  s.who = []; for (const k of s.subj) { const F = dirFind(k); if (F) { for (const x of F) if (!s.who.some(y => y.k === x.k && (y.P || y.g || y.pl) === (x.P || x.g || x.pl))) s.who.push(x); } else s.miss.push(k.toUpperCase()); }
+  if (!s.who.length) s.who = [{ k: 'me', name: 'YOU' }];
+  { const o = s.who.find(x => x.k !== 'me' && x.k !== 'place'); if (o) DIR.lastWho = o.name; }
+  s.bgP = s.bg ? dirPlace(s.bg) || (dirFind(s.bg)?.[0]) : null; s.fromP = s.from && s.from !== 'water' && s.from !== 'ground' ? dirPlace(s.from) : null;
+  if (s.from && s.from !== 'water' && s.from !== 'ground' && !s.fromP) s.from = '';
+  s.whenP = s.when ? dirPlace(s.when) : null;
+  if (s.whenP && !s.bgP) { s.bgP = s.whenP; s.bgSoft = true; }
+  if (!s.frame) s.frame = s.side === 'shoulder' ? 'tight' : s.who.length > 1 ? 'wide' : 'medium';
+  s.mt = s.dur || clamp(9 / s.speed, 3, 40);   // (how long the move takes: a crane, a push)
+  if (s.whenP && !how.now) { const d = Math.hypot(s.whenP.x - player.pos.x, s.whenP.z - player.pos.z); if (d > dirNear(s.whenP)) { DIR.next = s; s.wait = { t: 0, min: d }; dirRead(dirSay(s)); dirOn(); return true; } }
+  DIR.next = null; DIR.s = s; DIR.lift = 0; DIR.blockT = 0; DP.want = ''; DP.first = '';
+  dirOn();
+  if (state === 'photo') DIR.ph = { yaw: photo.yaw, pitch: photo.pitch, x: photo.pos.x, y: photo.pos.y, z: photo.pos.z, fov: photo.fov, fresh: true };
+  else if (cinema.on) dirShot();
+  dirRead(dirSay(s)); return true;
+}
+const dirNear = P => Math.max(320, (P.r || 0) * 1.4 + 160);
+// a direction puts the film camera on
+function dirOn() { if (state === 'play' && !cinema.manual) { TUT.cineOpen = true; cinema.manual = true; } }
+// the film camera's shot, made the directed one (its own sizes for the bird and for the boy)
+function dirShot() {
+  const p = player, foot = p.form === 'human';
+  cinema.sc = foot ? 0.085 : (1 + (birdK() - 1) * 0.85) * (1 + GODM.k * 0.3 + smoothstep(220, 700, p.speed) * 0.55);
+  cinema.shot = { type: 'dir', S: { fov: [camera.fov, camera.fov], smooth: 0.5 }, side: 0, t: 0, dur: 1e9, foot: false };
+  cinema.last = 'dir'; cinema.size = ''; cinema.blocked = 0; DIR.s.init = false;
+  cinema.pos.copy(camera.position); cinema.posV.set(0, 0, 0); cinema.aim.copy(camera.position).addScaledVector(camera.getWorldDirection(_v), 60); cinema.aimV.set(0, 0, 0);   // (from wherever the lens is now)
+}
+function dirAuto(quiet) {
+  DIR.s = null; DIR.next = null; DIR.ph = null; DP.want = ''; DP.hold = false;
+  if (state === 'play' && cinema.on) newShot();
+  if (!quiet) dirRead('AUTO · THE CAMERA CHOOSES');
+}
+// the shot in hand, moved: lower, slower, closer, the other side, held, or let go
+function dirAdjust(adj) {
+  const s = DIR.s || DIR.next; if (!s) return false; const said = [];
+  for (const a of adj) {
+    if (a === 'auto') { dirAuto(); return true; }
+    if (a === 'closer') { s.k = clamp(s.k * 0.7, 0.12, 8); said.push('CLOSER'); }
+    else if (a === 'further') { s.k = clamp(s.k * 1.45, 0.12, 8); said.push('FURTHER'); }
+    else if (a === 'lower') { s.elK = clamp(s.elK - 0.22, -1.2, 1.2); if (s.h !== null) s.h -= Math.max(2, Math.abs(s.h) * 0.3); said.push('LOWER'); }
+    else if (a === 'higher') { s.elK = clamp(s.elK + 0.22, -1.2, 1.2); if (s.h !== null) s.h += Math.max(2, Math.abs(s.h) * 0.3); said.push('HIGHER'); }
+    else if (a === 'slower') { s.speed = clamp(s.speed * 0.6, 0.1, 4); dirRetime(s); said.push('SLOWER'); }
+    else if (a === 'faster') { s.speed = clamp(s.speed * 1.6, 0.1, 4); dirRetime(s); said.push('FASTER'); }
+    else if (a === 'flip') { const o = s.move === 'orbit' ? s.az : s.az0; if (o !== undefined) { const n = Math.abs(Math.sin(o)) < 0.3 ? o + Math.PI : -o; if (s.move === 'orbit') { s.az = n; s.dir = -s.dir; } else s.az0 = n; s.bAz = (s.bAz || 0) + wrapAngle(o - n); s.anchor = null; }   // (round them to the other side, not through them)
+      s.side = s.side === 'left' ? 'right' : s.side === 'right' ? 'left' : s.side === 'behind' ? 'front' : s.side === 'front' ? 'behind' : s.side; said.push('OTHER SIDE'); }
+    else if (a === 'reverse') { s.dir = -s.dir; said.push('THE OTHER WAY'); }
+    else if (a === 'longer') { s.lensK = clamp(s.lensK * 1.4, 0.2, 6); said.push('LONGER LENS'); }
+    else if (a === 'wider') { s.lensK = clamp(s.lensK / 1.4, 0.2, 6); said.push('WIDER LENS'); }
+    else if (a === 'hold') { s.hold1 = true; s.dur = 0; s.hold = true; said.push('HOLDING'); }
+  }
+  dirRead(`${said.join(' · ')} · ${dirSay(s)}`); return true;
+}
+function dirRetime(s) { const u = clamp(s.t / s.mt, 0, 1); s.mt = clamp(9 / s.speed, 2, 60); s.t = u * s.mt; }   // (the move carries on from where it is, at the new pace)
+// the rig of the shot in hand, in a line, for the readout and for the director of photography
+function dirSay(s) {
+  if (!s) return '';
+  const who = s.who.map(w => w.name).join(' + ') + (s.miss.length ? ` · ${s.miss.join(', ')} NOT FOUND` : '');
+  const mm = Math.round((s.mm || DIR_MM[s.frame] || 50) * s.lensK);
+  const parts = [(s.held ? 'HELD' : DIR_MOVE[s.move] || 'FOLLOWING'), s.speed < 0.8 ? 'SLOW' : s.speed > 1.3 ? 'FAST' : '', who, s.side ? (s.side === 'shoulder' ? 'OVER THE SHOULDER' : s.side === 'behind' ? 'FROM BEHIND' : s.side === 'front' ? 'FROM THE FRONT' : `${s.side.toUpperCase()} SIDE`) : '',
+    s.angle ? { low: 'LOW', eye: 'EYE LEVEL', high: 'HIGH', top: 'TOP DOWN' }[s.angle] : '', s.frame.toUpperCase(), `${mm} MM`, s.from === 'water' ? 'FROM THE WATER' : s.from === 'ground' ? 'FROM THE GROUND' : s.fromP ? `FROM ${s.fromP.label}` : '',
+    s.bgP && !s.bgSoft ? `${s.bgP.label || s.bg.toUpperCase()} BEHIND` : '', s.dur ? `${Math.round(s.dur)} S` : '', s.cut ? 'CUT' : ''];
+  const line = parts.filter(Boolean).join(' · ');
+  return s.wait ? `READY · AS YOU REACH ${s.whenP.label} · ${fmtDist(Math.hypot(s.whenP.x - player.pos.x, s.whenP.z - player.pos.z))} · ${line}` : line;
+}
+function dirRead(text) { DIR.read = String(text || ''); DIR.readT = time; }
+// The pose the rig wants this moment: where the lens is, what it looks at, on what lens. Everyone in it is found again,
+// the middle of them and how far apart they are; the lens stands off at the distance that puts them at the asked size
+// on the asked lens, from the asked side and height, moving as asked.
+function dirPose(s, dt, out) {
+  const p = player, Ls = [];
+  for (let i = 0; i < s.who.length && Ls.length < DIR_AT.length; i++) if (dirAt(s.who[i], DIR_AT[Ls.length])) Ls.push(DIR_AT[Ls.length]);
+  if (!Ls.length) { s.lost = s.who.map(w => w.name).join(' + '); s.who = [{ k: 'me', name: 'YOU' }]; s.init = false; dirAt(s.who[0], DIR_AT[0]); Ls.push(DIR_AT[0]); dirRead(`${s.lost} GONE · ON YOU`); }
+  else if (Ls.length < s.who.length) { const keep = s.who.filter(w => dirAt(w, DIR_AT[7])); if (keep.length) s.who = keep; }   // (someone has landed and gone: the shot keeps the rest)
+  const c = DIR.c.set(0, 0, 0); for (const L of Ls) c.add(L.pos); c.multiplyScalar(1 / Ls.length);
+  let R = 0; for (const L of Ls) R = Math.max(R, L.pos.distanceTo(c) + L.r);
+  const L0 = Ls[0], multi = Ls.length > 1, fast = L0.vel.length();
+  if (!s.init) { s.head = L0.yaw; s.sep = R; }
+  s.head += wrapAngle(L0.yaw - s.head) * damp(s.move === 'orbit' || s.move === 'static' ? 0 : 0.9, dt);
+  s.sep += (R - s.sep) * damp(1.2, dt);   // (how far apart they are, eased: two fliers crossing do not make the lens lurch)
+  // the lens: asked for in millimetres, or the one the size of shot wants; then how far that puts the lens
+  const aspect = state === 'photo' || !camera.aspect ? Math.max(0.4, innerWidth / Math.max(1, innerHeight)) : camera.aspect;
+  let mm = (s.mm || DIR_MM[s.frame] || 50) * s.lensK, fov = 2 * Math.atan(12 / mm) * 180 / Math.PI;
+  const frac = multi ? { tight: 0.92, medium: 0.72, wide: 0.4 }[s.frame] : { tight: 0.7, medium: 0.3, wide: 0.09 }[s.frame];
+  const tanH = () => Math.tan(fov * Math.PI / 360) * Math.min(1, aspect);
+  let d = s.dist || s.sep / (frac * tanH()); d *= s.k;
+  if (d > 3200 && !s.mm) { fov = clamp(2 * Math.atan(s.sep / (frac * 3200) / Math.min(1, aspect)) * 180 / Math.PI, fov, 80); d = 3200 * s.k; }   // (too far apart to stand back that far: a wider lens)
+  d = clamp(d, s.sep * 1.25 + (p.form === 'human' ? 0.8 : 4), 6000);
+  // the angle he is seen from, and the side: as asked, or where the lens already is (no jump nobody asked for)
+  _v.copy(state === 'photo' ? DIR.pos : camera.position).sub(c);
+  if (s.hold1) {   // ("hold this": wherever the lens is now, relative to them, is where it stays)
+    const hz = Math.hypot(_v.x, _v.z) || 1; s.az0 = wrapAngle(s.head - Math.atan2(-_v.x, -_v.z)); s.el0 = Math.atan2(_v.y, hz) - s.elK - DIR.lift; s.k *= clamp(_v.length() / Math.max(1, d), 0.05, 20); d = _v.length();
+    s.move = 'follow'; s.hold1 = false; s.held = true; s.from = ''; s.fromP = null; s.h = null; s.anchor = null; s.bgSoft = true; s.t = s.mt;
+  }
+  if (!s.init) {
+    const hz = Math.hypot(_v.x, _v.z) || 1, curEl = Math.atan2(_v.y, hz), curAz = wrapAngle(s.head - Math.atan2(-_v.x, -_v.z));
+    s.el0 = s.angle ? DIR_EL[s.angle] : clamp(curEl, -0.3, 0.7);
+    s.az0 = s.side ? DIR_SIDE[s.side] : s.move === 'dolly' ? (Math.sign(curAz) || 1) * Math.PI / 2 : s.move === 'follow' && Math.abs(curAz) < 1.2 ? Math.PI * 0.8 * (Math.sign(curAz) || 1) : curAz;
+    if (s.side === 'shoulder') { s.az0 = Math.PI - 0.32 * (Math.sign(curAz) || 1); s.el0 = s.angle ? s.el0 : 0.16; }
+    if (s.move === 'crane_up' && !s.angle) s.el0 = 0.05; if (s.move === 'crane_down' && !s.angle) s.el0 = 0.2;
+    s.az = s.az0; s.headLock = s.head; s.anchor = null; s.t = 0; s.init = true; s.ease = s.cut ? 0 : 1;
+    // eased in, it goes round them from where it is, not straight across them: the angle, the height and the distance
+    // are blended apart about them, and only what is left is the springs' to do
+    if (s.cut) s.bAz = s.bEl = s.bD = 0; else { s.bAz = wrapAngle(curAz - s.az0); s.bEl = curEl - (s.el0 + s.elK + DIR.lift); s.bD = Math.log(clamp(_v.length() / Math.max(1, d), 0.05, 20)); }
+  }
+  s.t += dt; const u = clamp(s.t / s.mt, 0, 1), e = u * u * (3 - 2 * u);
+  { const kb = Math.exp(-dt * 1.25); s.bAz = (s.bAz || 0) * kb; s.bEl = (s.bEl || 0) * kb; s.bD = (s.bD || 0) * kb; }
+  let az = s.az0 + s.bAz, el = s.el0 + s.elK + DIR.lift + s.bEl, dd = d * Math.exp(s.bD), rel = true;
+  switch (s.move) {
+    case 'orbit': s.az += s.dir * 0.26 * s.speed * dt * clamp(140 / Math.max(40, d), 0.35, 1.6); az = s.az + s.bAz; rel = false; break;   // (the same pace across the frame, near or far)
+    case 'crane_up': el += lerp(-0.1, 0.85, e); dd *= lerp(0.85, 1.45, e); break;
+    case 'crane_down': el += lerp(0.85, -0.12, e); dd *= lerp(1.45, 0.85, e); break;
+    case 'push_in': dd *= lerp(1.6, 0.6, e); break;
+    case 'pull_out': dd *= lerp(0.6, 2.4, e); break;
+    case 'dolly': az = s.az0 + s.bAz + (e - 0.5) * 0.4 * Math.sign(s.az0 || 1); break;
+  }
+  el = clamp(el, -0.8, 1.5);
+  // which way, in the world: about him (turning when he turns), or fixed (an orbit, or a place to keep behind him)
+  let wa = (rel ? s.head : s.headLock) - az;
+  if (s.bgP && !s.bgSoft && !s.side) { const B = s.bgP.sun ? _p.copy(c).addScaledVector(sunDir, 5000) : _p.set(s.bgP.x, s.bgP.y, s.bgP.z); wa = Math.atan2(-(c.x - B.x), -(c.z - B.z)); }   // (on the far side of him from it: it stands behind him in the frame)
+  const T = DIR.t; let hd = dd * Math.cos(el);
+  if (s.fromP) T.set(s.fromP.x, Math.max(s.fromP.y, groundAt(s.fromP.x, s.fromP.z) + 3) + 12, s.fromP.z);
+  else {
+    T.set(c.x - Math.sin(wa) * hd, c.y + dd * Math.sin(el), c.z - Math.cos(wa) * hd);
+    if (s.h !== null) T.y = c.y + s.h;
+    if (s.from === 'water' || s.from === 'ground') {   // (down on the water, or the ground: far enough out that he is not straight overhead)
+      const wy = () => s.from === 'water' ? WATER + 1.4 * Math.max(1, cinema.sc || 1) : groundAt(T.x, T.z) + 1.7;
+      { const rise = c.y - wy(); if (rise > 0) { hd = Math.max(hd, rise / Math.tan(0.62)); T.set(c.x - Math.sin(wa) * hd, T.y, c.z - Math.cos(wa) * hd); } }
+      if (s.from === 'water' && terrainAt(c.x - Math.sin(wa + (s.wetA || 0)) * hd, c.z - Math.cos(wa + (s.wetA || 0)) * hd) >= WATER - 0.5 && !(s.wetT > time)) {   // (no water there: round him until there is, or the ground)
+        s.wetA = 0;
+        let ok = false; for (let i = 1; i <= 8 && !ok; i++) for (const sg of [1, -1]) { const a2 = wa + sg * i * 0.4, x = c.x - Math.sin(a2) * hd, z = c.z - Math.cos(a2) * hd; if (terrainAt(x, z) < WATER - 0.5) { s.wetA = a2 - wa; ok = true; break; } }
+        if (!ok) { s.from = 'ground'; dirRead('NO WATER THERE · FROM THE GROUND'); } s.wetT = time + 2;
+      }
+      if (s.wetA && s.from === 'water') T.set(c.x - Math.sin(wa + s.wetA) * hd, T.y, c.z - Math.cos(wa + s.wetA) * hd);
+      T.y = wy();
+    }
+  }
+  // a planted lens (locked off, or a fly-by): set down once, and set down again only if he gets away from it
+  if (s.move === 'static' || s.move === 'flyby') {
+    const far = s.anchor && (s.anchor.distanceTo(c) > Math.max(3 * d, 120) || s.move === 'flyby' && s.anchor.distanceTo(c) > Math.max(2 * d, 140) && _v.copy(s.anchor).sub(c).dot(L0.vel) < 0);
+    if (!s.anchor || far || DIR.blockT > 1.2) {
+      s.anchor = (s.anchor || new THREE.Vector3()).copy(T);
+      if (s.move === 'flyby' && fast > 3) { const lead = clamp(d / fast, 1.2, 4) * fast; _p.copy(L0.vel).setY(0).normalize(); s.anchor.set(c.x + _p.x * lead - _p.z * d * 0.45 * (s.dir || 1), c.y + d * 0.12 + (s.h || 0), c.z + _p.z * lead + _p.x * d * 0.45 * (s.dir || 1)); }
+      if (far || DIR.blockT > 1.2) { s.jump = true; DIR.blockT = 0; }
+    }
+    T.copy(s.anchor);
+  }
+  // never in the ground, never under the sea unless it was asked for
+  const foot = p.form === 'human', gm = foot ? 0.45 : 2.5 * Math.max(1, cinema.sc || 1);
+  T.y = Math.max(T.y, groundAt(T.x, T.z, T.y + 3) + gm, s.from === 'water' ? WATER + 0.6 : WATER + (foot ? 0.6 : 2));
+  // what it looks at: the middle of them, a little ahead of where they are going; and a place behind, if it is to be in the frame
+  const A = DIR.w.copy(c); if (fast > 2 && !multi) A.addScaledVector(L0.vel, Math.min(d * 0.05, 14) / fast);
+  if (s.bgP) {
+    const B = s.bgP.sun ? DIR.b.copy(T).addScaledVector(sunDir, 3000) : DIR.b.set(s.bgP.x, s.bgP.top ? lerp(s.bgP.y, s.bgP.top, 0.5) : s.bgP.y, s.bgP.z);
+    const a1 = _v.copy(A).sub(T), la = a1.length(); a1.normalize(); const b1 = _p.copy(B).sub(T).normalize(), th = Math.acos(clamp(a1.dot(b1), -1, 1));
+    if (th < 1.25) { const w = s.bgSoft ? 0.3 : 0.5; a1.lerp(b1, w).normalize(); A.copy(T).addScaledVector(a1, la); if (!s.bgSoft && !s.mm) fov = Math.max(fov, Math.min(78, th * 180 / Math.PI * 1.45)); }
+  }
+  if (s.fromP && !s.mm) fov = clamp(2 * Math.atan(s.sep / (frac * Math.max(1, T.distanceTo(c)))) * 180 / Math.PI / Math.min(1, aspect), 1.5, 75);   // (from far off: as long a lens as it takes)
+  out.T = T; out.A = A; out.fov = clamp(fov, 1.5, 100); out.c = c; out.d = d; out.top = el > 1.25;
+  return out;
+}
+const DIR_OUT = {};
+// the lens flown there: eased in (or cut, when he said cut), on springs, kept clear of the hills, and kept on them
+function dirFly(dt, cur, curV, aim, aimV, getFov) {
+  const s = DIR.s, P = dirPose(s, dt, DIR_OUT), T = P.T;
+  if (!Number.isFinite(T.x + T.y + T.z + P.A.x + P.A.y + P.A.z + P.fov)) { P.fov = getFov(); return P; }   // (never a lens put nowhere)
+  // a hill between the lens and them: the lens rises until it can see (it does not cut away from them)
+  let blocked = false; for (let i = 1; i < 6; i++) { const k = i / 6, x = lerp(cur.x, P.c.x, k), z = lerp(cur.z, P.c.z, k); if (terrainAt(x, z) > lerp(cur.y, P.c.y, k) + 1) { blocked = true; break; } }
+  DIR.blockT = blocked ? DIR.blockT + dt : 0; DIR.lift = blocked ? Math.min(1.1, DIR.lift + dt * 0.55) : Math.max(0, DIR.lift - dt * 0.12);
+  const jump = s.jump || s.ease === 0 && s.t <= dt * 1.5 || cur.distanceTo(T) > Math.max(2500, P.d * 6); s.jump = false;
+  if (jump) { cur.copy(T); curV.set(0, 0, 0); aim.copy(P.A); aimV.set(0, 0, 0); s.ease = 0; }
+  else {
+    const base = s.move === 'static' || s.move === 'flyby' ? 0.12 : s.move === 'orbit' ? 0.45 : /crane|push|pull/.test(s.move) ? 0.5 : 0.35;
+    s.ease = Math.max(0, s.ease - dt / 2.6); const sm = lerp(base, s.anchor ? 1.5 : 0.7, s.ease * s.ease);
+    springTo(cur, curV, T, sm, dt);
+    springTo(aim, aimV, P.A, lerp(0.16, 0.5, s.ease), dt);
+  }
+  { const g = groundAt(cur.x, cur.z, cur.y + 3) + (player.form === 'human' ? 0.35 : 1.5); if (cur.y < g) { cur.y = g; if (curV.y < 0) curV.y = 0; } }   // (the spring's own path never goes into the ground either)
+  // never off them: if the spring has let the aim drift, it is pulled back until they are well inside the frame
+  { const a = _v.copy(aim).sub(cur).normalize(), b = DIR.u.copy(P.c).sub(cur), bl = b.length(); b.normalize(); const half = getFov() * Math.PI / 360, off = Math.acos(clamp(a.dot(b), -1, 1)); if (off > half * 0.55) aim.lerp(_p.copy(cur).addScaledVector(b, bl), clamp((off - half * 0.55) / half, 0.15, 1)); }
+  if (s.dur && s.t > s.dur && !s.hold) { dirAuto(true); dirRead('DONE · BACK TO THE CAMERA\'S OWN CHOICE'); }
+  return P;
+}
+// the film camera (flying, or on foot), on the directed shot
+function dirCam(dt) {
+  const s = DIR.s; if (!s) { newShot(); return; }
+  const P = dirFly(dt, cinema.pos, cinema.posV, cinema.aim, cinema.aimV, () => camera.fov); if (!DIR.s) return;
+  camera.position.copy(cinema.pos);
+  if (P.top) camera.up.set(-Math.sin(s.head), 0, -Math.cos(s.head));
+  camera.lookAt(cinema.aim); camera.up.set(0, 1, 0);
+  const f = s.ease > 0 ? damp(2.2, dt) : damp(4, dt); camera.fov = clamp(camera.fov + (P.fov - camera.fov) * (s.ease === 0 && s.t <= dt * 1.5 ? 1 : f), 1.5, 100); camera.updateProjectionMatrix();
+}
+// the still camera, on the directed shot: it flies the lens in real time while the world all but stands still, and the
+// moment he takes the lens himself (a key, a drag, the lens wheel), it is his again
+function dirPhoto(dt) {
+  const s = DIR.s, H = DIR.ph; if (!s || !H || state !== 'photo') return;
+  if (!H.fresh && (Math.abs(photo.yaw - H.yaw) > 1e-4 || Math.abs(photo.pitch - H.pitch) > 1e-4 || Math.abs(photo.pos.x - H.x) > 1e-3 || Math.abs(photo.pos.y - H.y) > 1e-3 || Math.abs(photo.pos.z - H.z) > 1e-3 || Math.abs(photo.fov - H.fov) > 1e-3)) { DIR.ph = null; DIR.s = null; dirRead('THE CAMERA IS YOURS'); return; }
+  if (H.fresh) { DIR.pos.copy(photo.pos); DIR.posV.set(0, 0, 0); _v.set(0, 0, -1).applyEuler(_e.set(photo.pitch, photo.yaw, photo.roll, 'YXZ')); DIR.aim.copy(photo.pos).addScaledVector(_v, 50); DIR.aimV.set(0, 0, 0); DIR.fov = photo.fov; H.fresh = false; }
+  const P = dirFly(dt, DIR.pos, DIR.posV, DIR.aim, DIR.aimV, () => DIR.fov); if (!DIR.s) return;
+  DIR.fov += (P.fov - DIR.fov) * (s.ease === 0 && s.t <= dt * 1.5 ? 1 : damp(3, dt));
+  photo.pos.copy(DIR.pos); _v.copy(DIR.aim).sub(DIR.pos); photo.yaw = Math.atan2(-_v.x, -_v.z); photo.pitch = Math.atan2(_v.y, Math.hypot(_v.x, _v.z)); photo.roll = 0; photo.fov = DIR.fov;
+  Object.assign(H, { yaw: photo.yaw, pitch: photo.pitch, x: photo.pos.x, y: photo.pos.y, z: photo.pos.z, fov: photo.fov });
+}
+// every frame: a shot waiting for its place, the readout, and out of the chair, a clean slate
+function dirTick(dt) {
+  const on = dpOn();
+  if (!on && DIR.was) { DIR.s = null; DIR.next = null; DIR.ph = null; }
+  DIR.was = on;
+  const N = DIR.next;
+  if (N && on) { N.wait.t += dt; const d = Math.hypot(N.whenP.x - player.pos.x, N.whenP.z - player.pos.z); N.wait.min = Math.min(N.wait.min, d);
+    if (d < dirNear(N.whenP) || N.wait.min < 1600 && d > N.wait.min + 80 || N.wait.t > 150) { DIR.next = null; N.wait = null; dirStart(N, { now: true }); }   // (there: or as close as he is going to get)
+    else if (time - DIR.readT > 1) dirRead(dirSay(N)); }
+  const el = $('dirRead'), show = on && !MENU.open && state !== 'talk' && (DIR.s || DIR.next || time - DIR.readT < 6) && DIR.read;
+  const txt = show ? (DIR.s && time - DIR.readT > 6 ? dirSay(DIR.s) : DIR.read) : '';
+  if (txt !== DIR.shown) { DIR.shown = txt; el.textContent = txt; el.classList.toggle('on', !!txt); }
+}
+// who is flying with him, and the places, as the director of photography is told them
+function dirWho() {
+  const p = player, h = cineHead(), out = [];
+  for (const P of dirPeers().sort((a, b) => a.pos.distanceToSquared(p.pos) - b.pos.distanceToSquared(p.pos)).slice(0, 8)) {
+    const dx = P.pos.x - p.pos.x, dz = P.pos.z - p.pos.z, rel = wrapAngle(Math.atan2(-dx, -dz) - h), dy = Math.round(P.pos.y - p.pos.y);
+    out.push(`${P.name}: ${fmtDist(Math.hypot(dx, dz))} ${Math.abs(rel) < 0.8 ? 'ahead' : Math.abs(rel) > 2.3 ? 'behind' : rel > 0 ? 'to his left' : 'to his right'}${Math.abs(dy) > 15 ? `, ${Math.abs(dy)} m ${dy > 0 ? 'higher' : 'lower'}` : ''}${P.form === 'p' ? '' : ', on foot'}`);
+  }
+  for (const g of dirFolk()) { const d = Math.hypot(g.x - p.pos.x, g.z - p.pos.z); if (d < 2500) out.push(`${g.name} (${g.other ? 'one of the people' : 'a god'}): ${fmtDist(d)} away`); }
+  return out.slice(0, 10);
+}
+function dirPlaces() {
+  const L = ['the ring of fire', 'the mountain', 'the sun', 'the volcano', 'Crete', 'the nearest beacon', 'the nearest temple', 'the Parthenon', 'the monasteries', 'the water', 'the ground'];
+  const a = AREA.names.get(AREA.cur)?.name; if (a) L.push(a); return L;
+}
 // anything he says with the camera on is a direction; with it off, only what is plainly about a shot
 function dpHear(text, force) {
   const low = String(text || '').toLowerCase(), on = dpOn(); if (!low.trim()) return false;
   const d = dpParse(low, on || force);
+  if (d?.act === 'exit') { dpApply(d); return true; }
+  if ((on || force || d) && dirHear(text, low, d)) return true;   // (a shot in his own words, or a word to the one he described)
   if (d) { dpApply(d); return true; }
   if (!on && !force) return false;
   if (low.split(/\s+/).length < 2 && !force) return false;   // (a single stray word: not a direction)
   dpAsk(text); return true;
 }
 // the strip that says what the camera is doing, and the way out; and, the moment the camera comes on, where it opens
-function dpTick() {
+function dpTick(dt = 0) {
+  dirTick(dt);
   const on = dpOn() && !MENU.open && state !== 'talk';
   if (on !== DP.shown) { DP.shown = on; document.body.classList.toggle('dp', on); }
   const film = state === 'play' && cinema.manual;
   if (film && !DP.was) {   // he has just sat down in the chair
     DP.mem.n = (DP.mem.n | 0) + 1; const F = DP.mem.fav;
-    if (F && !DP.want && !!F.foot === dpFoot()) { DP.first = F.type; DP.side = F.side || 0; DP.said = `OPENING ON YOUR ${DP_NAMES[F.type] || 'SHOT'}`; } else DP.said = DP.mem.n > 1 && dpTop(DP.mem.liked, 1).length ? 'I KNOW WHAT YOU LIKE' : 'THE CAMERA IS YOURS · TELL IT WHAT YOU WANT';
+    if (DIR.s || DIR.next) { if (!(time - DP.saidT < 1)) { DP.said = 'THE CAMERA IS YOURS'; DP.saidT = time; } } else if (F && !DP.want && !!F.foot === dpFoot()) { DP.first = F.type; DP.side = F.side || 0; DP.said = `OPENING ON YOUR ${DP_NAMES[F.type] || 'SHOT'}`; } else DP.said = DP.mem.n > 1 && dpTop(DP.mem.liked, 1).length ? 'I KNOW WHAT YOU LIKE' : 'THE CAMERA IS YOURS · TELL IT WHAT YOU WANT';
     DP.saidT = time; if (cinema.on) newShot();
   }
   if (!film && DP.was) { if (DP.slow) { DP.slow = false; timeK = 1; } DP.want = ''; DP.first = ''; DP.hold = false; DP.k = 1; DP.lens = 1; DP.up = 0; DP.side = 0; }   // (out of the chair: the next time starts clean, except for what is remembered)
   DP.was = film;
   if (!on) return;
   const sh = cinema.shot, a = state === 'photo' ? 'STILL CAMERA' : `${DP_NAMES[sh?.type] || 'FILM CAMERA'}${DP.hold ? ' · HELD' : ''}${DP.slow ? ' · SLOW' : ''}${REC.on ? ' · ● ROLLING' : ''}`;
-  const b = time - DP.saidT < 5 && DP.said ? DP.said : mic.on ? 'say: wide · tighter · other side · from underneath · hold · i like that · take it · get me out' : TOUCH ? 'turn the microphone on to direct it · tap ✕ to leave' : 'press T and type /shot wide · tighter · other side · i like that — or turn the microphone on';
+  const b = time - DP.saidT < 5 && DP.said ? DP.said : mic.on ? 'say a shot: orbit slowly round me and a friend · low and wide from behind · lower · slower · other side · hold this · back to auto · take it' : TOUCH ? 'turn the microphone on and describe the shot · tap ✕ to leave' : 'press T and describe the shot: follow the nearest from her left · tighter · other side — or turn the microphone on';
   if (a !== DP.a || b !== DP.b) { DP.a = a; DP.b = b; const el = $('dpBar'); el.children[0].textContent = a; el.children[1].textContent = b; }
 }
 $('dpExit').addEventListener('click', e => { e.stopPropagation(); dpExit(); });
@@ -26953,7 +27413,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
   if (window.__icarus) Object.assign(window.__icarus, { crash, cpuShow, matchGhost, matchQuit, matchView, matchWhere, matchParty, matchRegulars, matchGlide, matchPractice, matchGoLive, matchSlot, BLAST, matchBlast, GHOST_U, NPCS, OLY_R, PARTY_R, chatCommand, cpuFly });
