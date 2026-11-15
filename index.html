@@ -8418,19 +8418,90 @@ try { facLoad(JSON.parse(localStorage.getItem('icarus.faction') || 'null')); } c
 //    someone's wing, and an answer when one is spoken to (api/_npc.js). One page does that talking for everybody: whoever
 //    has the lowest name on the wire. They write like people. They are never made to say they are people: asked sincerely,
 //    one says it is of the island. Only the keeper is shown which fliers these are.
-const NPC_WHO = [
-  { name: 'NIKO', pat: 'hermes', vibe: 'quick, jokey, always wants a race' }, { name: 'SELENE', pat: 'artemis', vibe: 'calm, plays late, knows where everything is and likes showing people' },
-  { name: 'JAX', pat: 'ares', vibe: 'competitive, few words, teases a little, friendly underneath' }, { name: 'MARLOW', pat: 'poseidon', vibe: 'easygoing, spends half the time in the sea and the caves' },
-  { name: 'IVY', pat: 'demeter', vibe: 'warm, fairly new herself, asks questions back' }, { name: 'KOA', pat: 'apollo', vibe: 'takes pictures of everything, loves the sunsets' },
-  { name: 'WREN', pat: 'athena', vibe: 'dry, clever, gives one good tip at a time' }, { name: 'ASH', pat: 'hephaestus', vibe: 'a tinkerer, talks about looks and shapes, a bit sleepy' }];
-const NPCS = { list: [], wp: new Map(), greeted: new Set(), q: [], sayT: 0, idleT: 200 + Math.random() * 260, hist: [], used: new Set(), selfT: 0, selfDone: false, LEG: 50 };
-const NPC_HI = ['sup', 'hey', 'yo', 'o/', 'heyy', 'hi!', 'welcome in', 'sup {n}', 'hey {n}', 'yo {n} welcome', 'ayy new bird', 'welcome {n}', 'hey hey', '{n}! hi'];
-const NPC_HI2 = ['nice wings', 'u just get here?', 'first time up here?', 'the ring of fire is worth the trip btw', 'if u get lost hit m', 'welcome :)', 'gl out there', 'try diving in the sea its wild', 'come fly with us'];
-const NPC_IDLE = ['anyone doing rings?', 'that sky rn', 'brb', 'who wants to race to the ring of fire', 'the sea is so good at night', 'found a cave by the pillars lol', 'ok that sunset', 'anyone up for warzone', 'crown is busy today', 'going for a dive'];
-const NPC_MEH = ['lol', 'haha fr', 'wanna race?', 'one sec', 'yeah', 'true', 'idk tbh', 'ha', 'maybe later'];
+// Who is flying in each of the eight places, and when. Every turn in the sky is somebody new: a handle the way people make
+// them (letters, numbers, a word or two run together), a manner, a way of typing, a god, things they love. A turn lasts an
+// hour or two and then that one logs off and, a few minutes later, someone else logs on in their place. All of it comes from
+// the clock and the place's number, so every screen agrees on who is up there without a message being sent.
+const NPC_N = 8;
+const NPC_W1 = ['sky', 'nova', 'ash', 'vex', 'kai', 'zed', 'luna', 'ember', 'drift', 'frost', 'pixel', 'rogue', 'nyx', 'orbit', 'toast', 'moth', 'echo', 'blaze', 'sol', 'jinx', 'haze', 'lumen', 'ruin', 'pyro', 'gale', 'kiwi', 'mango', 'boba', 'dusk', 'wisp', 'raven', 'storm', 'neon', 'zero', 'koi', 'hex', 'byte', 'lil', 'big', 'mr', 'its', 'xx', 'not', 'void', 'cosmo', 'taco', 'yeti', 'glitch', 'onyx', 'mochi', 'tidal', 'vapor', 'quill', 'rift', 'saint'];
+const NPC_W2 = ['wing', 'bird', 'fire', 'hawk', 'flame', 'feather', 'glide', 'soar', 'talon', 'plume', 'dive', 'flyer', 'phnx', 'burn', 'sky', 'cloud', 'wolf', 'cat', 'boi', 'gal', 'dude', 'kid', 'lord', 'main', 'gamer', 'ghost', 'fox', 'bean', 'goose', 'crow', 'owl', 'ttv', 'yt', 'fan', 'pilot', 'ace'];
+const NPC_STY = [
+  { k: 'low', d: 'all lowercase, no punctuation at all, short bursts, says lol and ngl now and then' },
+  { k: 'caps', d: 'gets hyped and types in CAPS a lot, double exclamation marks, short' },
+  { k: 'prim', d: 'full proper sentences with capitals and full stops, polite and a little formal, never slang' },
+  { k: 'emo', d: 'an emoji in most messages (one, sometimes two), bubbly' },
+  { k: 'terse', d: 'one to four words, never more: ya, nah, k, gg, bet' },
+  { k: 'typo', d: 'types fast and leaves small typos it never fixes, drops letters, no capitals' },
+  { k: 'zoom', d: 'young slang: fr, no cap, lowkey, bro, deadass, its giving; lowercase' },
+  { k: 'brit', d: 'british: mate, innit, proper, cheers, bit of a; mostly lowercase' },
+  { k: 'esl', d: 'english is a second language: simple words, small grammar slips, very warm, now and then a word of spanish or portuguese' },
+  { k: 'stretch', d: 'stretches words (heyyy, sooo, nooo), uses ~ and :) a lot, soft' },
+  { k: 'hero', d: 'half roleplays as a hero of old Greece (hail, by zeus, traveller) then slips back into ordinary gamer talk' },
+  { k: 'dots', d: 'trails off with ... a lot, thoughtful, a bit sleepy, lowercase' }];
+const NPC_ATT = ['friendly and welcoming, always wants to show new people around', 'competitive, a playful trash-talker who always wants to race or fight, a good sport when beaten',
+  'shy, says little at first, warms up and gets chatty once someone is nice to them', 'a know-it-all veteran who gives tips nobody asked for, but means well',
+  'chaotic and funny, random jokes, gets distracted halfway through a thought', 'chill and laid back, nothing is a big deal', 'curious, asks people about their bird, their god, what they have found',
+  'dry and a bit sarcastic, kind underneath', 'new to the game too, confused by things, asks for help and is grateful for it', 'a tryhard who takes the rings and the warzone very seriously and counts their times',
+  'a dreamer who loves the lore of the gods and the story of Icarus', 'an explorer who keeps finding hidden places and wants people to come and see'];
+const NPC_INT = ['ring races', 'warzone fights', 'the sea and the caves under it', 'sunsets and taking pictures', 'the ring of fire', 'the stone pillars and the monasteries on them', 'Crete and the tower',
+  'talking to the gods', 'new looks and shapes for their bird', 'flying as high as they can', 'perching on high places', 'the volcano of blue fire'];
+const NPCS = { list: [], wp: new Map(), greeted: new Set(), firstSeen: new Map(), q: [], sayT: 0, idleT: 150 + Math.random() * 220, hist: [], used: new Set(), selfT: 0, selfDone: false, LEG: 50, up: 0, rep: [], replyT: 0, memT: 0, cache: new Map() };
+const NPC_HI = ['sup', 'hey', 'yo', 'o/', 'heyy', 'hi!', 'welcome in', 'sup {n}', 'hey {n}', 'yo {n} welcome', 'ayy new bird', 'welcome {n}', 'hey hey', '{n}! hi', 'wsg {n}', 'hiii', 'oh hey {n}'];
+const NPC_HI2 = ['nice wings', 'u just get here?', 'first time up here?', 'the ring of fire is worth the trip btw', 'if u get lost hit m', 'welcome :)', 'gl out there', 'try diving in the sea its wild', 'come fly with us', 'u picked a god yet?', 'go say hi to a god they actually talk'];
+const NPC_IDLE = ['anyone doing rings?', 'that sky rn', 'brb', 'who wants to race to the ring of fire', 'the sea is so good at night', 'found a cave by the pillars lol', 'ok that sunset', 'anyone up for warzone', 'crown is busy today', 'going for a dive', 'how do u get the black bird', 'just talked to athena she roasted me', 'my wings keep catching the trees lol', 'the monasteries are so pretty from up high', 'lag?', 'whos on'];
+const NPC_IN = ['hey all', 'yo', 'back', 'hi everyone', 'sup sky', 'evening all', 'whos on', 'ok im on', 'hellooo', 'hi hi', 'what did i miss'];
+const NPC_MEH = ['lol', 'haha fr', 'wanna race?', 'one sec', 'yeah', 'true', 'idk tbh', 'ha', 'maybe later', 'wait what', 'mood'];
+const npcHandle = R => {   // a name the way people make them: never a real name
+  const p = a => a[Math.floor(R() * a.length)], d = n => String(Math.floor(R() * 10 ** n)), leet = t => t.replace(/[aeios]/g, c => R() < 0.5 ? ({ a: '4', e: '3', i: '1', o: '0', s: '5' })[c] : c);
+  const w1 = p(NPC_W1), w2 = p(NPC_W2), r = R(), C = 'bcdfghjklmnpqrstvwxz';
+  const n = r < 0.2 ? w1 + w2 : r < 0.36 ? w1 + d(R() < 0.3 ? 4 : 2) : r < 0.48 ? leet(w1 + w2) : r < 0.58 ? w2 + d(2) : r < 0.65 ? w1 + w1.slice(-1).repeat(2) : r < 0.74 ? p(C) + p('aeiouxyz') + p(C) + d(1 + Math.floor(R() * 2))
+    : r < 0.81 ? 'x' + w1 + 'x' : r < 0.89 ? (w1 + w2).replace(/[aeiou]/g, '') + d(1) : r < 0.95 ? w2 + ' ' + w1 : leet(w1) + d(3);
+  return cleanName(n.slice(0, 12));
+};
+const NPC_F = i => 3900 + i * 1130;   // (how long one turn in place i lasts, in seconds: each place its own, so they never all change at once)
+function npcWho(i, T) {   // who is flying in place i at T (seconds, by the clock), or null between turns
+  const F = NPC_F(i), s = T + i * 977, k = Math.floor(s / F), u = s - k * F, key = i + ':' + k;
+  let W = NPCS.cache.get(key);
+  if (!W) { const R = mulberry32((Math.imul(i + 11, 0x9e3779b1) ^ Math.imul(k + 7, 0x85ebca6b)) >>> 0), extra = i >= 5;
+    const a = extra ? 600 + R() * 1800 : 40 + R() * 220, b = extra ? 600 + R() * 1800 : 40 + R() * 260, used = !extra || R() < 0.62, pats = Object.keys(PATRONS);
+    let name = npcHandle(R); const sty = NPC_STY[Math.floor(R() * NPC_STY.length)], att = NPC_ATT[Math.floor(R() * NPC_ATT.length)], int = NPC_INT[Math.floor(R() * NPC_INT.length)];
+    for (const [k2, V] of NPCS.cache) if (V.name === name && k2 !== key) name = cleanName(name.slice(0, 10) + (k % 90 + 10));
+    W = { key, k, a, b, used, name, sty, att, int, pat: pats[Math.floor(R() * pats.length)] || 'zeus', chat: 0.3 + R() * 0.7, speed: 0.6 + R() * 0.9, on0: k * F - i * 977 + a };
+    if (NPCS.cache.size > 64) NPCS.cache.clear(); NPCS.cache.set(key, W); }
+  return W.used && u >= W.a && u <= F - W.b ? W : null;
+}
+function npcStyle(C, t) {   // a stock line said the way this one types
+  t = String(t); const R = Math.random;
+  switch (C && C.sty) {
+    case 'low': return t.toLowerCase().replace(/[.!?]+$/, '');
+    case 'caps': return R() < 0.6 ? t.toUpperCase().replace(/[.?]?$/, '!!') : t + '!';
+    case 'prim': { let x = t.replace(/\bu\b/g, 'you').replace(/\bbtw\b/g, 'by the way').replace(/\b(lol|fr|rn)\b/g, '').replace(/\s+/g, ' ').trim() || 'Hello'; x = x[0].toUpperCase() + x.slice(1); return /[.!?)]$/.test(x) ? x : x + (R() < 0.8 ? '.' : '!'); }
+    case 'emo': return t + ' ' + pick(['😄', '✨', '🔥', '😂', '🙌', '🐦', '☀️', '💛', '😎']);
+    case 'terse': return t.split(/\s+/).slice(0, 2).join(' ');
+    case 'typo': return t.toLowerCase().replace(/\b(\w)(\w)(\w{2,})/, (m, a, b, c) => R() < 0.6 ? b + a + c : m).replace(/[.!?]+$/, '');
+    case 'zoom': return t.toLowerCase().replace(/[.!]+$/, '') + (R() < 0.5 ? pick([' fr', ' no cap', ' lowkey', ' bro']) : '');
+    case 'brit': return t.toLowerCase() + (R() < 0.45 ? pick([' mate', ' innit', ' cheers']) : '');
+    case 'esl': return t.replace(/\bu\b/g, 'you') + (R() < 0.3 ? pick([' amigo', ' friend', ' hehe']) : '');
+    case 'stretch': return t.replace(/([yoe])\b/, '$1$1$1') + (R() < 0.5 ? ' :)' : ' ~');
+    case 'hero': return R() < 0.45 ? pick(['hail, ', 'by zeus, ', 'traveller, ']) + t.toLowerCase() : t;
+    case 'dots': return t.toLowerCase().replace(/[.!?]*$/, '...');
+  }
+  return t;
+}
+function npcMake(i, W) {
+  const C = { i, key: W.key, id: `npc-${i}-${W.k}`, name: W.name, pat: W.pat, sty: W.sty.k, style: W.sty.d, vibe: `${W.att}; loves ${W.int}`, chat: W.chat, speed: W.speed, on0: W.on0,
+    o: { x: 0, y: 0, z: 0 }, px: null, bud: null, sayT: 0, mem: [], talkTo: '', talkT: -99, on: true };
+  try { const m = JSON.parse(localStorage.getItem('icarus.npcmem') || '{}')[C.key]; if (Array.isArray(m)) C.mem = m.filter(x => typeof x === 'string').slice(-24); } catch {}
+  return C;
+}
+function npcMem(C, t) {   // what was said with this one: kept for its turn, on this device too, so a reload does not wipe it
+  if (!C) return; C.mem.push(String(t).slice(0, 190)); if (C.mem.length > 24) C.mem.shift();
+  clearTimeout(NPCS.memT); NPCS.memT = setTimeout(() => { try { const o = {}; for (const c of NPCS.list) if (c && c.mem.length) o[c.key] = c.mem; localStorage.setItem('icarus.npcmem', JSON.stringify(o)); } catch {} }, 1500);
+}
+const npcPick = L => { let best = null, bs = -1; for (const C of L) { const s = C.chat * (0.4 + Math.random()); if (s > bs) { bs = s; best = C; } } return best; };
 function npcWp(i, k) {   // the k-th place regular i is making for: the crown, or somewhere over its own piece of country
   const key = i * 1000003 + k, had = NPCS.wp.get(key); if (had) return had;
-  const R = mulberry32((Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(k, 0x85ebca6b)) >>> 0), u1 = R(), u2 = R(), u3 = R(), u4 = R(), ha = i / NPC_WHO.length * 6.283 + 0.6, hr = 1500 + 650 * (i % 3);
+  const R = mulberry32((Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(k, 0x85ebca6b)) >>> 0), u1 = R(), u2 = R(), u3 = R(), u4 = R(), ha = i / NPC_N * 6.283 + 0.6, hr = 1500 + 650 * (i % 3);
   let x, y, z;
   if (u1 < 0.26) { const a = u3 * 6.283, r = 260 + u2 * 560; x = MOUNT.x + Math.cos(a) * r; z = MOUNT.z + Math.sin(a) * r; y = SUMMIT + 40 + u4 * 260; }
   else { const a = u3 * 6.283, r = 2500 * Math.sqrt(u2); x = MOUNT.x + Math.cos(ha) * hr + Math.cos(a) * r; z = MOUNT.z + Math.sin(ha) * hr + Math.sin(a) * r; y = Math.max(overHeight(x, z), WATER) + 90 + u4 * 420; }
@@ -8443,14 +8514,20 @@ function npcAt(i, T, o) {   // where regular i is at T seconds by the clock: the
   o.z = 0.5 * (2 * B.z + (C.z - A.z) * u + (2 * A.z - 5 * B.z + 4 * C.z - D.z) * u2 + (3 * B.z - A.z - 3 * C.z + D.z) * u3);
   return o;
 }
-const npcOn = (i, T) => i < 5 || mulberry32((Math.imul(i + 3, 7919) ^ Math.floor(T / 5400)) >>> 0)() < 0.6;
+const npcOn = (i, T) => !!npcWho(i, T);
 // (the page that does their talking: the lowest name on the wire among the people here; alone, this one)
 function npcHost() { const now = performance.now(); for (const P of NET.peers.values()) if (!P.npc && !P.cpu && !P.memory && P.seen && P.s && now - P.s.t < 12000 && P.id < NET.id) return false; return true; }
 function updateNpcs(dt) {
   const N = NPCS; if (state === 'title' || state === 'loading' || state === 'prologue' || state === 'end') return;
   const T = Date.now() / 1000, now = performance.now(), h = Math.max(dt, 1e-3);
-  for (let i = 0; i < NPC_WHO.length; i++) {
-    const W = NPC_WHO[i], C = N.list[i] ||= { i, id: 'npc-' + W.name.toLowerCase(), name: W.name, pat: W.pat, vibe: W.vibe, o: { x: 0, y: 0, z: 0 }, px: null, bud: null, sayT: 0 }, on = npcOn(i, T) && !SHUN.block.has(W.name);
+  if (state === 'play') N.up += dt;
+  for (let i = 0; i < NPC_N; i++) {
+    const W = npcWho(i, T); let C = N.list[i];
+    if (C && (!W || C.key !== W.key)) { const Q = NET.peers.get(C.id); if (Q) dropPeer(C.id, Q); N.list[i] = C = null; }   // (that one has logged off: whoever comes next is someone else)
+    if (W && !C) { const Cn = C = N.list[i] = npcMake(i, W);
+      if (state === 'play' && N.up > 20) { chatLine('', `${Cn.name} IS FLYING`, 'sys'); if (npcHost() && Math.random() < 0.55) N.q.push({ at: time + 4 + Math.random() * 10, f: () => { if (Cn.on && N.list[i] === Cn) npcSay(Cn, npcLine(NPC_IN, '', Cn), null, 0.3); } }); } }
+    if (!C) continue;
+    const on = !SHUN.block.has(C.name);
     let P = NET.peers.get(C.id); C.on = on;
     if (!on) { if (P && P.s) { P.s = null; P.seen = false; if (P.av) { P.av.bird.group.visible = false; P.av.man.group.visible = false; } if (P.label) P.label.style.display = 'none'; } C.px = null; continue; }
     const o = npcAt(i, T, C.o); let x = o.x, y = o.y, z = o.z;
@@ -8471,45 +8548,105 @@ function updateNpcs(dt) {
   // what they say, and when: one page's to do
   if (!N.selfDone && state === 'play' && (N.selfT += dt) > 7) { N.selfDone = true; npcNoticed(NET.id); }   // (he has just arrived himself)
   for (let k = 0; k < N.q.length; k++) if (time >= N.q[k].at) { const e = N.q[k]; N.q.splice(k--, 1); try { e.f(); } catch {} }
-  if ((N.idleT -= dt) < 0) { N.idleT = 240 + Math.random() * 300; if (npcHost() && state === 'play') { const L = N.list.filter(C => C && C.on); if (L.length) npcSay(pick(L), npcLine(NPC_IDLE, ''), null, 0.5); } }
+  if ((N.idleT -= dt) < 0) { N.idleT = 150 + Math.random() * 240; if (npcHost() && state === 'play') { const L = N.list.filter(C => C && C.on); if (L.length) { const A = npcPick(L), t = npcLine(NPC_IDLE, '', A), D = L.filter(c => c !== A); npcSay(A, t, null, 0.5);
+    if (D.length && Math.random() < 0.45) N.q.push({ at: time + 8 + Math.random() * 12, f: () => { if (A.on && N.list.includes(A)) { const B = npcPick(D); if (B && B.on) npcAsk(B, A.name, A.id, t, false, false); } } }); } } }   // (and now and then another of them answers it: once, not back and forth)
 }
-function npcLine(pool, name) { let t = '', n = 0; do t = pick(pool); while (NPCS.used.has(t) && ++n < 12); NPCS.used.add(t); if (NPCS.used.size > 14) NPCS.used.delete(NPCS.used.values().next().value); return t.replace('{n}', String(name || '').toLowerCase()); }
+function npcLine(pool, name, C) { let t = '', n = 0; do t = pick(pool); while (NPCS.used.has(t) && ++n < 12); NPCS.used.add(t); if (NPCS.used.size > 18) NPCS.used.delete(NPCS.used.values().next().value); return npcStyle(C, t.replace('{n}', String(name || '').toLowerCase())); }
 function npcWhere(id) { if (id === NET.id) return player.pos; const P = NET.peers.get(id); return P && P.s ? P.pos : null; }
 // someone has just come in: one of them says hello (the nearest), in its own words, and goes over; sometimes another adds a word later. Never all of them.
 function npcNoticed(id) {
-  const N = NPCS; if (!npcHost() || N.greeted.has(id)) return; N.greeted.add(id);
+  const N = NPCS; if (!N.firstSeen.has(id)) N.firstSeen.set(id, performance.now()); if (!npcHost() || N.greeted.has(id)) return; N.greeted.add(id);
   const at = npcWhere(id), name = id === NET.id ? heroName : (NET.peers.get(id) || {}).name || '', L = N.list.filter(C => C && C.on && C.px != null); if (!at || !L.length) return;
   L.sort((a, b) => (a.px - at.x) ** 2 + (a.pz - at.z) ** 2 - (b.px - at.x) ** 2 - (b.pz - at.z) ** 2);
-  const g = L[0], g2 = L.length > 2 && Math.random() < 0.42 ? L[1 + Math.floor(Math.random() * Math.min(3, L.length - 1))] : null;
-  N.q.push({ at: time + 2.5 + Math.random() * 6, f: () => { npcSay(g, npcLine(NPC_HI, name), null, 0.2); npcBuddy(g, id); } });
-  if (g2) N.q.push({ at: time + 11 + Math.random() * 14, f: () => npcSay(g2, npcLine(NPC_HI2, name), null, 0.2) });
+  const g = npcPick(L.slice(0, 3)), R2 = L.filter(C => C !== g), g2 = R2.length > 1 && Math.random() < 0.42 ? npcPick(R2.slice(0, 4)) : null;
+  N.q.push({ at: time + 2.5 + Math.random() * 6, f: () => { npcSay(g, npcLine(NPC_HI, name, g), null, 0.2); npcBuddy(g, id); } });
+  if (g2) N.q.push({ at: time + 11 + Math.random() * 14, f: () => npcSay(g2, npcLine(NPC_HI2, name, g2), null, 0.2) });
 }
 function npcBuddy(C, id) {   // it goes to fly on their wing for a while: said once, and every screen draws it
   const at = npcWhere(id); if (!at || C.px == null) return; const d = Math.hypot(C.px - at.x, C.pz - at.z);
-  const tin = clamp(d / 75, 6, 60), ev = { j: C.i, to: id, t0: Date.now(), d: 26 + Math.random() * 28 + tin, off: Math.random() < 0.5 ? 1 : -1, in: tin }; C.bud = ev;   // (it comes over at a bird's pace, however far off it was)
+  const tin = clamp(d / 75, 6, 60), ev = { j: C.i, k: C.key, to: id, t0: Date.now(), d: 26 + Math.random() * 28 + tin, off: Math.random() < 0.5 ? 1 : -1, in: tin }; C.bud = ev;   // (it comes over at a bird's pace, however far off it was)
   if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'npc', payload: { i: NET.id, ...ev } });
 }
-function gotNpc(m) { if (!m || !ok(m.i) || !Number.isInteger(m.j) || !NPCS.list[m.j] || typeof m.to !== 'string' || m.to.length > 40) return; const P = peerOf(m.i); if (flood(P)) return;
+function gotNpc(m) { if (!m || !ok(m.i) || !Number.isInteger(m.j) || !NPCS.list[m.j] || typeof m.to !== 'string' || m.to.length > 40 || (typeof m.k === 'string' && m.k !== NPCS.list[m.j].key)) return; const P = peerOf(m.i); if (flood(P)) return;
   NPCS.list[m.j].bud = { j: m.j, to: m.to, t0: clamp(+m.t0 || 0, Date.now() - 8000, Date.now() + 4000), d: clamp(+m.d || 30, 8, 130), off: m.off < 0 ? -1 : 1, in: clamp(+m.in || 8, 4, 60) }; }
 // one of them types something: after about as long as it would take to type it
 function npcSay(C, text, toId, quick) {
-  const N = NPCS; text = cleanText(text); if (!text || !C) return; const wait = Math.max(0, N.sayT - time) + (quick ? 0.2 : 0.9) + text.length * 0.045 * (0.7 + Math.random() * 0.6); N.sayT = time + wait + 1.6; C.sayT = time + wait + 5;
+  const N = NPCS; text = cleanText(text); if (!text || !C) return; const wait = Math.max(0, N.sayT - time) + (quick ? 0.2 : 0.9) + text.length * 0.045 * (C.speed || 1) * (0.7 + Math.random() * 0.6); N.sayT = time + wait + 1.6; C.sayT = time + wait + 5;
   N.q.push({ at: time + wait, f: () => {
     const P = NET.peers.get(C.id); if (P) { P.said = text.slice(0, 160); P.saidT = performance.now(); }
-    if (toId) { if (toId === NET.id) { chatLine(`${C.name} → YOU`, text, 'dm'); CH.to = C.name; if (P) courier(P, text); } else if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'nr', payload: { i: NET.id, to: toId, j: C.i, t: text } }); return; }
-    chatLine(C.name, text, ''); N.hist.push(`${C.name}: ${text}`); if (N.hist.length > 8) N.hist.shift(); (audio.sfx.chat || audio.sfx.ui)?.();
+    if (toId) { npcMem(C, `you (to ${toId === NET.id ? heroName : (NET.peers.get(toId) || {}).name || 'someone'} alone): ${text}`); if (toId === NET.id) { chatLine(`${C.name} → YOU`, text, 'dm'); CH.to = C.name; if (P) courier(P, text); } else if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'nr', payload: { i: NET.id, to: toId, j: C.i, t: text } }); return; }
+    npcMem(C, `you: ${text}`); chatLine(C.name, text, ''); N.hist.push(`${C.name}: ${text}`); if (N.hist.length > 8) N.hist.shift(); (audio.sfx.chat || audio.sfx.ui)?.();
     if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'chat', payload: { i: C.id, n: C.name, t: text } }); } });
 }
-// something was said where they can hear it: one of them may answer (the one named; or the one written to)
-function npcHeard(from, fromId, text, priv, j) {
-  const N = NPCS; if (!priv) { N.hist.push(`${from}: ${text}`); if (N.hist.length > 8) N.hist.shift(); }
-  if (!npcHost() || !text) return;
-  let C = priv ? N.list[j] : null; if (!C) { const U = ' ' + text.toUpperCase().replace(/[^A-Z0-9 ]/g, ' ') + ' '; C = N.list.find(C => C && C.on && U.includes(' ' + C.name + ' ')) || null; }
-  if (!C && !priv && /^(hi|hey|hello|yo|sup|anyone|hola|heya|hiya)\b/i.test(text) && Math.random() < 0.6) { const at = npcWhere(fromId), L = N.list.filter(C => C && C.on && C.px != null && time > C.sayT); if (at && L.length) { L.sort((a, b) => (a.px - at.x) ** 2 + (a.pz - at.z) ** 2 - (b.px - at.x) ** 2 - (b.pz - at.z) ** 2); C = L[0]; } }
-  if (!C || !C.on || time < C.sayT - 3) return; C.sayT = time + 6;
-  const doing = C.bud ? 'flying on someone\'s wing' : Math.hypot(C.px - MOUNT.x, C.pz - MOUNT.z) < 900 ? 'circling the crown of olympus' : (overHeight(C.px, C.pz) < WATER ? 'out over the sea' : 'out over the country');
-  fetch('/api/hub?fn=npc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ who: C.name, vibe: C.vibe, from, said: text, hist: N.hist.slice(-6, -1), doing }), signal: AbortSignal.timeout(9000) })
-    .then(r => r.ok ? r.json() : null).then(o => o && typeof o.say === 'string' ? o.say : '').catch(() => '').then(say => npcSay(C, say || pick(NPC_MEH), priv ? fromId : null));
+// Everything said in the chat is heard by all of them (and remembered by the ones it concerns). One of them may answer: the
+// one named, or the one already talking with whoever spoke, or (to a greeting, a question anyone could answer, now and then
+// just something said) whichever of them is near and in the mood, the chattier ones more often. Never two at once, and only
+// so many a minute. What it is told is what a god is told: what it can see from where it is flying, what the one speaking is
+// doing and where, what has been said with it before, and the chat so far.
+function npcHeard(from, fromId, text, priv, j, voice) {
+  const N = NPCS; if (!text) return;
+  if (!priv) { N.hist.push(`${from}${voice ? ' (said out loud)' : ''}: ${text}`); if (N.hist.length > 16) N.hist.shift(); }
+  const U = ' ' + text.toUpperCase().replace(/[^A-Z0-9 ]/g, ' ') + ' ';
+  const named = priv ? null : N.list.find(C => C && C.on && (U.includes(' ' + C.name + ' ') || C.name.includes(' ') === false && U.includes(' ' + C.name.replace(/[0-9]+$/, '') + ' ') && C.name.replace(/[0-9]+$/, '').length >= 4)) || null;
+  if (named && !npcHost()) npcMem(named, `${from}: ${text}`);
+  if (!npcHost()) return;
+  let C = priv ? N.list[j] : named, addressed = !!C;
+  if (!C && !priv) {
+    const L = N.list.filter(c => c && c.on && c.px != null), r = Math.random();
+    const thread = L.find(c => c.talkTo === fromId && time - c.talkT < 75);   // (already talking with them: it goes on)
+    const q = /\?\s*$|^(how|what|where|who|why|when|is|are|does|do|can|any|anyone|anybody|which|should|wanna|u)\b/i.test(text);
+    const hi = /^(hi|hey|hello|yo|sup|hola|heya|hiya|wsg|wassup|whats up|good (morning|evening)|o\/)\b/i.test(text);
+    if (thread && r < 0.82) { C = thread; addressed = true; }
+    else if (L.length && r < (hi ? 0.7 : q ? 0.62 : voice ? 0.1 : 0.26)) { const at = npcWhere(fromId); C = npcPick(at ? L.filter(c => Math.hypot(c.px - at.x, c.pz - at.z) < 2500).concat(L).slice(0, 4) : L); }
+  }
+  if (!C || !C.on) return;
+  N.rep = N.rep.filter(t => time - t < 60);
+  if (!priv && !named && (time < N.replyT || N.rep.length >= 9 || time < C.sayT - 3)) return;
+  N.rep.push(time); N.replyT = time + 3.5; C.sayT = time + 5; C.talkTo = fromId; C.talkT = time;
+  npcAsk(C, from, fromId, text, priv, addressed);
+}
+function npcAsk(C, from, fromId, text, priv, addressed) {
+  npcMem(C, `${from}${priv ? ' (to you alone)' : ''}: ${text}`);
+  let ctx = {}; try { ctx = npcCtx(C, fromId); } catch {}
+  const hist = NPCS.hist.slice(-13).filter(x => x !== `${from}: ${text}`).slice(-12);
+  fetch('/api/hub?fn=npc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ who: C.name, vibe: C.vibe, style: C.style, from, said: text, priv: !!priv, addressed: !!addressed, hist, mem: C.mem.slice(-17, -1), ctx }), signal: AbortSignal.timeout(9000) })
+    .then(r => r.ok ? r.json() : null).then(o => o && typeof o.say === 'string' ? o.say : '').catch(() => '')
+    .then(say => { if (!C.on || !NPCS.list.includes(C)) return; if (!say && !addressed && !priv) return; npcSay(C, say || npcLine(NPC_MEH, '', C), priv ? fromId : null); });
+}
+function npcPlace(v) {   // where something is, in words a player would use
+  const x = v.x, z = v.z, g = overHeight(x, z), dM = Math.hypot(x - MOUNT.x, z - MOUNT.z), out = [], a = typeof AREA !== 'undefined' && AREA.names.get(areaKey(x, z, 'over'));
+  if (a && a.name) out.push(`over ${a.name}`);
+  out.push(dM < 900 ? 'at the crown of Mount Olympus' : dM < 3000 ? `${(dM / 1000).toFixed(1)} km from Olympus` : `${Math.round(dM / 1000)} km out from Olympus`);
+  if (typeof CRETE !== 'undefined' && CRETE && Math.hypot(x - CRETE.x, z - CRETE.z) < 2500) out.push('by Crete');
+  out.push(g < WATER ? (v.y < WATER + 2 ? 'in the sea' : 'over the sea') : 'over land'); out.push(`about ${Math.max(0, Math.round((v.y - Math.max(g, WATER)) / 10) * 10)} m up`);
+  return out.join(', ');
+}
+function npcDoing(C) { return C.px == null ? 'flying' : `flying ${npcPlace({ x: C.px, y: C.py, z: C.pz })}`; }
+function npcThem(fromId) {   // what can be told about whoever spoke
+  const first = NPCS.firstSeen.get(fromId), mins = first ? (performance.now() - first) / 60000 : null;
+  if (fromId === NET.id) { const p = player, f = p.form === 'phoenix' ? (p.sub ? 'swimming in the sea as a bird' : p.perch ? 'perched as a bird' : 'flying as a phoenix') : p.sub ? 'swimming' : 'on foot, as the boy';
+    return `${heroName} is ${f}, ${npcPlace(p.pos)}${realm === 'under' ? ', down in the Underworld' : ''}; their god is ${PATRON.id ? godById[PATRON.id]?.name || PATRON.id : 'not chosen yet'}; their rank is ${String(rankOf()).toLowerCase()}${flags.morphed ? '' : '; they are brand new to the game'}; lately they: ${(story.self || []).slice(-5).join('; ') || 'nothing much yet'}`; }
+  const P = NET.peers.get(fromId); if (!P || !P.s) return '';
+  const f = P.form === 'p' ? (P.gr ? 'on the ground as a bird' : 'flying as a phoenix') : P.form === 't' ? 'falling out of the sky' : P.form === 'c' ? 'climbing a cliff' : P.form === 'w' ? 'gliding on wax wings' : 'on foot';
+  return `${P.name} is ${f}, ${npcPlace(P.pos)}${P.realm ? ', down in the Underworld' : ''}${P.patron ? `; their god is ${godById[P.patron]?.name || P.patron}` : ''}${P.crete ? '; they are brand new, still on Crete at the very start' : mins != null && mins < 6 ? '; they only just arrived in the sky' : ''}${P.ma ? '; they are in a fight right now' : ''}${P.gm ? '; they are in god mode' : ''}`;
+}
+function npcSees(C, fromId) {   // what this one can see from where it is flying
+  if (C.px == null) return ''; const me = { x: C.px, y: C.py, z: C.pz }, out = [];
+  const tg = npcWhere(fromId); if (tg) { const d = Math.hypot(tg.x - me.x, tg.y - me.y, tg.z - me.z); out.push(d < 60 ? 'whoever spoke is right beside you' : d < 2500 ? `whoever spoke is about ${Math.round(d / 10) * 10} m from you, ${tg.y < me.y - 30 ? 'below you' : tg.y > me.y + 30 ? 'above you' : 'level with you'}` : `whoever spoke is far off, ${Math.round(d / 1000)} km away, out of sight`); }
+  let n = 0;
+  for (const P of NET.peers.values()) { if (n >= 4 || P.id === fromId || P.id === C.id || !P.s || !P.seen || P.realm) continue; const d = Math.hypot(P.pos.x - me.x, P.pos.z - me.z); if (d < 900) { out.push(`${P.name} is flying ${Math.round(d / 10) * 10} m from you`); n++; } }
+  if (fromId !== NET.id && state === 'play' && realm === 'over' && n < 4) { const d = Math.hypot(player.pos.x - me.x, player.pos.z - me.z); if (d < 900) out.push(`${heroName} is ${Math.round(d / 10) * 10} m from you`); }
+  const dM = Math.hypot(me.x - MOUNT.x, me.z - MOUNT.z); out.push(dM < 1200 ? 'Mount Olympus fills the view, the gods\' pillars on its crown' : `Mount Olympus stands ${(dM / 1000).toFixed(1)} km off`);
+  let best = null, bd = 1e18; for (const S of SITES) { const d = (S.x - me.x) ** 2 + (S.z - me.z) ** 2; if (d < bd) { bd = d; best = S; } } if (best && bd < 1500 ** 2) out.push(`${best.name} is ${Math.round(Math.sqrt(bd) / 10) * 10} m away`);
+  const dn = dayName(); out.push(dn === 'night' ? 'it is dark, the stars are out' : dn === 'dusk' ? 'the sun is going down' : dn === 'dawn' ? 'the sun is coming up' : 'bright daylight');
+  return out.join('; ');
+}
+function npcCtx(C, fromId) {
+  const ppl = [heroName, ...[...NET.peers.values()].filter(P => P.seen && P.s && !P.npc && !P.cpu && !P.memory).map(P => P.name)].slice(0, 10), regs = NPCS.list.filter(c => c && c.on && c !== C).map(c => c.name);
+  const mins = Math.max(1, Math.round((Date.now() / 1000 - C.on0) / 60));
+  return { you: `you are ${npcDoing(C)}${C.bud ? ', flying on someone\'s wing' : ''}; you logged on ${mins} minutes ago; your bird belongs to ${godById[C.pat]?.name || C.pat}`,
+    them: npcThem(fromId), sees: npcSees(C, fromId),
+    world: `In the sky now: ${ppl.join(', ')}${regs.length ? `, and the other regulars ${regs.join(', ')}` : ''}. ${typeof MATCH !== 'undefined' && MATCH.phase ? `A ${MATCH.kind || 'match'} is on. ` : ''}${storm > 0.3 ? 'A storm is blowing. ' : ''}` };
 }
 // written to one of them alone: it is not a person, so nothing is sealed; the page doing their talking answers
 function npcDm(P, text) {
@@ -8568,7 +8705,7 @@ function sendChat(raw) {
 function chatSay(text) {
   const t = String(text || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200), now = performance.now();
   if (t.length < 2 || now - (CHAT.saidT || 0) < 1200) return;
-  CHAT.saidT = now; chatLine(heroName, t, 'me voice');
+  CHAT.saidT = now; chatLine(heroName, t, 'me voice'); npcHeard(heroName, NET.id, t, false, 0, true);
   if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'chat', payload: { i: NET.id, n: heroName, t, v: 1 } });
 }
 function gotChat(m) {
@@ -8579,7 +8716,7 @@ function gotChat(m) {
   if (quiet(P)) return;
   P.said = text.slice(0, 160); P.saidT = performance.now();
   const called = !m.v && new RegExp('@' + heroName.replace(/[^A-Z0-9 ]/g, '').replace(/ /g, ' ?') + '(?![A-Z0-9])', 'i').test(text);
-  chatLine(P.name, text, m.v ? 'voice' : called ? 'at' : ''); if (!m.v && !P.npc) npcHeard(P.name, P.id, text, false); else if (P.npc) NPCS.hist.push(`${P.name}: ${text}`); if (called) { toast(`${P.name} CALLED YOU`); (audio.sfx.called || audio.sfx.newcomer)?.(); } else if (!m.v) (audio.sfx.chat || audio.sfx.ui)?.();
+  chatLine(P.name, text, m.v ? 'voice' : called ? 'at' : ''); if (!P.npc) npcHeard(P.name, P.id, text, false, 0, !!m.v); else { NPCS.hist.push(`${P.name}: ${text}`); if (NPCS.hist.length > 16) NPCS.hist.shift(); npcMem(NPCS.list.find(C => C && C.id === P.id), `you: ${text}`); } if (called) { toast(`${P.name} CALLED YOU`); (audio.sfx.called || audio.sfx.newcomer)?.(); } else if (!m.v) (audio.sfx.chat || audio.sfx.ui)?.();
 }
 $('chatInput').addEventListener('keydown', e => {
   e.stopPropagation();
@@ -24109,7 +24246,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { NPCS, NPC_WHO, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   frame();
 }, 30);
