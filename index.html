@@ -98,6 +98,17 @@
   #proAct:empty { display:none; }
   @media (max-width:760px) { #proAct { font-size:12px; letter-spacing:.08em; white-space:normal; width:min(92vw, 520px); text-align:center; } }
   @keyframes proPulse { 0%,100% { opacity:.55; } 50% { opacity:1; } }
+  /* a key and what it does, on a dark backing high on the screen: what the opening teaches, and what Hermes is showing on the first flight */
+  #keyCard { position:fixed; left:50%; top:calc(var(--st, 0px) + max(9vh, 54px)); transform:translate(-50%, -6px); z-index:8; pointer-events:none; display:flex; align-items:center; gap:14px; max-width:min(92vw, 760px); box-sizing:border-box;
+    padding:11px 20px 11px 12px; border-radius:14px; background:rgba(4,6,12,.8); border:1px solid rgba(255,190,130,.32); box-shadow:0 10px 34px rgba(0,0,0,.4); opacity:0; transition:opacity .45s, transform .45s; }
+  #keyCard.show { opacity:1; transform:translate(-50%, 0); }
+  #keyCard kbd { flex:none; min-width:44px; height:44px; padding:0 10px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid rgba(255,138,58,.6); background:rgba(255,138,58,.14);
+    font:inherit; font-size:18px; font-weight:700; letter-spacing:.06em; color:#ffd8a8; white-space:nowrap; }
+  #keyCard kbd:empty { display:none; }
+  #keyCard span { font-size:16px; font-weight:600; letter-spacing:.12em; line-height:1.4; color:#ffe9c8; text-shadow:0 1px 2px #000; }
+  #keyCard.done kbd { border-color:#9be29b; background:rgba(120,220,120,.16); color:#d8ffd8; }
+  .photo #keyCard, body:has(#map.open) #keyCard { display:none; }
+  @media (max-width:760px) { #keyCard { gap:10px; padding:9px 14px 9px 9px; } #keyCard kbd { min-width:36px; height:36px; font-size:15px; } #keyCard span { font-size:13px; letter-spacing:.06em; } }
   /* a conversation, on the tower: one line of his father's at a time, large enough to read at a glance; then what the boy can say back */
   #proTalk { position:fixed; left:50%; bottom:calc(var(--sb) + max(6vh, 22px)); width:min(580px, calc(100vw - 28px)); box-sizing:border-box; z-index:7; padding:16px 18px 12px; border-radius:14px;
     background:rgba(6,7,12,.86); box-shadow:0 0 0 1px rgba(244,234,210,.09), 0 18px 50px rgba(0,0,0,.45); text-align:left; opacity:0; pointer-events:none; transform:translate(-50%, 10px);
@@ -802,7 +813,7 @@
 <div id="toast"></div>
 <div id="explain"></div>
 <div id="card"><b></b><i></i></div>
-<div id="proSub"><b></b><span></span></div><div id="proSkip"></div><div id="proAct"></div>
+<div id="proSub"><b></b><span></span></div><div id="proSkip"></div><div id="proAct"></div><div id="keyCard" aria-live="polite"><kbd></kbd><span></span></div>
 <div id="proTalk" aria-live="polite"><b id="ptWho"></b><p id="ptSay"></p><div id="ptOpts" role="group" aria-label="What you say"></div><form id="ptOwn" autocomplete="off"><input id="ptIn" maxlength="90" autocomplete="off" autocapitalize="sentences" spellcheck="false" enterkeyhint="send" aria-label="Say it your own way"><button type="submit">say it</button></form><button id="ptJump" type="button">say nothing · jump</button></div>
 <div id="fsHint"><b>↑</b><span>SWIPE UP · OR TAP · FULL SCREEN</span><i>for no browser at all: Share → Add to Home Screen</i><u id="fsKeep">keep the bar</u></div>
 <div id="primer"><b>YOU WILL SPEAK FOR HIM</b><span id="primerSay">his father, the gods and the world can hear you</span><div id="primerRow"><button id="primerVoice" type="button">USE MY VOICE</button><button id="primerQuiet" type="button">PLAY WITHOUT VOICE</button></div><i id="primerNote"></i></div><div id="tut"><kbd></kbd><span></span></div>
@@ -8353,9 +8364,9 @@ const CMD_HELP = [
   ['SEND', '/message NAME words · /note NAME (a voice note: enter sends it, esc throws it away) · /file NAME · /files (what has been brought to you) · /take · /refuse · /files off'],
   ['PEOPLE', '/players · /follow @NAME · /track @NAME · /untrack · /friend @NAME · /mute @NAME · /block @NAME · @NAME calls them'],
   ['SEE', '/map · /map3d · /camera · /snap · /record · /album · /film · /face · /wide'],
-  ['YOU', '/name NEW · /become ANIMAL · /god (god mode) · /mortal · /bolt · /burn · /blow'],
+  ['YOU', '/name NEW · /become ANIMAL · /god (god mode: after it you are spent until you land and rest) · /godword WORD (your own word for it) · /mortal · /bolt · /burn · /blow'],
   ['NAMING', '/name-place NEW NAME (a place you found: its name for everyone, for good; found with a faction, the ones of it flying vote first) · /place (who named this one) · /aye · /nay (on a name your faction is voting on)'],
-  ['CRETE', '/watch (go and see who is waking on Crete; while a fight is on, it watches the fight) · /circle (the bird goes round the island by itself and the lens stays on them; steer to take it back)'],
+  ['CRETE', '/crete (the opening once more, and back where you were after) · /tour (Hermes flies your first flight with you again: say skip, or esc twice, to end it) · /watch (go and see who is waking on Crete; while a fight is on, it watches the fight) · /circle (the bird goes round the island by itself and the lens stays on them; steer to take it back)'],
   ['RINGS', '/rings (a ring race for everyone flying: chains of rings come into the air, the most when the clock runs out wins) · /rings 4 (with four birds that fly themselves) · /race NAME (one against one) · look at someone flying: /duel or /race'],
   ['THE FIGHT', '/fly (everyone flying, and the regulars too, over Olympus wherever you call it) · /fly regular (the same) · /fly party (everyone within 2.5 km of you, and your friends wherever they are) · /fly NAME (one against one) · those two are over Olympus if you are on or near it, otherwise where you are · everyone is flown in on a long glide; the first 30 s are a warm-up, when a hit only puts you back on your line; then GO · /fly watch or /watch (fly in as a ghost to watch: nothing touches you, nobody sees you) · /leave (out of it at once, and fly on) · /fly end (stops it for everyone, if you called it) · /again · /fly settings · /fly set close 120 · speed 1.5 · ring 1800 · floor 300 · warm 20 · /warzone reset'],
   ['COLOUR', '/vivid (the world in full colour, which is how it comes, or in its plainer colours)'],
@@ -8427,7 +8438,9 @@ function chatCommand(text) {
     case 'bird': if (!arg) birdSay(); else if (!birdHear(String(arg).toLowerCase(), String(arg).trim().split(/\s+/).length)) chatLine('', 'IT DOES NOT KNOW THAT ONE · /bird ALONE SAYS WHAT IT DOES', 'sys'); return true;
     case 'pet': if (player.form === 'phoenix') birdPet(1); else chatLine('', 'THERE IS NO BIRD TO STROKE', 'sys'); return true;
     case 'dp': case 'shot': case 'director': if (state === 'play' || state === 'photo') dpHear(arg || 'wide shot', true); return true;
-    case 'tour': case 'hermes': if (GFLY.on) gflyEnd(); else if (!tourStart()) chatLine('', player.form === 'phoenix' ? 'NOT NOW' : 'TAKE OFF FIRST · HERMES MEETS YOU IN THE AIR', 'sys'); return true;
+    case 'tour': case 'hermes': if (GFLY.tour) tourSkip(); else if (GFLY.on) gflyEnd(); else if (!tourStart()) chatLine('', player.form === 'phoenix' ? 'NOT NOW' : 'TAKE OFF FIRST · HERMES MEETS YOU IN THE AIR', 'sys'); return true;
+    case 'crete': case 'prologue': case 'opening': if (CHAT.open) closeChat(); creteCmd(); return true;   // (the opening once more, and back here after)
+    case 'godword': if (!arg) sys(GODM.word ? `YOUR GOD WORD IS “${GODM.word.toUpperCase()}” · /godword off TO DROP IT` : '/godword WORD · YOUR OWN WORD FOR GOD MODE'); else godWordSet('/godword ' + arg); return true;
     case 'accept': if (MATCH.inv && !MATCH.inv.mine) matchAnswer(true); else if (!xfAnswer(true, true)) sys('NOTHING IS WAITING FOR AN ANSWER'); return true;
     case 'decline': if (MATCH.inv && !MATCH.inv.mine) matchAnswer(false); else if (!xfAnswer(false, true)) sys('NOTHING IS WAITING FOR AN ANSWER'); return true;
     case 'warzone': case 'war': case 'brawl': matchCmd(arg); return true;
@@ -9770,11 +9783,24 @@ function forgeStep(dt) {
   say([{ text: 'There. Swing from the hip, not the shoulder. A tree gives logs, and now and then a sapling to put back. Logs make walls, and walls make a house.', title: 'Hephaestus' }]);
   toast(TOUCH ? 'AN AXE · TAP AT A TREE TO CHOP · THE BAG IS IN THE MENU' : 'AN AXE · SPACE AT A TREE TO CHOP · I FOR YOUR BAG');
   witness('was given his first axe by Hephaestus, made at the forge from a branch and a flint he brought', true);
+  if (!questOf('hermes')) setTimeout(ringsAfterAxe, 9000);   // (and then Hermes's rings)
+}
+// A newcomer's first steps, in order: Hermes flies the first minutes with him, Hephaestus makes him an axe, Hermes sets him
+// his rings; only then does anyone send him on. (Someone who flew Hermes's rings before the axe was a thing is not held back.)
+const axeBeforeRings = () => INV.q < 9 && !questOf('hermes') && story.phase === 'gods';
+const ringsOwed = () => { const q = questOf('hermes'); return !!q && q.kind === 'arena' && !q.done; };
+const newcomerHeld = id => id === 'hermes' ? axeBeforeRings() || ringsOwed() : id === 'hephaestus' ? !questOf('hermes')?.done && (INV.q < 9 || ringsOwed()) : false;
+function ringsAfterAxe() {   // the axe made: Hermes's word comes on the wind, and his rings are the next thing
+  const h = godById.hermes; if (!h || questOf('hermes') || realm !== 'over') return;
+  const tq = talk.quest; setQuest(h, ...FIXED.hermes); talk.quest = tq;
+  say([{ text: 'Nice axe. Now show me you can fly: my rings, round my island. Every one, in order.', voice: 'hermes', title: 'Hermes' }]);
+  toast('HERMES · FLY HIS RINGS ROUND HIS ISLAND'); saveSoon();
 }
 function axeObj() {   // what the line at the top says while the errand is on
   if (INV.q === 1) return `◇ FOR THE AXE · ${INV.branch ? '✓' : '·'} A BRANCH (${TOUCH ? 'TAP' : 'SPACE'} AT A TREE) · ${INV.flint ? '✓' : '·'} A FLINT (${TOUCH ? 'TAP' : 'SPACE'} ON THE SHORE)`;
   if (INV.q === 2) { const h = godById.hephaestus, d = h && h.active ? Math.hypot(player.pos.x - h.x, player.pos.z - h.z) : 0; return `◇ TAKE THE BRANCH AND THE FLINT TO HEPHAESTUS${d ? ' · ' + fmtDist(d) : ''}`; }
-  if (INV.q === 0 && !story.met.has('hephaestus') && !story.met.has('hermes')) return '◇ GO AND SEE HEPHAESTUS · HIS FORGE IS BELOW THE CLOUDS, BY HERMES';
+  if (INV.q === 0 && !story.met.has('hephaestus') && !questOf('hermes')) { if (GFLY.tour) return '◇ FLY WITH HERMES · SAY SKIP TO SKIP'; if (!flags.toured && flags.morphed) return '◇ HERMES IS COMING UP TO MEET YOU'; const d = Math.hypot(player.pos.x - FORGE.x, player.pos.z - FORGE.z); return `◇ GO AND SEE HEPHAESTUS · HIS FORGE ON HERMES’S ISLAND · ${fmtDist(d)}`; }
+  if (INV.q === 9 && ringsOwed()) { const d = Math.hypot(player.pos.x - MYKONOS.x, player.pos.z - MYKONOS.z); return `◇ FLY HERMES’S RINGS ROUND HIS ISLAND${d > 300 ? ' · ' + fmtDist(d) : ''}`; }
   return '';
 }
 function axeKeepHim(dt) {   // a newcomer's first errand: the smith stands at his forge by Hermes until it is done
@@ -9783,7 +9809,7 @@ function axeKeepHim(dt) {   // a newcomer's first errand: the smith stands at hi
   const h = godById.hephaestus; if (!h || talk.god === h) return;
   if (!h.active || Math.hypot(h.x - FORGE.x, h.z - FORGE.z) > 60) { spawnGod(h, FORGE.x, FORGE.z, true, true); h.place = 'THE FORGE'; }
   h.pinned = true;
-  if (!INV.called && !story.met.has('hephaestus')) { INV.called = 1; setTimeout(() => { toast('A HAMMER RINGS BELOW THE CLOUDS · HEPHAESTUS WANTS YOU FIRST'); sysLine('HEPHAESTUS IS AT HIS FORGE BY HERMES · HE MAKES YOUR FIRST AXE'); }, 6000); saveSoon(); }
+  if (!INV.called && !story.met.has('hephaestus') && flags.toured && !GFLY.tour) { INV.called = 1; setTimeout(() => { toast('A HAMMER RINGS BELOW THE CLOUDS · HEPHAESTUS WANTS YOU FIRST'); sysLine('HEPHAESTUS IS AT HIS FORGE ON HERMES’S ISLAND · HE MAKES YOUR FIRST AXE'); }, 6000); saveSoon(); }   // (not over Hermes's run: he takes him there himself)
 }
 // ── saplings
 const PLANT = { list: [], grow: 300e3, load: null, t: 0 };
@@ -10285,6 +10311,8 @@ function flipTick(dt) {
 function sendChat(raw) {
   const text = String(raw || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
   if (!text) return;
+  if (GFLY.tour && /^\/?skip( (it|this|the tour|the run))?[.!]?$/i.test(text)) { tourSkip(); return; }   // (Hermes's run, cut short)
+  if (text[0] === '/') TOURDO.cmd = time; else TOURDO.typed = time;
   if (/^\/(name|rename|call me|i am)\s+\S/i.test(text)) { renameSelf(text.replace(/^\/(name|rename|call me|i am)\s+/i, '')); return; }   // (/name ARIADNE: a new name)
   if (text[0] === '/' && chatCommand(text)) return;
   if (text[0] !== '/' && GFLY.on && state === 'play') { statsWords(text, true); chatLine(heroName, text); airSay(text); return; }   // (with a god beside him, what he writes is for the god: nobody else reads it)
@@ -10583,7 +10611,7 @@ function updatePhoenix(dt) {
   if (p.sub) return updateSub(dt);
   if (p.perchGo) return updatePerchGo(dt);
   const [ax, pin] = state === 'play' ? axes() : [0, 0], turn = -ax;
-  const boost = boosting() && p.flame > 0.05, diving = pin < -0.15;
+  const boost = boosting() && p.flame > 0.05 && !GODM.spent, diving = pin < -0.15;   // (spent, after the god in him: no fire to push with)
   // let go, and he glides: the wings held out and still, hardly sinking, the fire hardly burning. It is the way to rest in the air
   p.glideT = !boost && Math.abs(pin) < 0.15 && !p.wasRiding ? (p.glideT || 0) + dt : 0;
   const glide = smoothstep(0.7, 2.2, p.glideT);
@@ -10596,6 +10624,7 @@ function updatePhoenix(dt) {
   const up = smoothstep(0.5, 1.6, p.climbT) * smoothstep(35, 70, p.speed) + (FLIP.vert || 0);
   p.pitch = lerp(p.pitch, pin > 0 || FLIP.vert > 0 ? lerp(Math.max(0, pin) * 0.6, 1.45, Math.min(1, up)) : pin * 1.38, damp(diving ? 4.5 : up > 0.2 ? 2.4 : 1.8, dt));
   if (p.speed < 30 && !diving) p.pitch = lerp(p.pitch, -0.45, damp(2.5, dt));  // stall: the nose drops
+  if (GODM.spent) p.pitch = Math.min(p.pitch, -0.06);   // spent: the wings are heavy, and will not take him up
   // a jetstream takes him if he flies into one: carried down its line, very fast, and it costs him nothing
   p.riding = false;
   if ((p.jetCool = Math.max(0, (p.jetCool || 0) - dt)) <= 0 && jet.on && state === 'play') {
@@ -10630,10 +10659,11 @@ function updatePhoenix(dt) {
   const sp = Math.sin(p.pitch);
   const BK = 1 + (birdK() - 1) * 0.3, RK = 1 + (birdK() - 1) * 0.6;   // (the big bird: a stronger stroke, and the currents take it further and faster)
   p.overT = boost && sp < -0.25 ? (p.overT || 0) + dt : Math.max(0, (p.overT || 0) - dt * 1.5);   // (no top speed: the longer a dive is held with the boost, the faster it goes, without end)
-  const target = ((boost ? 125 : 64) - (sp > 0 ? sp * (GODM.on ? 30 : boost ? 55 : 75) : sp * 240)) * (1 + 0.12 * perks.swift + IS.swift) * BK * (1 + p.overT * 0.14);   // nose down: ~300 m/s, then on past it
+  const target = ((boost ? 125 : 64) - (sp > 0 ? sp * (GODM.on ? 30 : boost ? 55 : 75) : sp * 240)) * (1 + 0.12 * perks.swift + IS.swift) * BK * (1 + p.overT * 0.14) * (GODM.spent ? 0.6 : 1);   // nose down: ~300 m/s, then on past it
   p.speed = Math.max(18, lerp(p.speed, target * MOD.speed, damp(sp < -0.3 ? 1.7 : boost ? 1.1 : 0.55, dt)));
   if (p.riding) p.speed = lerp(p.speed, 310 * RK, damp(1.6 * RK, dt));
   p.vy = lerp(p.vy, diving ? 0 : lerp(-3.5, -1.1, glide), damp(0.85, dt));
+  if (GODM.spent) p.vy = Math.min(p.vy, -4);   // (and they sink: he is coming down, whatever he does)
   dir3.set(-Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(p.yaw) * Math.cos(p.pitch));
   // pull out before the ground does it for him
   const look = 40 + p.speed * 0.55;
@@ -17747,7 +17777,7 @@ function voiceRun(a) {
     case 'map3d': case 'map2d': mapMode(a === 'map3d'); if (state === 'play') openMap(); break;
     case 'map_left': case 'map_right': case 'map_up': case 'map_down': case 'map_north': if (state === 'play') openMap(); if (state === 'map') { if (a === 'map_north') mapNorth(); else mapTurn(a === 'map_left' ? 0.6 : a === 'map_right' ? -0.6 : 0, a === 'map_up' ? -0.14 : a === 'map_down' ? 0.14 : 0); } break;
     case 'hover': if (state === 'play') openPhoto(true); if (state === 'photo') photoLive(true); break;
-    case 'hands_on': if (XR.on || cam.on || cam.loading) toast('HANDS ARE ON'); else handsToggle(true, true); break;
+    case 'hands_on': if (XR.on || cam.on || cam.loading) { TOURDO.hands = time; toast('HANDS ARE ON'); } else handsToggle(true, true); break;
     case 'hands_off': handsToggle(false); break;
     case 'mic_off': setMicMuted(true); break;   // (and on again from the menu, or V: it can't hear "mic on")
     case 'tilt': if (TOUCH) useTilt(); else toast('TILT IS FOR PHONES'); break;
@@ -17821,7 +17851,7 @@ const V_RULES = [
   [/\b(go |look |move |pan )?east\b/, 'east'], [/\b(go |look |move |pan )?west\b/, 'west'],
   // the menu and its switches, by name
   [/\b(hands? (tracking |control |steering )?off|stop (tracking|watching|using) (my )?hands?|no (more )?hands)\b/, 'hands_off'],
-  [/\b(hands? (tracking |control |steering )?on|use (my )?hands?|track (my )?hands?|hand (tracking|control|steering)|watch my hands?|(fly|steer) with (my )?hands?)\b/, 'hands_on'],
+  [/\b(hands? (tracking |control |steering )?on|use (my )?hands?|track (my )?hands?|hand (tracking|control|steering)|watch my hands?|(fly|steer) with (my )?hands?|see (my )?hands|show (me )?(my )?hands|let me see (my )?hands)\b/, 'hands_on'],
   [/\b(mic(rophone)? off|mute (me|my ?self|my (mic|microphone|voice))|stop listening|don'?t listen|turn (the |my )?mic(rophone)? off)\b/, 'mic_off'],
   [/\b(tilt (steering|control|mode|to steer)|steer (with|by) (tilt|tilting|the phone)|use (the )?tilt)\b/, 'tilt'],
   [/\b(thumb (steering|control|stick|mode)|(use|steer with) (the |my )?(stick|joystick|thumb)|joystick)\b/, 'thumb'],
@@ -18832,10 +18862,11 @@ function endTalk() {
   // every one of the Twelve sends him away with something to do, whether or not they got round to saying so
   const hq = g?.id === 'hermes' && questOf('hermes');   // (Hermes's first errand is always his rings, whatever else got said)
   if (g && g.id === 'hephaestus' && INV.q === 0) axeBegin();   // (the smith's first errand is always the axe)
-  if (g && story.met.has(g.id) && FIXED[g.id] && !(g.id === 'hephaestus' && INV.q < 9) && (!questOf(g.id) || hq && hq.kind !== 'arena' && !hq.done && !story.chain)) { setQuest(g, ...FIXED[g.id]); talk.quest.narr = FIXED_SAY[g.id]; }
+  const axeFirst = g && g.id === 'hermes' && axeBeforeRings();   // (the order for a newcomer: Hermes's first flight, Hephaestus's axe, then Hermes's rings)
+  if (g && story.met.has(g.id) && FIXED[g.id] && !axeFirst && !(g.id === 'hephaestus' && INV.q < 9) && (!questOf(g.id) || hq && hq.kind !== 'arena' && !hq.done && !story.chain)) { setQuest(g, ...FIXED[g.id]); talk.quest.narr = FIXED_SAY[g.id]; }
   const lines = [];
-  const ringsFirst = g && g.id === 'hermes' && questOf('hermes')?.kind === 'arena' && !questOf('hermes').done;   // (Hermes sends him on once his rings are flown)
-  if (g && !g.other && g !== hades && story.met.has(g.id) && !ringsFirst) sendOn(g);
+  if (axeFirst) lines.push({ text: '◇ Hephaestus first — his forge is right here on my island. He makes you an axe. Then come back and fly my rings.', title: 'Hermes' });
+  if (g && !g.other && g !== hades && story.met.has(g.id) && !newcomerHeld(g.id)) sendOn(g);
   if (g && g.history.length) setTimeout(() => greatAfterTalk(g), 2600);   // (one of the three who have a labour for him: they put it to him as he goes)
   const c = g && !g.other && g !== hades && story.met.has(g.id) && chainInfo(), sent = c && story.chain.from === g.id;
   let prize = '';
@@ -19334,6 +19365,9 @@ function heard(text, recorded = false) {
     else if (live() && !talk.intro) talkHear(text, recorded);   // (kept until he has finished: see talkHear)
     return;
   }
+  if (state === 'play' && GFLY.tour && words <= 5 && /\b(skip( (it|this|the tour|the run))?|no tour|i know (all )?(this|that))\b/.test(low)) { tourSkip(); return; }   // (Hermes's run, cut short)
+  if (state === 'play' && godWordSet(text)) return;   // ("set my god word to …")
+  if (state === 'play' && !GODM.on && godWordSaid(low, words)) { godMode(true); return; }   // (his own word for the god in him)
   if (state === 'play' && GODM.on && globalThis.DAIMON?.hear(text)) return;   // (with the god in him he speaks to his own agents, by name: "atlas, run the tests" · "yes")
   if ((state === 'play' || state === 'photo') && dpHear(text)) return;   // (a direction to the camera)
   if (player.mount && words <= 4 && /\b(jump|leap|let go|get off)\b/.test(low)) return gflyLeap();
@@ -20430,7 +20464,7 @@ function saveData() {
       order: GOD_ORDER, lit: BEACONS.filter(b => b.lit).map(b => b.id), pos: checkpoint.toArray(),
       gods: Object.fromEntries(gods.map(g => [g.id, { h: g.history.slice(-40), r: g.revealed, f: Math.max(g.formIdx, g.wantForm), v: g.favor | 0 }])),
       others: Object.fromEntries(others.filter(o => o.history.length).map(o => [o.id, { h: o.history.slice(-20), r: o.revealed }])),
-      great: { fire: GREAT.fire === 2 ? 1 : GREAT.fire, bolt: GREAT.bolt, race: GREAT.race, got: GREAT.got, best: GREAT.best }, self: (story.self || []).slice(-14), items: (story.items || []).slice(-48), inv: invSave(), qlog: (story.qlog || []).slice(0, 40), track: story.track || '' });
+      great: { fire: GREAT.fire === 2 ? 1 : GREAT.fire, bolt: GREAT.bolt, race: GREAT.race, got: GREAT.got, best: GREAT.best }, self: (story.self || []).slice(-14), items: (story.items || []).slice(-48), inv: invSave(), qlog: (story.qlog || []).slice(0, 40), track: story.track || '', cv: story.cv | 0, toured: !!flags.toured, gw: GODM.word || '' });
   }
 }
 function loadGame() {
@@ -20447,6 +20481,7 @@ function loadGame() {
   for (const k in perks) perks[k] = Math.max(0, Math.min(3, (s.perks || {})[k] | 0));
   story.items = (Array.isArray(s.items) ? s.items : []).map(o => o && itemClean(o, o.from, o.fromName) && Object.assign(itemClean(o, o.from, o.fromName), { at: +o.at || Date.now(), made: !!o.made })).filter(Boolean); story.qlog = Array.isArray(s.qlog) ? s.qlog.filter(d => d && typeof d === 'object').slice(0, 40) : []; story.track = typeof s.track === 'string' ? s.track : ''; itemStats();
   invLoad(s);
+  story.cv = s.cv | 0; flags.toured = s.toured ?? flags.morphed; GODM.word = typeof s.gw === 'string' ? godWordClean(s.gw) : '';   // (a journey from before the first flight was what it is now has flown it: Crete again gives it him)
   story.known = new Set(s.known || []);
   { const g = s.great || {}, ok = v => [0, 1, 2, 9].includes(v) ? v : 0; GREAT.fire = ok(g.fire); GREAT.bolt = ok(g.bolt); GREAT.race = ok(g.race) === 2 ? 1 : ok(g.race); GREAT.best = +g.best || 0; for (const k of ['iron', 'lava', 'storm']) GREAT.got[k] = g.got && g.got[k] ? 1 : 0;
     story.self = (Array.isArray(s.self) ? s.self : []).filter(x => typeof x === 'string').map(x => x.slice(0, 110)).slice(-14); }
@@ -22795,6 +22830,24 @@ function proAct(text) {
   pro.act = text; const el = $('proAct');
   if (text) { el.textContent = text; el.classList.add('show'); } else el.classList.remove('show');
 }
+// one key and what it does, high on the screen on a dark backing (the opening's, and Hermes's on the first flight); done: he has just tried it
+const KEYC = { k: null, s: null, done: false };
+function keyCard(k, text, done = false) {
+  if (KEYC.k === k && KEYC.s === text && KEYC.done === done) return;
+  Object.assign(KEYC, { k, s: text, done }); const el = $('keyCard');
+  if (text) { el.firstChild.textContent = k || ''; el.lastChild.textContent = text; el.classList.add('show'); } else el.classList.remove('show');
+  el.classList.toggle('done', !!done); keyCardPlace();
+}
+function keyCardPlace() { const m = MENU.open && $('menu').getBoundingClientRect(); $('keyCard').style.top = m && m.bottom > 0 ? `${Math.round(m.bottom + 14)}px` : ''; }   // (under the strip while it is down, not over its drawers)
+// Over Crete, once he is flying and while nothing else is asked of him: the keys he will have on Olympus, one at a time.
+// (Nothing to press here: what he does with them comes when he gets there.)
+const PRO_KEYS = [['T', 'TALK · ON OLYMPUS, TO ANYONE · OR JUST SAY IT ALOUD'], ['/', 'COMMANDS · /help LISTS THEM ALL'], ['C', 'THE CINEMATIC CAMERA'], ['H', 'YOUR OWN HANDS, ON CAMERA · OR SAY “SEE HANDS”']];
+const PRO_KEYS_T = [['', 'ON OLYMPUS · SPEAK TO ANYONE, OUT LOUD'], ['☰', 'THE MENU AT THE TOP · CHAT · CAMERA · HANDS'], ['', 'OR JUST SAY IT: “MAP” · “CAMERA” · “SEE HANDS”']];
+function proKeys(t) {
+  const L = TOUCH ? PRO_KEYS_T : PRO_KEYS, w = PRO_TA + 3.5, i = Math.floor((t - w) / 2.8);
+  const on = pro.pov && !pro.falling && !(pro.dead > 0) && pro.lowT < 0.25 && t >= w && t < PRO_CLIMB - 1 && i < L.length;
+  keyCard(on ? L[i][0] : '', on ? L[i][1] : '');
+}
 // The voices over Crete are in the air with the people saying them. Each line comes from where its speaker is: off to the
 // side, ahead or behind; quieter and duller with distance (air takes the top off a far voice first); bent in pitch as they
 // rush toward each other or apart; torn at by the wind, more so the faster they go; and with a little of the open air on it.
@@ -22840,12 +22893,54 @@ function endPrologue(skipped) {
   proTalkEnd();
   WT.on = false;   // (whatever was still written over Crete is not carried to the mountain)
   if (!pro.on) return;
-  pro.on = false; proHush(); proAct('');
+  pro.on = false; proHush(); proAct(''); keyCard('', ''); story.cv = CRETE_V;
   document.body.classList.remove('pro'); $('proSub').classList.remove('show'); $('proSkip').classList.remove('hot'); $('card').classList.remove('show');
   pro.sc.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
   pro.sc = pro.dad = pro.son = pro.me = pro.sky = pro.halo = pro.disc = pro.feathers = pro.fp = null;
   camera.fov = 62; camera.updateProjectionMatrix(); postMat.uniforms.uSpeed.value = 0; heat = 0;
-  firstNight(!skipped);
+  if (pro.back) creteReturn(); else firstNight(!skipped);
+}
+// ── Crete again. The opening is played once more by anyone whose journey began before it was what it is now (their save
+//    is below CRETE_V): the rest of what they have is kept, and when the sea takes him they are back where they were, in
+//    the air, and Hermes comes up to fly the first minutes with them. The keeper is never made to: for him it is a
+//    mission he can fly again whenever he likes (/crete), and it puts him back where he was.
+const CRETE_V = 2;
+const isKeeper = () => !!(MOD.admin || AUTH.admin);   // (the server's word for it: never the name)
+const creteDue = () => resumed && (story.cv | 0) < CRETE_V && !isKeeper() && realm === 'over' && (story.phase === 'gods' || story.phase === 'free');   // (not from the Underworld, nor from the summit before he has flown: those come back to it next time)
+function creteBegin(forced) {
+  const p = player;
+  if (LIVE.on) { const H = LIVE.home; titleEnd(); LIVE.on = false; LIVE.leave = null; heroOff(); const T = $('title'); T.classList.remove('live', 'leaving'); $('liveRow').classList.add('hidden'); $('liveCap').classList.add('hidden'); phoenix.group.rotation.order = 'XYZ'; if (H.realm !== realm) setRealm(H.realm, H.pos.x, H.pos.z); }
+  else if (titleFly.on) titleEnd();
+  if (state === 'title') { nameAsked = true; nameInput.blur(); $('title').classList.add('hidden'); initAudio(); flags.beganAt = time; setTimeout(warmPrograms, 60); startMic(); }
+  if (GFLY.on) gflyEnd(true); if (CHAT.open) closeChat(); if (MENU.open) menuShow(false); if (state === 'map') closeMap(); if (GODM.on) godMode(false, true);
+  pro.back = { pos: p.pos.clone(), realm, form: p.form, grounded: p.grounded, yaw: p.yaw, hy: human.group.rotation.y, forced: !!forced, tour: !!forced };
+  startPrologue(); pro.waitMic = false;
+  if (forced) setTimeout(() => { if (state === 'prologue') toast('THE STORY HAS CHANGED · CRETE ONCE MORE · EVERYTHING YOU HAVE IS KEPT'); }, 4400);
+  return true;
+}
+function creteReturn() {
+  const B = pro.back, p = player; pro.back = null; if (!B) return;
+  if (B.realm !== realm) setRealm(B.realm, B.pos.x, B.pos.z);
+  state = 'play'; camera.rotation.order = 'XYZ'; $('hud').classList.remove('hidden');
+  p.pos.copy(B.pos); p.vel.set(0, 0, 0); p.cine = null; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.flame = 1;
+  const air = B.tour && realm === 'over' && flags.morphed;
+  if (air || B.form === 'phoenix') {   // (in the air: where he was, or high over where he stood)
+    const g = Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y + 600), WATER);
+    if (B.form !== 'phoenix' || air) p.pos.y = Math.max(p.pos.y, g + 150);
+    Object.assign(p, { form: 'phoenix', grounded: false, wings: false, scale: 1, burnout: false, yaw: B.form === 'phoenix' ? B.yaw : B.hy, pitch: 0, bank: 0, turn: 0, speed: 55, vy: 0 });
+    resetPose(); trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
+  } else { p.form = B.form; p.grounded = B.grounded; human.group.rotation.y = B.hy; }
+  p.fallTop = p.pos.y; camYaw = p.form === 'phoenix' ? p.yaw : B.hy;
+  camera.position.set(p.pos.x + Math.sin(camYaw) * 16, p.pos.y + 6, p.pos.z + Math.cos(camYaw) * 16); lookAt.copy(p.pos);
+  if (B.tour) { flags.toured = false; GFLY.wait = 0; }
+  if (p.form === 'phoenix') { SESSION.titled = true; audio.song?.(0); }
+  setTimeout(() => say([B.tour ? 'Olympus again. Everything you had is still yours. And somebody is coming up to meet you.' : 'Back where you were. Crete is behind you again.']), 700);
+  saveSoon();
+}
+// /crete: the opening once more, for whoever asks (the keeper's way back to it; anyone else may watch it again too)
+function creteCmd() {
+  if (state !== 'play' || player.cine || player.mount || MATCH.phase || LIVE.on) { toast('NOT NOW'); return; }
+  creteBegin(false);
 }
 const proBump = (t, a, b, c, d) => smoothstep(a, b, t) * (1 - smoothstep(c, d, t));
 function proFeather(x, y, z, vx, vy, vz) {
@@ -22853,6 +22948,7 @@ function proFeather(x, y, z, vx, vy, vz) {
   f.life = 2.6; f.p.set(x, y, z); f.v.set(vx, vy, vz); f.a = Math.random() * 6.28; f.w = rnd(7);
 }
 function updatePrologue(dt) {
+  if (pro.back && pro.back.forced && isKeeper() && pro.t > 0.5) { pro.back.tour = false; endPrologue(true); toast('THE KEEPER IS NEVER MADE TO · /crete FLIES IT AGAIN'); return; }   // (the server has just said who this is: let him go)
   proNet(dt); waveTick(dt, true);
   // the moment his father reaches for him and misses is the one moment that runs slow
   const near = pro.falling && !pro.hitT && (pro.dPass ? pro.t - pro.dPass < 0.24 : pro.dd < 30);
@@ -22906,6 +23002,7 @@ function updatePrologue(dt) {
     : pro.pov && !pro.falling && pro.speed < 17.5 && pro.vyNow < 3 ? (TOUCH ? 'TOO SLOW  —  TAP  —  BEAT YOUR WINGS' : 'TOO SLOW  —  S  —  NOSE DOWN  ·  SPACE  —  BEAT')
     : t >= PRO_CLIMB - 0.6 && t < PRO_FAIL - 1.2 && pro.c < 0.45 ? (TOUCH ? 'HIGHER  —  KEEP TAPPING  ·  FINGER HIGH ON THE GLASS' : 'HIGHER  —  HOLD W  ·  KEEP BEATING  —  SPACE')
     : pro.pov && !pro.falling && t < PRO_CLIMB - 0.6 && (pro.e < 0.42 || pro.rt - pro.povT < 7) ? (TOUCH ? 'TAP  —  BEAT YOUR WINGS  ·  LEFT, RIGHT  —  TURN' : 'SPACE  —  BEAT YOUR WINGS  ·  A D  —  TURN  ·  W S  —  UP, DOWN') : '');
+  proKeys(t);
   if (waiting && (pro.waitT += dt) > 6 && pro.rt - pro.nagT > 9) {
     pro.nagT = pro.rt; const L1 = pro.lines.find(l => l.clip === 'pd1');
     if (L1 && L1.buf) { const d = proSay(L1.buf, 'dad'); $('proSub').firstChild.textContent = L1.who; $('proSub').lastChild.textContent = L1.text; $('proSub').classList.add('show'); pro.subT = d + 0.5; }
@@ -23419,6 +23516,7 @@ function menuCaption(dt) {
 // FLY ON, or BACK TO WHERE YOU WERE
 function menuGo(kind) {
   const M = LIVE; if (!M.on || M.leave) return;
+  if (creteDue()) { nameAsked = true; creteBegin(true); return; }   // (see creteBegin)
   initAudio(); goFull(); nameInput.blur();
   if (kind === 'back') { if (!M.song) menuSong(); M.leave = { kind, t: 0, T: 0.8 }; }
   else {
@@ -23644,6 +23742,7 @@ $('nameRow').addEventListener('click', e => e.stopPropagation());
 function begin() {
   if (state !== 'title') return;
   if (MOD.banned) { modBanned(); return; }
+  if (creteDue()) { creteBegin(true); return; }   // (the opening has changed since he last came: Crete once more, and then the new first flight)
   if (LIVE.on) { nameAsked = true; menuGo('fly'); return; }   // (the live menu: the bird is taken where it is)
   if (!nameAsked) {   // asked once: answer, or go on as Icarus
     nameAsked = true; nameInput.focus();
@@ -24235,6 +24334,7 @@ function xrMove(ev) {
 // opens the room (and closes it again). Anywhere else it is the camera, as before. (A browser only lets a page open the
 // room from a tap or a key: asked for by voice, it says where to tap.)
 function handsToggle(on, spoken) {
+  if (on !== false) TOURDO.hands = time;   // (asked for: Hermes, if he is showing him, sees him try)
   if (XR.supported) {
     if (on === undefined) on = !XR.on;
     if (on && !XR.on) { if (spoken) toast('TAP HANDS IN THE MENU TO STEP INSIDE'); else xrEnter(); }
@@ -24743,7 +24843,22 @@ function tick(dt) {
 //    to turn onto the line, and then the stars run past. And behind him he leaves fire of a colder kind: a standing wall
 //    of light, squared and flickering, that stays in the air where he flew. (It lasts while the god in him lasts: two and
 //    a half minutes, and it comes back a little slower than it goes.)
-const GODM = { on: false, k: 0, charge: 1, built: false, parts: [], rings: [], beads: [], halo: null, haloMat: null, barT: 0, bar: '', forced: false };
+//    It is not free. When it goes, the bird is spent: half its speed, heavy wings that will not climb, until he has come down
+//    and stood (or perched) for a few breaths. (The first time, with Hermes beside him, it is on Hermes: freeUntil.) And
+//    "god mode" is only the word everyone has: he can choose his own (/godword WORD, or "set my god word to …"), kept with him.
+const GODM = { on: false, k: 0, charge: 1, built: false, parts: [], rings: [], beads: [], halo: null, haloMat: null, barT: 0, bar: '', forced: false, spent: 0, restT: 0, freeUntil: 0, word: '' };
+const godWordClean = w => String(w || '').toLowerCase().replace(/[^a-z0-9' ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+function godWordSaid(low, words) {   // his own word, said on its own (or nearly): the god in him wakes as it does for "god mode"
+  const w = GODM.word; if (!w || words > w.split(' ').length + 2) return false;
+  return new RegExp(`(^|\\b)${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\b|$)`).test(low);
+}
+function godWordSet(text) {   // "set my god word to …", "my god word is …": true if that is what it was
+  const m = /^(?:\/godword\s+|(?:please )?(?:set|make|change) my god ?(?:mode )?word to |my god ?(?:mode )?word is )(.+)$/i.exec(String(text || '').trim()); if (!m) return false;
+  const w = godWordClean(m[1].replace(/^["“']|["”'.!]+$/g, ''));
+  if (/^(off|none|clear|reset)$/.test(w)) { GODM.word = ''; toast('YOUR GOD WORD IS GONE · “GOD MODE” STILL WORKS'); saveSoon(); return true; }
+  if (w.length < 3 || /^(god|the|and|yes|no|stop|land|map|fly|camera|mortal)$/.test(w)) { toast('PICK ANOTHER WORD · ONE NOBODY SAYS BY ACCIDENT'); return true; }
+  GODM.word = w; toast(`YOUR GOD WORD IS “${w.toUpperCase()}” · SAY IT, AND THE GOD IN YOU WAKES`); saveSoon(); return true;
+}
 function godBuild() {
   if (GODM.built) return; GODM.built = true;
   const F = FIRE, W = [3.0, 2.7, 1.9], G = hdr(F.tip, 1.5), H2 = hdr(F.hot, 1.6);
@@ -24775,6 +24890,7 @@ function godMode(on = !GODM.on, quiet = false) {
     if (!flags.morphed) { toast('YOU HAVE NOT FLOWN YET'); return; }
     if (state !== 'play' || p.cine || realm === 'under' && false) { toast('NOT NOW'); return; }
     if (GODM.charge < 0.12 && !GODM.forced && !KEEP_ON && !MOD.admin) { toast(`THE GOD IN YOU IS SPENT · ${Math.ceil((0.12 - GODM.charge) * 110)} S`); return; }
+    if (GODM.spent && !GODM.forced && !isKeeper()) { toast('YOU ARE SPENT · LAND AND REST FIRST'); return; }
     godBuild(); GODM.on = true; NET.lastSent = null; p.flame = 1; p.burnout = false;
     if (p.form !== 'phoenix' && !SH.def) voiceFly();
     if (!quiet) { try { SESSION.titleTex?.dispose?.(); SESSION.titleTex = titleTexture(); } catch {} titleBurn();   // (the name, across the whole sky)
@@ -24785,16 +24901,21 @@ function godMode(on = !GODM.on, quiet = false) {
       if (!mic.stream && !VC.muted && !mic.denied) startMic(); }
     document.body.classList.add('godeye');
   } else {
-    GODM.on = false; GODM.forced = false; NET.lastSent = null; document.body.classList.remove('godeye');
-    if (!quiet) { toast('MORTAL AGAIN'); audio.sfx.flameout?.(); }
+    const cost = !quiet && !GODM.forced && !GODM.freeUntil && !isKeeper() && !KEEP_ON;   // (what it costs: see GODM)
+    GODM.on = false; GODM.forced = false; GODM.freeUntil = 0; NET.lastSent = null; document.body.classList.remove('godeye');
+    if (cost) { GODM.spent = 1; GODM.restT = 0; p.burnout = false; }
+    if (!quiet) { toast(cost ? 'MORTAL AGAIN · YOU ARE SPENT · LAND AND REST' : 'MORTAL AGAIN'); audio.sfx.flameout?.(); }
   }
 }
 function updateGod(dt) {
   const G = GODM, p = player, bird = p.form === 'phoenix';
   G.k = lerp(G.k, G.on && bird ? 1 : 0, damp(G.on ? 2.2 : 3.5, dt));
   if (G.on) { if (!G.forced && !KEEP_ON && !MOD.admin) G.charge = Math.max(0, G.charge - dt / 150);   // (the keeper's does not run down)
-    if (G.charge <= 0) godMode(false); p.flame = Math.min(1, p.flame + dt * 0.006); }
+    if (G.charge <= 0 || G.freeUntil && time > G.freeUntil) godMode(false); p.flame = Math.min(1, p.flame + dt * 0.006); }
   else G.charge = Math.min(1, G.charge + dt / 110);
+  if (G.spent) {   // spent: it comes back only on the ground (or a perch), standing still a few breaths
+    const rest = (p.form === 'human' && p.grounded || p.perch) && state === 'play'; G.restT = rest ? G.restT + dt : 0;
+    if (G.restT > 4 || state === 'dead') { G.spent = 0; G.restT = 0; if (state !== 'dead') toast('RESTED · YOUR WINGS ARE YOURS AGAIN'); } }
   if (G.built) {
     const show = G.k > 0.02 && bird && !p.gone; for (const m of G.parts) { m.visible = show; if (show) m.scale.setScalar(Math.max(0.001, G.k)); }
     G.halo.visible = show;
@@ -24986,17 +25107,25 @@ function birdSay() { const B = BIRD.bond, n = Math.round(B.trust * 8), m = BIRD.
 //    are people who need him; everyone sees everyone else's.
 const GOD_PHX = 4.2;
 const GFLY = { on: false, g: null, mode: '', B: null, busy: false, pend: '', last: -99, heard: -99, tour: null, land: null, gone: null, birds: new Map(), dest: null, t: 0, side: 1, sideT: 20, idleT: 0, nudges: 0, hd: 0, route: null, sent: 0, far: 0 };
-const TOUR_BEATS = [   // what Hermes shows a new arrival, in order, and the few words that go on the screen as he does
-  ['hello', 'A · D STEER    SPACE BEAT YOUR WINGS', 'TILT OR THUMB TO STEER    TAP TO BEAT YOUR WINGS'],
-  ['fire', 'YOUR FIRE CARRIES YOU    ONLY THE SUN AND THE UNDERWORLD EAT IT    DIVE TO GO FAST', 'YOUR FIRE CARRIES YOU    ONLY THE SUN AND THE UNDERWORLD EAT IT'],
-  ['voice', 'JUST SAY IT: LAND · MAP · CAMERA    T CHAT    M MAP', 'JUST SAY IT: LAND · MAP · CAMERA    THE MENU HAS THE REST'],
-  ['camera', 'C CINEMATIC CAMERA    + PHOTO CAMERA', 'CINEMATIC AND PHOTO CAMERAS ARE IN THE MENU'],
-  ['godmode', 'SAY “GOD MODE”', 'SAY “GOD MODE”'],
-  ['fights', '/fly    /fly party    /fly NAME    /fly watch    /leave', '/fly    /fly party    /fly NAME    /fly watch'],
-  ['sea', 'DIVE INTO THE SEA    HOLD SPACE TO STAY DOWN THERE', 'DIVE INTO THE SEA    STEER LEVEL TO STAY DOWN THERE'],
-  ['gods', 'ASK ANY GOD TO FLY WITH YOU, OR CARRY YOU    /stats', 'ASK ANY GOD TO FLY WITH YOU, OR CARRY YOU'],
-  ['rings', 'HERMES’S ISLAND · FLY HIS RINGS', 'HERMES’S ISLAND · FLY HIS RINGS'],
+// What Hermes shows a new arrival, in order: the key and the words that go up on the screen as he does (key for the keys,
+// touch for a finger), and how the game can tell that he has tried it (tryIt: by what has changed since the beat began).
+// ask: he asks something and waits for the answer; menu: he opens the drawers one by one; lead: he takes him somewhere.
+const TOURDO = { hands: -99, typed: -99, cmd: -99 };   // (when he last asked for his hands, wrote something, gave an order: see handsToggle, sendChat)
+const TOUR_BEATS = [
+  { id: 'hello', key: ['A · D', 'STEER    SPACE — BEAT YOUR WINGS'], touch: ['', 'TILT OR THUMB TO STEER    TAP — BEAT YOUR WINGS'] },
+  { id: 'holding', ask: true, key: ['T', 'ANSWER HIM · OUT LOUD, OR T TO TYPE IT'], touch: ['', 'ANSWER HIM · OUT LOUD, OR R · CHAT IN THE MENU'] },
+  { id: 'uber' },
+  { id: 'menu', menu: true },
+  { id: 'cinema', key: ['C', 'THE CINEMATIC CAMERA · TRY IT'], touch: ['C', 'THE MENU · C · FILM — THE CINEMATIC CAMERA · TRY IT'], tryIt: T => cinema.manual !== T.c0 },
+  { id: 'hands', key: ['H', 'OR SAY “SEE HANDS” · YOUR OWN HANDS, ON CAMERA'], touch: ['', 'SAY “SEE HANDS” · OR THE MENU · S · HANDS'], tryIt: T => TOURDO.hands > T.at },
+  { id: 'chat', key: ['T', 'TALK · TYPE HERMES SOMETHING · ENTER SENDS IT'], touch: ['R', 'THE MENU · R · CHAT — WRITE HERMES SOMETHING'], tryIt: T => TOURDO.typed > T.at, said: true },
+  { id: 'commands', key: ['/', 'COMMANDS · TYPE /help'], touch: ['/', 'IN THE CHAT A SLASH MAKES A COMMAND · TRY /help'], tryIt: T => TOURDO.cmd > T.at },
+  { id: 'godmode', key: ['SAY', '“GOD MODE” · OR /god · YOUR OWN WORD FOR IT: /godword WORD'], touch: ['SAY', '“GOD MODE” · OR YOUR OWN WORD: “SET MY GOD WORD TO …”'], tryIt: () => GODM.on },
+  { id: 'forge', lead: true },
 ];
+// what each letter of the menu is, in his words, as he opens it
+const TOUR_MENU = { I: 'I is you. Your name, your bag, your stats.', C: 'C, camera. Photos, the film, your album.', A: 'A, atlas. The map, and who else is up here.',
+  R: 'R, reach. Your voice, the chat, your post.', U: 'U, understand. Help, and your quests.', S: 'S, settings. Sound, looks — and your hands.' };
 function godBird(key, id) {
   let B = GFLY.birds.get(key); if (B) return B;
   const who = { value: 0.5 }, bird = makePhoenix(); bird.light.intensity = 0; bird.group.remove(bird.light);
@@ -25035,7 +25164,7 @@ function gflyStart(g, mode, o = {}) {
   if (near) { B.pos.set(g.x, g.gy + 14, g.z); burst(g.x, g.gy + 4, g.z, 200, 14, 1.5); shock(g.x, g.gy + 6, g.z, B.c.getHex(), 90, 1.2, true); g.group.visible = false; g.flying = true; }
   else B.pos.set(P.x + Math.sin(p.yaw) * 520 + 160, P.y + 240, P.z + Math.cos(p.yaw) * 520);   // (out of the sky behind him)
   B.vel.set(0, 12, 0); B.yaw = p.yaw; B.pitch = 0; B.bank = 0; godBirdShow(B, g.name);
-  Object.assign(GFLY, { on: true, g, mode: 'with', B, busy: false, pend: '', last: time, heard: time, tour: o.tour ? { i: 0, t: 2.6 } : null, land: null, dest: null, t: 0, idleT: 0, nudges: 0, far: 0, route: null, endAt: 0, want: '' });
+  Object.assign(GFLY, { on: true, g, mode: 'with', B, busy: false, pend: '', last: time, heard: time, tour: o.tour ? { i: 0, t: 2.6, ph: 'gap' } : null, land: null, dest: null, t: 0, idleT: 0, nudges: 0, far: 0, route: null, endAt: 0, want: '' });
   audio.sfx.rebirth?.(); audio.sfx.halo?.(); flash = Math.max(flash, 0.25);
   if (mode === 'ride') gflyMount(true);
   else toast(`${g.name.toUpperCase()} IS FLYING WITH YOU${o.tour ? '' : ' · JUST TALK'}`);
@@ -25073,6 +25202,7 @@ function gflyEnd(quiet) {
   if (!GFLY.on) return;
   const p = player, B = GFLY.B, g = GFLY.g;
   if (p.mount) { const [x, z] = dryNear(p.pos.x, p.pos.z); if (Math.hypot(x - p.pos.x, z - p.pos.z) < 60 && p.pos.y - groundAt(x, z) < 40) { p.pos.set(x, groundAt(x, z), z); p.grounded = true; } else { p.grounded = false; p.vel.copy(B.vel); } p.mount = null; human.group.scale.setScalar(MAN_SCALE); human.group.rotation.set(0, B.yaw, 0); p.fallTop = p.pos.y; }
+  if (GFLY.tour) { keyCard('', ''); if (MENU.open && TOUR_BEATS[GFLY.tour.i]?.menu) menuShow(false); }   // (the run cut short: nothing of it left on the screen)
   GFLY.on = false; GFLY.tour = null; GFLY.land = null; GFLY.dest = null; GFLY.busy = false; GFLY.pend = '';
   GFLY.gone = { B, t: 0 };   // (it climbs away, and is gone)
   if (g.flying) { g.flying = false; if (g.active) { g.group.visible = true; burst(g.x, g.gy + 3, g.z, 90, 8, 1.1); } }
@@ -25082,7 +25212,9 @@ function gflyEnd(quiet) {
 // what he says to them in the air, and what they say back: the same mind, the same memory, as on the ground
 async function airSay(text, o = {}) {
   const g = GFLY.g; if (!GFLY.on || !g) return;
-  if (GFLY.busy) { if (text && !o.aside && !o.tour) GFLY.pend = (GFLY.pend ? GFLY.pend + ' ' : '') + text; return; }
+  { const T = GFLY.tour, b = T && TOUR_BEATS[T.i];   // (on the first flight, what he says is an answer to what Hermes is showing him)
+    if (T && text && !o.tour) { o = { ...o, tour: b?.id === 'holding' && !T.got ? 'holding_re' : b?.id === 'chat' ? 'chat_re' : 'talk' }; if (o.tour === 'holding_re') T.got = text; } }
+  if (GFLY.busy) { if (text && !o.aside && (!o.tour || o.tour === 'talk')) GFLY.pend = (GFLY.pend ? GFLY.pend + ' ' : '') + text; return; }
   text = String(text || '').slice(0, 600);
   if (text) { GFLY.heard = time; GFLY.nudges = 0; g.history.push({ role: 'mortal', text }); statsTalk(g.id, 'me', text); if (MANNERS.test(text)) g.thanked = true; }
   else g.history.push({ role: 'mortal', text: `(${o.aside || (o.tour ? 'You are flying beside him on his first flight. Show him the next thing.' : 'He has said nothing for a while. The two of you are still flying.')})` });
@@ -25091,7 +25223,7 @@ async function airSay(text, o = {}) {
   if (text && /\b((set|put) me down|let me (off|down)|land (me|us)|take me down|i want to (get off|land))\b/i.test(text)) GFLY.want = 'land';
   let j = {};
   try {
-    const r = await fetch('/api/god', { method: 'POST', headers: authH({ 'Content-Type': 'application/json' }),
+    const r = await fetch('/api/god', { method: 'POST', headers: authH({ 'Content-Type': 'application/json' }), ...(o.tour ? { signal: AbortSignal.timeout(8000) } : {}),   // (on the run, a slow answer is not worth the wait: he has his own words)
       body: JSON.stringify({ god: g.id, code: WORLD.code, form: 'phoenix', air: GFLY.mode === 'ride' ? 'ride' : 'with', tour: o.tour ? { id: o.tour } : null, stage: g.history.filter(m => m.role === 'god').length, messages: g.history.slice(-40),
         gossip: story.gossip.filter(x => x.god !== g.id).slice(-30), met: [...story.met, ...story.known], perks: Object.keys(perks).filter(k => perks[k]), time: dayName(), storm: storm > 0.3, name: heroName !== 'ICARUS' ? heroName : '',
         tone: text ? toneNow(text) : '', houses: myHouses(), favor: g.favor | 0, self: (story.self || []).slice(-14), rank: rankOf(),
@@ -25100,29 +25232,56 @@ async function airSay(text, o = {}) {
   } catch {}
   GFLY.busy = false;
   if (!GFLY.on || GFLY.g !== g) return;
-  const said = j.text || (o.tour ? TOUR_FALLBACK[o.tour] : '') || '';
+  const own = !j.text && o.tour ? tourLine(o.tour, text) : '', L = (j.text ? [j.text] : Array.isArray(own) ? own : [own]).filter(Boolean), said = L.join(' ');   // (his own words, when nobody answered: one line, or a few said one after another)
   if (said) { g.history.push({ role: 'god', text: said }); statsTalk(g.id, 'god', said); meet(g); reveal(g);
-    say([{ text: clean(said), voice: g.id, title: g.name }], g.name, true); chatLine(g.name.toUpperCase(), clean(said), 'god'); }
+    say(L.map(t => ({ text: clean(t), voice: g.id, title: g.name })), g.name, true); for (const t of L) chatLine(g.name.toUpperCase(), clean(t), 'god'); }
   if (j.mood) { g.mood = j.mood; g.favor = clamp((g.favor | 0) + ({ warm: 1, amused: 1, proud: 2, curious: 0, bored: -1, hurt: -1, annoyed: -1, angry: -2 }[j.mood] || 0), -6, 6); }
   if (typeof j.learned === 'string' && j.learned.trim()) learnSelf(j.learned);
   saveSoon();
   const want = GFLY.want; GFLY.want = '';
-  if (j.act === 'land' || want === 'land') setTimeout(gflyLand, 2600);
+  if (j.act === 'land' && !GFLY.tour || want === 'land') setTimeout(gflyLand, 2600);
   else if (want === 'ride' && (g.favor | 0) > -3) setTimeout(() => gflyMount(false), 1500);
   if (GFLY.pend) { const t = GFLY.pend; GFLY.pend = ''; setTimeout(() => airSay(t), 400); }
 }
-// what he says when there is no one to ask (no keys, no network): the run, in his own words
+// what he says when there is no one to ask (no keys, no network): the run, in his own words. A list is a choice of ways to
+// say it; a list of lists, a choice of lines said one after another; a function, an answer to what was said.
+const TOUR_PANIC = /\b(dead|die|died|dying|death|crazy|insane|what (am i|do i|should i|the hell|the fuck)|what now|oh my (god|gosh)|omg|i swear|going to live|gonna live|not ready|freak(ing)? out|scared|terrified|afraid|help me|this can'?t be|no way|why me)\b/i;
 const TOUR_FALLBACK = {
-  hello: 'First flight? I take everyone up the first time. Lean to steer, beat your wings to climb, and stay off my wing.',
-  fire: 'That fire is your fuel. It runs down up here and comes back on the ground. Dive, and there is no limit to how fast you go.',
-  voice: 'You can just say what you want. Land. Map. Camera. And talk to anyone you meet, gods included.',
-  camera: 'There is a cinematic camera for when you want to look good, and a photo camera for keeping it.',
-  godmode: 'Say god mode, and the god in you wakes. A greater bird, a wall of fire behind you, and a voice called Gaia who does what you ask.',
-  fights: 'That fire is how they fight up here. Call everyone into the warzone over Olympus, or just those near you and your friends, or challenge one flier. The first half minute is practice; after that, touch a wall of fire and you are out. Or watch as a ghost.',
-  sea: 'Under the sea is the Underworld. The water between is deep, and full of fish. And the birds up here like anyone who flies gently.',
-  gods: 'The Twelve are all over these hills. Ask any of us to fly with you, or to carry you. Some of us will say yes.',
-  rings: 'That is my island, with the rings round it. Fly every one. End of the run. Five stars, I hope.',
+  hello: () => TOUCH ? ['First flight? Everybody’s first ride is with me. Tilt to steer, tap to beat your wings — and stay off my wing.', 'Hey, a new one! First flight’s on me. Steer with your thumb, tap to climb. Stay close.']
+    : ['First flight? Everybody’s first ride is with me. Lean to steer, Space to beat your wings — and stay off my wing.', 'Hey, a new one! First flight’s on me. A and D to steer, Space to climb. Stay close.'],
+  holding: ['So. How you holding up?', 'Okay, real talk — how you holding up?'],
+  holding_re: t => TOUR_PANIC.test(t) ? pick(['Yeah, yeah — you’re dead, it’s crazy, you swear you were going to live. Kid, I’ve heard it all before. Every single one of you.', 'Let me guess: dead, can’t believe it, had plans. I’ve heard it all before, believe me. You’re doing better than most.'])
+    : /\b(good|great|fine|ok(ay)?|amazing|awesome|alright|all right|cool|fun|incredible|love)\b/i.test(t) ? 'Good. Honestly? Most people scream for the first ten minutes.' : 'Ha. Fair enough. Everybody lands different.',
+  holding_none: ['Quiet one. That’s fine — most people scream.', 'Nothing? Okay. Take your time. It’s a lot.'],
+  uber: [['Can I tell you something? Some days I feel like an Uber driver.', 'Not that there’s anything wrong with Uber drivers, man — I did DoorDash during Covid. Good money.', 'I love what I do. I just meet so many new people, and everyone’s got somewhere to be. They chat when they can — never when I need them, you know?'],
+    ['Honestly? My life’s basically Uber.', 'Nothing wrong with Uber drivers, by the way — I did DoorDash all through Covid. Great money.', 'I love it. It’s just so many new faces, everyone’s busy, nobody stays. They talk when it suits them, not when I need it. You know?']],
+  menu: 'Your menu’s up top — it spells ICARUS. Six letters, six drawers. Watch.',
+  cinema: () => TOUCH ? 'In the menu, C, film: the cinematic camera. For when you want to look good up here.' : 'Press C. Cinematic camera — for when you want to look good up here.',
+  cinema_did: ['Gorgeous. Look at you. Same again puts me back behind you.', 'Oh, that’s your angle. Do it again whenever you want the plain view back.'],
+  hands: () => TOUCH ? 'Here’s a fun one. Say “see hands”. Your camera puts your own hands on the bird. Go on, wave at me.' : 'Here’s a fun one. Say “see hands” — or hit H. Your camera puts your own hands on the bird. Go on, wave at me.',
+  hands_did: ['Ha! Look at those little hands. Jazz hands at two thousand feet.', 'There they are! Ten out of ten hands. Wave at the next god you meet — they love that.'],
+  hands_none: 'No camera? Shame. I bet they’re great hands.',
+  chat: () => TOUCH ? 'The chat’s under R in your menu. Write me something. Anything.' : 'T opens the chat. Type me something — anything. Enter sends it.',
+  chat_re: ['Got it — loud and clear. With me beside you, only I read it. Otherwise everyone flying does.', 'There you go. Everyone up here reads that box — except right now. Right now it’s just us.'],
+  commands: 'Start it with a slash and it’s a command. Try /help.',
+  commands_did: ['That’s the lot. You’ll never need half of it. Nobody does.', 'See? Everything’s in there. Don’t read it all at once.'],
+  godmode: [['Last trick. It works like your voice — just say “god mode”. Or pick your own word for it.', 'Eagle eye, more speed, sharper turns, and the tron fire — don’t worry, Ares will explain that one.', 'But only when you really have to. After, you’re spent: heavy wings, and you have to land.']],
+  godmode_did: ['There it is! This one’s on me — no crash after. Say “mortal” when you’re done.', 'Look at that. Feels good, right? This time it’s free. Next time, it costs.'],
+  forge: 'Right. Hephaestus wants you — first job’s an axe. His forge is on my island. Follow me.',
+  forge_there: ['There — by the fire. Land and talk to him. Do the axe, then come fly my rings. Five stars, yeah?', 'That’s him, at the forge. Go on down. Axe first, then my rings. Rate me five stars.'],
+  forge_far: 'Lost me? My island, the forge on it. Hephaestus is waiting. Axe first, then my rings.',
+  done: ['That’s the run. You know where I am — my island, with the rings. Five stars, yeah?', 'End of the ride. Go on, they’re all waiting for you. Five stars.'],
+  skip: ['Fine, fine — you’ll figure it out. Hephaestus is at his forge on my island. Start there.', 'Busy, huh? Okay. Hephaestus, his forge, my island. Go.'],
+  skip_done: 'Fine. You know where I am.',
+  nudge: ['No? It’s there when you want it.', 'Later, then. Moving on.'],
+  talk: ['Ha. Hold that thought — there’s more to show you.', 'Tell me about it. Stay with me.', 'Fair. Keep flying.'],
 };
+function tourLine(id, text = '') { let f = TOUR_FALLBACK[id]; if (typeof f === 'function') f = f(text); return Array.isArray(f) ? pick(f) : f || ''; }
+// his own line, asked of nobody: what he says when he sees what you did, and the menu as he opens it
+function hermesSays(lines) {
+  const g = GFLY.g; if (!GFLY.on || !g) return; const L = (Array.isArray(lines) ? lines : [lines]).filter(Boolean); if (!L.length) return;
+  g.history.push({ role: 'god', text: L.join(' ') }); say(L.map(text => ({ text, voice: g.id, title: g.name })), g.name, true); for (const t of L) chatLine(g.name.toUpperCase(), t, 'god');
+}
 // anything he says while a god is flying with him is said to the god, and to nobody else
 function airHear(text) { if (!GFLY.on) return false; airSay(text); return true; }
 function tourStart() {
@@ -25130,6 +25289,78 @@ function tourStart() {
   flags.toured = true; saveSoon();
   return gflyStart(g, 'with', { tour: true });
 }
+const smithWaits = () => story.phase === 'gods' && INV.q < 9 && !(story.met.has('hephaestus') && INV.q === 0);   // (Hephaestus at his forge, with the axe still to make)
+// The run, one beat at a time: he says it (and it goes up on the screen); if there is something to try he waits for it, and
+// says something when he sees it done (or lets it go); then a breath, and the next. Never while either of them is talking.
+function tourStep(T, dt) {
+  const still = !GFLY.busy && !dlg.cur && !dlg.queue.length && !voiceSrc, free = still && time - GFLY.heard > 2.5, b = TOUR_BEATS[T.i];
+  if (!b) return tourEnd();
+  T.t -= dt;
+  if (T.ph === 'gap') { if (free && T.t <= 0) tourBegin(T, b); return; }
+  if (T.ph === 'say') {
+    if (b.menu) return tourMenu(T, dt, still);
+    if (!still || T.t > 0) return;   // (his line is still being said)
+    if (b.ask) { T.ph = 'ask'; T.t = 20; return; }
+    if (b.tryIt) { T.ph = 'try'; T.t = b.id === 'godmode' ? 32 : 24; return; }
+    if (b.lead) { T.ph = T.lead ? 'lead' : 'bye'; T.t = T.lead ? 150 : 1; return; }
+    return tourNext(T, 1.2);
+  }
+  if (T.ph === 'ask') { if (T.got) return tourNext(T, 1.5); if (T.t <= 0) { hermesSays(tourLine('holding_none')); tourNext(T, 1.5); } return; }
+  if (T.ph === 'try') {
+    if (b.tryIt(T)) { const K = TOUCH ? b.touch || b.key : b.key; keyCard(K[0], K[1], true); T.ph = 'did'; T.t = b.id === 'hands' ? 1.8 : 0.7; return; }
+    if (T.t <= 0) { hermesSays(tourLine('nudge')); tourNext(T, 1.5); } return;
+  }
+  if (T.ph === 'did') { if (T.t > 0) return;
+    if (b.id === 'hands') hermesSays(tourLine(cam.on || cam.loading || XR.on ? 'hands_did' : 'hands_none'));
+    else if (b.id === 'godmode') { GODM.freeUntil = time + 14; hermesSays(tourLine('godmode_did')); }   // (the first time is on him: no weakness after)
+    else if (!b.said) hermesSays(tourLine(b.id + '_did'));
+    return tourNext(T, 2);
+  }
+  if (T.ph === 'lead') {
+    const d = Math.hypot(FORGE.x - player.pos.x, FORGE.z - player.pos.z);
+    if (d > 450 && (T.ct = (T.ct || 0) - dt) <= 0) { T.ct = 0.5; if (!GFLY.dest) GFLY.dest = { x: FORGE.x, z: FORGE.z }; keyCard('◇', `FOLLOW HERMES · HEPHAESTUS’S FORGE · ${fmtDist(d)}`); }
+    if ((d < 450 || T.t <= 0) && still) { GFLY.dest = null; keyCard('◇', 'HEPHAESTUS · LAND BY HIS FORGE AND TALK TO HIM'); hermesSays(tourLine(d < 450 ? 'forge_there' : 'forge_far')); T.ph = 'bye'; T.t = 2; }
+    return;
+  }
+  if (T.ph === 'bye' && still && T.t <= 0) tourEnd();
+}
+function tourBegin(T, b) {
+  Object.assign(T, { ph: 'say', t: 1.2, at: time, c0: cinema.manual, got: '', k: null, mt: 0 });
+  const K = TOUCH ? b.touch || b.key : b.key; keyCard(K ? K[0] : '', K ? K[1] : '');
+  if (b.menu) return hermesSays(tourLine('menu'));
+  if (b.lead) { T.lead = smithWaits(); if (T.lead) { GFLY.dest = { x: FORGE.x, z: FORGE.z }; keyCard('◇', 'FOLLOW HERMES · HEPHAESTUS’S FORGE'); } }
+  airSay('', { tour: b.lead && !T.lead ? 'done' : b.id });
+}
+function tourNext(T, gap) { T.i++; T.ph = 'gap'; T.t = gap; keyCard('', ''); }
+// the six drawers, opened one after another while he says what each one is
+function tourMenu(T, dt, still) {
+  if (state !== 'play') { if (MENU.open) menuShow(false); return tourNext(T, 1); }
+  if (MENU.open) keyCardPlace();   // (the strip drops, and grows a row for the drawer: the card keeps below it)
+  if (!still || (T.mt -= dt) > 0) return;
+  T.k = T.k == null ? 0 : T.k + 1;
+  if (T.k >= MGROUPS.length) { if (MENU.open) { menuGroup(-1, true); menuShow(false); } return tourNext(T, 1); }
+  if (!MENU.open) menuShow(true);
+  menuGroup(T.k, true); const G = MGROUPS[T.k];
+  keyCard(G.L, `${G.label.toUpperCase()} · ${menuDrawer(G.L).map(it => it.label.toUpperCase()).join(' · ')}`);
+  hermesSays(TOUR_MENU[G.L]); T.mt = 1.6;
+}
+function tourEnd() {
+  if (!GFLY.tour) return; GFLY.tour = null; keyCard('', ''); flags.toured = true; GFLY.endAt = 0; GFLY.idleT = -30; saveSoon();
+  const g = GFLY.g; setTimeout(() => { if (GFLY.on && GFLY.g === g && !GFLY.tour) gflyEnd(); }, 4500);   // (Hermes has other people to meet)
+}
+// "skip", or Esc twice: he lets him go, and says where to start
+function tourSkip() {
+  const T = GFLY.tour; if (!T) return false;
+  if (MENU.open) menuShow(false);
+  const smith = smithWaits(); hermesSays(tourLine(smith ? 'skip' : 'skip_done')); tourEnd(); toast(smith ? 'TOUR SKIPPED · HEPHAESTUS IS AT HIS FORGE ON HERMES’S ISLAND' : 'TOUR SKIPPED');
+  return true;
+}
+addEventListener('keydown', e => {
+  const T = GFLY.tour; if (e.code !== 'Escape' || !T || state !== 'play' || CHAT.open || GUIDE.open || LOOK.open || QL.open || ALBUM.open || e.repeat) return;
+  if (MENU.open && TOUR_BEATS[T.i]?.id !== 'menu') return;   // (his own menu: Esc closes it, as ever)
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (time - (T.escT ?? -99) < 3) tourSkip(); else { T.escT = time; toast('ESC AGAIN · SKIP HERMES’S TOUR'); }
+}, true);
 function mountCam(dt) {
   const B = player.mount, wide = 0.5 + 0.5 * Math.sin(time * 0.07), a = B.yaw + Math.sin(time * 0.11) * 0.6, cd = lerp(58, 150, wide * wide);   // (close enough to see him sitting there; and now and then, far enough back to see what he is sitting on)
   camWant.set(B.pos.x + Math.sin(a) * cd, B.pos.y + lerp(30, 56, wide * wide) + Math.sin(time * 0.17) * 6, B.pos.z + Math.cos(a) * cd);
@@ -25148,8 +25379,7 @@ function updateGfly(dt) {
       shown++; let B = Q.gfB; if (!B || B.id !== F.id) { if (B) B.bird.group.visible = false; B = Q.gfB = godBird(`peer${shown}:${F.id}`, F.id); B.pos.set(F.x, F.y, F.z); B.vel.set(0, 0, 0); godBirdShow(B, godById[F.id]?.name || F.id); }
       godBirdFly(B, F.x, F.y, F.z, _v.set(Q.s.vx || 0, Q.s.vy || 0, Q.s.vz || 0), 420, dt); godBirdPose(B, dt); } }
   else for (const Q of NET.peers.values()) if (Q.gfB) { Q.gfB.bird.group.visible = false; Q.gfB = null; }
-  // the first flight: Hermes comes for him (anyone who had already flown before he started doing this is left alone: /tour asks for it)
-  if (GFLY.was === undefined && state !== 'loading' && state !== 'title') { GFLY.was = flags.morphed; if (flags.morphed && !flags.toured) flags.toured = true; }
+  // the first flight: Hermes comes for him (anyone who had flown before is given it once more after Crete again — see creteReturn; /tour asks for it any time)
   if (!GFLY.on && flags.morphed && !flags.toured && state === 'play' && realm === 'over' && p.form === 'phoenix' && !p.cine && !p.perch && !p.sub && !MATCH.phase && !LIVE.on) { GFLY.wait = (GFLY.wait || 0) + dt; if (GFLY.wait > 3.2) { GFLY.wait = 0; tourStart(); } }
   if (!GFLY.on) return;
   const B = GFLY.B, g = GFLY.g; GFLY.t += dt;
@@ -25175,7 +25405,7 @@ function updateGfly(dt) {
     const sv = BIRDS.sv, sp = sv.length(); let tx, ty, tz;
     if (!flying) { const a = time * 0.22; tx = P.x + Math.cos(a) * 190; tz = P.z + Math.sin(a) * 190; ty = P.y + 120; }
     else if (GFLY.dest) { const D = GFLY.dest, d = Math.hypot(D.x - P.x, D.z - P.z) || 1; tx = P.x + (D.x - P.x) / d * 240 + fz * 60 * GFLY.side; tz = P.z + (D.z - P.z) / d * 240 - fx * 60 * GFLY.side; ty = P.y + 30; if (d < 420) GFLY.dest = null; }
-    else { const lead = 150 + sp * 0.7, side = 175 * GFLY.side; tx = P.x + fx * lead - fz * side; tz = P.z + fz * lead + fx * side; ty = P.y + 64 + Math.sin(time * 0.31) * 10; }   // (up and to one side: where his own wings do not hide it)
+    else { const near = GFLY.tour ? 0.7 : 1, lead = (150 + sp * 0.7) * near, side = 175 * near * GFLY.side; tx = P.x + fx * lead - fz * side; tz = P.z + fz * lead + fx * side; ty = P.y + 64 + Math.sin(time * 0.31) * 10; }   // (up and to one side: where his own wings do not hide it)
     godBirdFly(B, tx, ty, tz, sv, Math.max(110, sp * 1.6 + 60), dt);
     const d = B.pos.distanceTo(P); GFLY.far = d > 1500 ? GFLY.far + dt : 0;
     if (GFLY.far > 12) { B.pos.set(P.x - fx * 500, P.y + 200, P.z - fz * 500); B.vel.copy(sv); GFLY.far = 0; }   // (lost each other: it comes down out of the sky behind him again)
@@ -25187,8 +25417,7 @@ function updateGfly(dt) {
   // the run with a new arrival: one thing at a time, when nobody is speaking
   const quiet = !GFLY.busy && !dlg.cur && !dlg.queue.length && !voiceSrc && time - GFLY.heard > 4;
   const T = GFLY.tour;
-  if (T) { if (quiet && (T.t -= dt) <= 0) { const b = TOUR_BEATS[T.i++]; airSay('', { tour: b[0] }); toast(TOUCH ? b[2] : b[1]); T.t = 9; if (b[0] === 'rings') GFLY.dest = { x: MYKONOS.x, z: MYKONOS.z };
-      if (T.i >= TOUR_BEATS.length) { GFLY.tour = null; GFLY.idleT = -30; GFLY.endAt = time + 50; } } }
+  if (T) tourStep(T, dt);   // (see tourStep)
   else if (GFLY.endAt && quiet && time - GFLY.heard > 14 && (time > GFLY.endAt || !GFLY.dest && time > GFLY.endAt - 26)) { GFLY.endAt = 0; gflyEnd(); return; }   // (the run is over, and he has nothing more to ask: Hermes has other people to meet)
   else if (quiet && !GFLY.land) {   // a long silence: they ask the next thing; after a few with no answer, they leave him to it
     if ((GFLY.idleT += dt) > (GFLY.nudges ? 55 : 34)) { GFLY.idleT = 0; if (++GFLY.nudges > 3) gflyLand(); else airSay('', {}); } }
@@ -25198,6 +25427,7 @@ function modeBarSet() {
   let a = '', b = '';
   if (typeof MATCH !== 'undefined' && MATCH.phase) [a, b] = matchBar();
   else if (GODM.on) { const n = Math.ceil(GODM.charge * 8); a = `GOD MODE ${'▰'.repeat(n)}${'▱'.repeat(8 - n)}`; b = TOUCH ? 'say what you want · tap a mark to go to it' : 'say what you want · click a mark to go to it'; }
+  else if (GODM.spent) { const n = Math.round(clamp(GODM.restT / 4, 0, 1) * 8); a = `SPENT ${'▰'.repeat(n)}${'▱'.repeat(8 - n)}`; b = GODM.restT > 0 ? 'resting · stay still' : 'heavy wings · land and rest a few seconds'; }
   if (a === MODEBAR.a && b === MODEBAR.b) return; MODEBAR.a = a; MODEBAR.b = b;
   const el = $('modeBar'); el.firstChild.textContent = a; el.lastChild.textContent = b; el.classList.toggle('on', !!a); document.body.classList.toggle('moding', !!a);
 }
