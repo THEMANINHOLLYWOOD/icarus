@@ -14547,18 +14547,18 @@ function hadesBuild() {
         float y = vUv.y, fl = n1(vec2(vUv.x * 10.0 + vSeed * 7.0, y * 4.0 - uTime * (2.2 + fract(vSeed)))) * n1(vec2(vUv.x * 23.0 + 4.0, y * 8.0 - uTime * 3.7 + vSeed));
         float pulse = 0.55 + 0.45 * sin(uTime * (0.9 + fract(vSeed * 3.1)) + vSeed * 40.0);
         float a = (1.0 - smoothstep(0.12, 1.0, y)) * (0.3 + 0.9 * smoothstep(0.15, 0.55, fl)) * pulse;
-        gl_FragColor = vec4(mix(vec3(0.9, 1.4, 3.0), vec3(0.25, 0.55, 2.2), y) * (0.7 + fl) * a * 0.38 * vNear, 1.0);
+        gl_FragColor = vec4(mix(vec3(0.9, 1.4, 3.0), vec3(0.25, 0.55, 2.2), y) * (0.7 + fl) * a * 0.62 * vNear, 1.0);
       }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
   });
   { const cones = UVOLC.filter(v => v.cone), m = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.3, 1, 1, 16, 1, true).translate(0, 0.5, 0), HL.plumeM, Math.max(1, cones.length));
-    cones.forEach((v, i) => { _mat.compose(_p.set(v.x, v.lava - 3, v.z), _q.identity(), _s.set(v.Rl * 0.42, 60 + v.R0 * 0.2, v.Rl * 0.42)); m.setMatrixAt(i, _mat); });
+    cones.forEach((v, i) => { _mat.compose(_p.set(v.x, v.lava - 3, v.z), _q.identity(), _s.set(v.Rl * 0.52, 80 + v.R0 * 0.28, v.Rl * 0.52)); m.setMatrixAt(i, _mat); });
     m.count = cones.length; m.frustumCulled = false; m.renderOrder = 3; grp.add(m); }
   // the punished, who move: Sisyphus and his stone, Tantalus under the branch, Ixion on his wheel
   udGeo();
-  { const a = newAcc(); box(a, 0.07, 1.7, 0.07, 0, 0.85, 0, ASPH.stem); box(a, 0.5, 0.05, 0.12, 0.1, 0.12, 0, ASPH.stem, 0, 0, 0.5); box(a, 0.45, 0.05, 0.12, -0.1, 0.1, 0.05, ASPH.stem, 0, 0.9, -0.5);
-    for (let i = 0; i < 3; i++) part(a, G.oct, 0, 1.2 + i * 0.2, 0, 0.21 - i * 0.03, 0.15, 0.21 - i * 0.03, ASPH.bloom, i);
-    const N = TOUCH ? 900 : 1800, m = new THREE.InstancedMesh(accToGeo(a), UD.mat, N); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.count = 0; m.frustumCulled = false; m.visible = false;
+  { const a = newAcc(); box(a, 0.07, 1.7, 0.07, 0, 0.85, 0, ASPH.stem);   // (a stem and two flowers up it: there are a great many of them)
+    for (let i = 0; i < 2; i++) part(a, G.oct, 0, 1.25 + i * 0.28, 0, 0.22 - i * 0.04, 0.17, 0.22 - i * 0.04, ASPH.bloom, i);
+    const N = TOUCH ? 700 : 1400, m = new THREE.InstancedMesh(accToGeo(a), UD.mat, N); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.count = 0; m.frustumCulled = false; m.visible = false;
     HL.asph = { m, N, cx: 1e9, cz: 1e9 }; grp.add(m); }
   const Pn = HL.punish, A = HL.anim = {}, upYaw = Math.atan2(Pn.ex, Pn.ez);
   A.sis = new THREE.Group(); A.gPush = shadeGeo('push'); A.gStand = shadeGeo('stand'); A.upYaw = upYaw; A.rollAx = new THREE.Vector3(Pn.ez, 0, -Pn.ex);
@@ -14606,7 +14606,7 @@ function hadesDeco(cx, cz, rng, acc, gacc) {
   const near = (A, m = 0) => A.x + A.r + m > x0 && A.x - A.r - m < x0 + CHUNK && A.z + A.r + m > z0 && A.z - A.r - m < z0 + CHUNK;
   const rp = () => [x0 + rng() * CHUNK, z0 + rng() * CHUNK], j = s => (rng() - 0.5) * s;
   const A = HL.asphodel, E = HL.elysium, T = HL.tartarus, P = HL.punish;
-  if (near(A)) for (let k = 0; k < 320; k++) {   // asphodel: tall grey stems, pale flowers up them that give a little light
+  if (near(A)) for (let k = 0; k < 220; k++) {   // asphodel: tall grey stems, pale flowers up them that give a little light
     const [x, z] = rp(); if (hlWhat(x, z) !== 'asphodel' || noise2(x / 55 + 7, z / 55 - 2) < -0.15) continue;
     const h = height(x, z); if (h < WATER + 1) continue;
     const s = 0.7 + rng() * 0.8;
@@ -14674,7 +14674,7 @@ function asphField(P) {
   const As = HL.asphodel, F = HL.asph, on = (P.x - As.x) ** 2 + (P.z - As.z) ** 2 < (As.r + 160) ** 2 && P.y < As.g + 180;
   F.m.visible = on; if (!on || (P.x - F.cx) ** 2 + (P.z - F.cz) ** 2 < 25 * 25) return;
   F.cx = P.x; F.cz = P.z;
-  const C = 5, R = 135, hh = (i, j, k) => { const v = Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453; return v - Math.floor(v); };
+  const C = TOUCH ? 7.5 : 5.5, R = 135, hh = (i, j, k) => { const v = Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453; return v - Math.floor(v); };
   let n = 0;
   for (let j = Math.floor((P.z - R) / C), j1 = Math.floor((P.z + R) / C); j <= j1 && n < F.N; j++) for (let i = Math.floor((P.x - R) / C), i1 = Math.floor((P.x + R) / C); i <= i1 && n < F.N; i++) {
     const x = (i + hh(i, j, 1)) * C, z = (j + hh(i, j, 2)) * C;
