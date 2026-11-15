@@ -391,6 +391,7 @@
   #nameInput { background:none; border:none; border-bottom:1px solid rgba(244,234,210,.4); border-radius:0; color:var(--ember); font:inherit; font-size:22px; letter-spacing:.3em;
     text-align:center; text-transform:uppercase; width:min(320px, 72vw); padding:4px 0 6px; outline:none; -webkit-user-select:text; user-select:text; caret-color:var(--ember); }
   #nameInput:focus { border-bottom-color:var(--ember); }
+  #nameAsk.need { color:var(--ember); animation:nameNeed .45s ease; } @keyframes nameNeed { 0%, 100% { transform:none; } 20% { transform:translateX(-6px); } 45% { transform:translateX(5px); } 70% { transform:translateX(-3px); } }
   .photo #hud > *, .photo #bars { opacity:0 !important; }
   /* the photo camera: one faint line of keys at the foot of the frame (never in the picture: it is not on the canvas) */
   #photoHint { position:fixed; left:50%; bottom:calc(var(--sb) + 12px); transform:translateX(-50%); z-index:6; pointer-events:none; width:min(860px, calc(100vw - 120px)); text-align:center; line-height:1.7;
@@ -27599,6 +27600,7 @@ function menuCaption(dt) {
 // FLY ON, or BACK TO WHERE YOU WERE
 function menuGo(kind) {
   const M = LIVE; if (!M.on || M.leave) return;
+  if (state === 'title' && needName()) return;
   if (creteDue()) { nameAsked = true; creteBegin(true); return; }   // (see creteBegin)
   initAudio(); goFull(); nameInput.blur();
   if (kind === 'back') { if (!M.song) menuSong(); M.leave = { kind, t: 0, T: 0.8 }; }
@@ -27814,7 +27816,14 @@ const nameInput = $('nameInput');
 try { nameInput.value = localStorage.getItem('icarus.name') || ''; } catch {}
 setName(nameInput.value, false);
 let nameAsked = !!nameInput.value;
-nameInput.addEventListener('input', () => setName(nameInput.value));
+nameInput.addEventListener('input', () => { setName(nameInput.value); if (nameOk()) $('nameAsk').classList.remove('need'); });
+// a name of his own (two letters at least) before he flies where the others can see him: asked for, not chosen for him
+const nameOk = () => nameInput.value.replace(/[^A-Za-z0-9]/g, '').length >= 2;
+function needName() {
+  if (nameOk()) return false;
+  nameAsked = true; titleAsk(); const a = $('nameAsk'); a.textContent = 'name yourself to fly'; a.classList.remove('need'); void a.offsetWidth; a.classList.add('need');
+  $('title').classList.add('asked'); try { nameInput.focus({ preventScroll: true }); } catch {} audio.sfx.ui?.(); return true;
+}
 nameInput.addEventListener('keydown', e => {
   e.stopPropagation();
   if (e.key === 'Enter') { nameAsked = true; nameInput.blur(); begin(); }
@@ -27825,12 +27834,10 @@ $('nameRow').addEventListener('click', e => e.stopPropagation());
 function begin() {
   if (state !== 'title') return;
   if (MOD.banned) { modBanned(); return; }
+  if (needName()) return;
   if (creteDue()) { creteBegin(true); return; }   // (the opening has changed since he last came: Crete once more, and then the new first flight)
   if (LIVE.on) { nameAsked = true; menuGo('fly'); return; }   // (the live menu: the bird is taken where it is)
-  if (!nameAsked) {   // asked once: answer, or go on as Icarus
-    nameAsked = true; nameInput.focus();
-    titleAsk(); return;
-  }
+  if (needName()) return;   // (nobody flies with the others without a name of their own)
   nameInput.blur();
   titleEnd();
   state = 'play'; flags.beganAt = time;
@@ -27905,7 +27912,7 @@ addEventListener('keydown', e => {
   if (state === 'title') {
     if (e.code === 'KeyN' && resumed) return newGame();
     // (come back to a bird already in the air: any key he would fly with takes it, where it is)
-    if (LIVE.on && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) { nameAsked = true; return menuGo('fly'); }
+    if (LIVE.on && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && e.target !== nameInput && ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) { nameAsked = true; return menuGo('fly'); }
     if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { if (!e.repeat) titlePress(true); return; }
     if (e.code === 'Enter') { nameAsked = true; if (LIVE.on && e.shiftKey) return menuGo('back'); return begin(); }
     if (titleFly.asked && /^(Key[A-Z]|Digit\d)$/.test(e.code) && !e.metaKey && !e.ctrlKey) nameInput.focus({ preventScroll: true });   // (typing goes to the name)
