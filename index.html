@@ -30332,7 +30332,7 @@ function matchAgain() {
 const flyBoss = () => !!MATCH.phase && (MATCH.host || !!MOD.admin);
 function flyCtl(op) {
   const sys = t => chatLine('', t, 'sys'), M = MATCH, id = M.phase ? M.id : M.seen?.m.id || '', host = M.host && !!M.phase;
-  if (op === 'restart' && !M.phase && M.last) return matchAgain();   // (it is over and gone: the same fight once more)
+  if (op === 'restart' && !M.phase && M.last && !matchBusy()) return matchAgain();   // (it is over and gone: the same fight once more; one he has only left is still someone else's)
   if (op === 'shuffle') return teamsShuffle();
   if (!id) return sys('NOTHING IS BEING FOUGHT');
   if (!host && !MOD.admin) return op === 'end' ? matchStop() : sys('ONLY WHOEVER CALLED IT, OR THE KEEPER, CAN DO THAT');
@@ -30357,7 +30357,7 @@ function flyCtlDo(op, id, by, t0) {
     MINTRO.clashed = true; MINTRO.hit = true; MD.ask = 'done'; MD.rdy = true; mdReadyBtn(false);
     if (matchSees()) { aresSay(pick(ARES_L.go), true); toast(`${by} SKIPS THE OPENING`); } modeBarSet(); return; }
   if (op !== 'restart') return;
-  ringsClear(); pwClear(); miEnd(); if (MD.cam) mdCamOff(); mdReadyBtn(false);
+  ringsClear(); pwClear(); miEnd(); if (MD.cam) mdCamOff(); mdReadyBtn(false); aresHush();
   for (const k of M.roster.keys()) { const T = TRON.trails.get(k); if (T) tronClear(T); } trailRib.key = null;
   for (const r of M.roster.values()) if (!r.left) Object.assign(r, { alive: true, lives: 0, kills: 0, glass: 0, outAt: 0, by: '' });
   for (const C of M.cpus) Object.assign(C, { alive: true, reAt: 0, lives: 0, glass: 0, immune: 0 });
@@ -30741,6 +30741,9 @@ function gotMatch(m) {
     const W = matchWhere(), g = { k: 'go', id: I.id, kind: 'duel', t0: Date.now() + 5000 + miLen('duel'), at: I.at || Date.now(), ids: [NET.id, I.to], names: [heroName, I.name], host: NET.id, cfg: MATCH.cfg, cx: W.cx, cz: W.cz, ol: W.ol || undefined, game: I.game || 'tron' }; matchSend(g); matchGo({ ...g, i: NET.id, n: heroName }, true); MATCH.last = { kind: 'duel', vs: I.name, game: I.game || 'tron' }; return; }
   if (m.k === 'ctl') { const boss = m.id === MATCH.id && MATCH.phase ? MATCH.hostId : MATCH.seen?.m.id === m.id ? MATCH.seen.m.host : '';   // (end, restart, skip: from whoever called it, and nobody else)
     if (boss && m.i === boss && (m.op === 'restart' || m.op === 'skip')) flyCtlDo(m.op, m.id, nm, +m.t0); return; }
+  if (m.k === 'out' && !m.left && m.id !== MATCH.id && MATCH.seen?.m.id === m.id && m.by !== 'gone') {   // (one put out of a fight this screen only heard of: told, as any death is told)
+    const who = typeof m.who === 'string' && m.i === MATCH.seen.m.host ? m.who : m.i, name = who === m.i ? nm : cleanName(NET.peers.get(who)?.name || ''), by = String(m.by || '').replace(/[<>]/g, '').slice(0, 30);
+    if (name && name !== 'SOMEONE' && !SHUN.block.has(name)) chatLine('', deathLine(name, 'out', 0, '', by), 'sys death'); return; }
   if (m.k === 'go') { matchGo(m); if (MATCH.yq) { if (!MATCH.me.in && !MATCH.queue) { MATCH.queue = MATCH.yq; chatLine('', 'YOURS WAITS FOR THIS ONE · IT IS CALLED WHEN THIS ONE ENDS', 'sys'); modeBarSet(); } MATCH.yq = null; } return; }
   if (m.id !== MATCH.id) return;
   if (m.k === 'teams') return gotTeams(m);
@@ -31228,6 +31231,7 @@ const ARES_L = {
 };
 const ARES_CTX = 'You are Ares, opening a fight of fire in the sky over Olympus, and one of the fighters asks you something before it starts. The rules: every bird leaves a wall of fire behind it; touching any wall, even your own, puts you out; the ring closes in over four minutes and its edge burns; glass rings in the air give one extra life and a few seconds of smashing through walls (not the ground); F (or FIRE) throws a fireball that hunts the nearest enemy, flies faster than a bird but turns slower, so a hard turn, dive or loop shakes it, one every four seconds; R (or WIND) once a life is a burst of speed that blows any fireball off you; the first half minute is a warm-up when nothing counts; the last one flying wins, and at four minutes the one with the most fires wins it. Answer in one or two short, plain sentences, in your own voice.';
 function aresSay(text, cut = false, cue = '') { if (!matchSees()) return; say([{ text, voice: 'ares', title: 'Ares', cue }], 'Ares', cut); }   // (cue: what the line is about, for the lens: see mdHoldTo)
+function aresHush() { for (let i = dlg.queue.length - 1; i >= 0; i--) if (dlg.queue[i].title === 'Ares') dlg.queue.splice(i, 1); if (dlg.cur?.title === 'Ares') { dlg.cur = null; stopVoice(); } }   // (the fight is gone, or begun again: what he had still to say goes with it)
 const ARES_CUE = ['walls', 'ring', 'glass', 'warm'];
 function aresStep(now) {
   const M = MATCH, pk = a => a[Math.floor(Math.random() * a.length)], idle = !dlg.cur && !dlg.queue.length && !MD.busy;
@@ -31739,7 +31743,7 @@ function updatePylonBlaze(dt) {
     if ((P.shockT -= dt) <= 0 && k > 0.3) { P.shockT = 2.4; shock(P.x, P.top + 4, P.z, new THREE.Color(P.hex).getHex(), 110, 1.3, false); } }
 }
 function matchLeave() {
-  const p = player, wasIn = MATCH.me.in, ghost = MATCH.ghost, over = MATCH.phase === 'over'; ringsClear(); pwClear(); if (MD.cam) mdCamOff(); MD.plan = null; MD.id = ''; mdReadyBtn(false);
+  const p = player, wasIn = MATCH.me.in, ghost = MATCH.ghost, over = MATCH.phase === 'over'; ringsClear(); pwClear(); if (MD.cam) mdCamOff(); MD.plan = null; MD.id = ''; mdReadyBtn(false); if (MATCH.phase === 'count') aresHush();
   for (const id of MATCH.roster.keys()) { const T = TRON.trails.get(id); if (!T) continue; if (T.sign && MATCH.win === id) { T.match = ''; T.signAt = time; continue; } tronClear(T); T.match = ''; T.sign = false; }   // (what the winner wrote on the sky is left there)
   for (const C of MATCH.cpus) { cpuShow(C, false); const P = NET.peers.get(C.id); if (P) { P.seen = false; dropPeer(C.id, P); NET.peers.delete(C.id); } tronDrop(C.id); }
   if (MATCH.ring) MATCH.ring.visible = false;
