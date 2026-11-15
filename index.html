@@ -21050,8 +21050,22 @@ function mapBirdAt(px, py, r) { let best = null, bd = r * r; for (const h of map
   };
   mapEl.addEventListener('pointerup', up); mapEl.addEventListener('pointercancel', up);
   mapEl.addEventListener('pointerleave', () => { mapV.ptr = null; });
-  mapEl.addEventListener('wheel', e => { e.preventDefault(); const d = clamp((e.deltaY || e.deltaX) * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1), -260, 260);
-    if (e.shiftKey) mapTurn(d * 0.0012, 0); else mapZoom(Math.exp(-d * (e.ctrlKey ? 0.011 : 0.0016)), e.clientX, e.clientY); }, { passive: false });
+  // Two fingers on a trackpad: drawn round in a circle, the whole map turns with them like a dial (all the way round, as
+  // many times as he likes); pushed up and down it comes closer and goes away; pushed sideways it turns. On a Mac in Safari
+  // the twist of two fingers turns it too.
+  const wh = { a: 0, t: 0, spin: 0, n: 0 };
+  mapEl.addEventListener('wheel', e => { e.preventDefault(); const k = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1, dx = e.deltaX * k, dy = e.deltaY * k, now = performance.now();
+    if (e.ctrlKey) { mapZoom(Math.exp(-clamp(dy, -260, 260) * 0.011), e.clientX, e.clientY); return; }   // (a pinch)
+    if (e.shiftKey) { mapTurn(clamp(dy || dx, -260, 260) * 0.0012, 0); return; }
+    const m = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+    if (now - wh.t > 140 || m < 0.5) { wh.n = 0; wh.spin = 0; }
+    if (m >= 0.5) { if (wh.n) { let da = a - wh.a; da = Math.atan2(Math.sin(da), Math.cos(da));   // (how far round the way the fingers are going has come)
+        wh.spin = Math.abs(da) < 1.2 ? wh.spin * 0.6 + da * 0.4 : wh.spin * 0.5; if (Math.abs(wh.spin) > 0.035 && Math.abs(da) < 1.2) { mapTurn(da * 1.15, 0); wh.a = a; wh.t = now; wh.n++; return; } }
+      wh.a = a; wh.t = now; wh.n++; }
+    if (Math.abs(dx) > Math.abs(dy) * 1.6) mapTurn(clamp(dx, -260, 260) * 0.0016, 0);   // (sideways: turned)
+    else mapZoom(Math.exp(-clamp(dy, -260, 260) * 0.0016), e.clientX, e.clientY); }, { passive: false });
+  let gr = 0; mapEl.addEventListener('gesturestart', e => { e.preventDefault(); gr = e.rotation || 0; });
+  mapEl.addEventListener('gesturechange', e => { e.preventDefault(); const r = e.rotation || 0; mapTurn((r - gr) * Math.PI / 180, 0); gr = r; });
 }
 // another flier on the map: a small bird of letters beating its wings, pointed the way it is going, with the line it has
 // flown behind it and a dotted line to where it will be in half a minute
