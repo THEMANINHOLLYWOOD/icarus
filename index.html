@@ -1237,6 +1237,26 @@ function craterAt(x, z) {
   return dh;
 }
 const floodAt = (x, z) => smoothstep(0.34, 0.48, noise2(x / 3100 + 71.3, z / 3100 - 19.7));
+// ── The sand sea. Ten kilometres south and west of the mountain, in the rain shadow of everything, the country gives up:
+//    no trees, no grass, no rock stands, a low dry floor of sand five kilometres across with dunes walking over it on the
+//    wind — long crests across the wind, a gentle back where the wind comes up them and a steep slip face where the sand
+//    falls over, here and there broken into separate horns. Dust storms come through it (see DUST). The ground of it is the
+//    ground of the game (it is cut into overHeight, so everything stands on the same sand), and it fades into whatever
+//    was there over its last eight hundred metres. (The wind's direction is written out here: WIND is made further down.)
+const DUNE = { x: -3000, z: 12400, R: 2800, base: WATER + 46, wx: 0.929, wz: 0.37 };
+DUNE.R2 = (DUNE.R + 440) ** 2; DUNE.u = DUNE.x * DUNE.wx + DUNE.z * DUNE.wz; DUNE.v = -DUNE.x * DUNE.wz + DUNE.z * DUNE.wx;
+function duneK(x, z) {   // how much of the sand sea this is: 1 in it, 0 out of it
+  const dx = x - DUNE.x, dz = z - DUNE.z, d2 = dx * dx + dz * dz; if (d2 > DUNE.R2) return 0;
+  return smoothstep(DUNE.R, DUNE.R - 800, Math.sqrt(d2) + 420 * noise2(x / 1500 + 2.2, z / 1500 - 6.1));
+}
+function duneLand(x, z, h) {
+  const k = duneK(x, z); if (k <= 0) return h;
+  const u = x * DUNE.wx + z * DUNE.wz, v = -x * DUNE.wz + z * DUNE.wx, n1 = noise2(x / 1700 + 3.1, z / 1700 - 8.4);
+  const uu = u + 150 * noise2(v / 760 + 9.3, u / 1300) + 46 * noise2(v / 230 - 2.2, u / 420 + 6.6);   // (the crests wander, fork and bend)
+  const f = ((uu / 230) % 1 + 1) % 1, up = f < 0.74 ? f / 0.74 : (1 - f) / 0.26, prof = up * up * (3 - 2 * up);   // the long back, then the slip face
+  const A = (17 + 13 * noise2(u / 900 + 1.7, v / 520 - 4.2)) * (0.45 + 0.55 * smoothstep(-0.55, 0.35, noise2(v / 330 + 4.4, u / 640)));   // (some lines break up into horns)
+  return lerp(h, DUNE.base + 26 * n1 + 9 * noise2(x / 480 - 5.5, z / 480 + 1.3) + A * prof, k);
+}
 // ── The deep. The Underworld is not only under the sea. Here and there in the land (one in about half the stretches of
 //    three and a half kilometres) the ground opens: a throat, a round pit going straight down into the dark, with a breath
 //    of cold coming up out of it. Whatever goes down one comes out of the roof of the same country the sea hides, but in
@@ -1249,7 +1269,7 @@ function caveSite(cx, cz) {
   const key = cx * 4096 + cz; let S = CAVE.cells.get(key); if (S !== undefined) return S;
   const fr = k => { const v = Math.sin(cx * 127.1 + cz * 311.7 + k * 74.7) * 43758.5453; return v - Math.floor(v); }; S = null;
   if (fr(1) < 0.72) { const C = CAVE.C, x = (cx + 0.22 + fr(2) * 0.56) * C, z = (cz + 0.22 + fr(3) * 0.56) * C;
-    if (Math.hypot(x - MOUNT.x, z - MOUNT.z) > MOUNT.R * 1.2 && Math.hypot(x - MOUNT.x - 11500, z - MOUNT.z - 11000) > 4300 && Math.hypot(x - 200, z - 200) > 800 && !volcanoNear(x, z, 900)) {
+    if (Math.hypot(x - MOUNT.x, z - MOUNT.z) > MOUNT.R * 1.2 && Math.hypot(x - MOUNT.x - 11500, z - MOUNT.z - 11000) > 4300 && Math.hypot(x - 200, z - 200) > 800 && !volcanoNear(x, z, 900) && Math.hypot(x - DUNE.x, z - DUNE.z) > DUNE.R + 900) {
       const g = baseHeight(x, z); if (g > WATER + 130 && g < 430) S = { id: `v${cx}_${cz}`, x, z, g, R: 34 + fr(4) * 10, depth: Math.min(150 + fr(5) * 50, g - WATER - 18), yaw: fr(6) * 6.283 }; } }   // (on high ground only: a pit that went below the sea would fill)
   CAVE.cells.set(key, S); return S;
 }
@@ -1314,6 +1334,7 @@ function overHeight(x, z) {
   }
   { const cdx = x - CRETE.x, cdz = z - CRETE.z, cd2 = cdx * cdx + cdz * cdz; if (cd2 < 3400 * 3400) h = lerp(Math.min(h, WATER - 18), h, smoothstep(2500, 3400, Math.sqrt(cd2))); }   // the sea round Crete (the island is only the Labyrinth's own rock)
   if (md2 > 4500 * 4500 && h > WATER - 1 && h < 170) { const f = floodAt(x, z); if (f > 0) h = lerp(h, WATER - 2.5 - (170 - h) * 0.02, f * smoothstep(170, 70, h)); }   // the drowned lands
+  if ((x - DUNE.x) ** 2 + (z - DUNE.z) ** 2 < DUNE.R2) h = duneLand(x, z, h);   // the sand sea (after the drowned lands: nothing of it is under water)
   if (CRATERS.length) h += craterAt(x, z);
   return caveCarve(x, z, h);
 }
@@ -1469,6 +1490,7 @@ scene.add(hemi, sun, sun.target);
 }
 
 const col = hex => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
+const DUNEC = { sand: col('#d2b183'), pale: col('#e8d2a8'), lee: col('#a5805a'), floor: col('#bca587') };
 const COL = {
   grassDark: col('#3c7a22'), grassLight: col('#86bd3c'), grassSun: col('#b0d456'), flower: col('#f3eaa2'),
   rock: col('#7d776b'), snow: col('#cfd6e0'), sand: col('#cdbb86'),
@@ -1524,6 +1546,8 @@ function terrainColor(x, z, h, ny, out, o) {
   }
   if (realm === 'over') { const S = caveSite(Math.floor(x / CAVE.C), Math.floor(z / CAVE.C)); if (S && (x - S.x) ** 2 + (z - S.z) ** 2 < (S.R * 2.6) ** 2) { mix(COL.rock, smoothstep(S.g + 6, S.g - 14, h)); mix([0.03, 0.035, 0.05], smoothstep(S.g - 18, S.g - S.depth * 0.7, h)); } }   // (a throat: rock at the lip, then nothing)
   mix(COL.sand, smoothstep(WATER + 5, WATER + 1, h));
+  { const dk = duneK(x, z); if (dk > 0) {   // the sand sea: warm sand, paler on the long backs, darker down the slip faces and in the hollows between
+    const n = noise2(x / 90 + 4.4, z / 90 - 1.9) * 0.5 + 0.5; mix(DUNEC.sand, dk); mix(DUNEC.pale, dk * smoothstep(0.93, 0.995, ny) * (0.3 + 0.4 * n)); mix(DUNEC.lee, dk * smoothstep(0.93, 0.8, ny) * 0.8); mix(DUNEC.floor, dk * smoothstep(DUNE.base + 4, DUNE.base - 18, h) * 0.6); } }
   for (const v of VOLCANOES) {   // black rock and grey ash on the volcanoes, yellow sulphur crusting the lake's rim
     const d = Math.hypot(x - v.x, z - v.z); if (d > v.R0) continue;
     const n = noise2(x / 23, z / 23);
@@ -1633,7 +1657,7 @@ const BIO = { blossom: [col('#f7b9d0'), col('#fbd3e1'), col('#f39ab8'), col('#ff
   stem: col('#d9d2c4'), night: col('#2a2440'), moss: col('#2f4a2a'), petal: col('#d9a9b8'), dusk: col('#27304a') };
 const _bw = [0, 0, 0];
 function biomeW(x, z) {   // how much of each (titanwood, lumen, blossom) this spot is: soft at the edges, so the ground changes over a walk, not a step
-  const far = smoothstep(2300, 2900, Math.hypot(x - MOUNT.x, z - MOUNT.z));   // (round Olympus the country is as it always was)
+  const far = smoothstep(2300, 2900, Math.hypot(x - MOUNT.x, z - MOUNT.z)) * (1 - duneK(x, z));   // (round Olympus the country is as it always was; and nothing of them in the sand sea)
   if (far <= 0) { _bw[0] = _bw[1] = _bw[2] = 0; return _bw; }
   const a = noise2(x / 2300 + 13.3, z / 2300 - 8.1), b = noise2(x / 2300 - 41.7, z / 2300 + 27.9);
   _bw[0] = smoothstep(0.24, 0.36, a) * far; _bw[1] = smoothstep(-0.28, -0.4, a) * far; _bw[2] = smoothstep(0.27, 0.39, b) * (1 - _bw[0]) * (1 - _bw[1]) * far;
@@ -1971,12 +1995,12 @@ function updateLeaves(dt) {
   worldFx.uGale.value = storm;
 }
 
-const nearSite = (x, z, r) => BEACONS.some(b => (x - b.x) ** 2 + (z - b.z) ** 2 < r * r) || volcanoNear(x, z, r) || riverF(x, z) < 1.6 || CRATERS.some(c => (x - c.x) ** 2 + (z - c.z) ** 2 < c.R * c.R * 1.7) || parthNear(x, z, r) || caveNearPit(x, z, r);   // (nothing grows or is built on the volcanoes, or in a river)
+const nearSite = (x, z, r) => BEACONS.some(b => (x - b.x) ** 2 + (z - b.z) ** 2 < r * r) || volcanoNear(x, z, r) || riverF(x, z) < 1.6 || CRATERS.some(c => (x - c.x) ** 2 + (z - c.z) ** 2 < c.R * c.R * 1.7) || parthNear(x, z, r) || caveNearPit(x, z, r) || duneK(x, z) > 0.3;   // (nothing grows or is built on the volcanoes, or in a river, or in the sand sea)
 
 // one wind for everything that drifts: clouds, their shadows, snow, the ribbons of air
 const WIND = new THREE.Vector3(0.93, 0, 0.37);
 // shared by every piece of ground: cloud shadows sliding over the hills, and a waterline that breathes
-const worldFx = { uTime: { value: 0 }, uShade: { value: 1 }, uUnder: { value: 0 }, uWater: { value: WATER }, uBird: { value: new THREE.Vector4() }, uGale: { value: 0 }, uSunD: { value: new THREE.Vector3(0.4, 0.8, 0.3) }, uSlope: { value: 1 } };
+const worldFx = { uTime: { value: 0 }, uShade: { value: 1 }, uUnder: { value: 0 }, uWater: { value: WATER }, uBird: { value: new THREE.Vector4() }, uGale: { value: 0 }, uSunD: { value: new THREE.Vector3(0.4, 0.8, 0.3) }, uSlope: { value: 1 }, uWet: { value: 0 }, uSky: { value: new THREE.Color(0.6, 0.75, 0.9) } };   // (uWet, uSky: the ground after rain, and what its puddles show; see WC)
 function patchWorld(mat, shore, sways) {
   mat.customProgramCacheKey = () => 'world' + (shore ? 'S' : '') + (sways ? 'W' : '') + '|a3';   // (the flags change the shader: each kind compiled for itself)
   mat.onBeforeCompile = sh => {
@@ -1999,7 +2023,7 @@ function patchWorld(mat, shore, sways) {
           vLeaf = lf;
         } else vLeaf = 0.0;` : ''));
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vWp; uniform float uTime, uShade, uUnder, uWater, uSlope; uniform vec3 uSunD;${sways ? ' varying float vLeaf;' : ''}
+      varying vec3 vWp; uniform float uTime, uShade, uUnder, uWater, uSlope, uWet; uniform vec3 uSunD, uSky;${sways ? ' varying float vLeaf;' : ''}
       float wHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float wNoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(wHash(i), wHash(i + vec2(1.0, 0.0)), f.x), mix(wHash(i + vec2(0.0, 1.0)), wHash(i + vec2(1.0, 1.0)), f.x), f.y); }`)
@@ -2028,6 +2052,17 @@ function patchWorld(mat, shore, sways) {
           gl_FragColor.rgb *= 1.0 - strata * 0.24 + smoothstep(0.92, 1.0, strata) * 0.12;
           float sp = wHash(floor(vWp.xz * 1.4));
           gl_FragColor.rgb *= 1.0 + (step(0.94, sp) * 0.2 - step(sp, 0.05) * 0.16) * flatK * near;
+          if (uWet > 0.003 && vWp.y > uWater + 0.6) {
+            // after rain: the soil dark with it and sheened, and in the flat low places puddles holding the sky, the sun
+            // glinting off them (they shrink from their edges as it dries)
+            vec3 V = normalize(cameraPosition - vWp), R = vec3(-V.x, V.y, -V.z);
+            float lie = smoothstep(0.05, 0.0, steep), pm = wNoise(vWp.xz * 0.06 + 2.3) * 0.65 + wNoise(vWp.xz * 0.23 - 5.1) * 0.35;
+            float pud = smoothstep(0.68 - uWet * 0.06, 0.7 - uWet * 0.06, pm) * lie * smoothstep(0.25, 0.6, uWet);
+            float fres = 0.25 + 0.75 * pow(1.0 - clamp(V.y, 0.0, 1.0), 4.0), glint = pow(max(dot(R, uSunD), 0.0), 90.0);
+            gl_FragColor.rgb *= 1.0 - uWet * 0.3 * flatK;
+            gl_FragColor.rgb += (uSky * 0.16 * fres + vec3(1.0, 0.95, 0.85) * pow(max(dot(R, uSunD), 0.0), 14.0) * 0.12) * uWet * flatK;
+            gl_FragColor.rgb = mix(gl_FragColor.rgb, uSky * (0.45 + 0.5 * fres) + vec3(1.0, 0.96, 0.88) * glint * 1.6, pud * 0.85);
+          }
         }
         float wv = sin(uTime * 0.9 + vWp.x * 0.05 + vWp.z * 0.035) * 0.35 + sin(uTime * 0.6 - vWp.z * 0.07) * 0.25;
         float d = vWp.y - (uWater + wv);
@@ -2718,24 +2753,30 @@ const water = new THREE.Mesh((() => {
 })(), waterMat);
 water.position.y = WATER; water.frustumCulled = false;
 scene.add(water);
+// The water going round: what the sea gives up, what the clouds carry inland and drop where they meet high ground, what
+// runs off the mountain and down the rivers and over the falls, and what lies on the ground after rain and dries off it.
+// wet: the ground where he is (soaked by rain, drying in sun and wind); basin: what has rained on the high country lately;
+// flood: how full the rivers and the falls run with it; rivT: the rivers' own clock (they run faster when they are full).
+const WC = { wet: 0, basin: 0.12, inflow: 0, flood: { value: 0 }, rivT: { value: 0 }, sT: 0, vapT: 0, cells: new Map() };
 // the rivers' water: a ribbon down each bed, always running downhill — streaks of foam carried along, faster and whiter where
-// it falls steeply — fanning out and fading into the sea at its mouth
+// it falls steeply — fanning out and fading into the sea at its mouth; full and brown and quick after rain on the mountain
 const riverMat = new THREE.ShaderMaterial({
-  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uDeep: { value: new THREE.Color() }, uShallow: { value: new THREE.Color() }, uSunCol: { value: new THREE.Color() }, uHor: { value: new THREE.Color() } }]),
+  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uDeep: { value: new THREE.Color() }, uShallow: { value: new THREE.Color() }, uSunCol: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uFlood: { value: 0 }, uRivT: { value: 0 } }]),
   vertexShader: `attribute float aSlope, aFade; varying vec2 vUv; varying float vSlope, vFade;
     #include <fog_pars_vertex>
     void main(){ vUv = uv; vSlope = aSlope; vFade = aFade; vec4 mvPosition = viewMatrix * modelMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mvPosition;
       #include <fog_vertex>
     }`,
-  fragmentShader: `uniform vec3 uDeep, uShallow, uSunCol, uHor; uniform float uTime; varying vec2 vUv; varying float vSlope, vFade;
+  fragmentShader: `uniform vec3 uDeep, uShallow, uSunCol, uHor; uniform float uTime, uFlood, uRivT; varying vec2 vUv; varying float vSlope, vFade;
     #include <fog_pars_fragment>
     float h1(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float n1(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h1(i), h1(i + vec2(1.0, 0.0)), f.x), mix(h1(i + vec2(0.0, 1.0)), h1(i + vec2(1.0, 1.0)), f.x), f.y); }
     void main(){
-      float fast = smoothstep(0.25, 1.1, vSlope), v = vUv.y - uTime * (0.45 + fast * 2.6), x = vUv.x;
+      float fast = smoothstep(0.25, 1.1, vSlope), v = vUv.y - uRivT * (0.45 + fast * 2.6), x = vUv.x;
       float streak = n1(vec2(x * 7.0, v * 3.0)) * n1(vec2(x * 15.0 + 3.0, v * 7.0 + 1.0));
-      float lines = smoothstep(0.34, 0.66, streak), bank = smoothstep(0.32, 0.5, abs(x - 0.5));
+      float lines = smoothstep(0.34 - uFlood * 0.14, 0.66 - uFlood * 0.12, streak), bank = smoothstep(0.32, 0.5, abs(x - 0.5));
       vec3 c = mix(uShallow * 1.15, uDeep * 0.85, 0.62 - bank * 0.45) + uSunCol * 0.1;
+      c = mix(c, vec3(0.42, 0.36, 0.27) * (0.45 + uSunCol * 0.45), uFlood * 0.32);   // (in spate: the colour of the hills it has come off)
       c += uSunCol * 0.25 * pow(n1(vec2(x * 22.0, v * 11.0)), 6.0);   // (glints)
       vec3 foam = uHor * 0.4 + uSunCol * 0.6 + vec3(0.08);
       c = mix(c, foam, clamp(lines * (0.2 + fast * 0.55) + fast * 0.25 + bank * 0.18 * (0.4 + 0.6 * lines), 0.0, 0.85));
@@ -2745,6 +2786,7 @@ const riverMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: true,
 });
 for (const k of ['uTime', 'uDeep', 'uShallow', 'uSunCol', 'uHor']) riverMat.uniforms[k] = waterMat.uniforms[k];   // (the same light and the same clock as the sea)
+riverMat.uniforms.uFlood = WC.flood; riverMat.uniforms.uRivT = WC.rivT;
 RIV.group = new THREE.Group(); RIV.group.renderOrder = 1;
 for (const R of RIV.list) {
   const pts = [];
@@ -2779,7 +2821,7 @@ function updateRivers(dt) {
   if (realm !== 'over' || !RIV.falls.length || (RIV.sprayT -= dt) > 0) return;
   RIV.sprayT = TOUCH ? 0.09 : 0.045;
   const c = camera.position;
-  for (let k = 0; k < 3; k++) {
+  for (let k = 0, n = 3 + Math.round(WC.flood.value * 4); k < n; k++) {
     const F = RIV.falls[Math.floor(Math.random() * RIV.falls.length)];
     if ((F.x - c.x) ** 2 + (F.z - c.z) ** 2 > 700 * 700) continue;
     emit(F.x + rnd(F.w * 0.4), F.y + 1, F.z + rnd(F.w * 0.4), rnd(2.5), 1.5 + Math.random() * 3.5, rnd(2.5), 1.4 + Math.random(), MIST, 0.6, 1.6);
@@ -2966,7 +3008,7 @@ function updateClouds(dt) {
       const env = smoothstep(0, 0.2, c.ph) * smoothstep(1, 0.78, c.ph), d = time * c.v;
       const x = cx + wrapW(c.x + WIND.x * d - cx), z = cz + wrapW(c.z + WIND.z * d - cz);
       if (c.heat) c.heat = Math.max(0, c.heat - dt * 0.04);   // (it gathers again, slowly)
-      const y = under ? WATER + 10 + c.yk * 60 : c.y, s = c.s * (0.2 + 0.8 * env) * (1 + c.puff * 0.3) * (1 - 0.6 * (c.heat || 0)), sy = (under ? 0.2 : K.sy) * (0.8 + 0.2 * env);
+      const y = under ? WATER + 10 + c.yk * 60 : c.y, s = c.s * (0.2 + 0.8 * env) * (1 + c.puff * 0.3) * (1 - 0.6 * (c.heat || 0)) * (under ? 1 : 1 + 0.4 * WX.storm), sy = (under ? 0.2 : K.sy) * (0.8 + 0.2 * env);   // (in wet weather they build)
       shove(c, x + c.ox, y + c.oy + 7 * s * sy, z + c.oz, 36 * s + 30, dt);
       _mat.compose(_p.set(x + c.ox, y + c.oy, z + c.oz), _q.setFromAxisAngle(UP, c.rot + time * c.spin + c.sa), _s.set(s, s * sy, s));
       K.mesh.setMatrixAt(i, _mat);
@@ -4089,7 +4131,7 @@ const postMat = new THREE.ShaderMaterial({
     uCell: { value: new THREE.Vector2() }, uAscii: { value: 1 }, uTotal: { value: glyphs.total }, uGA: { value: glyphs.A }, uGB: { value: glyphs.B }, uEdgeIdx: { value: glyphs.edge },
     tPrev: { value: null }, uPersist: { value: 0 }, tTitle: { value: null }, uTitleT: { value: -1 }, uSunUV: { value: new THREE.Vector2(0.5, 0.8) }, uRays: { value: 0 },
     tName: { value: null }, uNameNs: { value: new Float32Array(9).fill(7) }, uNameW: { value: 2 },
-    uNear: { value: 0.3 }, uFar: { value: 14000 }, uEdge: { value: 1 }, uFlash: { value: 0 }, uFlashCol: { value: new THREE.Color(1, 0.75, 0.45) }, uHeat: { value: 0 }, uGlow: { value: 0 },
+    uNear: { value: 0.3 }, uFar: { value: 14000 }, uEdge: { value: 1 }, uLineFar: { value: 1e5 }, uFlash: { value: 0 }, uFlashCol: { value: new THREE.Color(1, 0.75, 0.45) }, uHeat: { value: 0 }, uGlow: { value: 0 },
     uTint: { value: new THREE.Color(1, 1, 1) }, uFade: { value: 1 }, uWarp: { value: 0 }, uLight: { value: 0 }, uSpeed: { value: 0 }, uDanger: { value: 0 }, uDof: { value: 0 }, uSea: { value: 0 }, uVib: { value: 1 }, tBlur: { value: null }, uTime: worldFx.uTime,
     tCells: { value: null }, tCells2: { value: null }, uCells: { value: new THREE.Vector2(1, 1) }, uRelief: { value: 6 },
     uGlitch: { value: 0 }, uStTint: { value: new THREE.Color(1, 1, 1) }, uStA: { value: new THREE.Vector4(0, 1, 1, 1) }, uStB: { value: new THREE.Vector4(1, 1, 0, 0) }, tUI: { value: null }, tChars: { value: null }, uUiOn: { value: 0 }, uUiK: { value: 1 }, uUiN: { value: new THREE.Vector2(1, 1) }, tUI2: { value: null }, uUi2On: { value: 0 }, uUi2N: { value: new THREE.Vector2(1, 1) }, uWt: { value: [new THREE.Color(1, 0.9, 0.7), new THREE.Color(1, 0.7, 0.35), new THREE.Color(0.4, 0.2, 0.08)] }, uSayCol: { value: new THREE.Color(1, 0.7, 0.35) }, uUiCol: { value: [new THREE.Color(1, 0.54, 0.23), new THREE.Color(1, 0.85, 0.66), new THREE.Color(0.42, 0.15, 0.03)] } },
@@ -4327,10 +4369,10 @@ const CELL_GLSL = `
     float invZ(vec2 uv){ float z = texture2D(tDepth, uv).r * 2.0 - 1.0; return (uFar + uNear - z * (uFar - uNear)) / (2.0 * uNear * uFar); }
     float skyAt(vec2 uv){ return step(0.99995, texture2D(tDepth, uv).r); }`;
 const cellMat = new THREE.ShaderMaterial({
-  uniforms: { tScene: PU.tScene, tDepth: PU.tDepth, uRes: PU.uRes, uCell: PU.uCell, uNear: PU.uNear, uFar: PU.uFar, uEdge: PU.uEdge, uGlow: PU.uGlow, uRelief: PU.uRelief, uGA: PU.uGA, uGB: PU.uGB, uEdgeIdx: PU.uEdgeIdx },
+  uniforms: { tScene: PU.tScene, tDepth: PU.tDepth, uRes: PU.uRes, uCell: PU.uCell, uNear: PU.uNear, uFar: PU.uFar, uEdge: PU.uEdge, uGlow: PU.uGlow, uRelief: PU.uRelief, uGA: PU.uGA, uGB: PU.uGB, uEdgeIdx: PU.uEdgeIdx, uLineFar: PU.uLineFar },
   vertexShader: `void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: CELL_GLSL + `
-    uniform vec3 uGA[${glyphs.total}], uGB[${glyphs.total}]; uniform vec4 uEdgeIdx;
+    uniform vec3 uGA[${glyphs.total}], uGB[${glyphs.total}]; uniform vec4 uEdgeIdx; uniform float uLineFar;
     void main(){
       vec2 cell = floor(gl_FragCoord.xy), st = uCell / uRes, c0 = (cell + 0.5) * st;
       // six looks at what is behind this cell: two across, three down
@@ -4373,13 +4415,13 @@ const cellMat = new THREE.ShaderMaterial({
         // a silhouette has no brightness of its own to go by: where the depth breaks, the line is drawn along the break
         float zl = invZ(c0 - dx), zr = invZ(c0 + dx), zd = invZ(c0 - dy), zu = invZ(c0 + dy);
         vec2 lap = abs(vec2(zl + zr - 2.0 * zc, zd + zu - 2.0 * zc)) / max(max(zc, max(zl, zr)), max(zd, zu));
-        line = smoothstep(0.1, 0.28, lap.x + lap.y) * uEdge;
+        line = smoothstep(0.1, 0.28, lap.x + lap.y) * uEdge * (1.0 - smoothstep(uLineFar * 0.7, uLineFar, 1.0 / max(zc, 1e-7)));   // (none drawn through a dust storm or a white-out)
         if (line > 0.5 && hot < 0.5 && who < 0.5) {
           vec2 g = lap * sign(vec2(zr - zl, zu - zd) + 1e-9);
           float a = mod(atan(g.y / uCell.y, g.x / uCell.x) + 3.14159, 3.14159);   // direction of steepest change, 0..pi
           idx = a < 0.3927 || a > 2.7489 ? uEdgeIdx.x : a < 1.1781 ? uEdgeIdx.w : a < 1.9635 ? uEdgeIdx.z : uEdgeIdx.y;   // | \\ - /
           s = clamp(s * 1.25 + 0.06, 0.0, 1.0);
-        } else if (hot < 0.5 && who < 0.5 && sky < 0.5) {
+        } else if (hot < 0.5 && who < 0.5 && sky < 0.5 && 1.0 / max(zc, 1e-7) < uLineFar) {
           // and where the light itself turns hard — a shadow's edge, a cliff against a field — a stroke along it too
           float lL = lum(toSRGB(texture2D(tScene, c0 - dx).rgb)), lR = lum(toSRGB(texture2D(tScene, c0 + dx).rgb));
           float lD = lum(toSRGB(texture2D(tScene, c0 - dy).rgb)), lU = lum(toSRGB(texture2D(tScene, c0 + dy).rgb));
@@ -6062,7 +6104,7 @@ function groundKind(x, z, y) {
   const g = terrainAt(x, z);
   if (y - g > 0.5 || onPlatform(x, z, y + 0.5)) return 'stone';
   if (g < WATER + 0.25) return 'water';
-  if (g < WATER + 4.5) return 'sand';
+  if (g < WATER + 4.5 || duneK(x, z) > 0.5) return 'sand';
   for (const v of VOLCANOES) if ((x - v.x) ** 2 + (z - v.z) ** 2 < v.R0 * v.R0) return 'ash';
   if (g > 600) return 'snow';
   if (g > 400) return 'rock';
@@ -12201,13 +12243,13 @@ const sailGeo = (() => {
 })();
 const waterfallMat = new THREE.ShaderMaterial({
   uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uSize: { value: new THREE.Vector2(10, 200) },
-    uHit: { value: [new THREE.Vector4(0, 0, -99, 0), new THREE.Vector4(0, 0, -99, 0), new THREE.Vector4(0, 0, -99, 0)] } }]),   // (uHit: where it was last flown through — across, up, when, how hard)
+    uHit: { value: [new THREE.Vector4(0, 0, -99, 0), new THREE.Vector4(0, 0, -99, 0), new THREE.Vector4(0, 0, -99, 0)] }, uFlood: { value: 0 } }]),   // (uHit: where it was last flown through — across, up, when, how hard; uFlood: how full it runs after rain)
   vertexShader: `varying vec2 vUv;
     #include <fog_pars_vertex>
     void main(){ vUv = uv; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mvPosition;
     #include <fog_vertex>
     }`,
-  fragmentShader: `uniform float uTime; uniform vec2 uSize; uniform vec4 uHit[3]; varying vec2 vUv;
+  fragmentShader: `uniform float uTime, uFlood; uniform vec2 uSize; uniform vec4 uHit[3]; varying vec2 vUv;
     #include <fog_pars_fragment>
     void main(){
       // something went through it: a hole torn in the sheet, which the water carries down with it and closes over; foam round
@@ -12228,9 +12270,10 @@ const waterfallMat = new THREE.ShaderMaterial({
       float edge = smoothstep(0.0, 0.25, vUv.x) * smoothstep(1.0, 0.75, vUv.x);
       float fade = smoothstep(0.0, 0.5, vUv.y);   // dissolves into mist on the way down
       foam = clamp(foam, 0.0, 1.0);
-      vec3 c = mix(vec3(0.55, 0.78, 0.98), vec3(1.0), streak * 0.8) * 1.15;
+      vec3 c = mix(vec3(0.55, 0.78, 0.98), vec3(1.0), streak * (0.8 + uFlood * 0.2)) * (1.15 + uFlood * 0.15);
       c = mix(c, vec3(1.3), foam * 0.75) + max(wob, 0.0) * 0.3;
-      gl_FragColor = vec4(c, clamp(((0.5 + 0.5 * streak) * fade + foam * 0.4 + abs(wob) * 0.25 * fade) * edge, 0.0, 1.0) * hole);
+      edge = mix(edge, smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x), uFlood);   // (full: it runs the whole width of the lip)
+      gl_FragColor = vec4(c, clamp(((0.5 + 0.5 * streak + uFlood * 0.25) * fade + foam * 0.4 + abs(wob) * 0.25 * fade) * edge, 0.0, 1.0) * hole);
       #include <fog_fragment>
     }`,
   transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: true,
@@ -12481,7 +12524,7 @@ function disposeFeatures(group) {
 const FALLS = { prev: new THREE.Vector3(), has: false, side: new WeakMap(), live: new Set(), steam: 0, skimT: 0, at: -99, n: 0 }, _fv = new THREE.Vector3();
 function fallPierce(f, u, v, sp, at = null, part = 1) {
   const p = player, P = at || p.pos, F = FALLS, g = f.geometry.parameters, bird = p.form !== 'human', k = clamp(sp / 90, 0.25, 1) * (bird ? 1 : 0.7) * part;
-  if (f.material === waterfallMat) { const m = waterfallMat.clone(); m.uniforms.uTime = waterfallMat.uniforms.uTime; f.material = m; f.userData.hitN = 0; F.live.add(f); }
+  if (f.material === waterfallMat) { const m = waterfallMat.clone(); m.uniforms.uTime = waterfallMat.uniforms.uTime; m.uniforms.uFlood = waterfallMat.uniforms.uFlood; f.material = m; f.userData.hitN = 0; F.live.add(f); }
   f.material.uniforms.uSize.value.set(g.width, g.height);
   f.material.uniforms.uHit.value[f.userData.hitN++ % 3].set(u, v, time, k);
   f.userData.hitT = F.at = time; F.n++;
@@ -12529,7 +12572,7 @@ function updateWorldLife(dt) {
   for (const s of windmills) s.rotation.z = time * 0.7 + s.userData.phase;
   for (const f of waterfalls) {
     const L = f.userData.lip;
-    if (Math.random() < 0.35 && (L.x - player.pos.x) ** 2 + (L.z - player.pos.z) ** 2 < 450 * 450)
+    if (Math.random() < 0.35 + WC.flood.value * 0.45 && (L.x - player.pos.x) ** 2 + (L.z - player.pos.z) ** 2 < 450 * 450)
       emit(L.x + rnd(3), L.y - Math.random() * 8, L.z + rnd(3), rnd(2), -2 - Math.random() * 4, rnd(2), 1.6, [0.45, 0.55, 0.65]);
   }
 }
@@ -13959,9 +14002,9 @@ const SNOW = { k: 0, bliz: 0, told: 0, col: new THREE.Color(0xa8bcd8), white: ne
 function updateRain(dt) {
   const c = camera.position, inCloud = realm === 'over' ? smoothstep(170, 40, Math.abs(c.y - CLOUD_SEA)) : 0;
   const live = state !== 'title' && state !== 'loading' && realm === 'over', hg = live ? terrainAt(c.x, c.z) : -1e9;
-  SNOW.k = lerp(SNOW.k, live ? smoothstep(400, 540, Math.max(hg, Math.min(c.y - 60, hg + 260))) : 0, damp(0.8, dt));
+  SNOW.k = lerp(SNOW.k, live ? Math.max(smoothstep(400, 540, Math.max(hg, Math.min(c.y - 60, hg + 260))), WX.squall) : 0, damp(0.8, dt));   // (a squall is snow wherever it is)
   const flurry = SNOW.k * 0.22 * (0.5 + 0.5 * Math.sin(time * 0.07 + 1.3) * Math.sin(time * 0.023));
-  SNOW.bliz = lerp(SNOW.bliz, SNOW.k * Math.max(WX.thunder, storm > 0.3 ? storm : 0, WX.rain * 0.55), damp(0.5, dt));
+  SNOW.bliz = lerp(SNOW.bliz, SNOW.k * Math.max(WX.thunder, storm > 0.3 ? storm : 0, WX.rain * 0.55, WX.squall * 0.95), damp(WX.squall > SNOW.bliz ? 0.9 : 0.5, dt));
   const want = state === 'title' || state === 'loading' ? 0 : Math.max(realm === 'over' && storm > 0.3 && c.y > CLOUD_SEA - 150 ? storm : 0, inCloud * 0.9, realm === 'over' ? WX.rain : 0, flurry, SNOW.bliz);
   cloudStorm(dt, inCloud);
   rainAmt = lerp(rainAmt, want, damp(want > rainAmt ? 1.2 : 0.7, dt));
@@ -14668,14 +14711,14 @@ function gotBurn(m) {
 // out of one into another. They are worked out from the clock, so everyone flying sees the same weather in the same
 // place. Olympus keeps a sky of its own that turns from clear to cloud to storm; when someone new arrives in the world
 // Zeus breaks a storm over it; and a god can change it while you stand there — Zeus the storm, Poseidon the sea, Apollo the sun.
-const WX = { storm: 0, rain: 0, thunder: 0, light: 1, fog: 0, kind: '', shown: '', sampleT: 0, god: [], olyT: 0, waveT: 0, want: null };
+const WX = { storm: 0, rain: 0, thunder: 0, light: 1, fog: 0, dust: 0, squall: 0, kind: '', shown: '', sampleT: 0, god: [], olyT: 0, waveT: 0, want: null };
 const WX_KINDS = ['thunder', 'rain', 'rain', 'grey', 'grey', 'bright', 'mist', 'gold', 'gold'];
 const GOLD_C = new THREE.Color(1.0, 0.72, 0.36), GOLD_FOG = new THREE.Color(0.98, 0.66, 0.42);
-const WX_NAMES = { thunder: 'A THUNDERSTORM', rain: 'RAIN', grey: 'GREY SKIES', bright: 'CLEAR SKY', mist: 'MIST', waves: 'THE SEA RISES', gold: 'GOLDEN LIGHT' };
+const WX_NAMES = { thunder: 'A THUNDERSTORM', rain: 'RAIN', grey: 'GREY SKIES', bright: 'CLEAR SKY', mist: 'MIST', waves: 'THE SEA RISES', gold: 'GOLDEN LIGHT', dust: 'A DUST STORM', squall: 'A SNOW SQUALL' };
 function wxHash(a, b, c) { let h = Math.imul(a, 374761393) + Math.imul(b, 668265263) + Math.imul(c, 1442695041) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
 function wxAt(x, z) {
   const t = Date.now() / 1000, T = 7000, X = x - WIND.x * 7 * t, Z = z - WIND.z * 7 * t;   // (the whole pattern drifts downwind at 7 m/s)
-  const tx = Math.floor(X / T), tz = Math.floor(Z / T), w = { thunder: 0, rain: 0, grey: 0, bright: 0, mist: 0, waves: 0, gold: 0 };
+  const tx = Math.floor(X / T), tz = Math.floor(Z / T), w = { thunder: 0, rain: 0, grey: 0, bright: 0, mist: 0, waves: 0, gold: 0, dust: 0, squall: 0 };
   for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) for (let k = 0; k < 6; k++) {
     const a = tx + dx, b = tz + dz, h1 = wxHash(a, b, k), h2 = wxHash(a, b, k + 50), h3 = wxHash(a, b, k + 100), h4 = wxHash(a, b, k + 150);
     const life = Math.sin(t / (420 + h4 * 600) + h1 * 40); if (life <= 0) continue;   // each one grows, holds, dies away, and comes again
@@ -14683,8 +14726,18 @@ function wxAt(x, z) {
     const kind = WX_KINDS[Math.floor(h4 * 997) % WX_KINDS.length];
     w[kind] = Math.max(w[kind], smoothstep(r, r * 0.4, d) * smoothstep(0, 0.35, life));
   }
-  // the summit's own sky, round and round every few minutes; and Zeus's storm when someone arrives
   const md = Math.hypot(x - MOUNT.x, z - MOUNT.z);
+  // and the country under it. Wet air comes in off the sea in long waves on the wind (two of them, one slow and one
+  // quicker, both travelling downwind, so the same rain reaches the hills a while after it left the coast); it builds into
+  // cloud over the coasts and the hills, and rains itself out where it meets high ground. Past the high ground, in the rain
+  // shadow, the air comes down dry: the sand sea has no rain, only its dust (see WC, DUST and SQ)
+  { const G = wxGround(x, z), U = x * WIND.x + z * WIND.z, pulse = 0.6 * (0.5 + 0.5 * Math.sin((U - 7 * t) / 2600)) + 0.4 * (0.5 + 0.5 * Math.sin((U - 9 * t) / 1150 + 1.7));
+    const oro = G.moist * G.lift * smoothstep(0.52, 0.86, pulse) * smoothstep(900, 1500, md);   // (over the summit it is above all of it)
+    w.rain = Math.max(w.rain, oro * 0.95); w.thunder = Math.max(w.thunder, oro * G.lift * smoothstep(0.88, 0.98, pulse) * 0.8);
+    w.grey = Math.max(w.grey, G.moist * smoothstep(0.38, 0.8, pulse) * (0.22 + 0.36 * G.lift));
+    if (G.dry > 0) { for (const n of ['thunder', 'rain', 'grey', 'mist']) w[n] *= 1 - G.dry; w.bright = Math.max(w.bright, G.dry * 0.5); }
+    w.dust = dustAt(x, z, t); w.squall = squallAt(x, z, t); }
+  // the summit's own sky, round and round every few minutes; and Zeus's storm when someone arrives
   if (md < 1800) {
     const k = smoothstep(1800, 700, md), s = 0.5 + 0.5 * Math.sin(t / 75);
     w.thunder = Math.max(w.thunder, k * smoothstep(0.62, 0.92, s), k * smoothstep(0, 6, WX.olyT));
@@ -14695,7 +14748,7 @@ function wxAt(x, z) {
   for (const q of WX.god) {
     const k = smoothstep(q.r, q.r * 0.35, Math.hypot(x - q.x, z - q.z)) * smoothstep(0, 4, time - q.t0) * smoothstep(q.until, q.until - 8, time);
     if (k <= 0) continue;
-    if (q.kind === 'calm') { for (const n of ['thunder', 'rain', 'grey', 'mist', 'waves']) w[n] *= 1 - k; w.bright = Math.max(w.bright, k); }
+    if (q.kind === 'calm') { for (const n of ['thunder', 'rain', 'grey', 'mist', 'waves', 'dust', 'squall']) w[n] *= 1 - k; w.bright = Math.max(w.bright, k); }
     else w[q.kind] = Math.max(w[q.kind], k);
     if (q.kind === 'waves') w.rain = Math.max(w.rain, k * 0.7);
   }
@@ -14709,7 +14762,7 @@ function wxAt(x, z) {
 function updateWeather(dt) {
   if ((WX.olyT -= dt) < 0) WX.olyT = 0;
   WX.god = WX.god.filter(q => time < q.until);
-  if ((WX.sampleT -= dt) < 0 || !WX.want) { WX.sampleT = 0.25; WX.want = realm === 'over' ? wxAt(player.pos.x, player.pos.z) : { thunder: 0, rain: 0, grey: 0, bright: 0, mist: 0, waves: 0, gold: 0 }; }
+  if ((WX.sampleT -= dt) < 0 || !WX.want) { WX.sampleT = 0.25; WX.want = realm === 'over' ? wxAt(player.pos.x, player.pos.z) : { thunder: 0, rain: 0, grey: 0, bright: 0, mist: 0, waves: 0, gold: 0, dust: 0, squall: 0 }; }
   const w = WX.want, k = damp(0.35, dt);
   WX.thunder = lerp(WX.thunder, w.thunder, k);
   WX.rain = lerp(WX.rain, Math.max(w.thunder, w.rain * 0.85, w.waves * 0.6), k);
@@ -14717,6 +14770,7 @@ function updateWeather(dt) {
   WX.light = lerp(WX.light, clamp(1 - w.grey * 0.42 - w.thunder * 0.4 - w.rain * 0.22 - w.mist * 0.12 + w.bright * 0.3, 0.45, 1.3), k);
   WX.fog = lerp(WX.fog, Math.max(w.mist * 0.9, w.rain * 0.35, w.thunder * 0.4), k);
   WX.gold = lerp(WX.gold || 0, (w.gold || 0) * (1 - Math.max(w.thunder, w.rain)) * smoothstep(0.02, 0.2, sunDir.y), k);   // (golden light: only under a sun that is up, and not through rain)
+  WX.dust = lerp(WX.dust, w.dust || 0, damp(1.2, dt)); WX.squall = lerp(WX.squall, w.squall || 0, damp(0.9, dt));   // (these two come on quickly: a wall, a squall)
   // say what he has flown into, once, when it is properly here
   let top = '', tv = 0.55; for (const n in w) if (w[n] > tv) { tv = w[n]; top = n; }
   if (top && top !== WX.shown && state === 'play') { WX.shown = top; toast(SNOW.k > 0.6 && top === 'rain' ? 'SNOW' : SNOW.k > 0.6 && top === 'thunder' ? 'A SNOWSTORM' : WX_NAMES[top]); }
@@ -14731,60 +14785,110 @@ function updateWeather(dt) {
       break; } }
   }
 }
-// Tornadoes. Out in the low country, under a thunderstorm, the sky comes down to the ground: a grey funnel six hundred
-// metres tall that walks with the wind and tears up whatever it crosses. A bird that flies into one is taken round and
-// up and thrown out of the top; a man on the ground near one is picked up. They never come near the mountain.
-const TW = { list: [], t: 5, mat: null, geo: null };
+// Tornadoes. Out in the low country, under a thunderstorm, the sky comes down to the ground: a funnel well over a kilometre
+// tall, a rope of grey at its foot that spreads into a wall of cloud half a kilometre across where it meets the storm, a
+// skirt of dust and torn-up ground boiling round the foot, and wreckage going round and round it. It walks with the wind and
+// tears up whatever it crosses. A bird a long way off is shoved and shaken by it; nearer, dragged round it; in it, taken up
+// and round and thrown out of the side (it never kills him: what he is thrown at might). A man on the ground near one is
+// picked up. They never come near the mountain.
+const TW = { list: [], t: 5, mat: null, geo: null, sgeo: null, deb: null, dd: null, n: 0 };
+const TW_DEB = TOUCH ? 40 : 96;
+// how wide the funnel is at a height (0 at the ground, 1 at the cloud) as a share of its top: a rope, flaring into the wall cloud
+const twR = h => 0.075 + 0.5 * Math.pow(h, 2.4) + 0.5 * Math.pow(smoothstep(0.8, 1, h), 1.5);
 function twisterMesh() {
-  TW.geo ||= new THREE.CylinderGeometry(1, 0.07, 1, 20, 30, true).translate(0, 0.5, 0);
-  TW.mat ||= new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uCol: { value: new THREE.Color(0.12, 0.13, 0.16) } },
-    vertexShader: `uniform float uTime; varying vec2 vU;
-      void main() { vU = uv; vec3 p = position; float h = p.y, a = uTime * 0.9 + h * 5.0;
-        p.x += (sin(a) * 0.16 + sin(uTime * 0.31 + h * 2.0) * 0.1) * h; p.z += cos(a * 0.8) * 0.16 * h; p.xz *= 1.0 + 0.08 * sin(h * 26.0 - uTime * 7.0);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
-    fragmentShader: `uniform float uTime; uniform vec3 uCol; varying vec2 vU;
-      float hsh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-      float ns(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hsh(i), hsh(i + vec2(1.0, 0.0)), f.x), mix(hsh(i + vec2(0.0, 1.0)), hsh(i + vec2(1.0, 1.0)), f.x), f.y); }
-      void main() { float s = ns(vec2(vU.x * 14.0 + uTime * 2.6 + vU.y * 9.0, vU.y * 22.0 - uTime * 3.2));
-        float a = (0.74 + 0.26 * s) * smoothstep(0.0, 0.05, vU.y) * (1.0 - smoothstep(0.84, 1.0, vU.y));
-        gl_FragColor = vec4(uCol * (0.5 + 0.9 * s), a); }` });
-  const m = new THREE.Mesh(TW.geo, TW.mat); m.frustumCulled = false; m.renderOrder = 3; scene.add(m); return m;
+  if (!TW.geo) {
+    const g = new THREE.CylinderGeometry(1, 1, 1, 32, 48, true).translate(0, 0.5, 0), P = g.attributes.position;
+    for (let i = 0; i < P.count; i++) { const r = twR(P.getY(i)); P.setX(i, P.getX(i) * r); P.setZ(i, P.getZ(i) * r); }
+    const s = new THREE.CylinderGeometry(1, 1, 1, 28, 8, true).translate(0, 0.5, 0), Q = s.attributes.position;   // (the skirt: wide at the ground, drawing in as it rises)
+    for (let i = 0; i < Q.count; i++) { const y = Q.getY(i), r = 1 - 0.55 * y + 0.2 * y * y; Q.setX(i, Q.getX(i) * r); Q.setZ(i, Q.getZ(i) * r); }
+    TW.geo = g; TW.sgeo = s;
+    TW.mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uCol: { value: new THREE.Color(0.1, 0.105, 0.125) }, uFoot: { value: new THREE.Color(0.4, 0.33, 0.25) }, uSk: { value: 0 }, uK: { value: 1 } },
+      vertexShader: `uniform float uTime, uSk; varying vec2 vU;
+        void main() { vU = uv; vec3 p = position; float h = p.y, a = uTime * 0.9 + h * 5.0, bend = h * (1.0 - h * 0.6);
+          if (uSk < 0.5) { p.x += (sin(a) * 0.05 + sin(uTime * 0.31 + h * 2.0) * 0.035) * bend; p.z += cos(a * 0.8) * 0.05 * bend; }   // (the rope sways and snakes)
+          p.xz *= 1.0 + (0.07 * sin(h * 26.0 - uTime * 7.0 + uv.x * 18.85) * (1.0 - h * 0.5)) * (1.0 - uSk) + uSk * 0.14 * sin(uv.x * 37.7 + uTime * 3.0 + h * 9.0);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
+      fragmentShader: `uniform float uTime, uSk, uK; uniform vec3 uCol, uFoot; varying vec2 vU;
+        float hsh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float ns(vec2 p, float W) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); float a = mod(i.x, W), b = mod(i.x + 1.0, W);   // (wrapped round the funnel: no seam)
+          return mix(mix(hsh(vec2(a, i.y)), hsh(vec2(b, i.y)), f.x), mix(hsh(vec2(a, i.y + 1.0)), hsh(vec2(b, i.y + 1.0)), f.x), f.y); }
+        void main() { float s = ns(vec2(vU.x * 14.0 + uTime * 1.4 + vU.y * 6.0, vU.y * 40.0 - uTime * 3.2), 14.0), s2 = ns(vec2(vU.x * 40.0 + uTime * 4.0, vU.y * 90.0 - uTime * 6.0), 40.0);
+          float a; vec3 c;
+          if (uSk > 0.5) { a = (0.4 + 0.45 * s + 0.15 * s2) * smoothstep(0.0, 0.08, vU.y) * (1.0 - smoothstep(0.2, 1.0, vU.y)) * 0.9; c = uFoot * (0.55 + 0.8 * s); }
+          else { a = min(1.0, 0.86 + 0.24 * s) * smoothstep(0.0, 0.02, vU.y) * (1.0 - smoothstep(0.9, 1.0, vU.y)); c = mix(uFoot, uCol, smoothstep(0.0, 0.16, vU.y)) * (0.45 + 0.8 * s) * (0.85 + 0.3 * s2); }
+          gl_FragColor = vec4(c, a * uK); }` });
+    // the wreckage going round it: stones, earth, splintered wood
+    TW.deb = new THREE.InstancedMesh(G.rock, new THREE.MeshLambertMaterial({ color: 0x3e352b }), TW_DEB); TW.deb.frustumCulled = false; TW.deb.count = 0; scene.add(TW.deb);
+    TW.dd = Array.from({ length: TW_DEB }, () => ({ h: Math.random(), a: Math.random() * 6.28, rk: Math.random(), w: 0.35 + Math.random() * 0.8, s: 0.5 + Math.random() * Math.random() * 3.5, ph: Math.random() * 6.28 }));
+  }
+  const mk = (geo, sk) => { const mat = TW.mat.clone(); mat.uniforms.uTime = TW.mat.uniforms.uTime; mat.uniforms.uSk.value = sk; const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.renderOrder = 3; scene.add(m); return m; };
+  return [mk(TW.geo, 0), mk(TW.sgeo, 1)];
 }
-function twisterSpawn(x, z) { const T = { x, z, a: Math.random() * 6.28, t: 0, life: 55 + Math.random() * 50, R: 70 + Math.random() * 55, m: twisterMesh(), sT: 0, told: false }; TW.list.push(T); return T; }
+function twisterSpawn(x, z) {
+  const [m, sk] = twisterMesh();
+  const T = { id: ++TW.n, x, z, a: Math.random() * 6.28, t: 0, life: 100 + Math.random() * 60, R: 480 + Math.random() * 240, H: 1050 + Math.random() * 400, m, sk, sT: 0, told: false, inT: 0, out: 0 };
+  TW.list.push(T); return T;
+}
+function twisterDrop(T) { for (const m of [T.m, T.sk]) { scene.remove(m); m.material.dispose(); } }
 function updateTwisters(dt) {
   const p = player;
-  if (realm !== 'over') { for (const T of TW.list) scene.remove(T.m); TW.list.length = 0; return; }
+  if (realm !== 'over') { for (const T of TW.list) twisterDrop(T); TW.list.length = 0; if (TW.deb) TW.deb.count = 0; return; }
   const far = Math.hypot(p.pos.x - MOUNT.x, p.pos.z - MOUNT.z) > 3000, want = !far || state !== 'play' ? 0 : WX.thunder > 0.5 ? 2 : WX.storm > 0.6 ? 1 : 0;
   if ((TW.t -= dt) < 0) {
     TW.t = 5 + Math.random() * 9;
-    if (TW.list.length < want) { const a = Math.random() * 6.28, d = 380 + Math.random() * 420, x = p.pos.x + Math.cos(a) * d, z = p.pos.z + Math.sin(a) * d;
-      if (Math.hypot(x - MOUNT.x, z - MOUNT.z) > 2800) { twisterSpawn(x, z); toast('A TORNADO'); } }
+    if (TW.list.length < want) {   // (a long way off, and somewhere he can see it: it is too big to come up on anyone unseen)
+      const a = Math.atan2(dir3.z, dir3.x) + rnd(1.1), d = 1500 + Math.random() * 1200, x = p.pos.x + Math.cos(a) * d, z = p.pos.z + Math.sin(a) * d;
+      if (Math.hypot(x - MOUNT.x, z - MOUNT.z) > 3400 && !TW.list.some(o => Math.hypot(o.x - x, o.z - z) < 1500)) { twisterSpawn(x, z); toast('A TORNADO'); } }
   }
-  if (!TW.list.length) return;
+  if (!TW.list.length) { if (TW.deb) TW.deb.count = 0; return; }
   TW.mat.uniforms.uTime.value = time;
   for (let i = TW.list.length - 1; i >= 0; i--) {
     const T = TW.list[i]; T.t += dt;
-    if (T.t > T.life || Math.hypot(T.x - MOUNT.x, T.z - MOUNT.z) < 2500) { scene.remove(T.m); TW.list.splice(i, 1); continue; }
+    if (T.t > T.life || Math.hypot(T.x - MOUNT.x, T.z - MOUNT.z) < 2900) { twisterDrop(T); TW.list.splice(i, 1); continue; }
     T.a += rnd(0.7) * dt; T.x += (WIND.x * 9 + Math.cos(T.a) * 8) * dt; T.z += (WIND.z * 9 + Math.sin(T.a) * 8) * dt;
-    const g = Math.max(terrainAt(T.x, T.z), WATER), k = smoothstep(0, 4, T.t) * smoothstep(T.life, T.life - 5, T.t), wet = g <= WATER + 0.5;
-    T.m.position.set(T.x, g - 3, T.z); T.m.scale.set(T.R * k + 0.01, 640 * (0.25 + 0.75 * k), T.R * k + 0.01);
-    for (let j = 0; j < 3; j++) { const b = Math.random() * 6.28, r = 5 + Math.random() * 20; emit(T.x + Math.cos(b) * r, g + Math.random() * 34, T.z + Math.sin(b) * r, -Math.sin(b) * 20, 6 + Math.random() * 16, Math.cos(b) * 20, 1.1, wet ? [0.8, 0.9, 1] : [0.46, 0.41, 0.34], 6); }
-    const dx = p.pos.x - T.x, dz = p.pos.z - T.z, d = Math.hypot(dx, dz) || 1, alt = p.pos.y - g, reach = 14 + T.R * clamp(alt / 640, 0, 1);
-    if ((T.sT -= dt) < 0 && d < 900) { T.sT = 1.1; audio.at3(T.x, g + 60, T.z, () => audio.sfx.twister?.(k), { ref: 70, max: 1000 }); }
-    if (state !== 'play' || alt < -5 || alt > 660 || d > reach + 95) continue;
-    const pull = smoothstep(reach + 95, reach * 0.4, d) * k, tx = -dz / d, tz = dx / d;
+    const g = Math.max(terrainAt(T.x, T.z), WATER), k = smoothstep(0, 8, T.t) * smoothstep(T.life, T.life - 10, T.t), wet = g <= WATER + 0.5, H = T.H * (0.3 + 0.7 * k), Rk = T.R * (0.25 + 0.75 * k);
+    T.g = g; T.k = k;
+    T.m.position.set(T.x, g - 4, T.z); T.m.scale.set(Rk, H, Rk); T.m.material.uniforms.uK.value = smoothstep(0, 0.3, k);
+    const foot = Rk * 0.075, sr = foot * (2.4 + 0.3 * Math.sin(time * 0.7 + T.id)), sh = 120 + 40 * k;
+    T.sk.position.set(T.x, g - 3, T.z); T.sk.scale.set(sr, sh, sr); T.sk.material.uniforms.uK.value = k;
+    T.sk.material.uniforms.uFoot.value.setRGB(...(wet ? [0.62, 0.7, 0.78] : [0.44, 0.36, 0.27])); T.m.material.uniforms.uFoot.value.copy(T.sk.material.uniforms.uFoot.value);
+    const cd2 = (camera.position.x - T.x) ** 2 + (camera.position.z - T.z) ** 2;
+    if (cd2 < 2500 * 2500) for (let j = 0, n = TOUCH ? 3 : 7; j < n; j++) {   // what it is tearing up: dust (or spray), whirled up and out
+      const b = Math.random() * 6.28, r = foot * (0.6 + Math.random() * 1.8), up = Math.random();
+      emit(T.x + Math.cos(b) * r, g + up * up * 90, T.z + Math.sin(b) * r, -Math.sin(b) * 45 + Math.cos(b) * 8, 10 + Math.random() * 24, Math.cos(b) * 45 + Math.sin(b) * 8, 1.4 + Math.random(), wet ? [0.8, 0.9, 1] : [0.5, 0.44, 0.36], 6, 2 + Math.random() * 3);
+    }
+    const dx = p.pos.x - T.x, dz = p.pos.z - T.z, d = Math.hypot(dx, dz) || 1, alt = p.pos.y - g, hf = clamp(alt / H, 0, 1), core = twR(hf) * Rk;
+    if (audio.emit) audio.emit('tw:' + T.id, 'twister', T.x, g + 90, T.z, { ttl: 1.2, ref: 260, max: 3600, size: 1 + k * 1.5 });
+    if ((T.sT -= dt) < 0 && d < 3000) { T.sT = 1.1; audio.at3(T.x, g + 90, T.z, () => audio.sfx.twister?.(k), { ref: 240, max: 3200 }); }
+    if (state !== 'play' || alt < -5 || alt > H * 1.06 || d > core + 700) continue;
+    // three rings round it: the outer air shoves and shakes him; nearer, it drags him round; in it, it has him
+    const shake = smoothstep(core + 700, core, d) * k, pull = smoothstep(core + 420, core * 0.55, d) * k, tx = -dz / d, tz = dx / d, nx = dx / d, nz = dz / d;
     if (p.form === 'phoenix' && !p.perch && !p.sub && !p.cine) {
-      p.pos.x += (tx * 62 - dx / d * 18) * pull * dt; p.pos.z += (tz * 62 - dz / d * 18) * pull * dt; p.pos.y += 36 * pull * dt;
-      p.yaw += 1.7 * pull * dt; p.bank = lerp(p.bank, 1.1, Math.min(1, pull * dt * 3)); camShake = Math.max(camShake, 0.5 * pull);
-      if (pull > 0.45 && !T.told) { T.told = true; toast('THE TORNADO HAS YOU'); witness('flew into a tornado and was carried round it and thrown out of the top'); }
-    } else if (p.form === 'human' && p.grounded && !p.swim && !p.cine && d < reach + 26 && pull > 0.3) {
+      camShake = Math.max(camShake, 0.18 * shake + 0.55 * pull); p.bank += Math.sin(time * 4.3 + T.id) * shake * 1.4 * dt;
+      p.pos.x += (tx * 24 * shake - nx * 10 * shake) * dt; p.pos.z += (tz * 24 * shake - nz * 10 * shake) * dt;
+      if (pull > 0.5) T.inT += dt; else T.inT = Math.max(0, T.inT - dt * 0.5);
+      const throwK = T.out > 0 ? 1 : 0; if (T.inT > 6 || alt > H * 0.88) T.out = 2.5;   // (it does not keep him: a few turns, and it throws him out of the side)
+      if (T.out > 0) { T.out -= dt; T.inT = 0; }
+      const inward = throwK ? -55 : d < core ? -14 : 34;
+      p.pos.x += (tx * 80 * (1 - throwK * 0.5) + nx * inward) * pull * dt; p.pos.z += (tz * 80 * (1 - throwK * 0.5) + nz * inward) * pull * dt; p.pos.y += (throwK ? 8 : 40) * pull * dt;
+      p.yaw += 1.6 * pull * dt; p.bank = lerp(p.bank, 1.1, Math.min(1, pull * dt * 3));
+      if (pull > 0.45 && !T.told) { T.told = true; toast('THE TORNADO HAS YOU'); witness('flew into a tornado a kilometre tall and was carried round it and thrown out of the side'); }
+    } else if (p.form === 'human' && p.grounded && !p.swim && !p.cine && d < core + 40 && pull > 0.3) {
       p.grounded = false; p.tumble = true; p.vel.set(tx * 22, 27, tz * 22); p.fallTop = p.pos.y; toast('THE WIND TAKES YOU'); witness('was picked up off the ground by a tornado');
     }
   }
+  // the wreckage: low and wide most of it, a few pieces carried high up the funnel
+  const D = TW.deb, L = TW.list, n = L.length ? TW_DEB : 0;
+  for (let j = 0; j < n; j++) {
+    const q = TW.dd[j], T = L[j % L.length], hf = Math.pow(0.5 + 0.5 * Math.sin(time * q.w * 0.25 + q.ph), 3) * (q.rk < 0.2 ? 0.7 : 0.25), Rk = T.R * (0.25 + 0.75 * T.k);
+    q.a += q.w * dt * (1.4 - hf); const r = Math.max(twR(hf) * Rk, Rk * 0.075 * (1.2 + q.rk * 1.6)) * (1.05 + q.rk * 0.3), s = q.s * T.k;
+    _mat.compose(_p.set(T.x + Math.cos(q.a) * r, T.g + 4 + hf * T.H, T.z + Math.sin(q.a) * r), _q.setFromAxisAngle(UP, q.a * 3 + q.ph), _s.set(s, s * 0.6, s * 1.4)); D.setMatrixAt(j, _mat);
+  }
+  D.count = n; D.instanceMatrix.needsUpdate = true;
 }
 // a god's hand on the sky (from a conversation): it follows from where he stands, and lasts a few minutes
 function godWeather(g, sky) {
-  const kind = { storm: 'thunder', thunder: 'thunder', rain: 'rain', dark: 'grey', grey: 'grey', mist: 'mist', fog: 'mist', clear: 'calm', calm: 'calm', sun: 'calm', waves: 'waves', sea: 'waves' }[sky];
+  const kind = { storm: 'thunder', thunder: 'thunder', rain: 'rain', dark: 'grey', grey: 'grey', mist: 'mist', fog: 'mist', clear: 'calm', calm: 'calm', sun: 'calm', waves: 'waves', sea: 'waves', dust: 'dust', sand: 'dust', sandstorm: 'dust', snow: 'squall', squall: 'squall', blizzard: 'squall' }[sky];
   if (!kind) return;
   WX.god.push({ x: player.pos.x, z: player.pos.z, r: 1500, kind, t0: time, until: time + 240 });
   if (kind === 'thunder') { const a = Math.random() * 6.28; strike(player.pos.x + Math.cos(a) * 30, player.pos.y, player.pos.z + Math.sin(a) * 30, 1); }
@@ -14792,6 +14896,223 @@ function godWeather(g, sky) {
 }
 // someone new in the world: Zeus greets them the only way he knows
 function joinStorm() { WX.olyT = 50; WX.sampleT = 0; }
+
+// ───────────────────────── the air over the land: dust, squalls, valley mist, and the water going round ─────────────────────────
+// What the weather knows about the ground under it, a kilometre square at a time (worked out once, kept): how high it is,
+// how much sea the wind has come over to get here (wet air), how cold it is up there, and how dry (the sand sea).
+function wxGround(x, z) {
+  const C = 1000, cx = Math.floor(x / C), cz = Math.floor(z / C), key = cx * 65536 + cz, M = WC.cells;
+  let G = M.get(key); if (G) return G;
+  if (M.size > 24000) M.clear();
+  const px = (cx + 0.5) * C, pz = (cz + 0.5) * C, g = overHeight(px, pz);
+  let moist = 0; if (g < WATER) moist = 1; else for (const [d, wt] of [[600, 0.35], [1500, 0.3], [3000, 0.2], [5000, 0.15]]) if (overHeight(px - WIND.x * d, pz - WIND.z * d) < WATER) moist += wt;
+  const sd = Math.hypot(px - DUNE.x, pz - DUNE.z);
+  G = { g, moist, lift: smoothstep(140, 650, g), cold: smoothstep(330, 520, g), dry: smoothstep(DUNE.R + 1500, DUNE.R - 300, sd) };
+  M.set(key, G); return G;
+}
+
+// ── Dust storms. Now and then (in most stretches of eleven minutes, at a time worked out from the clock, so everyone sees
+//    the same one) the wind gets up over the sand sea and comes across it as a wall: brown and orange, five hundred metres
+//    high, the whole width of the sand, a kilometre and a half deep, going over at twenty metres a second. Seen from outside
+//    it is a rolling cliff of dust; inside it the world is gone past a few dozen metres, the sand streams past him and the
+//    wind has hold of him. It is through a place in a minute or so, and the sky behind it is clean.
+const DUST = { k: 0, P: 660, v: 21, W: 1500, N: TOUCH ? 30 : 60, col: new THREE.Color(0.72, 0.48, 0.27), fc: new THREE.Color(), mesh: null, mat: null, test: null, told: 0, F: null };
+function dustFront(t) {   // where the wall is across the sand (along the wind), and how much of it there is; or null: no storm now
+  if (DUST.test) return DUST.test;
+  const ci = Math.floor(t / DUST.P); if (wxHash(ci, 7, 911) > 0.62) return null;
+  const dur = (2 * DUNE.R + 2400) / DUST.v, tt = t - ci * DUST.P - wxHash(ci, 8, 913) * (DUST.P - dur); if (tt < 0 || tt > dur) return null;
+  return { uf: DUNE.u - DUNE.R - 1200 + DUST.v * tt, env: smoothstep(0, 40, tt) * smoothstep(dur, dur - 60, tt) };
+}
+function dustAt(x, z, t) {
+  const dx = x - DUNE.x, dz = z - DUNE.z; if (dx * dx + dz * dz > (DUNE.R + 2200) ** 2) return 0;
+  const F = dustFront(t); if (!F) return 0;
+  const u = x * DUNE.wx + z * DUNE.wz, v = -x * DUNE.wz + z * DUNE.wx, s = u - F.uf; if (s > 160 || s < -DUST.W) return 0;   // (s: how far ahead of the wall's face; behind it, inside)
+  return F.env * smoothstep(160, -90, s) * smoothstep(-DUST.W, -DUST.W * 0.4, s) * smoothstep(DUNE.R + 900, DUNE.R * 0.55, Math.abs(v - DUNE.v)) * smoothstep(DUNE.R + 1500, DUNE.R + 100, Math.abs(u - DUNE.u)) * (0.82 + 0.18 * noise2(v / 380, s / 260));
+}
+function updateDust(dt) {
+  const over = realm === 'over' && state !== 'title' && state !== 'loading', c = camera.position;
+  // the wall, from outside: heaps of dust along its face, the front row low and rolling, a second row higher behind it
+  const F = over ? dustFront(Date.now() / 1000) : null, show = !!F && Math.hypot(c.x - DUNE.x, c.z - DUNE.z) < DUNE.R + 9000;
+  if (show && !DUST.mesh) {
+    DUST.mat = cloudMaterial({ color: 0xd6a066, emissive: 0x5a3818, opacity: 0.62, fog: false });   // (it is seen from a long way off: it hazes by its own rule, below)
+    DUST.mesh = new THREE.InstancedMesh(cloudGeoOf(313, 10, [120, 46, 70], false), DUST.mat, DUST.N); DUST.mesh.frustumCulled = false; DUST.mesh.renderOrder = 3; DUST.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(DUST.mesh);
+    // and behind the heaps the body of it, one sheet the width of the sand with a torn, boiling top, so there is no daylight through the wall
+    DUST.sheet = new THREE.Mesh(new THREE.PlaneGeometry(1, 1, 1, 1), new THREE.ShaderMaterial({ transparent: true, depthWrite: true, side: THREE.DoubleSide, uniforms: { uTime: worldFx.uTime, uCol: { value: new THREE.Color() }, uA: { value: 0.9 } },
+      vertexShader: `varying vec2 vU; void main() { vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `uniform float uTime, uA; uniform vec3 uCol; varying vec2 vU;
+        float hs(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float ns(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hs(i), hs(i + vec2(1.0, 0.0)), f.x), mix(hs(i + vec2(0.0, 1.0)), hs(i + vec2(1.0, 1.0)), f.x), f.y); }
+        void main() { float n = ns(vec2(vU.x * 26.0 + uTime * 0.05, vU.y * 2.5 - uTime * 0.2)) * 0.6 + ns(vec2(vU.x * 80.0 - uTime * 0.1, vU.y * 7.0 - uTime * 0.5)) * 0.4;
+          float top = 0.62 + 0.3 * ns(vec2(vU.x * 18.0 + uTime * 0.03, uTime * 0.05));
+          float a = uA * smoothstep(top, top - 0.25, vU.y + n * 0.12) * smoothstep(0.0, 0.08, vU.x) * smoothstep(1.0, 0.92, vU.x);
+          if (a < uA * 0.4) discard;   // (a solid body with a torn top: what is behind it is behind it, outlines and all)
+          gl_FragColor = vec4(uCol * (0.75 + 0.45 * n) * mix(0.8, 1.1, vU.y), min(1.0, a * 1.15)); }` }));
+    DUST.sheet.frustumCulled = false; DUST.sheet.renderOrder = 2; scene.add(DUST.sheet);
+  }
+  if (DUST.mesh) DUST.mesh.visible = DUST.sheet.visible = show;
+  if (show) {
+    const L = DUNE.R + 500, per = DUST.N / 3, lit = clamp(pal.hemiI / 1.45, 0.2, 1.1) * (0.6 + 0.4 * Math.min(1, WX.light));
+    const u0 = c.x * DUNE.wx + c.z * DUNE.wz, v0 = -c.x * DUNE.wz + c.z * DUNE.wx, haze = smoothstep(1200, 9000, Math.hypot(u0 - F.uf, Math.max(0, Math.abs(v0 - DUNE.v) - L))) * 0.7;
+    DUST.mat.emissive.copy(DUST.col).multiplyScalar(0.42 * lit).lerp(scene.fog.color, haze * 0.6); DUST.mat.color.setRGB(0.86, 0.6, 0.34).multiplyScalar(0.55 + 0.45 * lit).lerp(scene.fog.color, haze); DUST.mat.opacity = 0.82 * (1 - haze * 0.5);
+    { const uu = F.uf - 420, sh = DUST.sheet; sh.position.set(uu * DUNE.wx - DUNE.v * DUNE.wz, DUNE.base + 330, uu * DUNE.wz + DUNE.v * DUNE.wx); sh.rotation.set(0, -Math.atan2(DUNE.wz, DUNE.wx) + Math.PI / 2, 0); sh.scale.set(2 * L, 760, 1);
+      sh.material.uniforms.uCol.value.copy(DUST.mat.color).lerp(DUST.mat.emissive, 0.3); sh.material.uniforms.uA.value = 0.92 * F.env * (1 - haze * 0.5); }
+    for (let i = 0; i < DUST.N; i++) {
+      const row = i % 3, j = Math.floor(i / 3), h = wxHash(i, 3, 5), vv = DUNE.v + ((j + row * 0.33) / (per - 1) - 0.5) * 2 * L + (h - 0.5) * 120, uu = F.uf - 60 - row * 260 + Math.sin(time * 0.35 + i * 1.3) * 35;
+      const s = (3.8 + 1.8 * h) * (1 - row * 0.12) * F.env * smoothstep(DUNE.R + 600, DUNE.R * 0.6, Math.abs(vv - DUNE.v)) * smoothstep(DUNE.R + 1500, DUNE.R, Math.abs(uu - DUNE.u)) + 0.001;
+      _mat.compose(_p.set(uu * DUNE.wx - vv * DUNE.wz, DUNE.base + 40 + row * 175 + s * 18, uu * DUNE.wz + vv * DUNE.wx), _q.setFromAxisAngle(UP, -Math.atan2(DUNE.wz, DUNE.wx) + Math.PI / 2 + (h - 0.5) * 0.4), _s.set(s, s * (1.9 + row * 0.3), s));
+      DUST.mesh.setMatrixAt(i, _mat);
+    }
+    DUST.mesh.instanceMatrix.needsUpdate = true;
+    if (audio.emit) { const u = c.x * DUNE.wx + c.z * DUNE.wz, v = clamp(-c.x * DUNE.wz + c.z * DUNE.wx, DUNE.v - L, DUNE.v + L), uu = Math.min(F.uf, Math.max(u, F.uf - DUST.W)); audio.emit('dust:wall', 'storm', uu * DUNE.wx - v * DUNE.wz, DUNE.base + 120, uu * DUNE.wz + v * DUNE.wx, { ttl: 1, ref: 500, max: 5000, size: 1.5 * F.env }); }   // (the roar of it, from the nearest part of it)
+  }
+  // inside it
+  const g = over ? Math.max(terrainAt(c.x, c.z), WATER) : 0, want = over ? WX.dust * smoothstep(720, 420, c.y - g) : 0;   // (above five hundred metres or so the sky is clear)
+  DUST.k = lerp(DUST.k, want, damp(want > DUST.k ? 1.6 : 0.7, dt));
+  const k = DUST.k; if (k < 0.01) return;
+  scene.fog.near = lerp(scene.fog.near, 2, k); scene.fog.far = lerp(scene.fog.far, Math.min(scene.fog.far, 75), Math.min(1, k * 1.1));
+  DUST.fc.copy(DUST.col).multiplyScalar(clamp(pal.hemiI / 1.45, 0.18, 1.05) * (0.65 + 0.35 * Math.min(1, WX.light))); scene.fog.color.lerp(DUST.fc, Math.min(1, k * 1.25));
+  skyMat.uniforms.mist.value = Math.max(skyMat.uniforms.mist.value, k * 0.97); skyMat.uniforms.mistCol.value.lerp(DUST.fc, Math.min(1, k * 1.3));
+  const p = player, P = p.pos, air = p.form === 'phoenix' && !p.perch || p.form === 'human' && !p.grounded;
+  for (let i = 0, n = Math.ceil(k * (TOUCH ? 6 : 15)); i < n; i++) emit(c.x + rnd(40) - WIND.x * 22, c.y + rnd(12), c.z + rnd(40) - WIND.z * 22, WIND.x * (42 + k * 30) + rnd(6), rnd(2), WIND.z * (42 + k * 30) + rnd(6), 0.55 + Math.random() * 0.5, [0.62, 0.45, 0.28], 0, 0.5 + Math.random() * 0.8);   // (sand, streaming past)
+  if (state === 'play' && air && !p.cine && !p.sub) { P.x += WIND.x * 15 * k * dt; P.z += WIND.z * 15 * k * dt; if (p.form === 'phoenix') p.bank += Math.sin(time * 3.1) * Math.sin(time * 1.3) * k * 1.1 * dt; camShake = Math.max(camShake, 0.14 * k); }
+  if (audio.emit) audio.emit('dust:in', 'wind', c.x + WIND.x * 30, c.y, c.z + WIND.z * 30, { ttl: 0.6, ref: 40, max: 400, size: 2 * k });
+  if (k > 0.6 && state === 'play' && time - DUST.told > 300) { DUST.told = time; witness('was caught in a dust storm out on the sand sea and could not see a thing'); }
+}
+
+// ── Snow squalls. Over the high country and wherever it is cold, a squall comes over now and then: a grey-white curtain
+//    hanging under a cloud, a kilometre across, going with the wind. Inside it the snow comes sideways and the air goes
+//    white for a minute; then it has gone over and the sun is out. (Worked out from the clock like the rest of the sky:
+//    the country is cut into squares that go with the wind, and in some of the five-minute stretches a square has one.)
+const SQ = { C: 2600, P: 300, v: 12, near: [], tmp: [], meshes: [], mat: null, test: null };
+function squallsNear(x, z, t, out) {
+  out.length = 0;
+  const ox = WIND.x * SQ.v * t, oz = WIND.z * SQ.v * t, cx = Math.floor((x - ox) / SQ.C), cz = Math.floor((z - oz) / SQ.C), w0 = Math.floor(t / SQ.P);
+  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) for (let w = w0 - 1; w <= w0; w++) {
+    const a = cx + i, b = cz + j, h = wxHash(a * 31 + w, b, 77); if (h > 0.6) continue;
+    const life = 55 + 30 * wxHash(a, b, w + 79), tt = t - w * SQ.P - wxHash(a, b * 17 + w, 78) * (SQ.P - 40); if (tt < 0 || tt > life) continue;
+    const sx = (a + 0.2 + 0.6 * wxHash(a, b, w + 80)) * SQ.C + ox, sz = (b + 0.2 + 0.6 * wxHash(a, b, w + 81)) * SQ.C + oz, G = wxGround(sx, sz); if (G.cold < 0.15) continue;
+    out.push({ x: sx, z: sz, g: Math.max(G.g, WATER), r: 420 + 300 * h / 0.6, k: smoothstep(0, 9, tt) * smoothstep(life, life - 14, tt) * G.cold });
+  }
+  if (SQ.test) out.push(...SQ.test);
+  return out;
+}
+function squallAt(x, z, t) { let k = 0; for (const q of squallsNear(x, z, t, SQ.tmp)) k = Math.max(k, q.k * smoothstep(q.r, q.r * 0.5, Math.hypot(x - q.x, z - q.z))); return k; }
+function updateSqualls(dt) {
+  const over = realm === 'over' && state !== 'title' && state !== 'loading', c = camera.position;
+  const L = over ? squallsNear(c.x, c.z, Date.now() / 1000, SQ.near).filter(q => q.k > 0.02).sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z)) : [];
+  if (L.length && !SQ.mat) SQ.mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: worldFx.uTime, uK: { value: 0 }, uCol: { value: new THREE.Color() } },
+    vertexShader: `varying vec2 vU; void main() { vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform float uTime, uK; uniform vec3 uCol; varying vec2 vU;
+      float hsh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float ns(vec2 p, float W) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); float a = mod(i.x, W), b = mod(i.x + 1.0, W);
+        return mix(mix(hsh(vec2(a, i.y)), hsh(vec2(b, i.y)), f.x), mix(hsh(vec2(a, i.y + 1.0)), hsh(vec2(b, i.y + 1.0)), f.x), f.y); }
+      void main() { float n = ns(vec2(vU.x * 48.0 + vU.y * 6.0, vU.y * 9.0 + uTime * 0.9), 48.0), m = ns(vec2(vU.x * 9.0, vU.y * 2.0 + uTime * 0.2), 9.0);   // (snow falling in sheets, slanting on the wind)
+        float a = uK * (0.3 + 0.4 * n * (0.5 + m)) * smoothstep(0.0, 0.12, vU.y) * (1.0 - smoothstep(0.6, 1.0, vU.y));
+        gl_FragColor = vec4(uCol * (0.85 + 0.25 * n), a); }` });
+  for (let i = 0; i < 3; i++) {
+    const q = L[i]; let m = SQ.meshes[i];
+    if (!q || Math.hypot(q.x - c.x, q.z - c.z) > 7000) { if (m) m.visible = false; continue; }
+    if (!m) { m = SQ.meshes[i] = new THREE.Mesh(new THREE.CylinderGeometry(1, 0.86, 1, 30, 1, true).translate(0, 0.5, 0), SQ.mat.clone()); m.material.uniforms.uTime = worldFx.uTime; m.frustumCulled = false; m.renderOrder = 3; scene.add(m); }
+    m.visible = true; m.position.set(q.x, q.g - 10, q.z); m.scale.set(q.r * 0.8, 820, q.r * 0.8);
+    m.material.uniforms.uK.value = q.k; m.material.uniforms.uCol.value.copy(pal.fog).lerp(WHITE_C, 0.6).multiplyScalar(clamp(pal.hemiI / 1.45, 0.3, 1));
+  }
+  const bz = SNOW.bliz, wk = Math.min(bz, WX.squall);   // inside one (or any snowstorm): the white goes all the way up; and in a squall, for a minute, there is nothing past a few dozen metres
+  if (bz > 0.02 && over) { skyMat.uniforms.mist.value = Math.max(skyMat.uniforms.mist.value, bz * 0.8); skyMat.uniforms.mistCol.value.lerp(SNOW.white, bz * 0.6); }
+  if (wk > 0.02 && over) { scene.fog.near = lerp(scene.fog.near, 6, wk); scene.fog.far = lerp(scene.fog.far, Math.min(scene.fog.far, 110), wk * 0.95); scene.fog.color.lerp(SNOW.white, wk * 0.35); }
+}
+
+// ── Mist in the valleys. On still nights, at dawn above all, and after rain, the cold air runs down into the low places and
+//    the damp in it hangs there: white pools in the hollows and along the rivers, a lying sheet over the low country by the
+//    water, all of it drifting a little on the wind; and as the sun gets up it thins and burns off. Each wisp is one soft
+//    sprite facing the lens; they are put down round him a few a frame, where the ground is lower than the ground round it.
+const VM = { N: TOUCH ? 110 : 300, k: 0, i: 0, mesh: null, pos: null, inf: null, want: null, R: 800, mat: null };
+function mistSpot(q, cx, cz, R) {   // a place for a wisp near (cx, cz): how misty a place it is (0: not at all), and where
+  const a = Math.random() * 6.283, d = R * Math.sqrt(Math.random()), x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d, g = overHeight(x, z);
+  q[0] = x; q[2] = z; q[1] = Math.max(g, WATER);
+  if (g < WATER) return 0.4;   // (over a lake, or the sea near the shore)
+  if (g > CLOUD_SEA - 120 || duneK(x, z) > 0.15 || volcanoNear(x, z, 60)) return 0;
+  const S = 150, m = (overHeight(x + S, z) + overHeight(x - S, z) + overHeight(x, z + S) + overHeight(x, z - S)) * 0.25;
+  return clamp(Math.max(smoothstep(3, 28, m - g), smoothstep(80, 8, g - WATER) * 0.6) + (riverF(x, z) < 2.4 ? 0.35 : 0), 0, 1);
+}
+const _vq = [0, 0, 0];
+function updateMist(dt) {
+  const over = realm === 'over' && state !== 'title' && state !== 'loading', c = camera.position;
+  if (!VM.mesh) {
+    const pg = new THREE.PlaneGeometry(1, 1), g = new THREE.InstancedBufferGeometry(); g.index = pg.index; g.setAttribute('position', pg.attributes.position); g.setAttribute('uv', pg.attributes.uv);
+    VM.pos = new THREE.InstancedBufferAttribute(new Float32Array(VM.N * 3).fill(-99999), 3).setUsage(THREE.DynamicDrawUsage); VM.inf = new THREE.InstancedBufferAttribute(new Float32Array(VM.N * 4), 4).setUsage(THREE.DynamicDrawUsage);
+    g.setAttribute('aPos', VM.pos); g.setAttribute('aInf', VM.inf); g.instanceCount = VM.N; VM.want = new Float32Array(VM.N);
+    VM.mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, fog: true, uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uCol: { value: new THREE.Color() }, uTime: { value: 0 } }]),
+      vertexShader: `attribute vec3 aPos; attribute vec4 aInf; varying vec2 vUv; varying float vA, vSeed;
+        #include <fog_pars_vertex>
+        void main() { vUv = uv; vSeed = aInf.w;
+          vec3 toC = cameraPosition - aPos; float dist = length(toC), down = abs(toC.y) / max(dist, 1.0);
+          vec4 mvPosition = viewMatrix * vec4(aPos, 1.0);
+          mvPosition.xy += position.xy * vec2(aInf.x, mix(aInf.y, aInf.x * 0.8, smoothstep(0.1, 0.6, down)));   // (a long low bank from the side; seen from above, a pool)
+          vA = aInf.z * smoothstep(6.0, 50.0, dist);   // (none in his face: when he is in it, the fog is the mist)
+          gl_Position = projectionMatrix * mvPosition;
+          #include <fog_vertex>
+        }`,
+      fragmentShader: `uniform vec3 uCol; uniform float uTime; varying vec2 vUv; varying float vA, vSeed;
+        #include <fog_pars_fragment>
+        float hs(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float ns(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hs(i), hs(i + vec2(1.0, 0.0)), f.x), mix(hs(i + vec2(0.0, 1.0)), hs(i + vec2(1.0, 1.0)), f.x), f.y); }
+        void main() { vec2 q = (vUv - 0.5) * 2.0;
+          float n = ns(q * 1.7 + vec2(vSeed * 17.0 + uTime * 0.04, vSeed * 9.0)) * 0.6 + ns(q * 4.1 + vec2(-uTime * 0.07, vSeed * 31.0)) * 0.4;
+          float a = (1.0 - smoothstep(0.1, 1.0, length(q) + (n - 0.5) * 0.6)) * smoothstep(0.0, 0.5, vUv.y + n * 0.25) * vA;
+          if (a < 0.004) discard;
+          gl_FragColor = vec4(uCol * (0.9 + 0.2 * n), a * 0.8);
+          #include <fog_fragment>
+        }` });
+    VM.mesh = new THREE.Mesh(g, VM.mat); VM.mesh.frustumCulled = false; VM.mesh.renderOrder = 2; scene.add(VM.mesh);
+  }
+  // how misty the hour is: night and the dawn most, after rain, in mist weather; the sun burns it off; no dust or blizzard
+  const night = smoothstep(0.06, -0.12, sunDir.y), dawn = smoothstep(0.14, 0.2, dayT) * smoothstep(0.36, 0.27, dayT), sunK = smoothstep(0.03, 0.42, sunDir.y) * clamp(WX.light, 0, 1.2);
+  const want = over ? clamp(0.1 + 0.5 * night + 0.75 * dawn + 0.55 * WC.wet + 0.6 * WX.fog - 0.55 * sunK * (1 - dawn), 0, 1) * (1 - DUST.k) * (1 - SNOW.bliz) : 0;
+  VM.k = lerp(VM.k, want, damp(want > VM.k ? 0.12 : 0.06, dt));
+  VM.mesh.visible = VM.k > 0.01;
+  if (!VM.mesh.visible) return;
+  const n = tierIdx === 0 ? VM.N >> 1 : VM.N, alt = Math.max(0, c.y - Math.max(terrainAt(c.x, c.z), WATER)), R = clamp(650 + alt * 1.3, 650, 1700), Rs = R / 800;
+  VM.mesh.geometry.instanceCount = n; VM.R = R;
+  VM.mat.uniforms.uTime.value = time;
+  VM.mat.uniforms.uCol.value.copy(pal.fog).lerp(WHITE_C, 0.6).lerp(pal.sun, 0.25 * dawn).multiplyScalar(clamp(pal.hemiI / 1.2, 0.4, 1.1) * lerp(1, WX.light, 0.5));
+  const P = VM.pos.array, I = VM.inf.array, fx = c.x + dir3.x * R * 0.3, fz = c.z + dir3.z * R * 0.3;
+  for (let s = 0, m = TOUCH ? 4 : 10; s < m; s++) {   // a few put down again each frame: those that have drifted out of reach, and those in a poor place
+    const i = VM.i = (VM.i + 1) % n, o = i * 3;
+    if ((P[o] - c.x) ** 2 + (P[o + 2] - c.z) ** 2 < R * R && VM.want[i] > 0.2) continue;
+    if (I[i * 4 + 2] > 0.03) { VM.want[i] = 0; continue; }   // (fade out where it is, then go)
+    let w = 0; for (let t = 0; t < 3 && w < 0.2; t++) w = mistSpot(_vq, fx, fz, R);
+    VM.want[i] = w; const h = wxHash(i, Math.floor(time), 3);
+    P[o] = _vq[0]; P[o + 1] = _vq[1] + (5 + 6 * h) * Rs; P[o + 2] = _vq[2];
+    I[i * 4] = (70 + 80 * h) * Rs; I[i * 4 + 1] = (20 + 14 * wxHash(i, 5, 9)) * Rs; I[i * 4 + 3] = h;
+  }
+  for (let i = 0; i < n; i++) {   // they drift, and come up and go as the hour wants
+    const o = i * 3; P[o] += WIND.x * 1.3 * dt; P[o + 2] += WIND.z * 1.3 * dt;
+    I[i * 4 + 2] += (VM.want[i] * VM.k - I[i * 4 + 2]) * damp(0.5, dt);
+  }
+  VM.pos.needsUpdate = true; VM.inf.needsUpdate = true;
+}
+
+// ── The water going round (see WC). Over the sea in sun, vapour coming off the water; the ground soaking in rain and drying
+//    after it (fast in sun and wind, slowly at night, at once on the sand), the puddles going with it; and the rivers and the
+//    falls running full a while after rain on the mountain they come down from.
+function updateWater(dt) {
+  const over = realm === 'over' && state !== 'title' && state !== 'loading', P = player.pos;
+  const sunK = smoothstep(0.02, 0.4, sunDir.y) * clamp(WX.light, 0.4, 1.2), rain = over ? WX.rain * (1 - SNOW.k * 0.85) : 0;
+  if (rain > 0.12) WC.wet = Math.min(1, WC.wet + rain * dt / 22);
+  else WC.wet = Math.max(0, WC.wet - dt * (0.45 + 1.5 * sunK + WX.dust) * (1 + 9 * duneK(P.x, P.z)) / 240);
+  worldFx.uWet.value = over ? WC.wet : 0; worldFx.uSky.value.copy(pal.hor).lerp(pal.zen, 0.35);
+  if ((WC.sT -= dt) < 0) { WC.sT = 3; let r = 0; for (let a = 0; a < 4; a++) { const w = wxAt(MOUNT.x + Math.cos(a * 1.571) * 1300, MOUNT.z + Math.sin(a * 1.571) * 1300); r += Math.max(w.rain, w.thunder) / 4; } WC.inflow = r; }   // (what is falling on the mountain's flanks)
+  WC.basin += (WC.inflow - WC.basin) * Math.min(1, dt / (WC.inflow > WC.basin ? 80 : 320));   // (up in a minute or two; down over five)
+  WC.flood.value = smoothstep(0.06, 0.6, WC.basin); WC.rivT.value += dt * (1 + WC.flood.value * 0.9); waterfallMat.uniforms.uFlood.value = WC.flood.value;
+  const c = camera.position;
+  if (over && sunK > 0.1 && c.y - WATER < 520 && (WC.vapT -= dt) < 0) { WC.vapT = TOUCH ? 0.12 : 0.05;
+    for (let i = 0; i < 2; i++) { const a = Math.random() * 6.283, d = 30 + Math.random() * 280, x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d, b = 0.34 * sunK * (1 - WX.rain);
+      if (b > 0.03 && overHeight(x, z) < WATER - 1) emit(x, WATER + 0.6, z, WIND.x * 2.5 + rnd(0.6), 1.3 + Math.random() * 1.6, WIND.z * 2.5 + rnd(0.6), 5 + Math.random() * 4, [b, b * 1.04, b * 1.1], 1.6, 2.6 + Math.random() * 3); } }
+}
+function updateAir(dt) {
+  updateDust(dt); updateSqualls(dt); updateMist(dt); updateWater(dt);
+  const shut = Math.max(DUST.k, Math.min(SNOW.bliz, WX.squall)); PU.uLineFar.value = scene.fog.far * 1.2 + (1 - shut) ** 4 * 40000;   // (where the air has closed in, the letters draw no outlines past it)
+}
 
 // ───────────────────────── grass ─────────────────────────
 // A field of it round him, a few tufts to the square metre, each tuft three blades. The wind goes through it in waves
@@ -14850,7 +15171,7 @@ const FLOWER_COLS = [[0.95, 0.12, 0.08], [1.0, 0.82, 0.12], [0.62, 0.4, 0.95], [
 const flowerAt = (x, z) => {
   let f = smoothstep(0.36, 0.52, noise2(x / 140 + 71.3, z / 140 - 29.1) * 0.65 + noise2(x / 47 - 13.7, z / 47 + 8.2) * 0.35);
   for (const b of FLOWERS.bloom) { const d2 = (x - b.x) ** 2 + (z - b.z) ** 2; if (d2 < b.r * b.r) f = Math.max(f, smoothstep(b.r, b.r * 0.55, Math.sqrt(d2))); }
-  return f;
+  return f > 0 ? f * (1 - duneK(x, z)) : f;
 };
 const flowerCol = (x, z) => { for (const b of FLOWERS.bloom) if (b.col && (x - b.x) ** 2 + (z - b.z) ** 2 < b.r * b.r) return b.col; return flowerCol0(x, z); };
 const flowerCol0 = (x, z) => FLOWER_COLS[Math.min(FLOWER_COLS.length - 1, Math.floor((noise2(x / 420 + 3.3, z / 420 - 7.7) * 0.5 + 0.5) * FLOWER_COLS.length))];
@@ -15352,7 +15673,7 @@ function meteoraAt(cx, cz) {   // is there a stand of rock in this square of cou
   const r = mulberry32((cx * 92837111) ^ (cz * 689287499) ^ 0x3e7e), C = 2600;
   if (r() > 0.58) return null;
   const x = (cx + 0.18 + r() * 0.64) * C, z = (cz + 0.18 + r() * 0.64) * C, h = overHeight(x, z);
-  if (h < WATER + 14 || h > 430 || Math.hypot(x - MOUNT.x, z - MOUNT.z) < MOUNT.R * 1.15 || Math.hypot(x - CRETE.x, z - CRETE.z) < 3900 || Math.hypot(x - MYKONOS.x, z - MYKONOS.z) < 900 || volcanoNear(x, z, 700)) return null;
+  if (h < WATER + 14 || h > 430 || Math.hypot(x - MOUNT.x, z - MOUNT.z) < MOUNT.R * 1.15 || Math.hypot(x - CRETE.x, z - CRETE.z) < 3900 || Math.hypot(x - MYKONOS.x, z - MYKONOS.z) < 900 || volcanoNear(x, z, 700) || Math.hypot(x - DUNE.x, z - DUNE.z) < DUNE.R + 500) return null;   // (and none in the sand sea)
   return { id: `m${cx}_${cz}`, kind: 'meteora', x, z, seed: (r() * 2 ** 31) | 0, R: 240 };
 }
 // (nothing grows on the hill of the Parthenon: the ground round it is kept clear, out past its steps)
@@ -21206,15 +21527,15 @@ function drawWeather(x, V, W, H) {
     const nh = Math.min(13, Math.ceil(span / 2 / step)), x0 = Math.round(V.tx / step) * step, z0 = Math.round(V.tz / step) * step;
     for (let iz = -nh; iz <= nh; iz++) for (let ix = -nh; ix <= nh; ix++) {
       const wx = x0 + ix * step, wz = z0 + iz * step, w = wxAt(wx, wz);
-      let kind = '', k = 0.3; for (const q of ['thunder', 'rain', 'gold', 'mist', 'waves', 'grey']) if (w[q] > k) { k = w[q]; kind = q; }
+      let kind = '', k = 0.3; for (const q of ['dust', 'squall', 'thunder', 'rain', 'gold', 'mist', 'waves', 'grey']) if (w[q] > k) { k = w[q]; kind = q; }
       if (kind && !(kind === 'waves' && height(wx, wz) > WATER)) R.wx.push({ x: wx, z: wz, kind, k, h: kind === 'waves' ? WATER : reliefH(wx, wz) + 380 });
     }
   }
-  const G = { thunder: ['z', '210,225,255'], rain: ['/', '130,170,230'], gold: ['*', '255,196,106'], mist: ['·', '200,205,215'], waves: ['~', '120,190,255'], grey: ['-', '150,155,170'] };
+  const G = { dust: ['%', '222,160,96'], squall: ['+', '236,242,255'], thunder: ['z', '210,225,255'], rain: ['/', '130,170,230'], gold: ['*', '255,196,106'], mist: ['·', '200,205,215'], waves: ['~', '120,190,255'], grey: ['-', '150,155,170'] };
   x.font = '11px Menlo, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
   for (const c of R.wx) { const g = G[c.kind], X = mapSX(c.x, c.z, c.h), Y = mapSY(c.x, c.z, c.h); if (!(X >= -10 && X <= W + 10 && Y >= -10 && Y <= H + 10)) continue;
     const fl = c.kind === 'thunder' && Math.sin(time * 9 + c.x * 0.01) > 0.9 ? 1 : 0; x.fillStyle = `rgba(${fl ? '255,255,255' : g[1]},${Math.min(0.9, 0.25 + c.k * 0.6 + fl * 0.3).toFixed(2)})`; x.fillText(g[0], X + (c.kind === 'rain' ? Math.sin(time * 2 + c.z) * 1.5 : 0), Y); }
-  for (const Tn of TW.list) { const g = Math.max(height(Tn.x, Tn.z), WATER), X = mapSX(Tn.x, Tn.z), Y0 = mapSY(Tn.x, Tn.z, g), Y1 = mapSY(Tn.x, Tn.z, g + 640);   // a tornado: a thin funnel from the ground to the cloud
+  for (const Tn of TW.list) { const g = Math.max(height(Tn.x, Tn.z), WATER), X = mapSX(Tn.x, Tn.z), Y0 = mapSY(Tn.x, Tn.z, g), Y1 = mapSY(Tn.x, Tn.z, g + Tn.H);   // a tornado: a funnel from the ground to the cloud
     x.strokeStyle = 'rgba(200,205,220,.8)'; x.beginPath(); x.moveTo(X, Y0); x.lineTo(X - Tn.R * V.s, Y1); x.moveTo(X, Y0); x.lineTo(X + Tn.R * V.s, Y1); x.stroke(); x.fillStyle = 'rgba(230,232,240,.9)'; x.fillText('TORNADO', X, Y1 - 9); }
   const seen = [...new Set(R.wx.map(c => c.kind))]; if (seen.length || TW.list.length) { x.textAlign = 'left'; x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = 'rgba(244,234,210,.6)';
     const it = seen.map(q => `${G[q][0]} ${WX_NAMES[q].toLowerCase()}`), rows = ['']; for (const t of it) { const l = rows.length - 1, w = rows[l] ? rows[l] + '   ' + t : t; if (rows[l] && x.measureText(w).width > W - 104) rows.push(t); else rows[l] = w; }   // (a narrow screen: the key takes two lines, and stays clear of the button)
@@ -24162,7 +24483,7 @@ function tick(dt) {
   updateSea(dt); updateSkim(dt); updateCaves(dt); updateFish(dt); updateDeep(dt); statsTick(dt); updateAreas(dt); updateGod(dt); globalThis.DAIMON?.update(dt); updateTron(dt); updateMatch(dt); updateGfly(dt); updateShore(); updateRivers(dt); updateStone(dt); updatePlaces(dt); updateDrift(dt); updateTear(dt); updatePools(dt);
   updateRings(dt);
   updateWorldLife(dt); updateLeaves(dt); updateLava(dt); updateEruptions(dt); updateCraters(dt); updateArena(dt); updateGrass(dt); updateFlowers(dt); updateWeather(dt); updateTwisters(dt); updateFire(dt); updateFlies(dt); updateFriends(dt); updatePantheon(dt); updateGusts(dt); updateHigh(dt);
-  updateTemple(); updateCurrents(dt); updateDay(dt); updateStorm(dt); updateOthers(dt);
+  updateTemple(); updateCurrents(dt); updateDay(dt); updateStorm(dt); updateAir(dt); updateOthers(dt);
   if (realm === 'over') { updateBeacons(dt); updateAnimals(dt); updateBirds(dt); updateGods(dt); }
   else updateUnder(dt);
   updateAgents(dt);
@@ -25989,7 +26310,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
   frame();
