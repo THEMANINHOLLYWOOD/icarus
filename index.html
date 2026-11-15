@@ -3103,7 +3103,7 @@ function farStep(dt) {
   // how far he can see: from up high, or going fast, a long way; down among the hills, as before
   const alt = c.y - Math.max(terrainAt(c.x, c.z), WATER), sp = p.form === 'phoenix' ? p.speed : Math.hypot(p.vel.x, p.vel.y, p.vel.z);
   // and on a wide shot (the director's long lenses, a camera far off him, the photo camera on a long lens) all the way out
-  const wideShot = (cinema.on && cinema.shot && /^(profile|wide|crane|top|orbit)$/.test(cinema.shot.type)) || (state === 'photo' && camera.fov < 42) || (state === 'play' && c.distanceTo(p.pos) > 95) || state === 'stats';
+  const wideShot = (cinema.on && cinema.shot && /^(profile|wide|crane|top|orbit|tele|scale|reveal|imax|pair|take)$/.test(cinema.shot.type)) || (state === 'photo' && camera.fov < 42) || (state === 'play' && c.distanceTo(p.pos) > 95) || state === 'stats';
   FAR.wide = lerp(FAR.wide || 0, wideShot ? 1 : 0, damp(wideShot ? 1.4 : 0.6, dt));
   VIEW_X = FAR.wide > 0.6 && !XR.on ? (TOUCH ? 1 : 2) : FAR.wide < 0.3 ? 0 : VIEW_X;
   const want = FAR.mesh ? Math.max(smoothstep(60, 700, alt), smoothstep(110, 280, sp) * 0.75, FAR.wide) : 0;
@@ -3164,6 +3164,10 @@ function updateClouds(dt) {
   const fFar = lerp(lerp(fogFar, Math.max(fogFar, FAR.span * 0.46), FAR.k), FAR.span * 0.66, (FAR.wide || 0) * 0.9), fNear = lerp(lerp(260, 900, FAR.k), 1600, (FAR.wide || 0) * 0.8);   // (a wide shot sees nearly all the way to the far country's edge)
   { const cf = Math.max(14000, fFar * 1.35); if (Math.abs(camera.far - cf) > 400) { camera.far = cf; camera.updateProjectionMatrix(); } }
   scene.fog.near = lerp(fNear, 40, cloudIn); scene.fog.far = lerp(fFar, 720, cloudIn);
+  cinema.fogK = lerp(cinema.fogK, cinema.on && state === 'play' && cinema.shot && cinema.shot.type !== 'dir' && !under ? 1 : 0, damp(1.5, dt));
+  if (cinema.fogK > 0.01) {   // the film camera: the haze begins just past him, and on a long lens it is thicker (cineHaze)
+    const k = cinema.fogK; scene.fog.near = lerp(scene.fog.near, Math.min(scene.fog.near, cinema.fogN), k); scene.fog.far = lerp(scene.fog.far, Math.max(scene.fog.near + 600, scene.fog.far * cinema.fogF), k);
+  }
   if (!under && WX.fog > 0.01) {   // rain and mist close the world in, and grey it
     scene.fog.near = lerp(scene.fog.near, 30, WX.fog * 0.8); scene.fog.far = lerp(scene.fog.far, Math.min(scene.fog.far, 560), WX.fog * 0.85);
     _cc.setRGB(0.52, 0.55, 0.6).multiplyScalar(pal.hemiI / 1.45); scene.fog.color.lerp(_cc, WX.fog * 0.55);
@@ -19006,8 +19010,21 @@ $('photoBar').addEventListener('click', e => {
 // After the GTA cinematic cam: a small vocabulary of shots on long and wide lenses, hard cuts between them,
 // spring-smoothed tracking so nothing ever jitters, a slow zoom inside every shot, and a cut the moment
 // a hill gets between the lens and the bird.
-const cinema = { on: false, manual: false, idle: 0, autoT: 0, shot: null, last: '', head: 0, blocked: 0,
-  aim: new THREE.Vector3(), aimV: new THREE.Vector3(), pos: new THREE.Vector3(), posV: new THREE.Vector3() };
+// And after the people who have actually filmed flight. Nolan and van Hoytema bolted IMAX cameras to the wings of their
+// Spitfires and flew a chase plane at the Spitfires' own speed: the plane stays put in the frame and the horizon rolls
+// behind it, and a wide lens close to it puts the whole real country behind. Top Gun: Maverick hung its camera under the
+// nose of a chase jet, low and behind, and asked the pilots not to fly level, so something is always moving behind
+// them. Deakins: one strong light from behind, a silhouette against open sky, never against another dark shape.
+// Lubezki: wide lenses very close, and long takes that go round the actors without a cut. The films that flew with birds
+// (Earthflight, Planet Earth): at the wingtip at eye level, matched speed, or the long lens a long way off with the
+// country stacked up flat behind the bird; the bird small in all that country, or filling the frame. So the shots
+// below, chosen by what he is doing and where (low over trees or water, high, fast, diving, in a fight, at night, near
+// the mountain, with someone), cut on what he does (a dive begun, a turn reversed, a burst of speed), the lens kept on
+// one side of his line of flight from cut to cut. And depth in a picture made of letters: the haze starts just past him
+// (he is the sharpest thing there; everything behind falls away into the air by its distance), near things rush
+// through the frame (motion parallax), and something huge stands behind him for scale.
+const cinema = { on: false, manual: false, idle: 0, autoT: 0, shot: null, last: '', head: 0, blocked: 0, cue: '', roll: 0, fogN: 0, fogF: 1, fogK: 0,
+  bkS: 0, dv: false, spd: 0, ctx: null, aim: new THREE.Vector3(), aimV: new THREE.Vector3(), pos: new THREE.Vector3(), posV: new THREE.Vector3(), rel: new THREE.Vector3(), relV: new THREE.Vector3(), aimR: new THREE.Vector3(), aimRV: new THREE.Vector3() };
 const SHOTS = {
   profile: { w: 3, dur: [6, 9], fov: [34, 28], dist: [120, 190], smooth: 0.9 },    // side-on and very wide: a small bird against the whole country
   tight:   { w: 2, dur: [4, 6], fov: [17, 14], dist: [70, 100], smooth: 0.7 },     // side-on, long lens, wings filling the frame
@@ -19025,11 +19042,29 @@ const SHOTS = {
   skim:    { w: 0, dur: [5, 7], fov: [24, 18], dist: [90, 125], smooth: 0.7 },     // (low over water) the lens down on the water, long: him and what he does to the surface
   sun:     { w: 0, dur: [6, 8], fov: [15, 11], dist: [230, 300], smooth: 1.0 },    // (a low sun) dead against the light: a black bird burning at the edges
   dive:    { w: 0, dur: [3.5, 5], fov: [60, 44], dist: [26, 34], smooth: 0.3 },    // (diving) over his back as he drops, the ground coming up
+  chase:   { w: 3, dur: [5, 8], fov: [48, 42], dist: [34, 46], smooth: 0.2, haze: 0.85 },   // Top Gun's chase jet: matched speed, low behind his quarter, a pilot's small drift, leaning some way into his turns
+  mount:   { w: 2, dur: [4, 6], fov: [76, 70], dist: [0, 0], smooth: 0 },          // Dunkirk's wing camera: bolted to him out past the wingtip, looking back in at him; he stays put and the world rolls
+  tele:    { w: 2, dur: [6, 9], fov: [6, 6], dist: [520, 800], smooth: 0, haze: 0.6 },   // the wildlife long lens, planted far ahead off his line: the country behind him stacked flat and huge, the lens zooming out as he comes so he stays the same size
+  imax:    { w: 3, dur: [5, 8], fov: [80, 74], dist: [13, 17], smooth: 0.22 },     // van Hoytema's IMAX: the widest lens, close under his wing and a little ahead, all the country behind
+  take:    { w: 2, dur: [16, 24], fov: [60, 54], dist: [26, 36], smooth: 1.2 },    // Lubezki's long take: no cut; the lens floats round him from where it was, beside, under, ahead and over to the other side
+  graze:   { w: 0, dur: [5, 7], fov: [60, 52], dist: [30, 44], smooth: 0.3 },      // (low over trees, rock or water) the lens down among them at his speed: what is under it rushes through the near frame
+  scale:   { w: 0, dur: [7, 10], fov: [30, 30], dist: [380, 620], smooth: 0.6, haze: 0.85 },   // (near the mountain, a volcano, a titan) far off, the huge thing behind and beside him: how small he is
+  reveal:  { w: 0, dur: [7, 9], fov: [44, 62], dist: [40, 60], smooth: 0.8 },      // (low over the land) from down behind the rise, craning up and back until the country opens out beyond him
+  dutch:   { w: 2, dur: [4, 6], fov: [30, 26], dist: [60, 85], smooth: 0.35 },     // three-quarters behind on a longer lens, the horizon tipped and tipping further as he banks
+  pair:    { w: 0, dur: [6, 9], fov: [34, 30], dist: [0, 0], smooth: 0.7 },        // (someone flying with him) side-on to the two of them, both in the frame
 };
 // how big he is in each (two frames of the same size are never cut together), and which are side-on (the side is kept
 // from cut to cut: the lens crosses his line of flight only by way of a shot that is on neither side)
-const SHOT_SIZE = { profile: 'wide', tight: 'close', flyby: 'mid', orbit: 'mid', low: 'mid', crane: 'wide', lead: 'close', top: 'wide', quarter: 'close', wing: 'pov', skim: 'mid', sun: 'close', dive: 'mid', along: 'near', headon: 'close', belly: 'near' };
-const SHOT_SIDED = new Set(['profile', 'tight', 'flyby', 'quarter', 'skim', 'wing', 'along']);
+const SHOT_SIZE = { profile: 'wide', tight: 'close', flyby: 'mid', orbit: 'mid', low: 'mid', crane: 'wide', lead: 'close', top: 'wide', quarter: 'close', wing: 'pov', skim: 'mid', sun: 'close', dive: 'mid', along: 'near', headon: 'close', belly: 'near',
+  chase: 'mid', mount: 'pov', tele: 'close', imax: 'near', take: 'mid', graze: 'mid', scale: 'wide', reveal: 'wide', dutch: 'close', pair: 'wide' };
+const SHOT_SIDED = new Set(['profile', 'tight', 'flyby', 'quarter', 'skim', 'wing', 'along', 'chase', 'mount', 'tele', 'imax', 'graze', 'dutch', 'scale']);
+// what can be seen from far off, and what only near him (in the dark, or in cloud and rain, his own fire is the light);
+// what a fight wants; and the shots a moment of action cuts to
+const CINE_FAR = new Set(['profile', 'crane', 'top', 'lead', 'quarter', 'tele', 'scale', 'reveal', 'sun', 'pair', 'flyby']);
+const CINE_NEAR = new Set(['mount', 'chase', 'imax', 'tight', 'along', 'belly', 'wing', 'take', 'dutch', 'low', 'headon', 'dive', 'graze']);
+const CINE_FIGHT = { chase: 4, mount: 3, dutch: 3, tight: 2, imax: 2, low: 2, wing: 2, headon: 1.5, dive: 1, belly: 1, along: 1, flyby: 1 };
+const CINE_CUE = { dive: ['dive', 'mount', 'chase'], pull: ['belly', 'imax', 'chase'], turn: ['dutch', 'chase', 'tight', 'mount'], surge: ['chase', 'mount', 'low', 'flyby'] };
+const CINE_PLAY = new Set(['take', 'tele', 'flyby', 'scale', 'pair', 'reveal']);   // (moves that are let play out: never cut short for the action)
 // critically damped spring (the "SmoothDamp" every camera rig uses)
 function springTo(cur, vel, target, smooth, dt) {
   if (smooth <= 0) { cur.copy(target); vel.set(0, 0, 0); return; }
@@ -19043,7 +19078,7 @@ const rr = ([a, b]) => a + Math.random() * (b - a);
 // which way he is facing, flying or walking, and how big the shots are around him
 const cineHead = () => player.form === 'human' ? human.group.rotation.y : player.yaw;
 const cineDir = out => player.form === 'human' ? out.set(-Math.sin(human.group.rotation.y), 0, -Math.cos(human.group.rotation.y)) : out.copy(dir3);
-const _cd = new THREE.Vector3();
+const _cd = new THREE.Vector3(), _cu = new THREE.Vector3();
 const FOOT_SHOTS = {
   face:  { w: 2, dur: [4, 6], fov: [30, 26] },   // in front of him, close: his face
   wide:  { w: 3, dur: [6, 9], fov: [26, 22] },   // a long way off and side on: him small against the whole country, on a third of the frame
@@ -19080,34 +19115,132 @@ function newShot() {
   const p = player, foot = p.form === 'human', sc = cinema.sc = foot ? 0.085 : (1 + (birdK() - 1) * 0.85) * (1 + GODM.k * 0.3 + smoothstep(220, 700, p.speed) * 0.55), fast = !foot && p.speed > 150;   // (and in god mode, or going very fast, further again, so he stays in the frame)   // (the big bird: every shot stands back for it, a little less than its size, so it still fills more of the frame)
   if (foot && !SH.def) return newFootShot();
   // what he is doing chooses the shot: low over water, the lens goes down to the water; in a dive, over his back; with
-  // the sun low and clear, against it
-  const alt = p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER), wet = !foot && alt < 45 && terrainAt(p.pos.x, p.pos.z) < WATER;
-  const diving = !foot && p.pitch < -0.55 && alt > 110, sunLow = !foot && realm === 'over' && sunDir.y > 0.03 && sunDir.y < 0.42 && storm < 0.35;
-  const wOf = k => { const w = k === 'skim' ? (wet ? 7 : 0) : k === 'dive' ? (diving ? 9 : 0) : k === 'sun' ? (sunLow ? 3 : 0) : k === 'wing' && foot ? 0 : SHOTS[k].w + (fast && (k === 'low' || k === 'top' || k === 'flyby' || k === 'wing') ? 2 : 0);
-    return w * (SHOT_SIZE[k] === cinema.size ? 0.3 : 1) * dpBias(k); };
-  const pool = Object.keys(SHOTS).filter(k => k !== cinema.last && !(fast && (k === 'orbit' || k === 'lead')) && wOf(k) > 0);
-  let roll = Math.random() * pool.reduce((s, k) => s + wOf(k), 0), type = pool[0];
+  // the sun low and clear, against it; and the rest of what is round him (cineCtx)
+  const C = cinema.ctx = cineCtx(foot, fast);
+  const wOf = k => shotW(k, C) * (SHOT_SIZE[k] === cinema.size ? 0.3 : 1) * dpBias(k);
+  const pool = Object.keys(SHOTS).filter(k => k !== cinema.last && wOf(k) > 0);
+  let roll = Math.random() * pool.reduce((s, k) => s + wOf(k), 0), type = pool[0] || 'profile';
   for (const k of pool) { roll -= wOf(k); if (roll <= 0) { type = k; break; } }
+  { const cue = CINE_CUE[cinema.cue], ok = cue && cue.filter(k => k !== cinema.last && wOf(k) > 0); cinema.cue = ''; if (ok?.length) type = ok[Math.floor(Math.random() * ok.length)]; }   // (a cut on the action: what he just did chooses what it cuts to)
   if (!cinema.last && cinema.autoT > 0) type = 'profile';   // the very first thing he sees of himself: the wide side-on
-  { const ask = DP.first || DP.want; DP.first = ''; if (ask && SHOTS[ask]) type = ask === 'skim' && !wet ? 'low' : ask; }   // (the director asked for it)
-  const crossed = !SHOT_SIDED.has(cinema.last) || !cinema.side;   // (only after a shot on neither side may the lens change sides)
+  { const ask = DP.first || DP.want; DP.first = ''; if (ask && SHOTS[ask]) type = ask === 'skim' && !C.wet ? 'low' : ask === 'scale' && !C.mark ? 'profile' : ask === 'pair' && !C.mate ? 'profile' : ask === 'mount' && foot ? 'wing' : ask; }   // (the director asked for it)
+  const was = cinema.last, crossed = !(SHOT_SIDED.has(was) || was === 'take') || !cinema.side;   // (only after a shot on neither side may the lens change sides; a long take ends on a side, and keeps it)
   cinema.last = type; cinema.size = SHOT_SIZE[type];
   // which side: where it is free to choose, mostly the side the sun is on, so the light is behind the lens and on him
   const h0 = cineHead(), lit = realm === 'over' && sunDir.y > 0.05 && Math.random() < 0.75 ? Math.sign(Math.cos(h0) * sunDir.x - Math.sin(h0) * sunDir.z) : 0;
   const S = SHOTS[type], side = cinema.side = DP.side || (crossed ? (lit || (Math.random() < 0.5 ? -1 : 1)) : cinema.side);
-  const shot = cinema.shot = { type, S, side, t: 0, dur: rr(S.dur) * (fast ? 0.7 : 1), dist: rr(S.dist) * sc * DP.k, up: rnd(1), drift: rnd(1), ang: Math.random() * 6.28 };
-  const hd = cineHead();
+  const shot = cinema.shot = { type, S, side, t: 0, dur: rr(S.dur) * (fast ? 0.7 : 1) * (C.fight && !CINE_PLAY.has(type) ? 0.6 : 1), dist: rr(S.dist) * sc * DP.k, up: rnd(1), drift: rnd(1), ang: Math.random() * 6.28 };
+  const hd = cineHead(), fx = -Math.sin(hd), fz = -Math.cos(hd), rx = Math.cos(hd), rz = -Math.sin(hd);
   if (type === 'flyby') {
     const spd = foot ? Math.max(1.5, Math.hypot(p.vel.x, p.vel.z)) : p.speed;
     shot.anchor = new THREE.Vector3().copy(p.pos).addScaledVector(cineDir(_cd), spd * shot.dur * 0.42)
       .add(_v.set(Math.cos(hd) * 26 * sc * side, (4 + Math.random() * 10) * sc, -Math.sin(hd) * 26 * sc * side));
     shot.anchor.y = Math.max(shot.anchor.y, groundAt(shot.anchor.x, shot.anchor.z, shot.anchor.y + 3) + (foot ? 1.2 : 5 * sc), WATER + 3 * sc);
   }
+  if (type === 'tele') {   // planted far down his line of flight and off to one side, at his height: he flies at the glass from a long way off
+    const A = Math.max(shot.dist, p.speed * shot.dur * 0.62);
+    shot.anchor = new THREE.Vector3().copy(p.pos).addScaledVector(cineDir(_cd), A).add(_v.set(rx * A * 0.16 * side, 0, rz * A * 0.16 * side));
+    shot.anchor.y = Math.max(shot.anchor.y, groundAt(shot.anchor.x, shot.anchor.z, shot.anchor.y + 3) + 6 * sc, WATER + 3 * sc); shot.A = A;
+  }
+  if (type === 'scale') {   // on the far side of him from the huge thing and a little round from it: it stands behind him and beside him, and the lens flies with him at his speed
+    const L = shot.L = C.mark, dx = L.x - p.pos.x, dz = L.z - p.pos.z, dl = Math.hypot(dx, dz) || 1, a = side * (0.3 + Math.random() * 0.15), ca = Math.cos(a), sa = Math.sin(a);
+    const ux = -dx / dl, uz = -dz / dl, D = shot.dist * (camera.aspect < 1 ? 0.65 : 1);   // (nearer on a tall screen, where he would be lost)
+    shot.off = new THREE.Vector3((ux * ca - uz * sa) * D, -D * 0.05, (ux * sa + uz * ca) * D);
+  }
+  if (type === 'pair') shot.mate = C.mate;
+  if (type === 'take') {   // from wherever the lens is, round him the near way (through his side, past his front, on to the other side)
+    const ox = camera.position.x - p.pos.x, oy = camera.position.y - p.pos.y, oz = camera.position.z - p.pos.z, a0 = Math.atan2(ox * rx + oz * rz, ox * fx + oz * fz);
+    shot.az0 = was ? a0 : Math.PI * 0.85 * side; shot.sg = shot.az0 > 0.05 ? -1 : shot.az0 < -0.05 ? 1 : -side; shot.el0 = was ? clamp(Math.atan2(oy, Math.hypot(ox, oz)), -0.4, 0.8) : 0.25; shot.a = shot.az0;
+  }
+  if (type === 'dutch') shot.tilt = side * (0.13 + Math.random() * 0.07);
   cinema.head = hd; cinema.blocked = 0;
-  shotPos(shot, cinema.pos); cinema.posV.set(0, 0, 0);
-  cinema.aim.copy(p.pos); if (foot) cinema.aim.y += 1.1; cinema.aimV.set(0, 0, 0);
+  if (type === 'take' && was) { cinema.pos.copy(camera.position); cinema.rel.subVectors(cinema.pos, p.pos); cinema.relV.multiplyScalar(0.5); cinema.aimR.subVectors(cinema.aim, p.pos); cinema.aimRV.set(0, 0, 0); return; }   // (no cut: the lens just carries on, and the take begins from where it is)
+  shotPos(shot, cinema.pos); cineKeep(cinema.pos, cinema.posV); cinema.posV.set(0, 0, 0); cinema.rel.subVectors(cinema.pos, p.pos); cinema.relV.set(0, 0, 0);
+  cinema.aim.copy(type === 'pair' && shot.mid ? shot.mid : p.pos); if (foot) cinema.aim.y += 1.1; cinema.aimV.set(0, 0, 0); cinema.aimR.subVectors(cinema.aim, p.pos); cinema.aimRV.set(0, 0, 0);
   camera.position.copy(cinema.pos);   // a hard cut
-  camera.fov = S.fov[0] * (camera.aspect < 1 ? 1.35 : 1);
+  camera.fov = shot.fovT || S.fov[0] * (camera.aspect < 1 ? 1.35 : 1); cinema.roll = 0;
+}
+// what is round him when the lens chooses: how high and over what, how fast, diving or not, the sun, the dark, the weather,
+// a fight, something huge near, someone flying with him
+function cineCtx(foot, fast) {
+  const p = player, P = p.pos, alt = P.y - Math.max(groundAt(P.x, P.z, P.y), WATER), sea = terrainAt(P.x, P.z) < WATER, sc = cinema.sc || 1;
+  return { foot, fast, alt, sea, sc,
+    wet: !foot && alt < 45 && sea, low: !foot && (alt < 50 * sc || cineCloudTop(P.x, P.z) > P.y - 50 * sc && cineCloudTop(P.x, P.z) < P.y), landLow: !foot && !sea && alt < 150 * sc && alt > 8 * sc,
+    diving: !foot && p.pitch < -0.55 && alt > 110, slow: !foot && p.speed < 45, high: !foot && alt > 450,
+    sunLow: !foot && realm === 'over' && sunDir.y > 0.03 && sunDir.y < 0.42 && storm < 0.35,
+    night: realm !== 'over' || sunDir.y < -0.04, murk: storm > 0.45 || WX.fog > 0.35 || cloudIn > 0.5,
+    fight: MATCH.phase === 'live' && !!MATCH.me.alive, mark: foot ? null : cineMark(), mate: foot ? null : cineMate() };
+}
+function shotW(k, C) {
+  if (C.foot && (k === 'wing' || k === 'mount' || k === 'tele' || k === 'scale' || k === 'pair')) return 0;
+  let w = k === 'skim' ? (C.wet ? 7 : 0) : k === 'dive' ? (C.diving ? 9 : 0) : k === 'sun' ? (C.sunLow ? 3 : 0) : k === 'graze' ? (C.low ? 5 : 0)
+    : k === 'scale' ? (C.mark ? 4 : 0) : k === 'pair' ? (C.mate ? 6 : 0) : k === 'reveal' ? (C.landLow ? 3 : 0) : SHOTS[k].w;
+  if (C.fast) { if (k === 'orbit' || k === 'lead' || k === 'take') return 0; if (k === 'low' || k === 'top' || k === 'flyby' || k === 'wing' || k === 'chase' || k === 'mount') w += 2; if (k === 'tele') w *= 0.3; }
+  if (C.slow && (k === 'take' || k === 'orbit')) w *= 2;
+  if (C.high && (k === 'top' || k === 'imax' || k === 'scale')) w *= 1.6;
+  if (C.sea && !C.low && (k === 'top' || k === 'reveal')) w *= 0.4;   // (straight down on open sea: nothing under him to read)
+  if (C.night || C.murk) w *= CINE_FAR.has(k) ? 0.2 : CINE_NEAR.has(k) ? 1.6 : 1;   // in the dark, or in cloud and rain, only what is near him can be seen
+  if (C.fight) w *= CINE_FIGHT[k] ?? 0.2;
+  return w;
+}
+// something huge near him to stand behind him for scale: the mountain, a volcano, a titan
+function cineMark() {
+  if (realm !== 'over') return null;
+  const p = player, md = Math.hypot(p.pos.x - MOUNT.x, p.pos.z - MOUNT.z);
+  if (md > 1100 && md < 9000) return { x: MOUNT.x, z: MOUNT.z, y: lerp(WATER, SUMMIT, 0.5), top: SUMMIT, r: MOUNT.R * 0.45 };
+  for (const v of VOLCANOES) { const d = Math.hypot(v.x - p.pos.x, v.z - p.pos.z), g = groundAt(v.x, v.z); if (d > 350 && d < 3500 && g > p.pos.y - 300) return { x: v.x, z: v.z, y: lerp(WATER, g, 0.6), top: g, r: (v.R0 || 300) * 0.6 }; }
+  for (const g of dirFolk()) { if (!g.titan) continue; const d = Math.hypot(g.x - p.pos.x, g.z - p.pos.z), H = (g.S || 10) * 2.2, y0 = g.gy ?? groundAt(g.x, g.z); if (d > 60 && d < 1500) return { x: g.x, z: g.z, y: y0 + H * 0.5, top: y0 + H, r: H * 0.4 }; }
+  return null;
+}
+// someone flying with him: a god's great bird beside him, or the nearest flier
+function cineMate() {
+  const p = player, lim = 420 * (cinema.sc || 1);
+  if (GFLY.on && GFLY.B && GFLY.B.pos.distanceTo(p.pos) < lim * 2) return { k: 'gfly' };
+  let best = null, bd = lim * lim;
+  for (const P of dirPeers()) { if (P.form !== 'p') continue; const d = P.pos.distanceToSquared(p.pos); if (d < bd) { bd = d; best = P; } }
+  return best && { k: 'peer', P: best, name: best.name };
+}
+const CINE_MATE = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), r: 6, yaw: 0 };
+function cineMateAt(M) {
+  if (!M) return null;
+  if (M.k === 'gfly') { if (!GFLY.on || !GFLY.B) return null; CINE_MATE.pos.copy(GFLY.B.pos); CINE_MATE.r = 30; }
+  else if (!dirAt(M, CINE_MATE)) return null;
+  return CINE_MATE.pos.distanceTo(player.pos) < 1400 * (cinema.sc || 1) ? CINE_MATE : null;
+}
+// how high the lens may come down to here: the ground, the water, the tops of the trees, or the top of the sea of cloud
+// round the mountain (he skims it, and the lens skims it with him)
+const cineCloudTop = (x, z) => { if (realm !== 'over') return -1e9; const md = Math.hypot(x - MOUNT.x, z - MOUNT.z); return md > 400 && md < 3500 && player.pos.y > CLOUD_SEA ? CLOUD_SEA + 48 : -1e9; };
+function cineSurf(x, z) {
+  let top = Math.max(groundAt(x, z), WATER, cineCloudTop(x, z));
+  treesNear(x, z, 12, (g, ck, i, t) => { if (!t.fell && t.top > top && (t.x - x) ** 2 + (t.z - z) ** 2 < (t.rad + 8) ** 2) top = t.top; });
+  return top;
+}
+// the wing camera: fixed to him, out over his wingtip and ahead of it, looking back along the wing at him and past him;
+// his roll is its roll
+function cineMount(sh, out, upOut, aimOut) {
+  const p = player, q = phoenix.group.quaternion, K = birdK() * (1 + 0.15 * perks.wings), s = sh.side || 1;
+  out.set(s * 12 * K, 4.6 * K, -7.5 * K).applyQuaternion(q).add(p.pos);
+  if (upOut) upOut.set(0, 1, 0).applyQuaternion(q);
+  if (aimOut) aimOut.set(-s * 2 * K, 0, 4 * K).applyQuaternion(q).add(p.pos);
+  return out;
+}
+// something he just did, worth cutting on: a dive begun or pulled out of, a turn thrown the other way, a burst of speed
+function cineCue() {
+  const p = player; if (p.form !== 'phoenix') return '';
+  let cue = '';
+  if (Math.abs(p.bank) > 0.45) { const s = Math.sign(p.bank); if (cinema.bkS && s !== cinema.bkS) cue = 'turn'; cinema.bkS = s; }
+  if (!cinema.dv && p.pitch < -0.6) { cinema.dv = true; cue = 'dive'; } else if (cinema.dv && p.pitch > 0.12) { cinema.dv = false; cue = 'pull'; } else if (cinema.dv && p.pitch > -0.25) cinema.dv = false;
+  if (p.speed > cinema.spd * 1.35 + 25) cue = 'surge';
+  cinema.spd = cinema.spd > p.speed ? p.speed : lerp(cinema.spd, p.speed, 0.02);
+  return cue;
+}
+// never in the ground or the sea, and never inside him (a spring swinging the lens round him takes it round, not through)
+function cineKeep(c, v) {
+  const p = player, foot = p.form === 'human', g = Math.max(groundAt(c.x, c.z, c.y + 3) + (foot ? 0.35 : 1.5), WATER + (foot ? 0.5 : 0.9));
+  if (c.y < g) { c.y = g; if (v.y < 0) v.y = 0; }
+  if (foot) return;
+  const rm = 9 * birdK(); _n.subVectors(c, p.pos); const d = _n.length();
+  if (d < rm) { if (d < 1e-3) _n.set(1, 0.3, 0); c.copy(p.pos).addScaledVector(_n.normalize(), rm); }
 }
 function shotPos(sh, out) {
   const p = player, h = cinema.head, fx = -Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h), d = sh.dist, s = sh.side, k = cinema.sc || 1;
@@ -19130,6 +19263,30 @@ function shotPos(sh, out) {
     case 'skim': { const along = (0.5 - u) * d * 0.5; out.set(p.pos.x + rx * d * s + fx * along, WATER + 1.3 * Math.max(1, k), p.pos.z + rz * d * s + fz * along); return out; }   // (right down on the water)
     case 'sun': out.set(p.pos.x - sunDir.x * d, p.pos.y - sunDir.y * d, p.pos.z - sunDir.z * d); break;   // the bird exactly between the lens and the sun
     case 'dive': out.set(p.pos.x - fx * d * 0.55 + rx * 5 * k * s, p.pos.y + d * 0.95, p.pos.z - fz * d * 0.55 + rz * 5 * k * s); break;
+    case 'chase': {   // behind his quarter and a little under, along the line he is climbing or diving on; the chase pilot is never quite still
+      const w = 0.42 + Math.sin(time * 0.37 + sh.ang) * 0.07, v = 0.1 + Math.sin(time * 0.29 + sh.ang * 2) * 0.05, ty = Math.sin(p.pitch) * d;
+      out.set(p.pos.x - fx * d + rx * d * w * s, p.pos.y - ty - d * v, p.pos.z - fz * d + rz * d * w * s); break; }
+    case 'mount': return cineMount(sh, out);
+    case 'tele': return out.copy(sh.anchor);
+    case 'imax': out.set(p.pos.x + fx * d * 0.45 + rx * d * 0.85 * s, p.pos.y - d * 0.3 + Math.sin(p.pitch) * d * 0.45, p.pos.z + fz * d * 0.45 + rz * d * 0.85 * s); break;   // (below him, so the horizon sits low and he is up against the sky with the country under it)
+    case 'take': {   // round him from where it began, through his side, under him as it passes, out ahead and over to the other side; breathing in and out
+      const a = sh.a = sh.az0 + sh.sg * u * 1.3 * Math.PI, el = lerp(sh.el0, 0.12, Math.min(1, u * 3)) - 0.3 * Math.sin(u * Math.PI * 2), r = d * (1 + 0.22 * Math.sin(u * Math.PI * 3)), hz = r * Math.cos(el);
+      out.set(p.pos.x + (fx * Math.cos(a) + rx * Math.sin(a)) * hz, p.pos.y + r * Math.sin(el), p.pos.z + (fz * Math.cos(a) + rz * Math.sin(a)) * hz); break; }
+    case 'graze': {   // beside and behind him at his speed, as low as the ground, the water or the treetops let it go
+      const x = p.pos.x - fx * d * 0.5 + rx * d * 0.62 * s, z = p.pos.z - fz * d * 0.5 + rz * d * 0.62 * s, g = cineSurf(x, z);
+      return out.set(x, Math.max(g + 2.4 * k, p.pos.y - d * 0.5 + DP.up * d * 0.35), z); }
+    case 'scale': out.copy(p.pos).add(sh.off); break;
+    case 'reveal': {   // from down behind the rise, up and back until it looks out over him at what is beyond
+      const e = u * u * (3 - 2 * u), x = p.pos.x - fx * d * (0.45 + 0.55 * e) + rx * d * 0.35 * s, z = p.pos.z - fz * d * (0.45 + 0.55 * e) + rz * d * 0.35 * s, g = Math.max(groundAt(x, z), WATER, cineCloudTop(x, z)) + 2.5 * k;
+      out.set(x, lerp(Math.min(Math.max(g, p.pos.y - d * 0.6), p.pos.y - 3 * k), Math.max(g, p.pos.y + d * 0.75), e), z); out.y = Math.max(out.y, g); return out; }   // (from as low as it can go, but never so far under him that he is a speck)
+    case 'dutch': out.set(p.pos.x - fx * d * 0.75 + rx * d * 0.55 * s, p.pos.y + d * 0.06 - Math.sin(p.pitch) * d * 0.75, p.pos.z - fz * d * 0.75 + rz * d * 0.55 * s); break;
+    case 'pair': {   // square on to the line between them, far enough back for both on this lens, the middle of them in the middle
+      const M = cineMateAt(sh.mate); if (!M) { sh.lost = true; return out.copy(cinema.pos); }
+      const mid = sh.mid || (sh.mid = new THREE.Vector3()); mid.addVectors(p.pos, M.pos).multiplyScalar(0.5);
+      const ex = M.pos.x - p.pos.x, ez = M.pos.z - p.pos.z, el = Math.hypot(ex, ez), sep = M.pos.distanceTo(p.pos) * 0.5 + Math.max(7.5 * birdK(), M.r);
+      let nx = el > 1 ? -ez / el : rx, nz = el > 1 ? ex / el : rz; if (nx * rx + nz * rz < 0) { nx = -nx; nz = -nz; }   // (from his side of the pair, the side the lens is on)
+      const fov = sh.fovT = SHOTS.pair.fov[0], dd = Math.max(60 * k, sep / (0.62 * Math.tan(fov * Math.PI / 360) * Math.min(1, camera.aspect || 1)));
+      out.set(mid.x + nx * dd * s - fx * dd * 0.25, mid.y + dd * 0.05, mid.z + nz * dd * s - fz * dd * 0.25); break; }
   }
   out.y += DP.up * d * 0.35;   // (higher, or lower, as he asked)
   out.y = Math.max(out.y, k < 1 ? groundAt(out.x, out.z, out.y + 3) + 0.9 : groundAt(out.x, out.z) + 4 * k, WATER + 3 * k);
@@ -19180,27 +19337,67 @@ function updateCinemaCam(dt) {
     return;
   }
   sh.t += dt;
-  cinema.blocked = sightBlocked() ? cinema.blocked + dt : 0;
-  if (sh.t > sh.dur && DP.hold && cinema.blocked <= 0.5 && sh.type !== 'flyby' && sh.type !== 'lead' && sh.type !== 'quarter') sh.t = sh.dur;
-  else if (sh.t > sh.dur || cinema.blocked > 0.5) { newShot(); return; }
+  const T = sh.type, u = Math.min(1, sh.t / sh.dur), sc = cinema.sc || 1;
+  cinema.blocked = T !== 'mount' && !(T === 'reveal' && u < 0.5) && sightBlocked() ? cinema.blocked + dt : 0;   // (the reveal begins down behind the rise on purpose)
+  if (T === 'take') cinema.side = Math.sign(Math.sin(sh.a)) || cinema.side;   // (where the long take is, it ends: the next shot keeps that side)
+  // a cut on the action: a dive begun, a turn thrown, a burst of speed; not in the first moments of a shot, not in a move that is let play
+  { const cue = cineCue(); if (cue && !DP.hold && !CINE_PLAY.has(T) && sh.t > Math.max(2.4, sh.dur * 0.35) && sh.t < sh.dur) { cinema.cue = cue; cinema.why = cue; newShot(); return; } }
+  const gone = T === 'pair' && sh.lost || T === 'tele' && _v.subVectors(sh.anchor, p.pos).dot(cineDir(_cd)) < sh.A * 0.1;   // (the one with him has gone; he is almost at the long lens)
+  if (sh.t > sh.dur && DP.hold && cinema.blocked <= 0.5 && !gone && T !== 'flyby' && T !== 'lead' && T !== 'quarter' && T !== 'tele') sh.t = sh.dur;
+  else if (sh.t > sh.dur || cinema.blocked > 0.5 || gone) { cinema.why = gone ? 'gone' : cinema.blocked > 0.5 ? 'hill' : 'end'; newShot(); return; }   // (why it cut, for whoever is looking)
   cinema.head += wrapAngle(cineHead() - cinema.head) * damp(0.5, dt);
-  springTo(cinema.pos, cinema.posV, shotPos(sh, _v), sh.S.smooth, dt);
+  if (T === 'mount') {   // bolted on: no spring, no lag; the horizon goes where his wings go
+    cineMount(sh, cinema.pos, _cu, cinema.aim); cineKeep(cinema.pos, cinema.posV); cinema.posV.set(0, 0, 0); cinema.aimV.set(0, 0, 0);
+    camera.position.copy(cinema.pos); camera.up.copy(_cu); camera.lookAt(cinema.aim); camera.up.set(0, 1, 0);
+    camera.fov = clamp(lerp(sh.S.fov[0], sh.S.fov[1], u) * (camera.aspect < 1 ? 1.3 : 1) * DP.lens, 6, 100); camera.updateProjectionMatrix();
+    cineHaze(dt, sh); return;
+  }
+  // a lens set down somewhere is sprung where it is; one that flies with him is sprung about him, so it keeps his speed
+  // exactly (a chase plane matched to him) and the spring only smooths how it moves round him
+  if (T === 'flyby' || T === 'tele') { springTo(cinema.pos, cinema.posV, shotPos(sh, _v), sh.S.smooth, dt); cinema.rel.subVectors(cinema.pos, p.pos); cinema.relV.set(0, 0, 0); }
+  else { springTo(cinema.rel, cinema.relV, shotPos(sh, _v).sub(p.pos), sh.S.smooth, dt); cinema.pos.addVectors(p.pos, cinema.rel); }
+  cineKeep(cinema.pos, cinema.posV); cinema.rel.subVectors(cinema.pos, p.pos);
   camera.position.copy(cinema.pos);
   // aim a little ahead of him so he flies into open frame, with a breath of handheld drift
   // side-on, he sits on a third of the frame with the other two-thirds in front of him to fly into; otherwise a little ahead
-  const dist = camera.position.distanceTo(p.pos), third = sh.type === 'profile' || sh.type === 'tight' || sh.type === 'skim' || sh.type === 'quarter' || sh.type === 'along';
-  const lead = sh.type === 'flyby' || sh.type === 'top' || sh.type === 'sun' || sh.type === 'headon' || sh.type === 'belly' ? 0 : third ? dist * Math.tan(camera.fov * Math.PI / 360) * camera.aspect * (sh.type === 'quarter' ? 0.2 : 0.33) / (cinema.sc || 1) : sh.type === 'wing' ? 70 : Math.min(18, dist * 0.09);
-  _p.copy(p.pos).addScaledVector(cineDir(_cd), lead * (cinema.sc || 1)); if (p.form === 'human') _p.y += 1.1;
-  if (sh.type === 'wing') _p.y -= 6 * (cinema.sc || 1);
+  const dist = camera.position.distanceTo(p.pos), third = T === 'profile' || T === 'tight' || T === 'skim' || T === 'quarter' || T === 'along' || T === 'graze';
+  const lead = T === 'flyby' || T === 'top' || T === 'sun' || T === 'headon' || T === 'belly' || T === 'tele' || T === 'imax' ? 0 : third ? dist * Math.tan(camera.fov * Math.PI / 360) * camera.aspect * (T === 'quarter' ? 0.2 : T === 'graze' ? 0.22 : 0.33) / sc : T === 'wing' ? 70 : Math.min(18, dist * 0.09);
+  _p.copy(p.pos).addScaledVector(cineDir(_cd), lead * sc); if (p.form === 'human') _p.y += 1.1;
+  if (T === 'wing') _p.y -= 6 * sc;
+  if (T === 'graze') _p.y -= dist * 0.1 * clamp(1 - (p.pos.y - camera.position.y) / (dist * 0.4), 0, 1);   // (he rides high in the frame and what rushes by fills the bottom of it; when the lens is well under him already, no higher)
+  if (T === 'reveal') { const e = u * u * (3 - 2 * u); _p.addScaledVector(cineDir(_cd), sh.dist * 1.6 * e); _p.y -= sh.dist * 0.5 * e; }   // (and at the top of the move it looks out past him)
+  if (T === 'pair' && sh.mid) _p.copy(sh.mid);
+  if (T === 'scale') {   // between him and the huge thing, so both are in it, him on one side of the frame and it on the other
+    const L = sh.L, c = camera.position, b = _n.subVectors(p.pos, c).normalize(), m = _s.set(L.x - c.x, lerp(L.y, L.top, 0.3) - c.y, L.z - c.z), ml = m.length(); m.normalize();
+    const ang = Math.acos(clamp(b.dot(m), -1, 1)), rad = Math.atan((L.r || 200) / ml), top = Math.atan2(L.top - c.y, Math.hypot(L.x - c.x, L.z - c.z));
+    _p.copy(c).addScaledVector(b.add(m).normalize(), dist);
+    const asp = Math.max(0.55, Math.min(1.8, camera.aspect || 1)), want = Math.max((ang + rad * 1.2 + 0.08) * 1.25 / asp, (Math.abs(top) + 0.1) * 1.6, 0.2);
+    sh.fovT = clamp(want * 180 / Math.PI, 12, 64);
+  }
+  if (T === 'tele') {   // the long lens zooms out as he comes, so he stays the same size and the country round him grows
+    const R = 7.5 * birdK() * Math.max(1, sc * 0.8); sh.fovT = clamp(2 * Math.atan(R / (0.3 * Math.max(1, dist) * Math.min(1, camera.aspect || 1))) * 180 / Math.PI, 2.5, 32);
+  }
   _p.x += Math.sin(time * 0.7) * dist * 0.004; _p.y += Math.sin(time * 0.9 + 1.3) * dist * 0.003;
-  springTo(cinema.aim, cinema.aimV, _p, sh.type === 'flyby' ? 0.18 : 0.3, dt);
-  if (sh.type === 'top') camera.up.set(-Math.sin(cinema.head), 0, -Math.cos(cinema.head));
+  { const sm = T === 'flyby' ? 0.18 : T === 'tele' ? 0.12 : T === 'chase' || T === 'imax' ? 0.2 : 0.3;   // (and the aim the same way: a planted lens pans after him; one flying with him is never left behind him)
+    if (T === 'flyby' || T === 'tele') { springTo(cinema.aim, cinema.aimV, _p, sm, dt); cinema.aimR.subVectors(cinema.aim, p.pos); cinema.aimRV.set(0, 0, 0); }
+    else { springTo(cinema.aimR, cinema.aimRV, _p.sub(p.pos), sm, dt); cinema.aim.addVectors(p.pos, cinema.aimR); } }
+  if (T === 'top') camera.up.set(-Math.sin(cinema.head), 0, -Math.cos(cinema.head));
   camera.lookAt(cinema.aim);
   camera.up.set(0, 1, 0);
-  if (p.form === 'phoenix') { const lean = sh.type === 'wing' ? 0.85 : sh.type === 'dive' ? 0.5 : sh.type === 'low' || sh.type === 'tight' ? 0.25 : 0; if (lean) camera.rotateZ(-p.bank * lean); }   // lean with him: on his shoulder, all the way
-  const u = sh.t / sh.dur, k = u * u * (3 - 2 * u);
-  camera.fov = clamp(lerp(sh.S.fov[0], sh.S.fov[1], k) * (camera.aspect < 1 ? 1.35 : 1) * DP.lens, 6, 100);
+  // lean with him: on his shoulder, all the way; the chase plane and the dutch angle some of the way (the dutch tipped to begin with);
+  // every other shot keeps the horizon level
+  { const lean = p.form !== 'phoenix' ? 0 : T === 'wing' ? 0.85 : T === 'dutch' ? 0.65 : T === 'dive' ? 0.5 : T === 'chase' ? 0.35 : T === 'low' || T === 'tight' ? 0.25 : T === 'imax' ? 0.12 : 0;
+    cinema.roll = lerp(cinema.roll, -p.bank * lean + (T === 'dutch' ? sh.tilt : 0), damp(T === 'wing' ? 30 : 4, dt)); if (cinema.roll) camera.rotateZ(cinema.roll); }
+  const k = u * u * (3 - 2 * u), fT = (sh.fovT ? sh.fovT : lerp(sh.S.fov[0], sh.S.fov[1], k) * (camera.aspect < 1 ? 1.35 : 1)) * DP.lens;   // (a lens worked out for the frame already allows for a tall screen)
+  camera.fov = clamp(sh.fovT && sh.t > dt * 1.5 ? lerp(camera.fov, fT, damp(T === 'tele' ? 6 : 2.5, dt)) : fT, 2, 100);
   camera.updateProjectionMatrix();
+  cineHaze(dt, sh);
+}
+// the air between: it begins just past him, so he is the clearest thing in the frame and what is behind him goes pale by
+// its distance (thicker on the long lens, as the air is when a long lens looks through a lot of it)
+function cineHaze(dt, sh) {
+  const d = camera.position.distanceTo(player.pos);
+  cinema.fogN = lerp(cinema.fogN || d, d * 1.15 + 8, damp(4, dt)); cinema.fogF = sh.S.haze || 1;
 }
 
 // ── The director's chair. With the film camera on, he is the director and the camera has an operator who listens: "get me
@@ -19210,7 +19407,7 @@ function updateCinemaCam(dt) {
 //    him), so the camera opens on his kind of shot and leans that way when it is left to choose — it gets to know him.
 const DP = { want: '', first: '', hold: false, k: 1, lens: 1, up: 0, side: 0, slow: false, busy: false, said: '', saidT: -99, was: false, grab: null, mem: { liked: {}, hated: {}, notes: [], fav: null, n: 0 } };
 try { const j = JSON.parse(localStorage.getItem('icarus.dp') || 'null'); if (j && typeof j === 'object') Object.assign(DP.mem, { liked: j.liked || {}, hated: j.hated || {}, notes: (j.notes || []).slice(-8), fav: j.fav || null, n: j.n | 0 }); } catch {}
-const DP_NAMES = { profile: 'WIDE, SIDE-ON', tight: 'TIGHT ON THE WINGS', flyby: 'FLY-BY', orbit: 'ORBIT', low: 'LOW BEHIND', crane: 'CRANE', lead: 'LONG LENS AHEAD', top: 'STRAIGHT DOWN', quarter: 'THREE-QUARTER', along: 'AT THE WINGTIP', headon: 'HEAD-ON', belly: 'FROM UNDERNEATH', wing: 'ON THE SHOULDER', skim: 'ON THE WATER', sun: 'AGAINST THE SUN', dive: 'OVER THE DIVE', face: 'CLOSE ON THE FACE', wide: 'WIDE', side: 'SIDE-ON', back: 'OVER THE SHOULDER', dir: 'DIRECTED' };
+const DP_NAMES = { profile: 'WIDE, SIDE-ON', tight: 'TIGHT ON THE WINGS', flyby: 'FLY-BY', orbit: 'ORBIT', low: 'LOW BEHIND', crane: 'CRANE', lead: 'LONG LENS AHEAD', top: 'STRAIGHT DOWN', quarter: 'THREE-QUARTER', along: 'AT THE WINGTIP', headon: 'HEAD-ON', belly: 'FROM UNDERNEATH', wing: 'ON THE SHOULDER', skim: 'ON THE WATER', sun: 'AGAINST THE SUN', dive: 'OVER THE DIVE', chase: 'CHASE PLANE', mount: 'ON THE WING', tele: 'LONG LENS, FAR OFF', imax: 'WIDE AND CLOSE', take: 'ONE LONG TAKE', graze: 'DOWN LOW, RUSHING', scale: 'FOR SCALE', reveal: 'THE REVEAL', dutch: 'DUTCH ANGLE', pair: 'TWO-SHOT', face: 'CLOSE ON THE FACE', wide: 'WIDE', side: 'SIDE-ON', back: 'OVER THE SHOULDER', dir: 'DIRECTED' };
 const dpOn = () => state === 'photo' || state === 'play' && cinema.manual;
 const dpFoot = () => player.form === 'human' && !SH.def;
 const dpSave = () => { try { localStorage.setItem('icarus.dp', JSON.stringify(DP.mem)); } catch {} saveSoon(); };
@@ -19222,6 +19419,16 @@ function dpParse(low, on) {
   if (has(/\b(get (me |us )?out of (the |this |here)?\s*(camera|film|cinematic|shot)?|exit (the |this )?(camera|shot|film|cinematic)|leave (the |this )?(camera|film)( mode)?|(camera|film|cinematic)( mode)? off|(back to|give me) (the |my )?(normal|regular|follow|ordinary|usual) (camera|view)|normal camera|that'?s a wrap|wrap it up|stop (the )?camera|we'?re done( here)?|i'?m done|end (the )?(shot|scene))\b/) && (on || has(/\b(camera|film|cinematic|shot|wrap|view)\b/))) return { act: 'exit' };
   if (!on && !has(/\b(shot|camera|angle|lens|cinematic|framing)\b/)) return null;
   const S = [
+    [/\b(chase (plane|jet|cam(era)?|shot)|top gun|chase me)\b/, 'chase', 'back'],
+    [/\b(wing ?mount(ed)?|bolted|on the wing ?tip|dunkirk|spitfire)\b/, 'mount', 'back'],
+    [/\b(telephoto|compress(ion|ed)?|from (far|way) (off|away)|from a long way off)\b/, 'tele', 'wide'],
+    [/\b(imax|nolan|hoytema|wide and close|close and wide)\b/, 'imax', 'low'],
+    [/\b(long take|one take|oner|lubezki|no cuts)\b/, 'take', 'side'],
+    [/\b(foreground|through the trees|treetops?|grazing|graze|skim the (trees|ground))\b/, 'graze', 'low'],
+    [/\b(for scale|show (the )?scale|dwarfed|how (small|tiny) (i am|he is)|beside the mountain|next to the mountain)\b/, 'scale', 'wide'],
+    [/\b(reveal|over the ridge)\b/, 'reveal', 'wide'],
+    [/\b(dutch|canted?|tilted horizon|tilt the horizon)\b/, 'dutch', 'side'],
+    [/\b(two.?shot|both of us)\b/, 'pair', 'side'],
     [/\b(wide( shot| one)?|go wide|establishing|pull (way |right )?back|see the whole)\b/, 'profile', 'wide'],
     [/\b(close.?up|tight( shot| one)?|go tight|on (my|his) face)\b/, 'tight', 'face'],
     [/\b(from above|top.?down|bird'?s.?eye|overhead|straight down|look(ing)? down on)\b/, 'top', 'wide'],
@@ -19785,7 +19992,7 @@ function dpTick(dt = 0) {
   if (!film && DP.was) { if (DP.slow) { DP.slow = false; timeK = 1; } DP.want = ''; DP.first = ''; DP.hold = false; DP.k = 1; DP.lens = 1; DP.up = 0; DP.side = 0; }   // (out of the chair: the next time starts clean, except for what is remembered)
   DP.was = film;
   if (!on) return;
-  const sh = cinema.shot, a = state === 'photo' ? 'STILL CAMERA' : `${DP_NAMES[sh?.type] || 'FILM CAMERA'}${DP.hold ? ' · HELD' : ''}${DP.slow ? ' · SLOW' : ''}${REC.on ? ' · ● ROLLING' : ''}`;
+  const sh = cinema.shot, a = state === 'photo' ? 'STILL CAMERA' : `${(COSMOS.on && COSMOS.cs?.type ? CZ_CINE_N[COSMOS.cs.type] : DP_NAMES[sh?.type]) || 'FILM CAMERA'}${DP.hold ? ' · HELD' : ''}${DP.slow ? ' · SLOW' : ''}${REC.on ? ' · ● ROLLING' : ''}`;
   const b = time - DP.saidT < 5 && DP.said ? DP.said : mic.on ? 'say a shot: orbit slowly round me and a friend · low and wide from behind · lower · slower · other side · hold this · back to auto · take it' : TOUCH ? 'turn the microphone on and describe the shot · tap ✕ to leave' : 'press T and describe the shot: follow the nearest from her left · tighter · other side — or turn the microphone on';
   if (a !== DP.a || b !== DP.b) { DP.a = a; DP.b = b; const el = $('dpBar'); el.children[0].textContent = a; el.children[1].textContent = b; }
 }
@@ -29290,6 +29497,34 @@ function cosmosFrame(dt) {
   if ((C.hudT -= dt) <= 0) { C.hudT = 0.25; czBar(true); }
   if (C.map.on) czLabels();
 }
+// the film camera out in the dark has its own few shots, cut between: the chase plane under his tail, the sun dead behind
+// him, the whole world round and small behind him, the nearest world filling the frame behind him, the slow way round him
+// that never cuts, and from ahead looking back. Sets _czv (where the eye is, from him); says the lens, its up, where it looks
+const CZ_CINE = { chase: [6, 9], sun: [6, 8], globe: [8, 11], world: [7, 10], round: [14, 18], ahead: [5, 7] };
+const CZ_CINE_N = { chase: 'CHASE PLANE', sun: 'AGAINST THE SUN', globe: 'THE WORLD BEHIND YOU', world: 'A WORLD BEHIND YOU', round: 'ONE LONG TAKE', ahead: 'HEAD-ON' };
+const _czr = new THREE.Vector3(), _czn = new THREE.Vector3();
+function czCine(dt, f, u, cd) {
+  const C = COSMOS, S = C.cs || (C.cs = { type: '', t: 0, dur: 0, side: 1, cut: false, a: 0, fov: 60, up: new THREE.Vector3(), lead: 0, rate: 2 });
+  const B = C.nearB, near = B && B.R && C.nearD < B.R * 7;
+  S.t += dt;
+  if (!S.type || S.t > S.dur || S.type === 'world' && !near) {
+    const pool = Object.keys(CZ_CINE).filter(k => k !== S.type && (k !== 'world' || near));
+    S.type = near && S.type !== 'world' && Math.random() < 0.5 ? 'world' : pool[Math.floor(Math.random() * pool.length)];
+    S.t = 0; S.dur = rr(CZ_CINE[S.type]); S.side = Math.random() < 0.5 ? -1 : 1; S.a = Math.random() * 6.28; S.cut = true;
+  }
+  const r = _czr.crossVectors(f, u).normalize(), n = _czn.copy(C.pos).normalize(), s = S.side;
+  S.up.copy(u); S.lead = 14 + C.rush * 20; S.rate = 1.5;
+  switch (S.type) {
+    case 'chase': _czv.copy(f).multiplyScalar(-cd * 1.5).addScaledVector(r, s * cd * 0.55).addScaledVector(u, -cd * 0.3); S.fov = 52; S.rate = 4; break;
+    case 'sun': _czv.copy(CZ_SUN).multiplyScalar(-cd * 7).addScaledVector(u, cd * 0.4); S.fov = 20; S.lead = 0; break;   // (him against the sun: the rays come round him)
+    case 'globe': _czv.copy(n).multiplyScalar(cd * 4.5).addScaledVector(r, s * cd * 2.5).addScaledVector(f, -cd * 1.5); S.fov = 46; S.lead = 0; S.up.copy(f); break;   // (from further out than he is, looking back down past him at the world)
+    case 'world': _czv.subVectors(C.pos, B.pos).normalize().multiplyScalar(cd * 3.6).addScaledVector(r, s * cd * 1.8).addScaledVector(u, cd * 0.5); S.fov = 44; S.lead = 0; break;
+    case 'round': { const a = S.a + S.t * 0.22 * s; _czv.copy(r).multiplyScalar(Math.cos(a) * cd * 2.1).addScaledVector(f, Math.sin(a) * cd * 2.1).addScaledVector(u, cd * (0.3 + 0.35 * Math.sin(S.t * 0.4))); S.fov = 60; S.rate = 3; break; }
+    default: _czv.copy(f).multiplyScalar(cd * 1.7).addScaledVector(u, cd * 0.15).addScaledVector(r, s * cd * 0.4); S.fov = 58;
+  }
+  if (Math.abs(_czw.copy(_czv).normalize().dot(S.up)) > 0.97) S.up.copy(n).cross(r).normalize();   // (never looking straight along its own up)
+  return S;
+}
 // the eye: behind him and a little above, along his own up (in the director's hands, wider shots that go round him; on the
 // map, wherever it has been turned to)
 function cosmosCam(dt) {
@@ -29305,17 +29540,18 @@ function cosmosCam(dt) {
     if (C.revealT > 0) {   // just out of the air: the eye stands back over him and looks down past him at the world falling away
       C.revealT -= dt; const e = smoothstep(4, 1.5, C.revealT); _czw.copy(C.pos).normalize(); _czv.copy(_czw).multiplyScalar(1.25).addScaledVector(f, -1).normalize().multiplyScalar(cd * (1.3 + 2.2 * e)); u.copy(_czw);
       cam.fov = lerp(cam.fov, 70 * fovK(), damp(2, dt));
-    } else if (cinema.on) {   // three shots, in turn: from his side as it goes round him, from ahead looking back, and from far off on a long lens
-      const k = Math.floor(time / 9) % 3, a = time * 0.16, r = _czw.crossVectors(f, u).normalize();
-      if (k === 0) _czv.copy(r).multiplyScalar(Math.cos(a) * cd * 2.1).addScaledVector(f, Math.sin(a) * cd * 2.1).addScaledVector(u, cd * 0.35);
-      else if (k === 1) _czv.copy(f).multiplyScalar(cd * 1.7).addScaledVector(u, cd * 0.15).addScaledVector(r, cd * 0.4);
-      else _czv.copy(r).multiplyScalar(cd * 5).addScaledVector(f, -cd * 2.5).addScaledVector(u, cd * 3);
-      cam.fov = lerp(cam.fov, (k === 2 ? 34 : 60) * fovK(), damp(2, dt));
+    } else if (cinema.on) {
+      const S = czCine(dt, f, u, cd), cut = S.cut || !C.camOff; S.cut = false;
+      if (cut) { C.camOff = (C.camOff || new THREE.Vector3()).copy(_czv); cam.fov = S.fov * fovK(); } else { C.camOff.lerp(_czv, damp(S.rate, dt)); cam.fov = lerp(cam.fov, S.fov * fovK(), damp(2, dt)); }
+      C.camPos.copy(C.pos).add(C.camOff);
+      _czw.copy(f).multiplyScalar(S.lead).add(C.pos).sub(C.camPos); czLook(_czq, _czw.normalize(), S.up); C.camQ.slerp(_czq, cut ? 1 : damp(6, dt));
+      cam.quaternion.copy(C.camQ); cam.position.set(0, 0, 0); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+      return;
     } else {
       _czv.copy(f).multiplyScalar(-cd).addScaledVector(u, cd * 0.3).applyAxisAngle(u, camYawOff);
       cam.fov = lerp(cam.fov, (68 + C.rush * 34) * fovK(), damp(2.4, dt));
     }
-    const first = !C.camOff; if (first) C.camOff = _czv.clone(); else C.camOff.lerp(_czv, damp(cinema.on ? 1.5 : 5, dt));
+    const first = !C.camOff; if (first) C.camOff = _czv.clone(); else C.camOff.lerp(_czv, damp(5, dt));
     C.camPos.copy(C.pos).add(C.camOff);
     _czw.copy(f).multiplyScalar(14 + C.rush * 20).sub(C.camOff); czLook(_czq, _czw.normalize(), u); C.camQ.slerp(_czq, first ? 1 : damp(8, dt));
     if (C.rush > 0.5) { const k = (C.rush - 0.5) * 0.1; C.camPos.x += rnd(k); C.camPos.y += rnd(k); }
