@@ -17044,13 +17044,10 @@ function paintFire(f) {
 }
 function updateFire(dt) {
   const p = player;
+  updateSkid(dt);   // (low enough, and the ground under him is scorched: see SKID)
   // the bird sets fire to what he flies through
   if ((BLAZE.scanT -= dt) < 0) {
     BLAZE.scanT = 0.1;
-    if (state === 'play' && p.form === 'phoenix' && !p.sub && !p.cine && !SH.def && !p.perch && (p.pos.x - SCORCH.lx) ** 2 + (p.pos.z - SCORCH.lz) ** 2 > 9) {   // low enough to singe the grass: a line of it, where he went
-      const g = groundAt(p.pos.x, p.pos.z, p.pos.y);
-      if (p.pos.y - g < 4.5 && g > WATER + 0.3) { const k = groundKind(p.pos.x, p.pos.z, g); if (k === 'grass' || k === 'leaves' || k === 'ash') { SCORCH.lx = p.pos.x; SCORCH.lz = p.pos.z; scorch(p.pos.x + rnd(0.6), p.pos.z + rnd(0.6), 1.5 + Math.random() * 1.1, g); } }
-    }
     if (realm === 'over' && state === 'play' && p.form === 'phoenix' && !p.sub && !p.cine && !SH.def && !p.perch)
       treesNear(p.pos.x, p.pos.z, 30, (g, ck, i, t) => {
         if ((t.x - p.pos.x) ** 2 + (t.z - p.pos.z) ** 2 < (t.rad + 3) ** 2 && p.pos.y > t.y0 - 2 && p.pos.y < t.top + 5) ignite(ck, i, true);
@@ -17154,6 +17151,140 @@ function scorch(x, z, r, y) {
   _mat.compose(_p.set(x, g + 0.07, z), _q, _s.set(r, 1, r)); m.setMatrixAt(i, _mat);
   const B = m.geometry.attributes.aBorn, D = m.geometry.attributes.aSeed; B.array[i] = time; D.array[i] = Math.random(); B.needsUpdate = D.needsUpdate = true;
   m.instanceMatrix.needsUpdate = true; m.count = S.n;
+}
+// Skid marks. Low over the ground the bird's own heat is enough: the grass under him browns and goes black in a streak
+// along the line he flew, the way a tyre leaves its mark on a road, and at the fresh end of it the ground is still alight,
+// a seam of embers that goes from yellow to red to black in a few seconds. The black fades as the ground comes back, over
+// a minute or two. How low is low goes with the size of the bird, and further when he is fast, or a god. Over water he
+// cannot mark it: it steams. Other fliers' low passes leave the same, worked out here from where they are seen to fly (no
+// message of its own). One mesh: a ribbon whose points are kept in a ring, each point two corners laid on the ground, the
+// oldest given up first; each point is joined to the one before it from the same flier, so every pass is one streak.
+const SKID = { N: TOUCH ? 700 : 2000, i: 0, n: 0, realm: '', runs: new Map(), scanT: 0, steamT: 0, lo: 1e9, hi: -1, ms: 0, mesh: null };
+{ const S = SKID, N = S.N, geo = new THREE.BufferGeometry();
+  S.pos = new Float32Array(N * 6); S.sk = new Float32Array(N * 8).fill(-9999); S.idx = new Uint16Array(N * 6);
+  S.prev = new Int32Array(N).fill(-1); S.next = new Int32Array(N).fill(-1); S.pt = new Float32Array(N * 6);   // (per point: x, z, ground, width, and the way it runs)
+  for (let j = 0; j < N * 2; j++) S.sk[j * 4 + 2] = j & 1 ? 1 : -1;
+  geo.setAttribute('position', S.aPos = new THREE.BufferAttribute(S.pos, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('aSk', S.aSk = new THREE.BufferAttribute(S.sk, 4).setUsage(THREE.DynamicDrawUsage));   // (when it was laid, how hot, which side, how far along its streak)
+  geo.setIndex(S.aIdx = new THREE.BufferAttribute(S.idx, 1).setUsage(THREE.DynamicDrawUsage));
+  const mat = new THREE.ShaderMaterial({
+    uniforms: Object.assign(THREE.UniformsUtils.merge([THREE.UniformsLib.fog]), { uTime: worldFx.uTime }),
+    vertexShader: `attribute vec4 aSk; uniform float uTime; varying vec4 vSk; varying float vAge;
+      #include <fog_pars_vertex>
+      void main(){ vSk = aSk; vAge = uTime - aSk.x; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mvPosition;
+      #include <fog_vertex>
+      }`,
+    fragmentShader: `varying vec4 vSk; varying float vAge;
+      #include <fog_pars_fragment>
+      float kH(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float kN(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(kH(i), kH(i + vec2(1.0, 0.0)), f.x), mix(kH(i + vec2(0.0, 1.0)), kH(i + vec2(1.0, 1.0)), f.x), f.y); }
+      void main(){
+        float s = vSk.z, u = vSk.w, heat = vSk.y, age = vAge;
+        float rag = (kN(vec2(u * 0.45, s > 0.0 ? 3.0 : 9.0)) - 0.5) * 0.5 + (kN(vec2(u * 1.7, s > 0.0 ? 5.0 : 1.0)) - 0.5) * 0.2;
+        float body = 1.0 - smoothstep(0.5, 0.98, abs(s) - rag);
+        float lines = smoothstep(0.25, 0.75, kN(vec2(s * 4.5, u * 0.035))) * 0.65 + smoothstep(0.35, 0.8, kN(vec2(s * 11.0 + 4.0, u * 0.09))) * 0.35;
+        float life = smoothstep(0.0, 0.35, age) * (1.0 - smoothstep(55.0, 130.0, age));
+        float cool = exp(-age / (2.0 + 4.0 * heat));
+        float spark = smoothstep(0.62, 0.92, kN(vec2(s * 7.0, u * 1.3)) * 0.7 + kN(vec2(s * 19.0, u * 3.7 - age * 0.3)) * 0.45);
+        float ember = body * cool * (spark * 1.2 + 0.35 * (1.0 - abs(s)) * heat);
+        vec3 hot = mix(vec3(0.9, 0.12, 0.02), mix(vec3(1.7, 0.55, 0.08), vec3(2.2, 1.6, 0.7), smoothstep(0.75, 1.0, cool)), smoothstep(0.15, 0.6, cool));
+        vec3 c = mix(vec3(0.03, 0.026, 0.024), hot, clamp(ember, 0.0, 1.0));
+        float a = max(body * mix(0.3, 0.95, lines) * (0.6 + 0.4 * heat), clamp(ember, 0.0, 1.0)) * life;
+        if (a < 0.01) discard;
+        gl_FragColor = vec4(c, a * 0.9);
+        #include <fog_fragment>
+      }`,
+    transparent: true, depthWrite: false, fog: true, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+  const m = S.mesh = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.renderOrder = 1; scene.add(m); }
+// (in the shader above: a ragged edge either side; streaks running along it, darker where the heat bit deepest; "cool" is
+// 1 just laid and 0 gone black; it fades out between one minute and two)
+// how hot the ground under a flier gets: 0 too high to feel it, 1 skimming it
+function skidHeat(K, speed, god, alt) { const H = K * (6.5 + clamp(speed / 28, 0, 5.5)) * (god ? 1.7 : 1); return alt > H || alt < -2 ? 0 : smoothstep(H, H * 0.25, alt); }
+function skidCorner(j, side, x, z, g, y0) { const gy = groundAt(x, z, y0 + 2), y = isFinite(gy) && Math.abs(gy - g) < 1.4 ? gy : g, o = (j * 2 + side) * 3; SKID.pos[o] = x; SKID.pos[o + 1] = y + 0.09; SKID.pos[o + 2] = z; }
+function skidPlace(j, dx, dz, y0) {   // the two corners of a point, square to the way the streak runs there
+  const S = SKID, q = j * 6, x = S.pt[q], z = S.pt[q + 1], g = S.pt[q + 2], w = S.pt[q + 3];
+  skidCorner(j, 0, x + dz * w, z - dx * w, g, y0); skidCorner(j, 1, x - dz * w, z + dx * w, g, y0);
+}
+function skidSeg(j, p) { const o = j * 6, S = SKID; if (p < 0) { S.idx.fill(0, o, o + 6); return; } const a = p * 2, b = p * 2 + 1, c = j * 2, d = j * 2 + 1; S.idx[o] = a; S.idx[o + 1] = b; S.idx[o + 2] = c; S.idx[o + 3] = b; S.idx[o + 4] = d; S.idx[o + 5] = c; }   // (wound to face up)
+function skidDirty(j) { SKID.lo = Math.min(SKID.lo, j); SKID.hi = Math.max(SKID.hi, j); }
+// one more point of a streak: who laid it (so it joins their last one), where, how wide, how hot
+function skidAt(src, x, z, g, w, heat, hx, hz) {
+  const S = SKID;
+  if (S.realm !== realm) { S.realm = realm; S.n = S.i = 0; S.runs.clear(); S.idx.fill(0); S.sk.fill(-9999); S.prev.fill(-1); S.next.fill(-1); for (let j = 0; j < S.N * 2; j++) S.sk[j * 4 + 2] = j & 1 ? 1 : -1; S.lo = 0; S.hi = S.N - 1; }
+  let run = S.runs.get(src);
+  if (run && (time - run.t > 0.7 || (x - run.x) ** 2 + (z - run.z) ** 2 > 30 * 30 || Math.abs(g - run.g) > 6)) run = null;   // (a gap, a jump, a drop off a roof: a new streak)
+  const j = S.i; S.i = (S.i + 1) % S.N; S.n = Math.min(S.N, S.n + 1);
+  // the slot given up: whatever was joined to it lets go
+  if (S.next[j] >= 0) { const k = S.next[j]; skidSeg(k, -1); S.prev[k] = -1; skidDirty(k); }
+  if (S.prev[j] >= 0) S.next[S.prev[j]] = -1;
+  S.next[j] = -1;
+  for (const [k, r] of S.runs) if (r.last === j) S.runs.delete(k);
+  if (run && run.last === j) run = null;
+  let dx = hx, dz = hz;
+  if (run) { const ex = x - run.x, ez = z - run.z, L = Math.hypot(ex, ez); if (L > 0.01) { dx = ex / L; dz = ez / L; } }
+  const L0 = Math.hypot(dx, dz) || 1; dx /= L0; dz /= L0;
+  const q = j * 6; S.pt[q] = x; S.pt[q + 1] = z; S.pt[q + 2] = g; S.pt[q + 3] = w; S.pt[q + 4] = dx; S.pt[q + 5] = dz;
+  skidPlace(j, dx, dz, g);
+  const u = run ? run.u + Math.hypot(x - run.x, z - run.z) : Math.random() * 50;
+  for (let s = 0; s < 2; s++) { const o = (j * 2 + s) * 4; S.sk[o] = time; S.sk[o + 1] = heat; S.sk[o + 3] = u; }
+  if (run) {   // the corner it turns at: the point before, set square to the mean of the two ways (a mitre, no gap and no fold)
+    const p = run.last, pq = p * 6; let mx = S.pt[pq + 4] + dx, mz = S.pt[pq + 5] + dz; const ml = Math.hypot(mx, mz);
+    if (ml > 0.3) { mx /= ml; mz /= ml; const k = 1 / Math.max(0.5, mx * dx + mz * dz), w0 = S.pt[pq + 3]; S.pt[pq + 3] = w0 * k; skidPlace(p, mx, mz, S.pt[pq + 2]); S.pt[pq + 3] = w0; skidDirty(p); }
+    S.prev[j] = p; S.next[p] = j; skidSeg(j, p);
+  } else { S.prev[j] = -1; skidSeg(j, -1); }
+  skidDirty(j);
+  S.runs.set(src, { last: j, x, z, g, u, t: time });
+}
+function skidFlush() {
+  const S = SKID; if (S.hi < S.lo) return;
+  const lo = S.lo, n = S.hi - S.lo + 1;
+  S.aPos.addUpdateRange(lo * 6, n * 6); S.aPos.needsUpdate = true;   // (the ranges pile up until the next frame is drawn, which sends them all and clears them)
+  S.aSk.addUpdateRange(lo * 8, n * 8); S.aSk.needsUpdate = true;
+  S.aIdx.addUpdateRange(lo * 6, n * 6); S.aIdx.needsUpdate = true;
+  S.lo = 1e9; S.hi = -1;
+}
+// one flier, looked at: low enough to mark the ground (or boil the water) under it?
+function skidFrom(src, x, y, z, K, speed, god, hx, hz, mine) {
+  const S = SKID, run = S.runs.get(src), gap = Math.max(1.4 * K, speed * 0.055);
+  if (run && (x - run.x) ** 2 + (z - run.z) ** 2 < gap * gap && time - run.t < 0.5) return;
+  const g = groundAt(x, z, y); if (!isFinite(g)) return;
+  const wet = g < WATER + 0.25, lvl = wet ? WATER : g, heat = skidHeat(K, speed, god, y - lvl);
+  if (heat <= 0) { if (run) S.runs.delete(src); return; }
+  if (wet) {   // over the sea it cannot burn: it boils
+    if (run) S.runs.delete(src);
+    if ((S.steamT -= 0.07) < 0 || mine) { S.steamT = 0.15; steamAt(x + rnd(1.2 * K), WATER + 0.2, z + rnd(1.2 * K), 1.2 * K, Math.ceil(heat * (mine ? 3 : 2)), heat > 0.5); if (Math.random() < 0.25 * heat) ripple(x, z, 0.5 * heat); }
+    S.runs.set(src, { last: -1, x, z, g, u: 0, t: time, wet: true });
+    return;
+  }
+  const kind = groundKind(x, z, g + 0.1);
+  if (kind === 'snow') { if (run) S.runs.delete(src); if (Math.random() < heat * 0.6) steamAt(x + rnd(1.5 * K), g + 0.2, z + rnd(1.5 * K), 1.5 * K, 2, false); return; }   // (snow only melts, and steams)
+  if (run && run.wet) S.runs.delete(src);
+  skidAt(src, x, z, g, K * (1.1 + 1.6 * heat) * (god ? 1.35 : 1), heat * (god ? 1 : 0.85), hx, hz);
+  // the fresh end: sparks off it, a wisp of smoke, and now and then what grows there catches
+  const d2 = (x - camera.position.x) ** 2 + (z - camera.position.z) ** 2;
+  if (d2 < 500 * 500 && Math.random() < heat * 0.9) for (let i = 0, n = 1 + (heat * 3 | 0); i < n; i++) emit(x + rnd(K), g + 0.2, z + rnd(K), rnd(1.5) + hx * speed * 0.05, 1 + Math.random() * 3.5 * heat, rnd(1.5) + hz * speed * 0.05, 0.4 + Math.random() * 0.6, pick(EMBER), 2.5, 0.25 + Math.random() * 0.35);
+  if (d2 < 900 * 900 && Math.random() < heat * 0.12) smokePuff(x - hx * 3, g + 0.6, z - hz * 3, 1.2 * K, Math.sqrt(d2), 0);
+  if (mine && realm === 'over' && (kind === 'grass' || kind === 'leaves')) {
+    if (heat > 0.45 && flowerAt(x, z) > 0.15 && Math.random() < 0.35 * heat) scorchFlowers(x, z, 2.5 * K);
+    if (heat > 0.6 && Math.random() < 0.012 * heat) igniteNear(x, z, 4 + 3 * K, true);   // (not every time: a tree he grazes may go up)
+  }
+}
+// every frame: him, and whoever else is flying low near enough to be seen doing it
+function updateSkid(dt) {
+  const S = SKID, t0 = performance.now(), p = player;
+  if (state === 'play' || state === 'talk') {
+    if (p.form === 'phoenix' && !p.sub && !p.perch && !SH.def && !p.cine) { const hl = Math.hypot(dir3.x, dir3.z);   // (a bird goes the way dir3 points, at p.speed)
+      skidFrom('me', p.pos.x, p.pos.y, p.pos.z, birdK(), p.speed || 0, GODM.on, hl > 0.05 ? dir3.x / hl : 0, hl > 0.05 ? dir3.z / hl : 1, true); }
+    else if (S.runs.has('me')) S.runs.delete('me');
+    if ((S.scanT -= dt) < 0) { S.scanT = 0.07; const now = performance.now(), me = realm === 'under' ? 1 : 0, c = camera.position;
+      for (const P of NET.peers.values()) {
+        if (P.form !== 'p' || !P.s || now - P.s.t > 1500 || P.realm !== me || SHUN.block.has(P.name) || (P.pos.x - c.x) ** 2 + (P.pos.z - c.z) ** 2 > 1400 * 1400) { if (S.runs.has(P.id)) S.runs.delete(P.id); continue; }
+        const sp = Math.hypot(P.s.vx, P.s.vy, P.s.vz), hl = Math.hypot(P.s.vx, P.s.vz);
+        skidFrom(P.id, P.pos.x, P.pos.y, P.pos.z, (P.bk || bigName(P.name)) * (P.sm ? SMALL.MIN : 1), sp, P.gm, hl > 0.1 ? P.s.vx / hl : 1, hl > 0.1 ? P.s.vz / hl : 0, false);
+      } }
+  }
+  skidFlush();
+  S.ms = S.ms * 0.95 + (performance.now() - t0) * 0.05;
 }
 // Smoke. What a burning wood sends up is black: thick, rolling columns, lit orange underneath by the fire, that lean over
 // with the wind as they climb and, a hundred metres up or so, stop climbing and spread out flat. Over a big fire the
@@ -33383,7 +33514,7 @@ setTimeout(() => {
   titleStart();
   warmPrograms();
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
-    camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
+    camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { NEWB, newbHear, newbHeard, newbTyped, newbTalk, newbFallback, newbArrive });
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
