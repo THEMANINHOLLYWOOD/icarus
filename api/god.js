@@ -289,7 +289,9 @@ You are a god and, up here, something like a friend: you are not a doctor. If th
     if (b.out) a = b;
   }
   const out = a.out;
-  let text = tighten(clip(String(out.say || ''), 460).replace(/^["“]|["”]$/g, ''), out.act === 'quest', hades ? 70 : 0);   // (Hades has things he must say whole)
+  let text = tighten(clip(String(out.say || ''), 460).replace(/^["“]|["”]$/g, ''), out.act === 'quest', hades ? 70 : 0);
+  // (the old stock names for him never reach him: "fireboy", "mortal", "little bird", "boy of wax" said to his face)
+  text = text.replace(/,?\s*\b(fire-?boy|wax-?boy|wax-?wings?|little (bird|one|flame)|mortal|child of the (sky|sun)|boy of wax|sky-?boy|bird-?boy)\b(?=\s*[.?!,]|$)/gi, '').replace(/\s+([.?!,])/g, '$1').replace(/^\s*[,.]\s*/, '');   // (Hades has things he must say whole)
   // the same stage cue two lines running is a tic: the second one goes
   const lastCue = ([...history].reverse().find(m => m.role === 'assistant')?.content.match(/\[[^\]]*\]/) || [''])[0].toLowerCase();
   if (lastCue) text = text.replace(/\[[^\]]*\]\s*/g, m => m.trim().toLowerCase() === lastCue ? '' : m).trim();
