@@ -3461,6 +3461,161 @@ function updateRings(dt) {
     r.m.material.opacity = (1 - u) * (1 - u) * 0.9;
   }
 }
+// ── The sound barrier. Past the speed of sound (SOUND: the world's metres a second, the same figure the sound itself is
+//    worked out with) the air cannot get out of a bird's way in time and it breaks: a double crack, heard for miles, as
+//    late as sound takes to get there; and for a moment the damp in the air condenses into a collar round him (the
+//    Prandtl–Glauert cloud), with a ring thrown off where it broke. Once a crossing: he has to come back down well under
+//    it (ARM) before it can happen again. Anyone else's bird does it too, worked out from how fast it is said to be going,
+//    so nothing new is sent. Only a dive with the fire up gets there (a plain dive tops out near 300); a jetstream, nearly.
+//    (g: the load on his wings, in his own weights, for the sound of the air; near: what he is about to pass close by)
+const SOUND = 343, ARM = 0.88;
+const SONIC = { armed: true, t: -9, n: 0, g: 0, gp: false, v: new THREE.Vector3(), a: new THREE.Vector3(), q: [], cones: [], hold: 0,
+  near: { t: 0, was: [false, false, false], cool: 0, trees: new Map() } };
+{
+  // the collar: an open cone, narrow at his wings and flaring back, brightest at its sharp front edge and edge-on, frayed
+  // into streaks, adding light only (so his own mark in the picture is left alone, as the sparks do)
+  const geo = new THREE.CylinderGeometry(0.42, 1, 1, 40, 6, true).translate(0, -0.5, 0);   // (the narrow end at y 0, the wide end a length behind)
+  for (let i = 0; i < 3; i++) {
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uK: { value: 0 }, uT: { value: 0 }, uSeed: { value: 0 } }, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, premultipliedAlpha: true,
+      vertexShader: `varying float vA, vAng; varying vec3 vN, vV;
+        void main(){ vA = -position.y; vAng = atan(position.z, position.x); vec4 w = modelMatrix * vec4(position, 1.0);
+          vN = normalize(mat3(modelMatrix) * normal); vV = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix * viewMatrix * w; }`,
+      fragmentShader: `uniform float uK, uT, uSeed; varying float vA, vAng; varying vec3 vN, vV;
+        float h(float n){ return fract(sin(n) * 43758.5453); }
+        void main(){
+          float rim = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 1.4);
+          float front = smoothstep(0.0, 0.05, vA) * exp(-vA * 2.4) + 0.5 * smoothstep(0.08, 0.0, abs(vA - 0.04));
+          float a = vAng * 6.0 + uSeed, s = mix(h(floor(a)), h(floor(a) + 1.0), smoothstep(0.0, 1.0, fract(a)));
+          float wisp = 0.45 + 0.55 * s * (0.6 + 0.4 * sin(vAng * 17.0 + vA * 11.0 - uT * 9.0 + uSeed));
+          float k = uK * (0.3 + 0.9 * rim) * front * wisp;
+          gl_FragColor = vec4(vec3(0.92, 0.97, 1.0) * k * 3.2, 0.0);
+        }`,
+    });
+    const m = new THREE.Mesh(geo, mat); m.visible = false; m.frustumCulled = false; m.renderOrder = 3; scene.add(m);
+    SONIC.cones.push({ m, mat, t: 1, T: 1, P: null, K: 1, d: new THREE.Vector3(0, 0, -1) });
+  }
+}
+const _sonY = new THREE.Vector3(0, 1, 0);
+// what stands round a place and sends a boom back to it, as [seconds, side as the lens has it (−1 left … +1 right), level]:
+// the hills in eight directions (the first one tall enough, near or far), and the ground or the sea under it
+function sonicTaps(x, y, z) {
+  const out = [], e = camera.matrixWorld.elements, rl = Math.hypot(e[0], e[2]) || 1, rx = e[0] / rl, rz = e[2] / rl;
+  for (let i = 0; i < 8; i++) {
+    const a = (i + 0.5) / 8 * Math.PI * 2, dx = Math.sin(a), dz = Math.cos(a);
+    for (const r of [200, 450, 750, 1000]) {
+      const h = terrainAt(x + dx * r, z + dz * r);
+      if (h > y - 120) { out.push([2 * r / SOUND, dx * rx + dz * rz, clamp((h - y + 120) / 400, 0.15, 1) * clamp(400 / r, 0.25, 1)]); break; }
+    }
+  }
+  const alt = y - Math.max(groundAt(x, z), WATER);
+  if (alt > 0 && alt < 1500) out.push([Math.max(0.05, 2 * alt / SOUND), 0, (1 - alt / 1500) * 0.6]);
+  return out.sort((a, b) => b[2] - a[2]).slice(0, 8);
+}
+// the collar on a bird (P: someone else's, or none for his own), and the ring off it
+function sonicCone(P, pos, dir, K) {
+  const S = SONIC, c = S.cones.find(c => c.t >= c.T) || S.cones.reduce((a, b) => (b.t > a.t ? b : a));
+  c.P = P; c.t = 0; c.T = 1.0; c.K = K; c.d.copy(dir); c.mat.uniforms.uSeed.value = Math.random() * 60; c.m.visible = true;
+  shock(pos.x, pos.y, pos.z, 0xf4fbff, 40 * PHX_S * K, 0.8); rings[(ringN - 1) % rings.length].m.quaternion.setFromUnitVectors(_tmpZ.set(0, 0, 1), dir);   // (across the way he was going)
+  for (let i = 0, n = Math.round((TOUCH ? 22 : 44) * Math.sqrt(K)); i < n; i++) {   // (the cloud left hanging in the air where it broke)
+    const a = Math.random() * Math.PI * 2, r = (8 + Math.random() * 5) * PHX_S * K;
+    _tmpV.set(Math.cos(a), Math.sin(a), 0).applyQuaternion(rings[(ringN - 1) % rings.length].m.quaternion).multiplyScalar(r).add(pos).addScaledVector(dir, -Math.random() * 14 * PHX_S * K);
+    emit(_tmpV.x, _tmpV.y, _tmpV.z, rnd(2) + dir.x * 6, rnd(2) + dir.y * 6, rnd(2) + dir.z * 6, 1.1 + Math.random() * 1.2, MIST, 0.4, (4.5 + Math.random() * 3) * K);
+  }
+}
+const _tmpZ = new THREE.Vector3(), _tmpV = new THREE.Vector3();
+// his own boom: the sound, the collar and the ring, the lens knocked, and the sea thrown up if he is low over it
+function sonicBoom() {
+  const p = player, K = birdK(), S = SONIC; S.n++;
+  audio.sonic?.({ own: true, k: K, taps: sonicTaps(p.pos.x, p.pos.y, p.pos.z) });
+  sonicCone(null, p.pos, dir3, K);
+  camShake = Math.max(camShake, 0.55 + 0.15 * (K - 1)); flash = Math.max(flash, 0.1);
+  if (!XR.on && !cinema.on && !p.cine && !p.mount && !p.ferry) camera.fov = Math.min(150, camera.fov + 8);   // (a punch: the following lens eases back by itself. Never in a headset, nor a lens of the director's.)
+  STOOP.boomed = true;
+  const g = groundAt(p.pos.x, p.pos.z), low = p.pos.y - WATER;
+  if (g < WATER - 2 && low < 45 * K && realm === 'over') {
+    ripple(p.pos.x, p.pos.z, 3); shock(p.pos.x, WATER + 0.4, p.pos.z, 0xdff4ff, 40 * K, 1.1);
+    const v = clamp(1 - low / (45 * K), 0.3, 1);
+    for (let i = 0, n = Math.round((TOUCH ? 60 : 130) * v * Math.sqrt(K)); i < n; i++) { const a = Math.random() * Math.PI * 2, sp = (18 + Math.random() * 34) * v;
+      emit(p.pos.x + Math.cos(a) * 6 * PHX_S * K - dir3.x * Math.random() * 30, WATER + 0.6, p.pos.z + Math.sin(a) * 6 * PHX_S * K - dir3.z * Math.random() * 30, Math.cos(a) * sp + dir3.x * 30, 6 + Math.random() * 22 * v, Math.sin(a) * sp + dir3.z * 30, 0.7 + Math.random() * 0.8, [0.78, 0.9, 1.0], -16, (0.8 + Math.random()) * K); }
+  }
+}
+function updateSonic(dt) {
+  const p = player, S = SONIC;
+  const fly = p.form === 'phoenix' && state === 'play' && !p.perch && !p.sub && !p.takeoff && !p.perchGo && !COSMOS.on;
+  // ── the load on his wings: how hard the way he is going is being bent, in his own weights
+  if (fly && dt > 0) {
+    S.v.copy(dir3).multiplyScalar(p.speed); S.v.y += p.vy || 0;
+    if (S.gp) { S.a.subVectors(S.v, S.a).divideScalar(dt); const sp = S.v.length() || 1, al = S.a.dot(S.v) / sp, perp = Math.sqrt(Math.max(0, S.a.lengthSq() - al * al)); if (perp < 3000) S.g = lerp(S.g, perp / 9.81, damp(12, dt)); }
+    S.a.copy(S.v); S.gp = true;
+  } else { S.gp = false; S.g = lerp(S.g, 0, damp(6, dt)); }
+  // ── his own barrier
+  if (fly && p.speed >= SOUND) { if (S.armed && time - S.t > 2.5) { S.armed = false; S.t = time; sonicBoom(); } }
+  else if (!fly || p.speed < SOUND * ARM) S.armed = true;
+  // ── everyone else's, as they are told to us: only on a new message, never on one gone stale
+  const me = realm === 'under' ? 1 : 0, now = performance.now();
+  if (NET.peers.size) for (const P of NET.peers.values()) {
+    if (!P.s || P.form !== 'p' || P.realm !== me || now - P.s.t > 2500) continue;
+    const v = Math.hypot(P.s.vx, P.s.vy, P.s.vz), o = P.son || (P.son = { armed: v < SOUND, t: -9, s: null });
+    if (o.s === P.s) continue; o.s = P.s;
+    if (v >= SOUND) { if (o.armed && time - o.t > 2.5) { o.armed = false; o.t = time; peerBoom(P, v); } }
+    else if (v < SOUND * ARM) o.armed = true;
+  }
+  // (the window-rattle of someone else's, when it gets here)
+  for (let i = S.q.length - 1; i >= 0; i--) if (now >= S.q[i].at) { camShake = Math.max(camShake, S.q[i].k); S.q.splice(i, 1); }
+  // ── the collars, riding on their birds as long as they last, shedding vapour behind
+  for (const c of S.cones) {
+    if (c.t >= c.T) { c.m.visible = false; continue; }
+    c.t = S.hold ? Math.min(c.t + dt, S.hold) : c.t + dt;
+    const Q = c.P, pos = Q ? Q.pos : p.pos;
+    if (Q) { if (!Q.s) { c.t = c.T; continue; } const v = Math.hypot(Q.s.vx, Q.s.vy, Q.s.vz); if (v > 1) c.d.set(Q.s.vx / v, Q.s.vy / v, Q.s.vz / v); } else c.d.copy(dir3);
+    const u = c.t / c.T, k = smoothstep(0, 0.05, u) * Math.pow(1 - u, 1.5), K = c.K;
+    const Rr = 10 * PHX_S * K * (1 + 0.35 * u), Ll = 15 * PHX_S * K * (1 + 0.8 * u);   // (as wide as his wings, about: the collar stands round all of him, not inside him)
+    c.m.position.copy(pos).addScaledVector(c.d, 2 * PHX_S * K); c.m.quaternion.setFromUnitVectors(_sonY, c.d);
+    c.m.scale.set(Rr, Ll, Rr);
+    c.mat.uniforms.uK.value = k; c.mat.uniforms.uT.value += dt;
+    for (let j = 0, n = Math.random() < k * (TOUCH ? 0.6 : 1) ? (TOUCH ? 1 : 3) : 0; j < n; j++) { const a = Math.random() * Math.PI * 2, r = Rr * (0.85 + Math.random() * 0.2);
+      _tmpV.set(Math.cos(a) * r, -Math.random() * Ll * 0.5, Math.sin(a) * r).applyQuaternion(c.m.quaternion).add(c.m.position);
+      emit(_tmpV.x, _tmpV.y, _tmpV.z, rnd(1.5), rnd(1.5), rnd(1.5), 0.8 + Math.random() * 0.9, MIST, 0.3, (4 + Math.random() * 3) * K); }
+  }
+  nearMissTick(dt, fly);
+}
+// someone else's boom: seen at once, heard when the sound has come this far
+function peerBoom(P, v) {
+  const c = camera.position, d = P.pos.distanceTo(c); if (d > 9000) return;
+  const K = P.bk || bigName(P.name);
+  _tmpV.set(P.s.vx / v, P.s.vy / v, P.s.vz / v);
+  if (d < fogFar + 600) sonicCone(P, P.pos, _tmpV, K);
+  const r = audio.sonic?.({ x: P.pos.x, y: P.pos.y, z: P.pos.z, k: K, taps: sonicTaps(c.x, c.y, c.z) });
+  if (r && r.vol > 0.12) SONIC.q.push({ at: performance.now() + r.delay * 1000, k: clamp(r.vol, 0, 1) * 0.5 });
+}
+// Near misses: a few times a second, where he will be a moment from now. A wall of rock or a roof beside that point, the
+// ground rising under it, a tree just off his line: each is a swish of air, timed so that it is loudest as the thing is
+// beside him. (Going through leaves is the brush's sound, not this; another bird going by is the bird's own.)
+function nearMissTick(dt, fly) {
+  const N = SONIC.near, p = player;
+  if ((N.t -= dt) > 0) return; N.t = 0.05;
+  if (!fly || p.speed < 60 || MOD.noclip || !audio.sfx.nearMiss) { N.was[0] = N.was[1] = N.was[2] = false; return; }
+  const K = birdK(), v = p.speed, thr = (5 + v * 0.035) * K, tau = 0.12, ah = v * tau, hl = Math.hypot(dir3.x, dir3.z) || 1, rx = -dir3.z / hl, rz = dir3.x / hl;
+  const ax = p.pos.x + dir3.x * ah, ay = p.pos.y + dir3.y * ah, az = p.pos.z + dir3.z * ah;
+  for (let s = -1; s <= 1; s += 2) {   // (each side: a wall, a ridge, a roof standing higher than he will be)
+    let hit = 0; for (const w of [0.45, 1]) if (groundAt(ax + rx * thr * w * s, az + rz * thr * w * s) > ay - 1.2 * K) { hit = 1 - w * 0.55; break; }
+    const i = s + 1; if (hit && !N.was[i] && time > N.cool) { N.cool = time + 0.1; audio.sfx.nearMiss(s, hit, v, 'rock', tau); } N.was[i] = hit > 0;
+  }
+  { const gA = groundAt(ax, az), cb = ay - Math.max(gA, WATER), c0 = p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z), WATER), near = cb < thr * 0.8 && cb > -2;   // (the ground coming up under him)
+    if (near && !N.was[1] && cb < c0 * 0.7 && time > N.cool) { N.cool = time + 0.1; audio.sfx.nearMiss(0, clamp(1 - cb / (thr * 0.8), 0.2, 1), v, gA < WATER ? 'water' : 'ground', tau); } N.was[1] = near; }
+  let best = null, bm = 1e9, bs = 0, bt = 0;
+  treesNear(p.pos.x + dir3.x * v * 0.08, p.pos.z + dir3.z * v * 0.08, Math.min(70, thr + v * 0.16), (g, ck, i, t) => {
+    if (!t || t.fell || p.pos.y < t.y0 - 1 || p.pos.y > (t.top ?? t.y0 + 20) + 3 * K) return;
+    const dx = t.x - p.pos.x, dz = t.z - p.pos.z, tca = (dx * dir3.x + dz * dir3.z) / hl / (v * hl);
+    if (tca < 0.02 || tca > 0.16) return;
+    const lat = dx * rx + dz * rz, miss = Math.abs(lat) - (t.rad || 3);
+    if (miss < 1.2 * K || miss > thr || miss >= bm) return;
+    const key = ck + ':' + i; if ((N.trees.get(key) || 0) > time) return;
+    best = key; bm = miss; bs = Math.sign(lat); bt = tca;
+  });
+  if (best && time > N.cool) { N.cool = time + 0.1; N.trees.set(best, time + 2); if (N.trees.size > 200) N.trees.clear(); audio.sfx.nearMiss(bs, 1 - bm / thr, v, 'tree', bt); }
+}
 // ── Fireworks of the gods. A bird that explodes goes up the way its god would have it: the sea's turns to water and comes
 //    down as spray, the hunt's looses a sky of arrows, the vine's fizzes and throws out vines that end in grapes. Each is a
 //    firework more than a blast — a white core, a first burst in the house's own colours, and a second a moment later that
@@ -5439,7 +5594,7 @@ function updateAudio(dt) {
     summit: over && isH && p.pos.y > CLOUD_SEA + 200, sky: over ? smoothstep(CLOUD_SEA - 150, CLOUD_SEA + 250, p.pos.y) : 0,
     water: gnd < WATER ? clamp(1 - (p.pos.y - WATER) / 45, 0, 1) : 0, skim: skim.s, sub: SEA.murk, rain: Math.min(1, rainAmt * 1.4), burning: !!p.cine, falling: isH && !p.grounded && !p.wings && p.vel.y < -8,
     wind: clamp(gust * 0.6 + cloudIn + (windLead ? 0.3 : 0) + storm * 0.6, 0, 1),
-    turn: isH ? 0 : -(p.turn || 0) * 2.2, bank: isH ? 0 : -(p.bank || 0), alt: p.pos.y - Math.max(gnd, WATER), perched: !!p.perch,   // (for the air over each wing, and the feathers: to the right is positive)
+    turn: isH ? 0 : -(p.turn || 0) * 2.2, bank: isH ? 0 : -(p.bank || 0), alt: p.pos.y - Math.max(gnd, WATER), perched: !!p.perch, g: isH ? 0 : SONIC.g,   // (for the air over each wing, and the feathers: to the right is positive; g, the load on his wings)
   });
   // his burning wingtips through the trees: each wing by itself, by how deep it is in the leaves
   if (!isH && state === 'play' && over && !p.perch && !p.sub && p.pos.y - gnd < 90 && audio.brush) {
@@ -11545,10 +11700,8 @@ function stoopStep(dt, diving, dive) {
   D.tuck = lerp(D.tuck, D.on ? dive * (0.45 + 0.55 * smoothstep(90, 220, p.speed)) : 0, damp(D.on ? 5 : 9, dt));
   D.pull = Math.max(0, D.pull - dt / 0.85);
   if (state !== 'play' || SH.def) return;
-  // the air breaking: once a dive, the first time past the speed of it
-  if (D.on && !D.boomed && p.speed > 250) { D.boomed = true;
-    shock(p.pos.x, p.pos.y, p.pos.z, 0xfff1d0, 16 * K, 0.45, false); shock(p.pos.x - dir3.x * 8 * K, p.pos.y - dir3.y * 8 * K, p.pos.z - dir3.z * 8 * K, 0xff9a40, 26 * K, 0.7, false);
-    (audio.sfx.boom || audio.sfx.whoomph)?.(1); camShake = Math.max(camShake, 0.35 + 0.15 * (K - 1)); netFx?.('flap'); }
+  // (the air breaking is the sound barrier's now, at the real speed of it: see SONIC. Coming up to it, from about 250,
+  //  the air is heard shaking him harder and harder, and that is all until he goes through.)
   // a meteor: white heat off his breast streaming back the length of him
   if (D.fast > 0.25 && (D.glowT -= dt) <= 0) { D.glowT = 0.016;
     for (let i = 0, n = Math.round(1 + D.fast * 3 * Math.sqrt(K)); i < n; i++) {
@@ -11846,7 +11999,7 @@ function updatePhoenix(dt) {
   p.flapPhase = Math.min(1, p.flapPhase + dt / 0.55);
   const dive = smoothstep(-0.2, -0.8, Math.asin(clamp(dir3.y, -1, 1))) * (1 - brk);
   stoopStep(dt, diving, dive);
-  flyWings(dt, { boost, dive: dive * (1 - STOOP.pull), climb: Math.max(clamp(pin, 0, 1), brk), tuck: STOOP.tuck * (1 - STOOP.pull), flutter: STOOP.fast, pull: STOOP.pull });
+  flyWings(dt, { boost, dive: dive * (1 - STOOP.pull), climb: Math.max(clamp(pin, 0, 1), brk), tuck: STOOP.tuck * (1 - STOOP.pull), flutter: Math.max(STOOP.fast, smoothstep(4, 22, SONIC.g) * 0.7, smoothstep(250, 333, p.speed) * smoothstep(372, SOUND, p.speed) * 0.8), pull: STOOP.pull });   // (the feathers shaken by a hard pull, and by the air piling up in front of him near the speed of sound)
 
   const n = SH.def ? 0 : boost || dive > 0.5 ? 4 : 2;
   for (let i = 0; i < n; i++) {
@@ -29371,6 +29524,7 @@ function tick(dt) {
   updateRings(dt); updateHouseBooms(dt);
   updateWorldLife(dt); updateLeaves(dt); updateLava(dt); updateEruptions(dt); updateCraters(dt); updateArena(dt); updateGrass(dt); updateFlowers(dt); updateWeather(dt); updateTwisters(dt); updateFire(dt); updateFlies(dt); updateFriends(dt); updatePantheon(dt); updateGusts(dt); updateHigh(dt);
   updateTemple(); updateCurrents(dt); updateDay(dt); updateStorm(dt); updateAir(dt); updateOthers(dt);
+  updateSonic(dt);   // (the sound barrier, his and everyone's, and the near misses: after the others have been moved, so the collars ride on them)
   if (realm === 'over') { updateBeacons(dt); updateAnimals(dt); updateBirds(dt); updateGods(dt); }
   else updateUnder(dt);
   updateAgents(dt);
@@ -33837,6 +33991,7 @@ setTimeout(() => {
   if (window.__icarus) Object.assign(window.__icarus, { crash, cpuShow, matchGhost, matchQuit, matchView, matchWhere, matchParty, matchRegulars, matchGlide, matchPractice, matchGoLive, matchSlot, BLAST, matchBlast, GHOST_U, NPCS, OLY_R, PARTY_R, chatCommand, cpuFly });
   if (window.__icarus) Object.assign(window.__icarus, { STU, stuOpen, stuClose, stuTab, stuMissions, stuProSeek, stuPlay, stuWatch, stuFetch, stuTest, stuBack, stuGo, stuStep, stuPP, stuRate, sceneClean, stuDone });
   if (window.__icarus) Object.assign(window.__icarus, { MD, PW, INKW, inkSay, inkNow, mdReady, mdHeard, mdShotAt, mdCamOn, mdSkip, matchBusy, matchWait, matchFire, matchUnqueue, matchFirst, matchRAt, matchWhere, matchParty, pwTake, pwShatter, matchBar, aresScript, miPose, MODEBAR, queueOf: () => MATCH.queue });   // (tests: the fight's opening, its words, one at a time)
+  if (window.__icarus) Object.assign(window.__icarus, { SONIC, SOUND, sonicBoom, sonicTaps, sonicCone, peerBoom, nearMissTick });   // (tests: the sound barrier)
   frame();
 }, 30);
 </script>
