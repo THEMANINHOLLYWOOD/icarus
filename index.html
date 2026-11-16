@@ -3632,6 +3632,7 @@ function updateSonic(dt) {
       emit(_tmpV.x, _tmpV.y, _tmpV.z, rnd(1.5), rnd(1.5), rnd(1.5), 0.8 + Math.random() * 0.9, MIST, 0.3, (4 + Math.random() * 3) * K); }
   }
   nearMissTick(dt, fly);
+  hyperPeers();   // (and anyone in hyper leaves their trail: see HY)
 }
 // someone else's boom: seen at once, heard when the sound has come this far
 function peerBoom(P, v) {
@@ -8494,6 +8495,7 @@ function menuItems() {
     { g: 'C', ic: 'rec', label: REC.on ? 'stop' : 'record', key: 'O', on: REC.on, f: () => { REC.on ? recStop() : recStart(); } },
     { g: 'C', ic: 'album', label: 'album', f: () => albumShow(true) },
     { g: 'A', ic: 'map', label: 'map', key: 'M', f: () => { if (state === 'play') openMap(); } },
+    ...(COSMOS.on ? [{ g: 'A', ic: 'map', label: 'to earth', f: () => cosmosLeave(false) }] : []),   // (out in space: the way home)
     { g: 'A', ic: 'who', label: 'players', key: 'Tab', badge: String(flyers), on: who.pinned, f: () => { who.pinned = !who.pinned; who.open = who.pinned; } },
     { g: 'R', ic: mic.denied ? 'micx' : 'mic', label: mic.denied ? 'no mic' : 'voice', key: 'V', on: !!mic.stream && !VC.muted, keep: true, f: menuMic },
     { g: 'R', ic: 'chat', label: 'chat', key: 'T', f: () => openChat() },
@@ -8929,6 +8931,13 @@ function auiPilot() {
       uilPut(q[0], q[1], i < 3 ? 111 : i % 3 === 0 ? 43 : 127, i % 3 === 0 ? 2 : 1, B(235 - i * 9)); }
     const g = Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER); if (p.pos.y - g > 12) { const q = at(p.pos.x, g + 0.5, p.pos.z); if (q) { uilPut(q[0], q[1], 43, 1, B(210)); uilPut(q[0] - 1, q[1], 45, 1, B(150)); uilPut(q[0] + 1, q[1], 45, 1, B(150)); } } }
 }
+// hyper's charge: a thin line across the letters under the middle, filling as he holds on, and full and bright a moment as
+// he goes over (see HY)
+function auiHyper() {
+  const H = HY, nx = UIL.nx, ny = UIL.ny, w = Math.max(10, Math.min(nx - 8, Math.round(nx * 0.34))), c0 = (nx - w) >> 1, r = Math.max(4, Math.round(ny * 0.24));
+  const f = H.on ? w : Math.round(H.c * w), b = H.on ? 255 * smoothstep(1.4, 0.5, time - H.onT) : 255;
+  for (let i = 0; i < w; i++) uilPut(c0 + i, r, i < f ? 45 : 46, H.on ? 2 : 1, Math.round(i < f ? b * (0.65 + 0.35 * (i / w)) : 70));
+}
 function drawAsciiUi(dt) {
   const cl = document.body.classList, on = asciiOn && !XR.on && !!UIL.buf;
   { // how many letters wide the boy is on the screen just now: his name is run along that many to a row, so it can be read
@@ -8952,6 +8961,7 @@ function drawAsciiUi(dt) {
     if (state === 'map' && mapV.open) auiMapChrome();
     if (state === 'play' && !cl.contains('pro')) auiMarks();
     if (state === 'play' && PILOT.k > 0.35 && !cl.contains('pro')) auiPilot();
+    if (state === 'play' && (HY.c > 0.01 || HY.on && time - HY.onT < 1.4) && !cl.contains('pro')) auiHyper();
     if (state !== 'title' && state !== 'stats' && !cl.contains('pro') && !cl.contains('photo')) { auiDom(); auiArea(dt); } else if (state === 'title' && AGC.open) auiDom('agentCard');
     if (shown && !REC.on && !STV.on) auiMark();
     if (state !== 'title' && !REC.on) { auiMenu(); auiToast(); }
@@ -11910,6 +11920,61 @@ function speedFov(dt) {
   SPF.k += (want - SPF.k) * damp(want > SPF.k ? 0.6 : 0.45, dt);
   return SPF.k;
 }
+// ── Hyper. Hold the fire (Shift, a phone's thumb pushed right out, the pad's trigger; the pilot's lever all the way up)
+//    and fly on roughly straight: for three seconds a thin line is drawn across the letters, filling, and a hard turn
+//    empties it. Full, he goes over into hyper: six times a plain flight's speed, the lens opened wide by the speed itself
+//    (see SPF; the edges darkened, in a headset), the world streaking past, and a trail of his house's colour left hanging
+//    in the air behind him — which everyone else sees too, worked out from how fast he is said to be going (nothing new is
+//    sent). It goes through the sound barrier on the way (see SONIC). Low over the ground he scorches it and the woods
+//    under him go up (the skid marks and the fanned fire, with their own limits). Let go, turn hard, or come at the ground
+//    too fast (p.danger), and he drops out of it. Never in a fight (MATCH.phase). Pointed up, it carries him out through
+//    the top of the sky into space, for anyone who gets there so (COSMOS.hy); and out there it crosses the dark between the
+//    worlds in moments. (c: the charge, 0..1; k: how far into it, eased; at: when it was last looked after)
+const HY = { c: 0, on: false, k: 0, hard: 0, at: -9, onT: -9, told: false, why: '', col: new THREE.Color() };
+const HY_MUL = 6, HY_CHARGE = 3, HY_PEER = 420;   // (HY_PEER: how fast someone else has to be said to be going, nearly level, to be in hyper)
+const hyHouse = () => PATRONS[PATRON.id]?.[0] || (realm === 'under' ? '#7f8cff' : '#ff8a3a');   // (his house's colour: his god's, or the fire's)
+// every frame he is flying: held is the fire held, can is whether hyper may be had at all just now
+function hyperTick(dt, held, ax, pin, can) {
+  const H = HY, hard = Math.abs(ax) > 0.72, straight = Math.abs(ax) < 0.35 && Math.abs(pin) < 0.5;
+  H.at = time;
+  if (!can) { if (H.on) hyperOff(''); H.c = 0; }
+  else if (!H.on) { if (hard || !held) H.c = 0; else if (straight) H.c = Math.min(1, H.c + dt / HY_CHARGE); if (H.c >= 1) hyperGo(); }   // (not quite straight: it waits; a hard turn, or the fire let go: empty)
+  else { H.hard = hard ? H.hard + dt : 0; if (!held) hyperOff('release'); else if (H.hard > 0.2) hyperOff('turn'); }
+  H.k = lerp(H.k, H.on ? 1 : 0, damp(H.on ? 2 : 1.3, dt));
+}
+function hyperGo() {
+  const H = HY, p = player, K = birdK(); H.on = true; H.c = 0; H.hard = 0; H.onT = time;
+  if (!COSMOS.on) shock(p.pos.x, p.pos.y, p.pos.z, H.col.set(hyHouse()).getHex(), 34 * PHX_S * K, 0.7);
+  flash = Math.max(flash, 0.12); camShake = Math.max(camShake, 0.25); audio.sfx.whoosh?.(true);
+  if (!H.told) { H.told = true; toast(COSMOS.on ? 'HYPER · ACROSS THE DARK · LET GO TO SLOW' : XR.on ? 'HYPER · LET GO TO DROP OUT' : 'HYPER · LET GO TO DROP OUT · POINT UP FOR SPACE'); }
+}
+function hyperOff(why) {
+  const H = HY, p = player; if (!H.on) return; H.on = false; H.c = 0; H.why = why;
+  if (why === 'ground') {   // (the ground coming: thrown out of it at once, the air braking him hard, before the pull-up has to do it alone)
+    p.speed = Math.min(p.speed, 240); p.pitch = Math.max(p.pitch, 0.55); camShake = Math.max(camShake, 0.45);   // (and the nose thrown up)
+    _v.copy(p.pos).addScaledVector(dir3, 12 * birdK()); shock(_v.x, _v.y, _v.z, 0xf4fbff, 30 * PHX_S * birdK(), 0.6); toast('OUT OF HYPER · THE GROUND'); }
+}
+// the trail: his house's colour, a few motes a frame along the way he has come, hanging and slowly rising, some of them white
+function hyperTrail(x0, y0, z0) {
+  const p = player, H = HY, K = birdK(); if (H.k < 0.05 || SH.def) return;
+  const c = H.col.set(hyHouse()), n = Math.round((TOUCH ? 3 : 6) * H.k);
+  for (let i = 0; i < n; i++) { const u = Math.random(), w = Math.random() < 0.25;
+    emit(lerp(x0, p.pos.x, u) + rnd(3 * K), lerp(y0, p.pos.y, u) + rnd(3 * K), lerp(z0, p.pos.z, u) + rnd(3 * K), rnd(1.5), rnd(1.5) + 0.6, rnd(1.5), 1.4 + Math.random() * 1.6, w ? [2.3, 2.25, 2.1] : [c.r * 1.8, c.g * 1.8, c.b * 1.8], 0.15, (1.6 + Math.random() * 2.2) * K); }
+}
+// everyone else's: anyone said to be going faster than HY_PEER, nearly level, leaves the same trail in their own colour
+const _hyC = new THREE.Color();
+function hyperPeers() {
+  if (!NET.peers.size || SH.def) return;
+  const now = performance.now(), me = realm === 'under' ? 1 : 0, c = camera.position;
+  for (const P of NET.peers.values()) {
+    if (P.form !== 'p' || !P.s || now - P.s.t > 1500 || P.realm !== me || SHUN.block.has(P.name)) { P.hyL = null; continue; }
+    const v = Math.hypot(P.s.vx, P.s.vy, P.s.vz);
+    if (v < HY_PEER || Math.abs(P.s.vy) > v * 0.6 || (P.pos.x - c.x) ** 2 + (P.pos.z - c.z) ** 2 > 3000 * 3000) { P.hyL = null; continue; }
+    const L = P.hyL || (P.hyL = P.pos.clone()), K = (P.bk || bigName(P.name)) * (P.sm ? SMALL.MIN : 1), col = P.patron ? _hyC.set(PATRONS[P.patron]?.[0] || '#ff1206') : _hyC.setHex(PEER_COLS[P.slot ?? 0]);
+    for (let i = 0, n = TOUCH ? 2 : 4; i < n; i++) { const u = Math.random(); emit(lerp(L.x, P.pos.x, u) + rnd(3 * K), lerp(L.y, P.pos.y, u) + rnd(3 * K), lerp(L.z, P.pos.z, u) + rnd(3 * K), rnd(1.5), rnd(1.5) + 0.6, rnd(1.5), 1.2 + Math.random() * 1.4, [col.r * 1.8, col.g * 1.8, col.b * 1.8], 0.15, (1.6 + Math.random() * 2) * K); }
+    L.copy(P.pos);
+  }
+}
 // Where the bird could set down, shown in the world and nowhere else: a ring of light lying on the place — a named perch
 // he is flying toward, or the ground just ahead of him when he comes in low and slow — with a second ring drawing in to
 // its middle, and a thread of light standing on it so it can be found from the air. One press, and he goes down to it by
@@ -12029,13 +12094,14 @@ function updatePhoenix(dt) {
   const stag = p.stagger = Math.max(0, (p.stagger || 0) - dt);   // just hit something: half in control, rolling
   p.turn = lerp(p.turn, turn * (stag > 0 ? 0.35 : 1) * (FLIP.cu.y < -0.25 ? -1 : 1), damp(PV ? 8 : 4, dt));   // (the lens upside down with him, over the top: left is still the left of the picture)
   const elev = Math.asin(clamp(Math.sin(p.pitch), -1, 1)), brk = FLIP.brake;   // (how steeply he is going, however the pitch is written)
+  hyperTick(dt, state === 'play' && (boosting() || PV && PILOT.thr > 0.86), ax, pin, state === 'play' && !MATCH.phase && !GODM.spent && p.flame > 0.05 && !FLIP.over && !p.riding && brk < 0.2 && realm === 'over');   // (see HY)
   const pivot = FLIP.over ? 0 : FLIP.hangT > 0 ? 1 : smoothstep(0.75, 1.25, elev) * smoothstep(55, 28, p.speed);   // straight up and slowing: a turn swings him round where he hangs (the stall turn)
   p.yaw += p.turn * (diving ? 0.85 : 1.25) * (1 + 2.6 * pivot) * (1 + 0.6 * brk) * dt;
   // S folds the wings and drops him out of the sky; W climbs, and climbing takes wingbeats
   p.climbT = pin > 0.6 && !PV ? (p.climbT || 0) + dt : Math.max(0, (p.climbT || 0) - dt * 3);   // (held: the nose keeps coming up, past a climb to straight up)
   const up = smoothstep(0.5, 1.6, p.climbT) * Math.max(smoothstep(35, 70, p.speed), smoothstep(1.4, 2.4, p.climbT)) + (FLIP.vert || 0);   // (fast, the nose comes right up; slower, it takes a longer hold)
   // held on, past straight up: over the top (or, on his back, S past straight down). Only his own hands do it, never the autopilot's
-  if (!FLIP.over && state === 'play' && !GODM.spent && !p.wasRiding && Math.abs(AP.ay || 0) < 0.05 && brk < 0.3) {
+  if (!FLIP.over && state === 'play' && !GODM.spent && !p.wasRiding && Math.abs(AP.ay || 0) < 0.05 && brk < 0.3 && !HY.on) {   // (in hyper, straight up is the way to space, not over the top)
     if (pin > 0.6 && p.pitch > 1.36 && p.speed > 24 && !FLIP.vert) FLIP.over = 1;
     else if (pin < -0.6 && p.pitch < -1.3 && Math.cos(FLIP.a) < -0.5) FLIP.over = -1;
     if (FLIP.over) FLIP.qv = 0.35;   // (it goes on at about the rate it came up at, and gathers)
@@ -12094,8 +12160,8 @@ function updatePhoenix(dt) {
     DIVE.k = lerp(DIVE.k, bomb ? 1 : 0, damp(bomb ? 1.6 : 2.6, dt));
     if (!bomb && DIVE.was && p.speed > 180) DIVE.pull = 1;
     DIVE.was = bomb; DIVE.pull = Math.max(0, DIVE.pull - dt / 1.4); p.overT = DIVE.t; }
-  const target = lerp(((boost ? 125 : PV ? lerp(40, 112, Math.min(1, PILOT.thr / 0.86)) : 64) - (sp > 0 ? sp * (GODM.on ? 30 : boost ? 55 : PV ? 34 : 75) : sp * 240)) * (1 + 0.12 * perks.swift + IS.swift) * BK * diveMul(DIVE.t) * (GODM.spent ? 0.6 : 1), 3, brk);   // nose down: ~300 m/s; held on S, far past it   // (braking: down to a hover)
-  p.speed = Math.max(lerp(18, 1.5, brk), lerp(p.speed, target * MOD.speed, damp(lerp(sp < -0.3 ? 1.7 + 1.6 * DIVE.k : boost ? 1.1 : PV ? 0.95 : 0.55 * (1 - 0.6 * DIVE.pull), 1.5, brk), dt)));   // (just out of a dive bomb he carries the speed a while)
+  const target = HY.on ? 125 * HY_MUL * (1 + 0.12 * perks.swift + IS.swift) * BK : lerp(((boost ? 125 : PV ? lerp(40, 112, Math.min(1, PILOT.thr / 0.86)) : 64) - (sp > 0 ? sp * (GODM.on ? 30 : boost ? 55 : PV ? 34 : 75) : sp * 240)) * (1 + 0.12 * perks.swift + IS.swift) * BK * diveMul(DIVE.t) * (GODM.spent ? 0.6 : 1), 3, brk);   // nose down: ~300 m/s; held on S, far past it   // (braking: down to a hover)   // (in hyper: six times a plain flight, climbing or not)
+  p.speed = Math.max(lerp(18, 1.5, brk), lerp(p.speed, target * MOD.speed, damp(HY.on ? 0.9 : lerp(sp < -0.3 ? 1.7 + 1.6 * DIVE.k : boost ? 1.1 : PV ? 0.95 : 0.55 * (1 - 0.6 * DIVE.pull), 1.5, brk), dt)));   // (just out of a dive bomb he carries the speed a while)
   if (FLIP.over || sp > 0.8 && pin < 0.2) p.speed = Math.max(14, p.speed - sp * 24 * dt);   // going round (or hanging straight up, the wings still): the way up costs him speed and the way down gives it back
   if (p.riding) p.speed = lerp(p.speed, 310 * RK, damp(1.6 * RK, dt));
   const knife = FLIP.over ? 0 : smoothstep(0.8, 0.98, Math.abs(Math.sin(FLIP.a)));   // (on his side the wings hold nothing up: he sinks)
@@ -12110,11 +12176,12 @@ function updatePhoenix(dt) {
   const toWater = dir3.y < -0.3 ? (p.pos.y - WATER) / -dir3.y : 1e9;
   const plunge = realm === 'over' && diving && toWater < 1200 && story.phase !== 'summit' && story.phase !== 'leap'
     && groundAt(p.pos.x + dir3.x * toWater, p.pos.z + dir3.z * toWater, WATER) < WATER - 4;
-  const ahead = Math.max(gAhead, WATER);
+  let ahead = Math.max(gAhead, WATER);
+  if (HY.on) { const ax2 = p.pos.x + dir3.x * look * 0.5, az2 = p.pos.z + dir3.z * look * 0.5; treesNear(ax2, az2, 16 * birdK(), (g, ck, i, t) => { if (!t.fell && t.top > ahead) ahead = t.top; }); }   // (skimming in hyper: over the treetops, never through the trunks)
   // left alone he rides up over rising ground, as far as a bird can; folding his wings and diving, the ground is his to judge
-  if (!MOD.noclip && !plunge && !diving && ahead + 10 * birdK() + p.speed * 0.12 > p.pos.y + dir3.y * look) {   // (a bigger bird keeps further off the ground: its wings reach further down)
+  if (!MOD.noclip && !plunge && !diving && ahead + 10 * birdK() + (HY.on ? 14 : p.speed * 0.12) > p.pos.y + dir3.y * look) {   // (in hyper he is let down low, to skim)   // (a bigger bird keeps further off the ground: its wings reach further down)
     const need = clamp(Math.atan2(ahead + 14 - p.pos.y, look) + 0.12, 0.4, 0.85);
-    if (p.pitch < need - 0.05 && !FLIP.over) p.pitch = lerp(p.pitch, need, damp(3, dt));
+    if (p.pitch < need - 0.05 && !FLIP.over) p.pitch = lerp(p.pitch, need, damp(HY.on ? 8 : 3, dt));   // (in hyper the ground comes quicker: he answers it quicker)
     if (need > 0.6 && Math.abs(ax) < 0.2) {   // too steep to climb: he leans away along the slope, toward whichever side is lower
       const gl = terrainAt(p.pos.x + (dir3.x * 0.7 + dir3.z * 0.7) * look, p.pos.z + (dir3.z * 0.7 - dir3.x * 0.7) * look), gr = terrainAt(p.pos.x + (dir3.x * 0.7 - dir3.z * 0.7) * look, p.pos.z + (dir3.z * 0.7 + dir3.x * 0.7) * look);
       p.yaw += (gl < gr ? 1 : -1) * 0.8 * dt; p.bank = lerp(p.bank, (gl < gr ? 1 : -1) * 0.5, damp(2, dt));
@@ -12124,12 +12191,18 @@ function updatePhoenix(dt) {
   // the colour drains, the edges close in red, the view narrows and shakes, and his heart is heard, faster the closer it is
   // (the faster he goes, the sooner it warns: a dive bomb near a thousand metres a second needs three or four seconds to pull out of)
   const tHit = (diving || FLIP.over) && !plunge && state === 'play' && dir3.y < -0.2 ? (p.pos.y - ahead) / Math.max(1, -dir3.y * p.speed) : 99, tWarn = 1.8 + clamp((p.speed - 300) / 350, 0, 1.6), dWant = clamp((tWarn - tHit) / (tWarn * 0.72), 0, 1);
-  p.danger = lerp(p.danger || 0, dWant, damp(dWant > (p.danger || 0) ? 7 : 2.5, dt));
+  // (in hyper, flying level: the ground standing up across his line too steeply for him to ride up over it in time)
+  let hW = 0; if (HY.on && !plunge && state === 'play') for (const t of [0.2, 0.4, 0.7, 1, 1.4]) { const d = p.speed * t, x = p.pos.x + dir3.x * d, z = p.pos.z + dir3.z * d; if (Math.max(terrainAt(x, z), WATER) + 10 > p.pos.y + d * 0.255) { hW = clamp((1.9 - t) / 1.3, 0, 1); break; } }   // (ground rising across a gentle climb from where he is: a mountain, not a hill)
+  p.danger = lerp(p.danger || 0, Math.max(dWant, hW), damp(Math.max(dWant, hW) > (p.danger || 0) ? 7 : 2.5, dt));
+  if (HY.on && p.danger > 0.22) hyperOff('ground');
   if (p.danger > 0.3 && time > (p.beatT || 0)) { p.beatT = time + lerp(0.95, 0.42, p.danger); audio.sfx.heart?.(p.danger); }
   const p0x = p.pos.x, p0y = p.pos.y, p0z = p.pos.z, K0 = birdK(), sv = SMALL.k < 1 ? smallV() : K0 > 1.01 ? 1 + 0.18 * (K0 - 1) : 1;   // (and a big one covers more: the keeper's bird is a third as fast again for its size)   // (a small bird covers less ground: its own lengths a second are what they were)
   p.pos.addScaledVector(dir3, p.speed * sv * dt);
   p.pos.y += p.vy * sv * dt;
   const gHere = groundAt(p.pos.x, p.pos.z, p.pos.y);
+  hyperTrail(p0x, p0y, p0z);
+  // (pointed up in hyper, near the top of the sky: the way out is open to him, until he is back down under it — see COSMOS)
+  if (HY.on && p.pitch > 0.2 && p.pos.y > SKY_LIMIT - 900 && !XR.on) COSMOS.hy = true; else if (COSMOS.hy && !HY.on && !COSMOS.on && p.pos.y < SKY_LIMIT - 300) COSMOS.hy = false;
   if (plunge && gHere < WATER - 3 && p.pos.y < WATER + 5.1 * birdK() && state === 'play') { enterSea(-1); return; }
   // the sea overhead is the way back: climb into it and he goes through; graze it and it holds him under
   if (realm === 'under') { const rf = underRoof(p.pos.x, p.pos.z); if (rf < UNDER.ceil - 2 && p.pos.y > rf - 7) {   // (rock overhead, not water: it does not give)
@@ -17547,7 +17620,7 @@ function fanFlap(hard) {
 }
 // every tenth of a second, from the scan in updateFire: the air of his passing
 function fanPass(dt) {
-  const p = player, K = birdK(), sp = p.speed || 0, god = GODM.on;
+  const p = player, K = birdK(), sp = p.speed || 0, god = GODM.on || HY.on;   // (hyper burns like a god)
   if (realm !== 'over' || state !== 'play' || p.form !== 'phoenix' || p.sub || p.cine || p.perch || SH.def) { FAN.last = null; return; }
   // how far above the treetops he is, if there are trees under him
   let top = -1e9; treesNear(p.pos.x, p.pos.z, 10 + 6 * K, (g, ck, i, t) => { if (!t.fell && (t.x - p.pos.x) ** 2 + (t.z - p.pos.z) ** 2 < (t.rad + 6 * K) ** 2) top = Math.max(top, t.top); });
@@ -17675,7 +17748,8 @@ const SKID = { N: TOUCH ? 700 : 2000, i: 0, n: 0, realm: '', runs: new Map(), sc
 // (in the shader above: a ragged edge either side; streaks running along it, darker where the heat bit deepest; "cool" is
 // 1 just laid and 0 gone black; it fades out between one minute and two)
 // how hot the ground under a flier gets: 0 too high to feel it, 1 skimming it
-function skidHeat(K, speed, god, alt) { const H = K * (6.5 + clamp(speed / 28, 0, 5.5)) * (god ? 1.7 : 1); return alt > H || alt < -2 ? 0 : smoothstep(H, H * 0.25, alt); }
+function skidHeat(K, speed, god, alt) {   // (god 2: in hyper, hotter still and from higher up)
+  const H = K * (6.5 + clamp(speed / 28, 0, 5.5)) * (god >= 2 ? 3 : god ? 1.7 : 1); return alt > H || alt < -2 ? 0 : smoothstep(H, H * 0.25, alt); }
 function skidCorner(j, side, x, z, g, y0) { const gy = groundAt(x, z, y0 + 2), y = isFinite(gy) && Math.abs(gy - g) < 1.4 ? gy : g, o = (j * 2 + side) * 3; SKID.pos[o] = x; SKID.pos[o + 1] = y + 0.09; SKID.pos[o + 2] = z; }
 function skidPlace(j, dx, dz, y0) {   // the two corners of a point, square to the way the streak runs there
   const S = SKID, q = j * 6, x = S.pt[q], z = S.pt[q + 1], g = S.pt[q + 2], w = S.pt[q + 3];
@@ -17684,11 +17758,11 @@ function skidPlace(j, dx, dz, y0) {   // the two corners of a point, square to t
 function skidSeg(j, p) { const o = j * 6, S = SKID; if (p < 0) { S.idx.fill(0, o, o + 6); return; } const a = p * 2, b = p * 2 + 1, c = j * 2, d = j * 2 + 1; S.idx[o] = a; S.idx[o + 1] = b; S.idx[o + 2] = c; S.idx[o + 3] = b; S.idx[o + 4] = d; S.idx[o + 5] = c; }   // (wound to face up)
 function skidDirty(j) { SKID.lo = Math.min(SKID.lo, j); SKID.hi = Math.max(SKID.hi, j); }
 // one more point of a streak: who laid it (so it joins their last one), where, how wide, how hot
-function skidAt(src, x, z, g, w, heat, hx, hz) {
+function skidAt(src, x, z, g, w, heat, hx, hz, jump = 30) {   // (jump: how far apart two points can be and still be one streak)
   const S = SKID;
   if (S.realm !== realm) { S.realm = realm; S.n = S.i = 0; S.runs.clear(); S.idx.fill(0); S.sk.fill(-9999); S.prev.fill(-1); S.next.fill(-1); for (let j = 0; j < S.N * 2; j++) S.sk[j * 4 + 2] = j & 1 ? 1 : -1; S.lo = 0; S.hi = S.N - 1; }
   let run = S.runs.get(src);
-  if (run && (time - run.t > 0.7 || (x - run.x) ** 2 + (z - run.z) ** 2 > 30 * 30 || Math.abs(g - run.g) > 6)) run = null;   // (a gap, a jump, a drop off a roof: a new streak)
+  if (run && (time - run.t > 0.7 || (x - run.x) ** 2 + (z - run.z) ** 2 > jump * jump || Math.abs(g - run.g) > 6)) run = null;   // (a gap, a jump, a drop off a roof: a new streak)
   const j = S.i; S.i = (S.i + 1) % S.N; S.n = Math.min(S.N, S.n + 1);
   // the slot given up: whatever was joined to it lets go
   if (S.next[j] >= 0) { const k = S.next[j]; skidSeg(k, -1); S.prev[k] = -1; skidDirty(k); }
@@ -17735,7 +17809,7 @@ function skidFrom(src, x, y, z, K, speed, god, hx, hz, mine) {
   const kind = groundKind(x, z, g + 0.1);
   if (kind === 'snow') { if (run) S.runs.delete(src); if (Math.random() < heat * 0.6) steamAt(x + rnd(1.5 * K), g + 0.2, z + rnd(1.5 * K), 1.5 * K, 2, false); return; }   // (snow only melts, and steams)
   if (run && run.wet) S.runs.delete(src);
-  skidAt(src, x, z, g, K * (1.1 + 1.6 * heat) * (god ? 1.35 : 1), heat * (god ? 1 : 0.85), hx, hz);
+  skidAt(src, x, z, g, K * (1.1 + 1.6 * heat) * (god ? 1.35 : 1), heat * (god ? 1 : 0.85), hx, hz, Math.max(30, gap * 1.8));   // (at hyper's speed the points are far apart: still one streak)
   // the fresh end: sparks off it, a wisp of smoke, and now and then what grows there catches
   const d2 = (x - camera.position.x) ** 2 + (z - camera.position.z) ** 2;
   if (d2 < 500 * 500 && Math.random() < heat * 0.9) for (let i = 0, n = 1 + (heat * 3 | 0); i < n; i++) emit(x + rnd(K), g + 0.2, z + rnd(K), rnd(1.5) + hx * speed * 0.05, 1 + Math.random() * 3.5 * heat, rnd(1.5) + hz * speed * 0.05, 0.4 + Math.random() * 0.6, pick(EMBER), 2.5, 0.25 + Math.random() * 0.35);
@@ -17750,13 +17824,13 @@ function updateSkid(dt) {
   const S = SKID, t0 = performance.now(), p = player;
   if (state === 'play' || state === 'talk') {
     if (p.form === 'phoenix' && !p.sub && !p.perch && !SH.def && !p.cine) { const hl = Math.hypot(dir3.x, dir3.z);   // (a bird goes the way dir3 points, at p.speed)
-      skidFrom('me', p.pos.x, p.pos.y, p.pos.z, birdK(), p.speed || 0, GODM.on, hl > 0.05 ? dir3.x / hl : 0, hl > 0.05 ? dir3.z / hl : 1, true); }
+      skidFrom('me', p.pos.x, p.pos.y, p.pos.z, birdK(), p.speed || 0, HY.on ? 2 : GODM.on, hl > 0.05 ? dir3.x / hl : 0, hl > 0.05 ? dir3.z / hl : 1, true); }
     else if (S.runs.has('me')) S.runs.delete('me');
     if ((S.scanT -= dt) < 0) { S.scanT = 0.07; const now = performance.now(), me = realm === 'under' ? 1 : 0, c = camera.position;
       for (const P of NET.peers.values()) {
         if (P.form !== 'p' || !P.s || now - P.s.t > 1500 || P.realm !== me || SHUN.block.has(P.name) || (P.pos.x - c.x) ** 2 + (P.pos.z - c.z) ** 2 > 1400 * 1400) { if (S.runs.has(P.id)) S.runs.delete(P.id); continue; }
         const sp = Math.hypot(P.s.vx, P.s.vy, P.s.vz), hl = Math.hypot(P.s.vx, P.s.vz);
-        skidFrom(P.id, P.pos.x, P.pos.y, P.pos.z, (P.bk || bigName(P.name)) * (P.sm ? SMALL.MIN : 1), sp, P.gm, hl > 0.1 ? P.s.vx / hl : 1, hl > 0.1 ? P.s.vz / hl : 0, false);
+        skidFrom(P.id, P.pos.x, P.pos.y, P.pos.z, (P.bk || bigName(P.name)) * (P.sm ? SMALL.MIN : 1), sp, sp > HY_PEER && Math.abs(P.s.vy) < sp * 0.6 ? 2 : P.gm, hl > 0.1 ? P.s.vx / hl : 1, hl > 0.1 ? P.s.vz / hl : 0, false);
       } }
   }
   skidFlush();
@@ -20956,7 +21030,8 @@ function voiceRun(a) {
       else { const w = { x: p.pos.x + v[0] * 900, z: p.pos.z + v[1] * 900 }; w.y = Math.max(groundAt(w.x, w.z), WATER); apMark(w); AP.kind = 'go'; AP.t0 = time; }   // (on the ground or in the air: that way, a good distance)
       break; }
     case 'objective': { const o = $('obj')?.textContent?.trim(), q = $('quest')?.textContent?.trim(); toast((o || q || 'FOLLOW THE WIND').toUpperCase()); break; }
-    case 'home': respawnTop(); break;
+    case 'home': if (COSMOS.on) cosmosLeave(false); else respawnTop(); break;   // (out in space, home is the world)
+    case 'space_home': if (COSMOS.on) cosmosLeave(false); break;
     case 'record': recStart(); break;
     case 'record_stop': recStop(); break;
     case 'mark_here': wpMarkHere(); break;
@@ -21044,6 +21119,7 @@ const V_RULES = [
   [/\b(how (do i|to) play|explain( the game| everything| it)?|tutorial|what is this game|teach me|what can i do here)\b/, 'explain'],
   [/\b(unmute|sound on|music on|turn (the )?sound on)\b/, 'unmute'],
   [/\b(mute|sound off|music off|silence|turn (the )?sound off)\b/, 'mute'],
+  [/\b(back to (the )?(world|earth|ground|air)|leave space|out of space|down to (the )?(world|earth))\b/, 'space_home'],
   [/\b(back to olympus|go home|respawn|start over|olympus)\b/, 'home'],
   [/\b(temple|next god)\b/, 'temple'],
 ];
@@ -26139,7 +26215,8 @@ const _pcO = new THREE.Vector3();
 function updateCamera(dt) {
   const p = player;
   { const on = pilotView(); PILOT.k = Math.abs(PILOT.k - (on ? 1 : 0)) < 0.002 ? (on ? 1 : 0) : lerp(PILOT.k, on ? 1 : 0, damp(on ? 3.4 : 5, dt)); }   // (how far the lens has gone over to the pilot's)
-  const sfk = speedFov(dt); if (XR.on || XR.vigM) xrVig(dt, sfk);   // (how much wider for sheer speed: see SPF)
+  if (time - HY.at > 0.3) { if (HY.on || HY.c) { HY.on = false; HY.c = 0; } HY.k = lerp(HY.k, 0, damp(2, dt)); }   // (something else is flying him: no hyper)
+  const sfk = speedFov(dt); if (XR.on || XR.vigM) xrVig(dt, Math.max(sfk, HY.k));   // (how much wider for sheer speed: see SPF)
   if (mdCamOn()) return mdCam(dt); if (MD.cam) mdCamOff();   // (a fight opening: the lens is the fight's, until it goes live — see MD)
   if (state === 'watch') return camWatch(dt);
   if (state === 'stats') return statsCam(dt);   // (his record in the sky: a wide shot of where he is)
@@ -26259,7 +26336,7 @@ function updateCamera(dt) {
     { const s = DIVE.k * smoothstep(220, 800, p.speed) * (1 - 0.6 * pk) * 0.32 * Math.sqrt(camK);   // (a dive bomb: a tremor that builds with the speed, smooth, not a rattle)
       if (s > 0.005) { camera.position.x += (Math.sin(time * 27.1) + 0.5 * Math.sin(time * 41.3 + 1.7)) * s; camera.position.y += (Math.sin(time * 23.7 + 0.6) + 0.5 * Math.sin(time * 37.9 + 2.9)) * s; } }
     if ((p.danger || 0) > 0.15) { const k = p.danger * 0.2 * (1 - 0.6 * pk); camera.position.x += rnd(k); camera.position.y += rnd(k); }
-    postMat.uniforms.uSpeed.value = lerp(postMat.uniforms.uSpeed.value, rush + 0.55 * DIVE.k * smoothstep(300, 850, p.speed), damp(3, dt));   // (and a dive bomb's streaks, thicker)
+    postMat.uniforms.uSpeed.value = lerp(postMat.uniforms.uSpeed.value, rush + 0.55 * DIVE.k * smoothstep(300, 850, p.speed) + 0.6 * HY.k, damp(3, dt));   // (and a dive bomb's streaks, thicker; hyper's thicker still)
   }
   if (camShake > 0) {
     camShake = Math.max(0, camShake - dt * 2.2);
@@ -29731,6 +29808,7 @@ function xrHud(dt, sc) {
   const fpHint = xrFP() && state === 'play' ? xrHint(act) : null;
   if (XR.err) lines.push(['XR', XR.err]);
   const pilot = PILOT.on && pilotFly();   // (pilot view: the instruments, in a line, and what the yoke does)
+  if (HY.c > 0.02 && !HY.on && lines.length < 3) lines.push(['HYPER', '-'.repeat(Math.round(HY.c * 16)) + '.'.repeat(16 - Math.round(HY.c * 16))]);   // (hyper's charge)
   if (pilot && lines.length < 2) { const p = player; lines.push(['PILOT', `${Math.round(p.speed * 3.6 / 5) * 5} KM/H · ${Math.round((p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER)) / 5) * 5} M · ${String(Math.round((((-p.yaw * 180 / Math.PI) % 360) + 360) % 360 / 5) * 5 % 360).padStart(3, '0')} · THRUST ${Math.round(pilotThr() * 10) * 10}%${PILOT.hold ? ' · HEIGHT HELD' : ''}`]); }
   if (!PATRON.id && state === 'play' && !player.cine) lines.push(['PRAY', 'say the name of the god you pray to: Zeus, Hera, Poseidon, Demeter, Athena, Apollo, Artemis, Ares, Aphrodite, Hephaestus, Hermes or Dionysus']);
   const hint = fpHint !== null ? fpHint : pilot ? 'pinch and hold: the yoke · move it to steer, lift it to climb · push it away: thrust · let go: he flies level' : state === 'prologue' ? (pro.act ? pro.act.replace(/SPACE|TAP/, 'CLAP').replace('HOLD  —', 'FLAP  —').replace('HOLD CLAP', 'FLAP') : 'push both palms out to skip')
@@ -33116,7 +33194,7 @@ const COSMOS = { on: false, up: 0, cool: 0, fadeT: 0, built: false, told: false,
   dNear: 1e9, beatT: 0, ringL: new THREE.Vector3(), ringR: 0, ringY: 1e9, tex: { data: null, tex: null, job: null, upT: 0, at: -1e9, n: -1 }, map: { on: false, piv: new THREE.Vector3(), q: new THREE.Quaternion(), d: 600, td: 60000, pid: 'me', keys: {}, hits: [] }, hudT: 0, trail: null };
 const _czC = new THREE.Color(), _czv = new THREE.Vector3(), _czw = new THREE.Vector3(), _czf = new THREE.Vector3(), _czu = new THREE.Vector3(), _czq = new THREE.Quaternion(), _czm = new THREE.Matrix4(), _cz0 = new THREE.Vector3(), _czX = new THREE.Vector3(1, 0, 0), _czY = new THREE.Vector3(0, 1, 0), _czZ = new THREE.Vector3(0, 0, 1);
 // whether the way up is open to him now
-function cosmosOpen() { const p = player; return !!MOD.admin && GODM.on && realm === 'over' && !XR.on && p.form === 'phoenix' && !p.cine && !p.sub && !p.perch && !p.mount && !p.ferry; }
+function cosmosOpen() { const p = player; return (!!MOD.admin && GODM.on || COSMOS.hy) && realm === 'over' && !XR.on && p.form === 'phoenix' && !p.cine && !p.sub && !p.perch && !p.mount && !p.ferry; }
 // past a few kilometres, nearer and smaller in proportion (everything out to the end of space fits in twice that)
 const czK = d => d <= CZ_D0 ? 1 : CZ_D0 * (2 - CZ_D0 / d) / d;
 // where a place in the world is on the globe: as far from the pole as it is from Olympus, in the same direction. The unit
@@ -33410,7 +33488,7 @@ function cosmosEnter() {
 // he is left where the world has put him)
 function cosmosLeave(quiet = false) {
   const C = COSMOS, p = player; if (!C.on) return;
-  C.on = false; if (C.map.on) cosmosMap(false);
+  C.on = false; C.hy = false; if (C.map.on) cosmosMap(false);   // (hy: who came up in hyper comes down under the sky limit like anyone)
   (C.home || scene).add(phoenix.group); C.home = null; trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
   document.body.classList.remove('cosmos'); czBar(false); C.rocks.count = 0;
   if (quiet) return;
@@ -33428,6 +33506,7 @@ function cosmosLeave(quiet = false) {
 function cosmosFly(dt) {
   const C = COSMOS, p = player, M = C.map.on;
   const [ax, pin] = M || state !== 'play' ? [0, 0] : axes(), boost = !M && (boosting() || C.beatT > 0);
+  hyperTick(dt, !M && state === 'play' && boosting(), ax, pin, !M && state === 'play' && !MATCH.phase);   // (hyper out here: the dark between the worlds crossed in moments)
   C.beatT = Math.max(0, C.beatT - dt);
   p.turn = lerp(p.turn, -ax, damp(4, dt)); C.pv = lerp(C.pv, pin, damp(4, dt));
   C.q.multiply(_czq.setFromAxisAngle(_czY, p.turn * 1.15 * dt)).multiply(_czq.setFromAxisAngle(_czX, C.pv * 1.3 * dt));
@@ -33436,8 +33515,9 @@ function cosmosFly(dt) {
   { const B = C.nearB, c = B ? B.pos : _cz0; _czv.subVectors(C.pos, c).normalize(); const s = _czv.dot(f); _czw.copy(_czv).addScaledVector(f, -s);
     if (_czw.lengthSq() > 0.04) { _czw.normalize(); const a = Math.atan2(_czv.crossVectors(u, _czw).dot(f), u.dot(_czw)); C.q.premultiply(_czq.setFromAxisAngle(f, a * damp(0.9, dt) * (1 - Math.min(1, Math.abs(ax) * 1.5)))); } }
   C.q.normalize();
-  const base = (boost ? 320 : 150) * MOD.speed * (1 + 0.15 * perks.swift), want = Math.min(base * (1 + Math.max(0, C.dNear) / 700), 3e6);
-  C.v = lerp(C.v, M ? 0 : want, damp(want < C.v || M ? 4 : 0.45, dt));   // (slow to gather speed, quick to shed it near a world)
+  const hk = HY.on ? 1 + 15 * smoothstep(1500, 30000, C.dNear) : 1;   // (not near a world: it would be through it before he could turn)
+  const base = (boost ? 320 : 150) * MOD.speed * (1 + 0.15 * perks.swift), want = Math.min(base * (1 + Math.max(0, C.dNear) / 700) * hk, HY.on ? 5e7 : 3e6);
+  C.v = lerp(C.v, M ? 0 : want, damp(want < C.v || M ? 4 : HY.on ? 1.1 : 0.45, dt));   // (slow to gather speed, quick to shed it near a world)
   f.set(0, 0, -1).applyQuaternion(C.q);
   C.pos.addScaledVector(f, C.v * dt);
   if (C.nearB && C.nearD < C.nearB.R * 3) C.pos.add(C.nearB.dp);   // (carried along with the world he is near)
@@ -33527,7 +33607,7 @@ function cosmosCam(dt) {
       return;
     } else {
       _czv.copy(f).multiplyScalar(-cd).addScaledVector(u, cd * 0.3).applyAxisAngle(u, camYawOff);
-      cam.fov = lerp(cam.fov, (68 + C.rush * 34) * fovK(), damp(2.4, dt));
+      cam.fov = lerp(cam.fov, Math.min(118, (68 + C.rush * 34 + HY.k * 14) * fovK()), damp(2.4, dt));
     }
     const first = !C.camOff; if (first) C.camOff = _czv.clone(); else C.camOff.lerp(_czv, damp(5, dt));
     C.camPos.copy(C.pos).add(C.camOff);
@@ -34285,7 +34365,8 @@ setTimeout(() => {
   if (window.__icarus) Object.assign(window.__icarus, { SONIC, SOUND, sonicBoom, sonicTaps, sonicCone, peerBoom, nearMissTick });   // (tests: the sound barrier)
   if (window.__icarus) Object.assign(window.__icarus, { FAR, TIERS, sightFar, farStep, xrLeave, tick, get dir3() { return dir3; } });   // (tests: the far country)
   if (window.__icarus) Object.assign(window.__icarus, { PILOT, PAD, pilotSet, pilotHold, pilotMouse, pilotFly, pilotView, pilotAxes, pilotThr, xrYoke, voiceRun, UIL, menuItems, get camYawOff() { return camYawOff; } });   // (tests: pilot view)
-  if (window.__icarus) Object.assign(window.__icarus, { DIVE, SPF, STOOP, BIG, fovFromSpeed, xrVig });   // (tests: the dive bomb, and the lens opened for speed)
+  if (window.__icarus) Object.assign(window.__icarus, { DIVE, SPF, STOOP, BIG, fovFromSpeed, xrVig });
+  if (window.__icarus) Object.assign(window.__icarus, { HY, HY_MUL, hyperTick, hyperGo, hyperOff, hyperPeers, PEER_COLS, auiHyper, FAN, FAN_Q, get flash() { return flash; } });   // (tests: hyper)   // (tests: the dive bomb, and the lens opened for speed)
   frame();
 }, 30);
 </script>
