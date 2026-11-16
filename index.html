@@ -5865,6 +5865,7 @@ function spaceAction() {
   if (state !== 'play' || p.cine || p.stumbleT > 0 || p.rollT > 0 || p.trip) return null;
   if (p.dive) return p.dive.through ? null : p.dive.rise ? null : state === 'play' && axes()[1] < -0.25 ? { kind: 'boil', label: 'set the water alight' } : { kind: 'rise', label: 'up and out, and burn' };   // (under the sea: the way out is one press, from any depth; with the dive held his fire answers where he is)
   if (p.form === 'phoenix') {
+    if (MATCH.phase && MATCH.me.in && !p.perch) return null;   // (in a fight Space is the wings beating, never landing or letting the bird go)
     if (!p.perch && vultThreat()) return { kind: 'airnova', label: 'burn it' };   // (something is coming down at him)
     if (p.perch) {   // on the ground as the bird: everything a man on the ground could do, and up again
       if (udNear(9)) return { kind: 'nova', label: 'burn them back' };
@@ -11862,9 +11863,14 @@ function updatePhoenix(dt) {
   }
   // a jetstream takes him if he flies into one: carried down its line, very fast, and it costs him nothing
   p.riding = false;
-  if ((p.jetCool = Math.max(0, (p.jetCool || 0) - dt)) <= 0 && jet.on && state === 'play') {
+  // (a current only takes him if he is flying along it and has let go of the controls: any hand on him and he is his own again;
+  //  never in a fight. Before, it seized anyone who strayed near, turned him and pulled him in, and only a hard turn got him out)
+  const handsOn = Math.abs(ax) > 0.15 || Math.abs(pin) > 0.15 || brk > 0.1, mayRide = state === 'play' && !MATCH.phase && !handsOn;
+  if (!mayRide && p.wasRiding) { p.jetCool = Math.max(p.jetCool || 0, 1.5); p.gustCool = Math.max(p.gustCool || 0, 1.5); }
+  if ((p.jetCool = Math.max(0, (p.jetCool || 0) - dt)) <= 0 && jet.on && mayRide) {
     const t = jetNearest(p.pos);
-    if (jet.d < 70 && t > 0.005 && t < 0.975) {
+    const along = jet.d < 45 && t > 0.005 && t < 0.975 && (p.wasRiding || (jetAt(Math.min(1, t + 0.012), _v).sub(jetAt(t, _jp)).normalize(), -_v.x * Math.sin(p.yaw) * Math.cos(p.pitch) + _v.y * Math.sin(p.pitch) - _v.z * Math.cos(p.yaw) * Math.cos(p.pitch) > 0.55));   // (along his own heading, as it is now)
+    if (along) { jetNearest(p.pos);
       if (FLIP.over) flipLevel();
       p.riding = true; jet.t = t;
       jetAt(Math.min(1, t + 0.012), _v).sub(jetAt(t, _n)).normalize();
@@ -11872,23 +11878,19 @@ function updatePhoenix(dt) {
       p.pitch = lerp(p.pitch, Math.asin(clamp(_v.y, -1, 1)), damp(3.2, dt));
       p.pos.lerp(_n, damp(1.1, dt));
       p.flame = Math.min(1, p.flame + dt * 0.05);
-      p.jetOut = Math.abs(ax) > 0.6 || pin < -0.6 ? (p.jetOut || 0) + dt : 0;
-      if (p.jetOut > 0.45) { p.jetCool = 4; p.jetOut = 0; }   // steer hard and he drops out of it
-      if (!p.wasRiding) { (audio.sfx.jetstream || audio.sfx.whoosh)(true); toast('JETSTREAM'); }
+      if (!p.wasRiding) { (audio.sfx.jetstream || audio.sfx.whoosh)(true); toast('JETSTREAM · STEER TO LEAVE IT'); }
       if (t > 0.9) questEvent.jet = true;
     }
   }
-  if (!p.riding && state === 'play' && (p.gustCool = Math.max(0, (p.gustCool || 0) - dt)) <= 0 && GUST.list.length) {
+  if (!p.riding && mayRide && (p.gustCool = Math.max(0, (p.gustCool || 0) - dt)) <= 0 && GUST.list.length) {
     const R = gustAt(p.pos);
-    if (R && R.d < 24 && R.u < 0.97 && _gustD.x * dir3.x + _gustD.y * dir3.y + _gustD.z * dir3.z > 0.2) {
+    if (R && R.d < 24 && R.u < 0.97 && -_gustD.x * Math.sin(p.yaw) * Math.cos(p.pitch) + _gustD.y * Math.sin(p.pitch) - _gustD.z * Math.cos(p.yaw) * Math.cos(p.pitch) > (p.wasRiding ? 0.2 : 0.55)) {
       if (FLIP.over) flipLevel();
       p.riding = true;
       p.yaw += wrapAngle(Math.atan2(-_gustD.x, -_gustD.z) - p.yaw) * damp(3.2, dt);
       p.pitch = lerp(p.pitch, Math.asin(clamp(_gustD.y, -1, 1)), damp(3.2, dt));
       p.pos.lerp(_gustQ, damp(1.4, dt));
       p.flame = Math.min(1, p.flame + dt * 0.04);
-      p.jetOut = Math.abs(ax) > 0.6 || pin < -0.6 ? (p.jetOut || 0) + dt : 0;
-      if (p.jetOut > 0.45) { p.gustCool = 3; p.jetOut = 0; }   // steer hard and he drops out of it
       if (!p.wasRiding) { (audio.sfx.jetstream || audio.sfx.whoosh)(true); toast(R.g.mine ? 'YOUR WIND' : `${R.g.by}'S WIND`); }
     }
   }
@@ -30780,7 +30782,8 @@ const MATCH = { id: '', kind: '', phase: '', t0: 0, lock: 0, over: 0, roster: ne
   ring: null, inv: null, watch: '', cpus: [], host: false, big: '', bigT: 0, placed: false, slot: null, prev: new THREE.Vector3(), has: false, back: null, win: '', sim: false, endSent: false, cool: 0 };
 // How a fight is set, by whoever calls it (and sent with the call, so it is the same fight for everyone in it): how long the
 // ring takes to close, how fast everything flies, how wide the ring is when it starts and when it has closed.
-const WAR_DEF = { close: 200, speed: 1, ring: 900, floor: 260, time: 150, warm: 30 }, WAR_LIM = { close: [40, 900], speed: [0.6, 2], ring: [400, 3200], floor: [120, 1200], time: [40, 600], warm: [0, 90] };
+const WAR_DEF = { close: 40, speed: 1, ring: 460, floor: 110, time: 45, warm: 8 },   // (short and close: a small ring that closes in under a minute)
+     WAR_DEF_OLD = null, WAR_LIM = { close: [40, 900], speed: [0.6, 2], ring: [400, 3200], floor: [120, 1200], time: [40, 600], warm: [0, 90] };
 const warCfg = c => { const o = {}; for (const k in WAR_DEF) { const v = c && c[k] != null ? +c[k] : NaN; o[k] = Number.isFinite(v) ? clamp(v, WAR_LIM[k][0], WAR_LIM[k][1]) : WAR_DEF[k]; } o.floor = Math.min(o.floor, o.ring * 0.8); return o; };
 MATCH.cfg = warCfg((() => { try { return JSON.parse(localStorage.getItem('icarus.warcfg') || 'null'); } catch { return null; } })());
 Object.assign(MATCH, { spd: 1, hostId: '', lastOut: null, fin: null, overFor: 6500, againUntil: 0, last: null, kills: 0, liveAt: 0, game: 'tron', base: SUMMIT - 300, lo: 0, dur: 150, home: null,
@@ -30806,7 +30809,7 @@ function matchCmd(arg) {
   if (w[0] === 'settings' || w[0] === 'set' && w.length === 1) return sys(warSay(MATCH.cfg) + ' · /fly set close 120 · speed 1.5 · ring 1800 · floor 300 · warm 20 · /fly reset');
   if (w[0] === 'reset' || w[0] === 'default') { MATCH.cfg = warCfg(null); try { localStorage.removeItem('icarus.warcfg'); } catch {} return sys('AS IT WAS · ' + warSay(MATCH.cfg)); }
   const words = w[0] === 'set' ? w.slice(1) : w, c = { ...MATCH.cfg }; let any = false;
-  const named = { fast: { close: 110 }, slow: { close: 420 }, quick: { close: 110 }, long: { close: 420 }, wide: { ring: 2400 }, tight: { ring: 900, floor: 220 } };
+  const named = { fast: { close: 28, time: 32 }, quick: { close: 28, time: 32 }, slow: { close: 90, time: 100 }, long: { close: 200, time: 150, ring: 900, floor: 260, warm: 20 }, wide: { ring: 1400, close: 70, time: 80 }, tight: { ring: 420, floor: 100 } };
   for (let i = 0; i < words.length; i++) { const k = { close: 'close', closes: 'close', shrink: 'close', time: 'time', timer: 'time', race: 'time', speed: 'speed', fast: null, ring: 'ring', size: 'ring', radius: 'ring', floor: 'floor', end: 'floor', min: 'floor', warm: 'warm', warmup: 'warm', practice: 'warm' }[words[i]], v = parseFloat(words[i + 1]);
     if (k && Number.isFinite(v)) { c[k] = v; any = true; i++; } else if (named[words[i]]) { Object.assign(c, named[words[i]]); any = true; } }
   if (!any) return sys('/fly set close 120 · speed 1.5 · ring 1200 · floor 300 · time 180 · warm 20 (any of them) · /fly settings · /fly reset');
@@ -31784,9 +31787,9 @@ function mdStep(now) {
 const ARES_L = {
   open: ['Right. Listen up.', 'Fighters. Eyes on me.', 'Here we go. Quick one.', 'Good, you came. Listen.', 'Over here. This is mine.'],
   rules: [['Your fire stays in the sky behind you. It is a wall.', 'Touch anyone\'s wall, even your own, and you burn.'],
-    ['Stay inside the ring. It closes in, and its edge burns too.', 'Last one flying wins. Four minutes, no more.'],
+    ['Stay inside the ring. It closes in fast, and its edge burns too.', 'Last one flying wins. Under a minute, no more.'],
     ['See a glass ring? Fly through it.', 'An extra life, and a few seconds where walls shatter instead of you.'],
-    ['The first half minute is warm-up. Nothing counts.', 'Learn your turns. Then it is real.']],
+    ['The first few seconds are warm-up. Nothing counts.', 'Learn your turn. Then it is real.']],
   fire: () => TOUCH ? ['Tap FIRE and a fireball hunts the nearest of them.', 'Once a life, tap WIND. It throws you on and blows fire off you.'] : ['F throws a fireball. It hunts the nearest of them.', 'R is your wind, once a life. It throws you on and blows fire off you.'],
   vet: ['You know this. Walls burn, the ring closes, last one up wins.', 'Same as ever. Don\'t touch fire. Grab the glass.', 'Walls kill, glass saves, the ring closes. You know it.', 'No speeches for you. Fly well.'],
   ask: ['Anyone have any questions?', 'Questions? Now\'s the time.', 'Anything you don\'t get? Ask me.', 'Any questions before we start?'],
@@ -31795,7 +31798,7 @@ const ARES_L = {
   rings: ['No fire this time. Gold rings come in chains: be first through them.', 'A whole chain is worth three more. Most rings when the clock stops wins.'],   // (a ring race: nothing puts anyone out of it)
   rvet: ['Rings, not fire. Most rings when the clock stops wins.', 'You know this one. Chains of gold. Take the most.'],
 };
-const ARES_CTX = 'You are Ares, opening a fight of fire in the sky over Olympus, and one of the fighters asks you something before it starts. The rules: every bird leaves a wall of fire behind it; touching any wall, even your own, puts you out; the ring closes in over four minutes and its edge burns; glass rings in the air give one extra life and a few seconds of smashing through walls (not the ground); F (or FIRE) throws a fireball that hunts the nearest enemy, flies faster than a bird but turns slower, so a hard turn, dive or loop shakes it, one every four seconds; R (or WIND) once a life is a burst of speed that blows any fireball off you; the first half minute is a warm-up when nothing counts; the last one flying wins, and at four minutes the one with the most fires wins it. Answer in one or two short, plain sentences, in your own voice.';
+const ARES_CTX = 'You are Ares, opening a fight of fire in the sky over Olympus, and one of the fighters asks you something before it starts. The rules: every bird leaves a wall of fire behind it; touching any wall, even your own, puts you out; the ring closes in under a minute and its edge burns; glass rings in the air give one extra life and a few seconds of smashing through walls (not the ground); F (or FIRE) throws a fireball that hunts the nearest enemy, flies faster than a bird but turns slower, so a hard turn, dive or loop shakes it, one every four seconds; R (or WIND) once a life is a burst of speed that blows any fireball off you; the first few seconds are a warm-up when nothing counts; the last one flying wins, and when time runs out (under a minute) the one with the most fires wins it. Answer in one or two short, plain sentences, in your own voice.';
 function aresSay(text, cut = false, cue = '') { if (!matchSees()) return; say([{ text, voice: 'ares', title: 'Ares', cue }], 'Ares', cut); }   // (cue: what the line is about, for the lens: see mdHoldTo)
 function aresHush() { for (let i = dlg.queue.length - 1; i >= 0; i--) if (dlg.queue[i].title === 'Ares') dlg.queue.splice(i, 1); if (dlg.cur?.title === 'Ares') { dlg.cur = null; stopVoice(); } }   // (the fight is gone, or begun again: what he had still to say goes with it)
 const ARES_CUE = ['walls', 'ring', 'glass', 'warm'];
@@ -31833,13 +31836,13 @@ async function aresAnswer(q) {
 function aresScript(q) {
   const t = String(q).toLowerCase();
   if (/\b(life|lives|extra|glass|power|ring of glass|shatter|break)\b/.test(t)) return 'Fly through a glass ring. One extra life, and for a few seconds walls shatter instead of you. Not the ground.';
-  if (/\b(ring|edge|border|circle|close|closing|shrink|outside)\b/.test(t)) return 'The ring closes in over four minutes. Once it is closing, touch its edge and you burn.';
+  if (/\b(ring|edge|border|circle|close|closing|shrink|outside)\b/.test(t)) return 'The ring closes in fast, under a minute. Once it is closing, touch its edge and you burn.';
   if (/\b(wall|fire|trail|line|behind)\b/.test(t)) return 'Your fire stays behind you as a wall. Any wall burns you, yours too. Make them cross yours.';
-  if (/\b(win|winner|score|end|long|minute|time)\b/.test(t)) return 'Last one flying wins. Four minutes at most; then the most fires takes it.';
+  if (/\b(win|winner|score|end|long|minute|time)\b/.test(t)) return 'Last one flying wins. Under a minute; then the most fires takes it.';
   if (/\b(fireball|shoot|missile|throw|wind|gust|evade|dodge)\b/.test(t)) return TOUCH ? 'Tap FIRE: it hunts the nearest of them. Turn hard or dive to shake one. WIND, once a life, blows it off you.' : 'F throws a fireball that hunts the nearest of them. Turn hard or dive to shake one. R, once a life, is your wind: it blows it off you.';
   if (/\b(steer|control|turn|move|key|keys|speed|boost|fast|how do i fly)\b/.test(t)) return TOUCH ? 'Drag to steer. The fire comes out behind you by itself.' : 'Steer with the mouse or W A S D. The fire comes out behind you by itself.';
   if (/\b(die|dead|out|lose|lost|after)\b/.test(t)) return 'Out is out. You watch the rest from the sky, then we go again.';
-  if (/\b(warm|practice|start)\b/.test(t)) return 'The first half minute nothing counts. Crash all you like, then it is real.';
+  if (/\b(warm|practice|start)\b/.test(t)) return 'The first few seconds nothing counts. Crash all you like, then it is real.';
   return pick(['Fly, don\'t touch fire, be the last one up. That\'s all of it.', 'Keep it simple. Walls burn, glass saves, last one wins.', 'You\'ll understand it in ten seconds of flying.']);
 }
 function mdReady() {
