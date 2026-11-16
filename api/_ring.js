@@ -12,14 +12,14 @@ import { json, refuse, limited } from './_lib.js';
 import { rest, travellerOf, nameOf, LIVE } from './_store.js';
 
 const HOUSES = ['zeus', 'hera', 'poseidon', 'demeter', 'athena', 'apollo', 'artemis', 'ares', 'aphrodite', 'hephaestus', 'hermes', 'dionysus'];
-const NOT_YET = new Set(['', 'agent', 'pair', 'summit', 'leap']);
+const NOT_YET = new Set(['', 'agent', 'pair', 'note', 'summit', 'leap']);
 const memWorld = () => globalThis.__icarusWorld || null;   // (world.js's own store, on the dev server with no database)
 const counts = row => !!row && !NOT_YET.has(String(row.phase || '')) && !(LIVE && /^ZZTEST/.test(String(row.name || ''))) && !(row.save && row.save.ring === 0);   // (the dev server's own world is all tests: there they count)
 const houseOf = save => (save && HOUSES.includes(save.patron) ? save.patron : '');
 const CACHE = globalThis.__icarusRing ||= { at: 0, v: null };
 
 // (PostgREST: past the summit, not an agent or a pairing, not a test, and not marked as still to fly through)
-const BASE = 'phase=not.in.(agent,pair,summit,leap)&phase=neq.&name=not.like.ZZTEST*';
+const BASE = 'phase=not.in.(agent,pair,note,summit,leap)&phase=neq.&name=not.like.ZZTEST*';
 const NOT_ZERO = '&or=(save->>ring.is.null,save->>ring.neq.0)';
 async function tally() {
   if (!LIVE) {
@@ -61,7 +61,7 @@ export async function POST(req) {
   if (!LIVE) row = memWorld()?.trav?.get(T.hash) || null;
   else { const r = await rest(`travellers?select=name,phase,save&hash=eq.${T.hash}&limit=1`); if (!r.ok) return json({ error: 'the world is not answering' }, 502); row = Array.isArray(r.data) && r.data[0] || null; }
   if (!row) return json({ ok: false, later: true });   // (not kept yet: his next save carries it)
-  if (row.phase === 'agent' || row.phase === 'pair') return json({ error: 'not a traveller' }, 403);
+  if (row.phase === 'agent' || row.phase === 'pair' || row.phase === 'note') return json({ error: 'not a traveller' }, 403);
   const added = !counts(row), save = { ...(row.save && typeof row.save === 'object' ? row.save : {}), ring: 1, patron: house };   // (added: he was not one of them a moment ago)
   if (row.save && row.save.ring === 1 && row.save.patron === house) return json({ ok: true, added: false });
   if (!LIVE) row.save = save;

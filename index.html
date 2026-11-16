@@ -212,6 +212,16 @@
   body.asciiui #agentCard h4, body.asciiui #agentCard h5, body.asciiui #agentCard p, body.asciiui #agentCard .row, body.asciiui #agentCard .ln { margin:0 0 var(--ch, 14px) !important; } body.asciiui #agentCard h5 { margin-bottom:0 !important; }
   body.asciiui #agentCard button { padding:0 var(--cw, 9px) !important; border:0 !important; } body.asciiui #agentCard .row { gap:var(--cw, 9px); } body.asciiui #agentCard { padding:var(--ch, 14px) calc(var(--cw, 9px) * 3) !important; }
   .touch #agentCard button { padding:10px 14px; } .photo #agentCard, .pro #agentCard { display:none; }
+  /* (your agents at work: who is at what, with the god in you, or kept up with /agent) */
+  #agx { position:fixed; right:calc(var(--sr, 0px) + 14px); top:calc(var(--st, 0px) + 13vh); z-index:9; width:min(400px, calc(100vw - 28px)); max-height:72vh; overflow:hidden; box-sizing:border-box; padding:12px 14px 10px; background:rgba(6,7,12,.82); border:1px solid rgba(255,190,140,.2); border-radius:3px; font-size:11px; line-height:1.5; letter-spacing:.04em; color:var(--ink); }
+  #agx.hidden { display:none; } #agx h4 { margin:0 0 8px; font-weight:500; font-size:10px; letter-spacing:.3em; color:#ffd9a8; }
+  #agx p { margin:0 0 2px 10px; overflow-wrap:anywhere; } #agx .dim { color:var(--dim); } #agx .wt { color:#ffb36b; }
+  #agx .ar { display:flex; gap:10px; align-items:baseline; margin-top:2px; } #agx .ar i { font-style:normal; color:var(--dim); margin-left:auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } #agx .ar.wt i { color:#ffb36b; }
+  #agx .row { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 6px 10px; }
+  #agx button { font:inherit; font-size:10px; letter-spacing:.12em; color:#ffd9a8; background:rgba(0,0,0,.35); border:1px solid rgba(255,217,168,.3); border-radius:3px; padding:2px 8px; cursor:pointer; white-space:nowrap; } #agx button.on { color:#160b04; background:#ffb36b; border-color:#ffb36b; }
+  body.asciiui #agx h4 { margin:0 0 var(--ch, 14px) !important; } body.asciiui #agx p, body.asciiui #agx .ar { margin:0 !important; } body.asciiui #agx p { padding-left:calc(var(--cw, 9px) * 2); } body.asciiui #agx .row { margin:0 0 var(--ch, 14px) calc(var(--cw, 9px) * 2) !important; gap:0 var(--cw, 9px); }
+  body.asciiui #agx button { padding:0 var(--cw, 9px) !important; border:0 !important; } body.asciiui #agx { padding:var(--ch, 14px) calc(var(--cw, 9px) * 2) !important; }
+  .touch #agx button { padding:8px 10px; } .photo #agx, .pro #agx { display:none; }
   #newcomer { position:fixed; left:50%; top:calc(var(--st, 0px) + 44px); transform:translate(-50%, -8px); z-index:7; background:none; border:0; border-bottom:1px solid rgba(190,255,220,.45); padding:9px 4px 6px; color:#d8ffe8; font:inherit; font-size:10px; letter-spacing:.26em; white-space:nowrap; cursor:pointer; opacity:0; pointer-events:none; transition:opacity .6s ease, transform .6s ease; text-shadow:0 0 8px #000; -webkit-tap-highlight-color:transparent; }
   #newcomer.on { opacity:.92; transform:translate(-50%, 0); pointer-events:auto; } #newcomer:hover { color:#fff; border-bottom-color:#fff; }
   .touch #newcomer { padding:14px 8px 10px; font-size:9px; letter-spacing:.16em; max-width:92vw; overflow:hidden; text-overflow:ellipsis; }
@@ -508,6 +518,8 @@
   #chatTabs button { font:inherit; font-size:10px; letter-spacing:.14em; color:var(--dim); background:rgba(0,0,0,.4); border:1px solid rgba(255,255,255,.12); border-radius:3px; padding:3px 8px; cursor:pointer; } #chatTabs button.on { color:#ffd9a8; border-color:rgba(255,217,168,.5); }
   body.asciiui #chatTabs button { padding:0 var(--cw, 9px) !important; border:0 !important; background:none !important; } body.asciiui #chatTabs { margin-bottom:var(--ch, 14px); gap:var(--cw, 9px); }
   #chat.open[data-f=ply] #chatLog .cl:not(.k-ply), #chat.open[data-f=god] #chatLog .cl:not(.k-god), #chat.open[data-f=pm] #chatLog .cl:not(.k-pm), #chat.open[data-f=sys] #chatLog .cl:not(.k-sys) { display:none; }
+  #chat.open[data-f=ag] #chatLog .cl:not(.k-ag) { display:none; } #chatTabs button[data-f=ag] { display:none; } #chat.hasag #chatTabs button[data-f=ag] { display:inline-block; }   /* (his own agents: the tab is there once he has any) */
+  #chatLog .cl.ag b { color:#a8f0dc; } #chatRow span.ch-ag { color:#a8f0dc; }
   #chatLog .cl b { font-weight:400; color:var(--ember); letter-spacing:.12em; margin-right:6px; }
   #chatLog .cl.me b { color:#ffd9a8; }
   #chatLog .cl.sys { color:#e9d27a; letter-spacing:.14em; font-size:10.5px; }
@@ -942,7 +954,7 @@
 <div id="proTalk" aria-live="polite"><b id="ptWho"></b><p id="ptSay"></p><div id="ptOpts" role="group" aria-label="What you say"></div><form id="ptOwn" autocomplete="off"><input id="ptIn" maxlength="90" autocomplete="off" autocapitalize="sentences" spellcheck="false" enterkeyhint="send" aria-label="Say it your own way"><button type="submit">say it</button></form><button id="ptJump" type="button">say nothing · jump</button></div>
 <div id="fsHint"><b>↑</b><span>SWIPE UP · OR TAP · FULL SCREEN</span><i>for no browser at all: Share → Add to Home Screen</i><u id="fsKeep">keep the bar</u></div>
 <div id="primer"><b>YOU WILL SPEAK FOR HIM</b><span id="primerSay">his father, the gods and the world can hear you</span><div id="primerRow"><button id="primerVoice" type="button">USE MY VOICE</button><button id="primerQuiet" type="button">PLAY WITHOUT VOICE</button></div><i id="primerNote"></i></div><div id="tut"><kbd></kbd><span></span></div>
-<div id="chat" class="hidden" data-f="all"><div id="chatTabs"><button type="button" data-f="all" class="on">all</button><button type="button" data-f="ply">players</button><button type="button" data-f="god">gods</button><button type="button" data-f="pm">private</button><button type="button" data-f="sys">game</button></div><div id="chatLog"></div><div id="chatRow"><span>›</span><input id="chatInput" maxlength="200" autocomplete="off" spellcheck="false" enterkeyhint="send" placeholder="say something to everyone"></div></div>
+<div id="chat" class="hidden" data-f="all"><div id="chatTabs"><button type="button" data-f="all" class="on">all</button><button type="button" data-f="ply">players</button><button type="button" data-f="god">gods</button><button type="button" data-f="pm">private</button><button type="button" data-f="ag">agents</button><button type="button" data-f="sys">game</button></div><div id="chatLog"></div><div id="chatRow"><span>›</span><input id="chatInput" maxlength="200" autocomplete="off" spellcheck="false" enterkeyhint="send" placeholder="say something to everyone"></div></div>
 <div id="photoGrid" class="on"><i></i><i></i><i></i><i></i><b></b></div><div id="photoLens"></div>
 <div id="photoBar"><button type="button" data-a="exit" aria-label="Leave the camera">✕</button><button type="button" data-a="prev" aria-label="Previous view">◂</button><button type="button" data-a="next" aria-label="Next view">▸</button><button type="button" data-a="grid" aria-label="Grid">▦</button><button type="button" data-a="run" aria-label="Hold to let time run">▶</button><button type="button" data-a="live" aria-label="Hover while the world goes on">≈</button><button type="button" data-a="rec" aria-label="Record">●</button><button type="button" data-a="album" aria-label="Your photographs">▤</button></div>
 <button id="recChip" type="button" aria-label="Stop recording"><i></i><span></span></button>
@@ -971,6 +983,7 @@
 </div></div>
 <div id="areaBar" aria-live="polite"><b></b><i></i><span></span></div>
 <div id="agentCard" class="hidden" role="dialog" aria-label="Your agents"></div>
+<div id="agx" class="hidden" role="region" aria-label="Your agents at work"></div>
 <div id="modeBar" aria-live="polite"><b></b><i></i></div>
 <div id="dpBar" aria-live="polite"><b></b><i></i></div><div id="dirRead" aria-live="polite"></div><button id="dpExit" type="button">✕ exit camera<span> · esc</span></button><div id="matchBig" aria-live="assertive"></div><div id="fightCard" aria-live="polite"></div><button id="matchAsk" type="button"></button>
 <div id="title" class="hidden">
@@ -9043,8 +9056,8 @@ addEventListener('keydown', e => {
 // typed into the grid too. The page keeps every one of them, laid out as before but in letters the size of the grid's
 // (so where a word is on the page is where it is typed), unseen; a press still lands on the real thing. A panel is
 // looked at afresh when something in it changes, or every quarter of a second, and typed in again every frame from that.
-const AUID = { ids: ['agentCard', 'chat', 'who', 'prompt', 'warn', 'mic', 'modeBar', 'newcomer', 'friendAsk', 'xfCard', 'xfList', 'waveBtn', 'flipBtn', 'diveBtn', 'bag', 'bldBar', 'matchBig', 'fightCard', 'matchAsk', 'dpBar', 'dpExit', 'recChip', 'guide', 'qlog', 'healthPill', 'looks', 'patron', 'tut'],
-  panels: new Set(['agentCard', 'who', 'xfCard', 'xfList', 'bag', 'bldBar', 'guide', 'qlog', 'looks', 'patron', 'fightCard']), roots: [], mo: null };
+const AUID = { ids: ['agentCard', 'agx', 'chat', 'who', 'prompt', 'warn', 'mic', 'modeBar', 'newcomer', 'friendAsk', 'xfCard', 'xfList', 'waveBtn', 'flipBtn', 'diveBtn', 'bag', 'bldBar', 'matchBig', 'fightCard', 'matchAsk', 'dpBar', 'dpExit', 'recChip', 'guide', 'qlog', 'healthPill', 'looks', 'patron', 'tut'],
+  panels: new Set(['agentCard', 'agx', 'who', 'xfCard', 'xfList', 'bag', 'bldBar', 'guide', 'qlog', 'looks', 'patron', 'fightCard']), roots: [], mo: null };
 const UIASC = { '⟲': '@', '✕': 'X', '×': 'x', '◂': '<', '▸': '>', '‹': '<', '›': '>', '«': '<<', '»': '>>', '→': '->', '←': '<-', '↑': '^', '↓': 'v', '●': '*', '◉': '@', '◎': '@', '◆': '<>', '◇': '<>', '✦': '*', '✧': '+', '⌂': 'n', '♣': '&', '△': '^', '▲': '^', '▶': '>', '▦': '#', '▣': '#', '†': '+', '—': '-', '–': '-', '…': '...', '’': "'", '‘': "'", '“': '"', '”': '"', '·': '\x7f', '•': '\x7f', '\x7f': '\x7f', '²': '2', '³': '3', '°': 'o', '✓': 'v', '★': '*', '☆': '*', '♥': '<3', '✎': '>_', '⚑': 'P', '⏵': '>', '⏸': '||' };
 const uiAsc = s => String(s || '').replace(/[^\x20-\x7e]/g, ch => UIASC[ch] ?? (/[À-ÿ]/.test(ch) ? ch.normalize('NFD')[0] : ''));
 function auidInit() {
@@ -9461,7 +9474,7 @@ function chatLine(name, text, kind) {
   if (name) { const b = document.createElement('b'); b.textContent = name; el.append(b);
     if (!/\b(sys|god|eye)\b/.test(kind || '')) { let c = ''; try { c = chatCol(name); } catch {} if (c) b.style.color = c; } }   // (a name in the colour of their house)
   el.append(document.createTextNode(text));
-  const k = kind || '', cat = /\bsys\b/.test(k) ? 'sys' : /\bgod\b/.test(k) ? 'god' : /\b(dm|fac)\b/.test(k) ? 'pm' : 'ply'; el.classList.add('k-' + cat);
+  const k = kind || '', cat = /\bag\b/.test(k) ? 'ag' : /\bsys\b/.test(k) ? 'sys' : /\bgod\b/.test(k) ? 'god' : /\b(dm|fac)\b/.test(k) ? 'pm' : 'ply'; el.classList.add('k-' + cat);
   box.append(el); while (box.children.length > 120) box.firstChild.remove();
   { const L = box.children; for (let i = Math.max(0, L.length - CHAT_SHUT - 1); i < L.length - CHAT_SHUT; i++) L[i].classList.add('old'); }   // (shut, only the newest few stay up)
   box.scrollTop = box.scrollHeight;
@@ -9502,6 +9515,7 @@ const CMD_HELP = [
   ['THE FIGHT', '/fly (everyone flying, and the regulars too, over Olympus wherever you call it) · /fly regular (the same) · /fly party (everyone within 2.5 km of you, and your friends wherever they are) · /fly NAME (one against one) · /fly teams · /fly 2v2 · /fly 3v3 · /fly 2v2v2 · /fly A B vs C D (sides: the walls of a side let its own through; the birds of the house even them out; /race 2v2 for rings; /fly shuffle before they go in) · those two are over Olympus if you are on or near it, otherwise where you are · everyone is flown in on a long glide; the first 30 s are a warm-up, when a hit only puts you back on your line; then GO · in a fight F throws a fireball that hunts the nearest of the others (turn hard, dive or loop to shake one), and R is your wind, once a life: a rush of speed that blows any fireball off you (FIRE and WIND keys on a touch screen, X and B on a pad, or say "fire", "wind") · /fly watch or /watch (fly in as a ghost to watch: nothing touches you, nobody sees you) · /leave (out of it at once, and fly on) · /fly end (stops it for everyone) · /fly restart (the same birds, from the top) · /fly skip (past the opening, straight to the count) · those three are for whoever called it, and the keeper, and are keys on the screen for them too · /again · /fly settings · /fly set close 120 · speed 1.5 · ring 1800 · floor 300 · warm 20 · /warzone reset'],
   ['COLOUR', '/vivid (the world in full colour, which is how it comes, or in its plainer colours)'],
   ['HAMLET', '/hamlet (your own AI agents: who lives there, what they are building, the way to it) · /hamlet connect (bring your Claude, Codex and other agents in) · /hamlet key (the key, by hand)'],
+  ['AGENTS', '@NAME and what you want to say (one of your own agents: it reads it at its next step, and what it answers comes back here, under the agents tab) · /agent NAME (stay with it: then just type, and /goal /todo /plan /mode /effort /model /compact /review /test /commit /stop /status /skills are requests to it; /help there lists them all) · /agent all · /agent off · /agent go NAME · with the god in you they are marked wherever they are, and a panel says what each is at (/agent panel keeps it up)'],
   ['GAMES', '/fly modes (every game, a line each) · /fly hunger · /fly snd · /fly ctf · /fly zombies · /fly possess · /fly speed · /fly king · /fly tag (/fly tag once: one round) · /fly jugg · /fly survive · /race long · any of them with a number for that many of the house’s birds (they fill the empty places anyway)'],
   ['FIGHT', '/fly · /fly party · /fly NAME (or cpu) · /fly teams · /fly 2v2 · /fly A B vs C D · F fire · R wind · C changes your shape: bird, falling, gliding (1 BIRD · 2 FALL · 3 GLIDE · SPACE as a man is the bird again · Y on a pad · the SHAPE key on a touch screen · or say fall, glide, bird) · /accept · /decline · /cpu N (birds that fly themselves) · /cpus off (none) · /cpus on (the usual ones back) · /warsim N (watch N of them) · /fly watch · /leave · /forfeit · /fly end · /fly restart · /fly skip (if you called it)'],
   ['SET', '/sound on|off · /mic on|off · /hands on|off · /quality up|down · /letters up|down · /text bigger|smaller (the size of the words) · /clear'],
@@ -9556,6 +9570,7 @@ function chatCommand(text) {
   const m = text.match(/^\/([a-z0-9?][a-z0-9?-]*)\s*(.*)$/i); if (!m) return false;   // (a hyphen inside one, as in /name-place)
   const c = m[1].toLowerCase(), arg = m[2].trim(), low = arg.toLowerCase().replace(/^@/, ''), sys = t => chatLine('', t, 'sys'), p = player;
   const run = (...a) => { AP.q.push(...a); apPump(); }, off = /^(off|no|0|false|down)$/.test(low), homes = () => WP.list.filter(w => w.h && (w.r || 0) === (realm === 'under' ? 1 : 0));
+  if (agxCommand(c, arg)) return true;   // (his own agents in the hamlet: /agent NAME, and their commands while the chat line is theirs — see AGX)
   if (globalThis.DAIMON?.command(c, arg)) return true;   // (his agents: /agents · /a NAME … · /yes · /no · /bless · /share · /send — see daimon/icarus.js)
   if (['kick', 'ban', 'ipban', 'unban', 'noclip', 'speed', 'spawn', 'summon', 'agent'].includes(c) && !MOD.admin) { sys(AUTH.s ? 'THAT IS NOT YOURS TO DO' : 'THAT IS NOT YOURS TO DO · THE KEEPER SIGNS IN FIRST'); return true; }
   if (c === 'watch' && (MATCH.phase || MATCH.seen && Date.now() < MATCH.seen.until)) { matchGhost(); return true; }   // (while a fight is on, /watch is the fight; otherwise Crete)
@@ -9690,7 +9705,7 @@ function facKeep(o) { try { if (o) localStorage.setItem('icarus.faction', JSON.s
 async function symSeal(key, ad, text) { const E = new TextEncoder(), iv = crypto.getRandomValues(new Uint8Array(12)), ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: E.encode(ad) }, key, E.encode(text))), out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12); return b64(out); }
 async function symOpen(key, ad, c) { const u = unb64(c); return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: u.subarray(0, 12), additionalData: new TextEncoder().encode(ad) }, key, u.subarray(12))); }
 const facMates = () => FAC.tag ? [...NET.peers.values()].filter(P => P.seen && P.fa === FAC.tag && P.s && performance.now() - P.s.t < 15000) : [];
-function chList() { const L = ['pub']; if (FAC.key) L.push('fac'); L.push('dm', 'ask'); if (KEEP_ON || MOD.admin) L.push('god', 'reg'); return L; }
+function chList() { const L = ['pub']; if (FAC.key) L.push('fac'); L.push('dm', 'ask'); if (agxHas()) L.push('ag'); if (KEEP_ON || MOD.admin) L.push('god', 'reg'); return L; }
 function chTarget() {   // who a message to one person goes to: whoever was last written to or heard from, else whoever he is looking at, else whoever is nearest
   let P = CH.to ? peerNamed(CH.to) : null; if (P && P.name !== CH.to) P = null;
   if (!P && typeof AIM !== 'undefined' && AIM.P && AIM.P.seen) P = AIM.P;
@@ -9700,8 +9715,8 @@ function chTarget() {   // who a message to one person goes to: whoever was last
 function chShow() {
   const row = $('chatRow'); if (!row) return; const sp = row.firstElementChild, inp = $('chatInput'); if (!chList().includes(CH.cur)) CH.cur = 'pub';
   const k = CH.cur, T = k === 'dm' ? chTarget() : null;
-  sp.textContent = k === 'fac' ? `${FAC.name} ›` : k === 'dm' ? `TO ${T ? T.name : '…'} ›` : k === 'god' ? 'THE SKY ›' : k === 'ask' ? 'THE GODS ›' : k === 'reg' ? 'REGULARS ›' : chList().length > 2 || FAC.key ? 'ALL ›' : '›'; sp.className = 'ch-' + k;
-  inp.placeholder = k === 'ask' ? 'ask the gods anything · they answer, and do it if they can' : k === 'reg' ? 'say something to your regulars · they answer you alone' : k === 'fac' ? 'say something to your faction' : k === 'dm' ? (T ? `say something to ${T.name.toLowerCase()} alone` : 'nobody to write to yet · @name first') : k === 'god' ? 'say it to everyone, from the sky' : 'say something to everyone · tab changes who hears it';
+  sp.textContent = k === 'ag' ? agxPrompt() : k === 'fac' ? `${FAC.name} ›` : k === 'dm' ? `TO ${T ? T.name : '…'} ›` : k === 'god' ? 'THE SKY ›' : k === 'ask' ? 'THE GODS ›' : k === 'reg' ? 'REGULARS ›' : chList().length > 2 || FAC.key ? 'ALL ›' : '›'; sp.className = 'ch-' + k;
+  inp.placeholder = k === 'ag' ? agxHint() : k === 'ask' ? 'ask the gods anything · they answer, and do it if they can' : k === 'reg' ? 'say something to your regulars · they answer you alone' : k === 'fac' ? 'say something to your faction' : k === 'dm' ? (T ? `say something to ${T.name.toLowerCase()} alone` : 'nobody to write to yet · @name first') : k === 'god' ? 'say it to everyone, from the sky' : 'say something to everyone · tab changes who hears it';
 }
 function chNext() { const L = chList(); CH.cur = L[(L.indexOf(CH.cur) + 1) % L.length]; chShow(); audio.sfx.menuHover?.(); }
 async function sendTo(kind, text, P) {   // sealed: to his faction ('fac'), or to one person ('dm')
@@ -9716,6 +9731,7 @@ async function sendTo(kind, text, P) {   // sealed: to his faction ('fac'), or t
 }
 function sendCh(text) {   // a line typed with a channel other than everyone chosen
   const k = CH.cur;
+  if (k === 'ag') { if (!agxHas()) { CH.cur = 'pub'; chShow(); return false; } agxSend(agxTo(), 'say', text); return true; }   // (to one of his own agents, or all of them)
   if (k === 'ask') { chatLine(`${heroName} → THE GODS`, text, 'dm me'); if (!flyAsk(text, true)) guideAsk(text, { auto: true }); return true; }   // (said to the gods themselves: they answer, and do it if they can)
   if (k === 'reg') { if (!keeperHere()) { CH.cur = 'pub'; chShow(); return false; } chatLine(`${heroName} → REGULARS`, text, 'reg me'); const L = NPCS.list.filter(C => C && C.on); if (!L.length) { sysLine('NONE OF THEM IS UP'); return true; }
     const U = ' ' + text.toUpperCase().replace(/[^A-Z0-9 ]/g, ' ') + ' ', C = L.find(c => U.includes(' ' + c.name + ' ')) || npcPick(L); npcAsk(C, heroName, NET.id, text, false, true, true); return true; }
@@ -11551,6 +11567,7 @@ function sendChat(raw) {
     return;
   }
   const t = performance.now(); if (t - CHAT.last < 700) { chatLine('', 'SLOW DOWN A LITTLE', 'sys'); return; } CHAT.last = t;
+  if (text[0] === '@' && agxAt(text)) return;   // (@NAME, where the name is one of his own agents)
   if (CH.cur !== 'pub' && sendCh(text)) return;   // (to his faction, to one person, or from the sky: see CH)
   chatLine(heroName, text, 'me'); npcHeard(heroName, NET.id, text, false);
   if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'chat', payload: { i: NET.id, n: heroName, t: text } });
@@ -11575,7 +11592,8 @@ function gotChat(m) {
 }
 $('chatInput').addEventListener('keydown', e => {
   e.stopPropagation();
-  if (e.code === 'Tab') { e.preventDefault(); const v = e.target.value, cm = v.match(/^(\/(?:fly|duel|challenge|race|message|msg|m|dm|w|whisper|tell|note|vn|file|tp|teleport|warp|follow|track|friend|mute|unmute|block|unblock|kick|ban|ipban|unban|faction invite)\s+@?)([a-z0-9 ]*)$/i);
+  if (e.code === 'Tab') { e.preventDefault(); { const ax = agxTab(e.target.value); if (ax !== null) { e.target.value = ax; return; } }   // (one of his agents' names, or a command of theirs)
+    const v = e.target.value, cm = v.match(/^(\/(?:fly|duel|challenge|race|message|msg|m|dm|w|whisper|tell|note|vn|file|tp|teleport|warp|follow|track|friend|mute|unmute|block|unblock|kick|ban|ipban|unban|faction invite)\s+@?)([a-z0-9 ]*)$/i);
     if (cm) { const T = CH.tab && CH.tab.v === v ? CH.tab : (() => { const pre = cm[2].toUpperCase().trim(), now = performance.now(); const L = [...NET.peers.values()].filter(P => P.seen && P.name && P.s && now - P.s.t < 15000 && P.name.startsWith(pre)).map(P => P.name).filter((n, i, a) => a.indexOf(n) === i).sort(); return { base: cm[1], L, i: -1 }; })();
       if (!T.L.length) { toast('NOBODY BY THAT NAME IS UP'); return; } T.i = (T.i + 1) % T.L.length; e.target.value = T.base + T.L[T.i]; T.v = e.target.value; CH.tab = T; return; }   // (Tab again: the next one, through everyone who is up)
     const at = v.match(/@([a-z0-9 ]*)$/i); if (at) { const pre = at[1].toUpperCase(), F = [...NET.peers.values()].find(P => P.seen && P.name && P.name.startsWith(pre) && P.name !== heroName); if (F) e.target.value = v.slice(0, at.index) + '@' + F.name + ' '; } else chNext(); return; }   // (Tab finishes a name)
@@ -23008,6 +23026,7 @@ function heard(text, recorded = false) {
   if (state === 'play' && godWordSet(text)) return;   // ("set my god word to …")
   if (state === 'play' && !GODM.on && godWordSaid(low, words)) { godMode(true); return; }   // (his own word for the god in him)
   if (state === 'play' && GODM.on && globalThis.DAIMON?.hear(text)) return;   // (with the god in him he speaks to his own agents, by name: "atlas, run the tests" · "yes")
+  if (state === 'play' && GODM.on && agxHear(text)) return;   // (and to the ones in his hamlet: "tell NAME to run the tests" · "ask NAME how it is going")
   if ((state === 'play' || state === 'photo') && dpHear(text)) return;   // (a direction to the camera)
   if (player.mount && words <= 4 && /\b(jump|leap|let go|get off)\b/.test(low)) return gflyLeap();
   if (flyAsk(text, false)) return;   // (how to fly: figure eights, the water, up and then down — said to the bird)
@@ -24491,16 +24510,23 @@ function qlUpdate() {
 // arrow pointing the way round to it
 function qlMarker() {
   const m = QL.mk; if (!m) return; if (!QL.mkTo) { if (m.style.display !== 'none') m.style.display = 'none'; return; }
-  const x = QL.mkTo.x, z = QL.mkTo.z, y = Math.max(terrainAt(x, z), WATER) + 40; _v.set(x, y, z).project(camera);
+  const x = QL.mkTo.x, z = QL.mkTo.z, y = Math.max(terrainAt(x, z), WATER) + 40;
+  if (!markEdge(m, x, y, z, QL.mkLabel)) placeMarker(m, x, y, z, true, '◆', QL.mkLabel, true);
+}
+// (a mark off the screen, or behind him, put at the edge as an arrow the way round to it; false if it is on the screen)
+function markEdge(m, x, y, z, label) {
+  _v.set(x, y, z).project(camera);
   const off = _v.z > 1 || Math.abs(_v.x) > 0.94 || Math.abs(_v.y) > 0.9;
-  if (!off) { m.classList.remove('edge'); placeMarker(m, x, y, z, true, '◆', QL.mkLabel, true); return; }
+  if (!off) { m.classList.remove('edge'); return false; }
+  m._wx = x; m._wy = y; m._wz = z; m._l = m._t = '';   // (a press on the arrow goes there too; and placeMarker places it afresh when it is back on the screen)
   let ex = _v.x, ey = _v.y; if (_v.z > 1) { ex = -ex; ey = -ey; } if (Math.abs(ex) < 1e-3 && Math.abs(ey) < 1e-3) ey = -1;
   const k = Math.min(0.9 / Math.max(Math.abs(ex), 1e-3), 0.84 / Math.max(Math.abs(ey), 1e-3)); ex *= k; ey *= k;
   const a = Math.atan2(-ey * innerHeight, ex * innerWidth), g = '→↘↓↙←↖↑↗'[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
   if (m.style.display) m.style.display = ''; m.classList.add('edge', 'lit');
   m.style.left = ((ex * 0.5 + 0.5) * innerWidth).toFixed(1) + 'px'; m.style.top = ((-ey * 0.5 + 0.5) * innerHeight).toFixed(1) + 'px';
-  if (m.firstChild.textContent !== g) m.firstChild.textContent = g; m._g = g; if (m.lastChild.textContent !== QL.mkLabel) m.lastChild.textContent = QL.mkLabel;
+  if (m.firstChild.textContent !== g) m.firstChild.textContent = g; m._g = g; if (m.lastChild.textContent !== label) m.lastChild.textContent = label;
   if (m.lastChild.style.transform) { m.lastChild.style.transform = ''; m._sh = 0; }
+  return true;
 }
 const qlEsc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 function qlRender() {
@@ -29540,7 +29566,7 @@ function tick(dt) {
   updateSonic(dt);   // (the sound barrier, his and everyone's, and the near misses: after the others have been moved, so the collars ride on them)
   if (realm === 'over') { updateBeacons(dt); updateAnimals(dt); updateBirds(dt); updateGods(dt); }
   else updateUnder(dt);
-  updateAgents(dt);
+  updateAgents(dt); updateAgx(dt);
   updateWind(dt);
   updateParticles(dt);
   updateDialog(dt);
@@ -30860,7 +30886,7 @@ function agGreet(H) {
 //    to put it, how to pause), for letting a computer in when its install line sends him here (#pair=…), and for an agent
 //    signing in (/authorize, OAuth): who is asking and where the answer goes, checked by the server, then ALLOW or NOT NOW.
 //    Nothing opens another page; the only time he leaves is when a sign-in he allowed hands him back to his agent.
-const AGC = { open: false, mode: 'home', want: '', pair: '', oauth: null, client: null, names: 'folder', said: '', bad: false, where: false, busy: false, boss: '', key: '', lines: [] };
+const AGC = { open: false, mode: 'home', want: '', pair: '', oauth: null, client: null, names: 'folder', talk: 'on', said: '', bad: false, where: false, busy: false, boss: '', key: '', lines: [] };
 { const q = new URLSearchParams(location.search), f = new URLSearchParams(location.hash.slice(1)), framed = self !== top;   // (never inside someone else's page)
   if (!framed && /^[0-9a-f]{64}$/.test(f.get('pair') || '')) AGC.pair = f.get('pair');
   if (!framed && q.get('client_id') && q.get('redirect_uri')) AGC.oauth = Object.fromEntries(q);
@@ -30887,13 +30913,14 @@ async function agCardOpen(mode = 'home') {
 function agCardClose() { AGC.open = false; $('agentCard').classList.add('hidden'); AGC.oauth = null; AGC.pair = ''; }
 function agCardDraw() {
   const el = $('agentCard'); if (!el || !AGC.open) return;
-  const esc = t => String(t).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`), b = (a, t, cls = '', v = '') => `<button type="button" data-a="${a}"${v ? ` data-v="${esc(v)}"` : ''}${cls ? ` class="${cls}"` : ''}${AGC.busy && /allow|deny|nm/.test(a) ? ' disabled' : ''}>${esc(t)}</button>`;
+  const esc = t => String(t).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`), b = (a, t, cls = '', v = '') => `<button type="button" data-a="${a}"${v ? ` data-v="${esc(v)}"` : ''}${cls ? ` class="${cls}"` : ''}${AGC.busy && /allow|deny|nm|tk/.test(a) ? ' disabled' : ''}>${esc(t)}</button>`;
   const ham = `${AGC.boss ? esc(AGC.boss) + "'s" : 'your'} hamlet`, said = `<p class="said${AGC.bad ? ' bad' : ''}" role="status">${esc(AGC.said)}</p>`, L = AGC.lines = [];
   const ln = (t, i = L.push(t) - 1) => `<div class="ln"><code>${esc(t)}</code>${b('copy', 'copy', '', String(i))}</div>`;
   let h = '';
   if (AGC.mode === 'pair') {
     h = `<h4>LET THIS COMPUTER IN?</h4><p>A computer that ran the Icarus install line wants to bring its agents into ${ham}.</p><p class="dim">Allow this only if you ran that line yourself just now.</p>`
       + `<h5>WHAT OTHERS SEE THEM CALLED</h5><div class="row">${b('nm', 'the folder each works in', AGC.names === 'folder' ? 'on' : '', 'folder')}${b('nm', 'a number only', AGC.names === 'plain' ? 'on' : '', 'plain')}</div>`
+      + `<h5>MAY YOU WRITE TO THEM FROM THE GAME</h5><div class="row">${b('tk', 'yes: they read my notes', AGC.talk !== 'off' ? 'on' : '', 'on')}${b('tk', 'no', AGC.talk === 'off' ? 'on' : '', 'off')}</div><p class="dim">A note reaches an agent marked as a chat message from you. Only you can send one.</p>`
       + (AGC.busy === 'done' ? `<div class="row go">${b('x', 'close')}</div>` : `<div class="row go">${b('allow', 'allow', 'hot')}${b('deny', 'not now')}</div>`) + said;
   } else if (AGC.mode === 'oauth') {
     const c = AGC.client; h = `<h4>LET ${esc((c?.name || 'AN AGENT').toUpperCase())} IN?</h4>`;
@@ -30903,7 +30930,7 @@ function agCardDraw() {
   } else {
     const H = AG.mine && AG.ham.get(AG.mine), list = H ? H.agents : [], url = agHere() + '/mcp';
     h = `<h4>YOUR AGENTS${list.length ? ' · ' + list.length : ''}</h4>`;
-    if (list.length) h += list.slice(0, 6).map(a => `<div class="ar"><span>${esc(a.n)}</span><i>${esc(a.k ? a.k.toLowerCase().slice(0, 30) : a.gone ? 'gone in' : 'resting')}</i></div>`).join('') + `<div class="row">${b('go', 'go to them', 'hot')}</div>`;
+    if (list.length) h += list.slice(0, 6).map(a => `<div class="ar"><span>${esc(a.n)}</span><i>${esc(a.k ? a.k.toLowerCase().slice(0, 30) : a.gone ? 'gone in' : 'resting')}</i></div>`).join('') + `<div class="row">${b('go', 'go to them', 'hot')}${b('watch', 'talk to them')}</div>`;
     else h += `<p class="dim">None yet. Bring one in: each gets a cabin in your hamlet and builds while it works for you.</p>`;
     h += `<h5>CLAUDE CODE OR CODEX</h5><p class="dim">run once, in a terminal on the computer they work on</p>` + ln(`curl -fsSL ${agHere()}/connect.sh | sh`);
     h += `<h5>CLAUDE APPS, CURSOR, ANY MCP APP</h5><p class="dim">add as a custom connector, then sign in when it asks</p>` + ln(url);
@@ -30921,10 +30948,12 @@ async function agCardAct(a, v) {
   if (a === 'pause' || a === 'remove') { const t = a === 'pause' ? 'touch ~/.icarus/off' : 'sh ~/.icarus/install.sh remove'; return say((await copy(t) ? 'Copied: ' : 'In a terminal: ') + t + (a === 'pause' ? ' (delete that file to start again)' : ' (the houses they built stay)')); }
   if (a === 'go') { agCardClose(); const H = AG.mine && AG.ham.get(AG.mine); if (H) { if (H.site === undefined) H.site = agSite(H.o) || null; if (H.site && realm === 'over' && state === 'play') { startWarp(H.site.x, H.site.z); toast('TO YOUR AGENTS'); } else agCommand(''); } return; }
   if (a === 'nm') { AGC.names = v === 'plain' ? 'plain' : 'folder'; return agCardDraw(); }
+  if (a === 'tk') { AGC.talk = v === 'off' ? 'off' : 'on'; return agCardDraw(); }
+  if (a === 'watch') { agCardClose(); chatCommand('/agent'); return; }
   if (AGC.mode === 'pair' && (a === 'allow' || a === 'deny')) {
     if (a === 'deny') { AGC.busy = 'done'; return say('Nothing was allowed.'); }
     AGC.busy = true; say('Letting them in…');
-    const r = await agApi('mcp', { op: 'pair', code: WORLD.code, p: AGC.pair, names: AGC.names });
+    const r = await agApi('mcp', { op: 'pair', code: WORLD.code, p: AGC.pair, names: AGC.names, talk: AGC.talk });
     if (r.ok) { AGC.busy = 'done'; AGC.boss = r.j?.boss || AGC.boss; say('Allowed. Your agents are moving in: the terminal finishes by itself.'); AGW.until = performance.now() + 15 * 60000; AGW.t = 0; }
     else { AGC.busy = false; say(r.status === 404 ? 'The world does not know you yet: fly for a moment, then press allow again.' : r.status === 429 ? 'Too many tries. Wait a minute and press allow again.' : 'The world did not answer. Press allow again.', true); }
     return;
@@ -30977,6 +31006,239 @@ async function agCommand(arg) {
   sys(`YOUR AGENTS · ${H.agents.map(a => `${a.n}${a.k ? ' (' + a.k.toUpperCase().slice(0, 36) + ')' : a.gone ? ' (GONE IN)' : ''}`).join(' · ')}`);
   sys(`${homes} LOG ${homes === 1 ? 'HOME' : 'HOMES'}${st.done.includes('shrine') ? ` · THE SHRINE${H.god ? ' TO ' + H.god.toUpperCase() : ''}` : ''}${st.now ? ` · NOW: ${st.now.startsWith('post:') ? 'THE POST OF ' + st.now.slice(5).toUpperCase() : st.now === 'home' ? 'A LOG HOME' : 'THE ' + st.now.toUpperCase()} ${Math.round(st.f * 100)}%` : ''}`);
   if (H.site && realm === 'over') apMark({ x: H.site.x, y: H.site.y + 4, z: H.site.z, n: 'YOUR AGENTS' });
+}
+// ── Talking to your agents, and seeing what they are at. With the god in him his own agents are marked through the
+//    world wherever they are; a panel says of each what it is doing, its goal and how far through its todos it is, the
+//    model and mode it says it runs in, how long it has been at it, what it has built, and whether it is waiting on
+//    him; and he can go to any of them. In the chat he talks to one as he would in its own terminal: @NAME and what he
+//    wants to say, or /agent NAME to stay with it (the line then reads NAME ›; Tab goes on round as before). What it
+//    answers comes back into the chat, under the agents tab.
+//      What this can and cannot be: a game cannot turn a running agent's dials. Its model, its permission mode and its
+//    effort are set in its own terminal, by whoever sits at it. So every command here (/goal, /todo, /plan, /mode,
+//    /effort, /model, /compact, /review, /test, /commit, /stop … the ones a person has in Claude Code) goes as a
+//    plainly worded REQUEST: a note the agent is handed at its next step, and weighs for itself. The chat says so each
+//    time. What is real here: choosing who he talks to, going to them, and the panel, which shows what each agent
+//    itself reported (counts and names of settings; never its code or what it was asked).
+//      The notes go through api/_mcp.js (tell · hear) with his travel code, so only he can write to his agents, and
+//    the wording of each request is the server's (api/_talk.js). An agent he has through a daimon hub is spoken to with
+//    that hub's own /a instead (daimon/icarus.js: nothing of it is changed).
+const AGX = { st: new Map(), sel: '', to: '', since: 0, first: true, pollT: 0, busy: false, hot: 0, cmds: null, pin: false, hide: false, god: false, has: false, marks: new Map(), far: null, edge: null, picked: false, drawT: 0, tab: null, said: new Map(), err: '' };
+try { AGX.since = +localStorage.getItem('icarus.agx.since') || 0; } catch {} AGX.first = !AGX.since;
+const AGX_NAMES = ['goal', 'todo', 'plan', 'mode', 'effort', 'model', 'compact', 'clear', 'review', 'security', 'simplify', 'test', 'verify', 'commit', 'diff', 'stop', 'resume', 'status', 'recap', 'context', 'usage', 'skills', 'subagents', 'mcp', 'permissions', 'memory', 'init', 'btw', 'loop'];
+const AGX_ALSO = { todos: 'todo', tasks: 'todo', goals: 'goal', 'security-review': 'security', tests: 'test', pause: 'stop', continue: 'resume', cost: 'usage', skill: 'skills', agents: 'subagents', subtask: 'subagents', remember: 'memory', 'code-review': 'review' };   // (the same names the server keeps: api/_talk.js)
+const AGX_SET = ['plan', 'mode', 'effort', 'model', 'compact', 'clear'];   // (dials only its own terminal has: asked for, never turned from here)
+const agxFlat = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const agxStr = (v, n) => String(v || '').replace(/[^A-Za-z0-9 .,'!?:;()\/+\-_#&]/g, '').slice(0, n);
+const agxHam = () => AG.mine && AG.ham.get(AG.mine) || AG.ham.get(AG_DMN) || null;
+const agxList = () => agxHam()?.agents || [];
+function agxHas() { try { return agxList().length > 0; } catch { return false; } }   // (asked while the page is still starting, too)
+const agxLine = t => chatLine('', t, 'ag sys');
+const agxAgo = ms => { const m = Math.max(0, Math.round(ms / 60000)); return m < 1 ? 'a moment' : m < 60 ? m + 'm' : m < 1440 ? `${Math.floor(m / 60)}h ${m % 60}m` : Math.floor(m / 1440) + 'd'; };
+function agxFind(ref) { const k = agxFlat(ref), L = agxList(); if (!k) return null; return L.find(a => agxFlat(a.n) === k) || L.find(a => agxFlat(a.n).startsWith(k)) || null; }
+// who he is talking to: the one he chose, else the one the panel has open, else the first of them
+function agxTo() { if (AGX.to === '*') return '*'; const L = agxList(); if (!L.some(a => a.n === AGX.to)) AGX.to = (L.find(a => a.n === AGX.sel) || L[0] || { n: '' }).n; return AGX.to; }
+const agxPrompt = () => { const t = agxTo(); return `${t === '*' ? 'ALL AGENTS' : t || 'AGENT'} ›`; };
+const agxHint = () => { const t = agxTo(); return `tell ${t === '*' ? 'all your agents' : (t || 'your agent').toLowerCase()} anything · /help: what it can be asked · tab changes who hears it`; };
+const agxWaits = (P, now) => !!P && P.wait > 0 && now - P.wait < 12 * 3600e3;
+function agxDoing(a, P, now) {   // what one of them is at, in a few words
+  if (a.gone) return 'gone in'; if (agxWaits(P, now)) return 'waiting on you';
+  return now - a.hb > AG_ACTIVE ? `quiet ${agxAgo(now - a.hb)}` : a.k || 'at work';
+}
+// where one of them is: its figure if it has one, else its own door
+function agxSpot(a, out = {}) {
+  const H = agxHam(); if (!H || !a) return null; if (H.site === undefined) H.site = agSite(H.o) || null; if (!H.site) return null;
+  const f = H.figs.get(a.id); if (f && f.set) { out.x = f.x; out.y = f.y; out.z = f.z; return out; }
+  const [cu, cv] = agCabinAt(H, Math.max(0, H.agents.indexOf(a))); agAt(H, cu + 3, cv + 4.4, out); return out;
+}
+function agxGo(a) {
+  if (!a) return agxLine('GO TO WHICH · /go NAME');
+  if (realm !== 'over' || state !== 'play') return agxLine('NOT FROM HERE');
+  const s = agxSpot(a); if (!s) return agxLine('THEIR HAMLET HAS NO GROUND YET');
+  AGX.sel = a.n; AGX.picked = true; if (CHAT.open) closeChat();
+  if (GODM.on) { if (!godDash(s.x, s.z, s.y + 30)) toast(`YOU ARE WITH ${a.n}`); } else { startWarp(s.x, s.z); toast(`TO ${a.n}`); }
+}
+// ───────── what the world says of them, for him alone, and what they have answered
+async function agxPoll() {
+  if (AGX.busy || !WORLD.code) return; AGX.busy = true;
+  const r = await agApi('mcp', { op: 'hear', code: WORLD.code, since: AGX.since, cmds: AGX.cmds ? undefined : 1 }); AGX.busy = false;
+  if (!r.ok || !r.j) { AGX.err = r.status === 404 ? 'the world does not know you yet' : r.status === 429 ? '' : 'the world is not answering'; return; }
+  AGX.err = ''; AGX.okT = performance.now(); const j = r.j, now = +j.now || Date.now();
+  if (Array.isArray(j.cmds)) AGX.cmds = j.cmds.filter(c => c && typeof c.name === 'string').slice(0, 90).map(c => ({ name: agxStr(c.name, 20).toLowerCase(), kind: c.kind === 'set' ? 'set' : 'req', use: String(c.use || '').replace(/[<>]/g, '').slice(0, 60), what: agxStr(c.what, 90), of: c.of ? agxStr(c.of, 20) : '' }));
+  AGX.st.clear();
+  for (const a of Array.isArray(j.agents) ? j.agents.slice(0, 16) : []) if (a && typeof a.n === 'string')
+    AGX.st.set(agxStr(a.n, 12), { act: agxStr(a.act, 12), wait: +a.wait || 0, ws: +a.ws || 0, hb: +a.hb || 0, goal: agxStr(a.goal, 160), gb: a.gb === 'boss' ? 'boss' : a.gb === 'self' ? 'self' : '', can: agxStr(a.can, 200), m: agxStr(a.m, 40), pm: agxStr(a.pm, 20), ef: agxStr(a.ef, 8), td: a.td | 0, tn: a.tn | 0, fl: a.fl | 0, u: +a.u || 0, d: a.d | 0, hears: !!a.hears, pend: a.pend | 0 });
+  let top = AGX.since; const H = agxHam();
+  for (const n of Array.isArray(j.notes) ? j.notes.slice(0, 60) : []) { const at = +n.at || 0, who = agxStr(n.n, 12), t = agxStr(n.t, 280); if (at <= AGX.since || !who || !t) continue; top = Math.max(top, at);
+    if (AGX.first && now - at > 600e3) continue;   // (the first look on a device: not a day of old answers)
+    chatLine(who, t, 'ag'); toast(`${who} ANSWERED`); (audio.sfx.chat || audio.sfx.ui)?.();
+    const a = H && H.agents.find(x => x.n === who), f = a && H.figs.get(a.id); if (f) { f.say = t.toUpperCase().slice(0, 60); f.sayT = time; } }   // (and it says it over its own head, if he is there to see)
+  AGX.first = false; if (top > AGX.since) { AGX.since = top; try { localStorage.setItem('icarus.agx.since', String(top)); } catch {} }
+  AGX.drawT = 0;
+}
+// ───────── sending: a line as typed (kind 'say'), or a command (the server words it)
+async function agxSend(to, kind, text) {
+  const all = to === '*', A = all ? null : agxFind(to); text = cleanText(text);
+  if (!all && !A) { agxLine(agxList().length ? `NO AGENT OF YOURS IS CALLED ${String(to || '?').toUpperCase().slice(0, 14)} · YOU HAVE ${agxList().map(a => a.n).join(' · ')}` : 'NO AGENT OF YOURS LIVES HERE YET · /hamlet connect BRINGS YOUR CLAUDE AND CODEX AGENTS IN'); return false; }
+  if (kind === 'say' && !text) return false;
+  const shown = kind === 'say' ? text : `/${kind}${text ? ' ' + text : ''}`, name = all ? 'ALL AGENTS' : A.n, what = AGX.cmds?.find(c => c.name === kind)?.what || kind;
+  if (A && A.loc) { chatLine(`${heroName} → ${name}`, shown, 'ag me'); chatCommand(`/a ${A.n} ${kind === 'say' ? text : `A request from your owner (${what})${text ? ': ' + text : ''}`}`); return true; }   // (one he has through a hub: said through the hub)
+  if (!WORLD.code) { agxLine('FLY ONCE FIRST: YOUR AGENTS ARE TIED TO YOUR TRAVELLER'); return false; }
+  chatLine(`${heroName} → ${name}`, shown, 'ag me');
+  const r = await agApi('mcp', { op: 'tell', code: WORLD.code, to: all ? '*' : A.n, kind, text }), j = r.j || {};
+  if (!r.ok || !j.ok) { const e = j.error;
+    agxLine(e === 'usage' ? `NOT SENT · TYPE IT LIKE THIS: ${String(j.use || '/' + kind).toUpperCase()}` : e === 'full' ? `NOT SENT · ${name} HAS NOT READ YOUR LAST NOTES YET: IT READS THEM AT ITS NEXT STEP` : r.status === 429 ? 'NOT SENT · SLOW DOWN A LITTLE' : e === 'no such agent' ? `NOT SENT · THE WORLD KNOWS NO AGENT OF YOURS CALLED ${name}` : e === 'no such command' ? `NOT SENT · /${kind.toUpperCase()} IS NOT ONE OF THEIRS · /help` : r.status === 404 ? 'NOT SENT · THE WORLD DOES NOT KNOW YOU YET: FLY A MOMENT' : 'NOT SENT · THE WORLD IS NOT ANSWERING');
+    return false; }
+  AGX.hot = performance.now() + 600e3; AGX.pollT = Math.min(AGX.pollT, 3);
+  // what became of it, said in full the first time and briefly after
+  const key = name + (kind === 'say' ? '' : '/'), last = AGX.said.get(key), now = performance.now(), full = last === undefined || now - last > 300e3, deaf = !all && Array.isArray(j.hears) && !j.hears.includes(A.n), quiet = !all && Date.now() - A.hb > AG_ACTIVE;
+  const when = deaf ? 'ITS COMPUTER HAS AN OLDER SCRIPT THAT CANNOT HEAR THE GAME: RUN THE INSTALL LINE THERE AGAIN (/hamlet connect) · AN AGENT ON MCP READS THIS WHEN IT LOOKS AT ITS INBOX' : quiet ? 'IT IS QUIET NOW: IT READS THIS WHEN IT NEXT TAKES A STEP' : 'IT READS THIS AT ITS NEXT STEP';
+  if (kind === 'say') { if (deaf || full) agxLine(`SENT TO ${name} · ${when}`); }
+  else agxLine(`A REQUEST, NOT A SWITCH · ${name} ${all ? 'DECIDE' : 'DECIDES'}${j.kind === 'set' ? ' · THE REAL SETTING IS ONLY IN ITS OWN TERMINAL' : ''}${deaf || full ? ' · ' + when : ''}`);
+  AGX.said.set(key, now); return true;
+}
+// what one of them has reported, as lines of chat (/status, /goal, /model, /todo with nothing after)
+function agxReport(a) {
+  const P = AGX.st.get(a.n), now = Date.now(); let t = `${a.n} · ${agxDoing(a, P, now).toUpperCase()}`;
+  if (P) { if (P.goal) t += ` · GOAL: ${P.goal.toUpperCase()}${P.gb === 'boss' ? ' (YOURS)' : ''}`; if (P.tn) t += ` · TODO ${P.td}/${P.tn}`; if (P.m) t += ` · ${P.m.toUpperCase()}`; if (P.pm) t += ` · MODE ${P.pm.toUpperCase()}`; if (P.ef) t += ` · EFFORT ${P.ef.toUpperCase()}`; if (P.fl) t += ` · ${P.fl} FILES`; if (P.can) t += ` · HAS: ${P.can.toUpperCase()}`; if (P.pend) t += ` · ${P.pend} OF YOUR NOTES NOT YET READ`; }
+  else if (!a.loc) t += ' · IT HAS REPORTED NOTHING MORE YET';
+  agxLine(t + ' · (AS IT REPORTED)');
+}
+function agxDo(c, arg, to = agxTo()) {   // one of the commands, for whoever he is talking to
+  const k = AGX_ALSO[c] || c, A = to === '*' ? null : agxFind(to), bare = !String(arg || '').trim();
+  if (to !== '*' && !A) return agxSend(to, k, arg);
+  if (bare && ['status', 'goal', 'model', 'todo', 'mode', 'effort'].includes(k)) { agxRoster(A ? [A] : agxList()); if (k === 'goal' || k === 'mode' || k === 'effort') { agxLine(k === 'goal' ? '/goal WHAT GIVES IT ONE · /goal clear LIFTS IT' : k === 'mode' ? '/mode plan · default · auto ASKS IT TO WORK THAT WAY (ITS REAL MODE IS SET IN ITS TERMINAL)' : '/effort low · medium · high · max ASKS FOR THAT MUCH CARE (ITS REAL SETTING IS IN ITS TERMINAL)'); return true; } }
+  return agxSend(to, k, arg);
+}
+function agxHelp() {
+  const C = AGX.cmds, use = k => C ? C.filter(c => !c.of && c.kind === k).map(c => c.use).join(' · ') : AGX_NAMES.filter(n => AGX_SET.includes(n) === (k === 'set')).map(n => '/' + n).join(' · ');
+  agxLine('YOUR AGENTS · @NAME AND WHAT YOU WANT TO SAY · /agent NAME STAYS WITH ONE (THEN JUST TYPE) · /agent all · /agent off · TAB FINISHES A NAME OR A COMMAND');
+  agxLine('REAL, HERE · /go NAME (FLY TO IT) · /who · /panel · THE PANEL SHOWS WHAT EACH AGENT ITSELF REPORTED');
+  agxLine(`REQUESTS · A NOTE IT IS HANDED AT ITS NEXT STEP, AND WEIGHS FOR ITSELF · ${use('req').toUpperCase()}`);
+  agxLine(`ASKED FOR, NOT SET · ONLY ITS OWN TERMINAL TURNS THESE DIALS · ${use('set').toUpperCase()}`);
+  if (!C && WORLD.code) agxPoll();
+}
+async function agxRoster(L = agxList()) {   // (asked of the world first, if what is known here is old)
+  if (!L.length) return agxLine('NO AGENT OF YOURS LIVES HERE YET · /hamlet connect BRINGS YOUR CLAUDE AND CODEX AGENTS IN');
+  if (WORLD.code && L.some(a => !a.loc) && (!AGX.st.size || performance.now() - (AGX.okT || 0) > 12000)) await agxPoll(); for (const a of L) agxReport(a); }
+// a name at the start of what he typed: the longest of theirs it begins with
+function agxLead(s) {
+  const U = String(s || '').trim(); let best = null;
+  for (const a of agxList()) { const m = new RegExp('^' + a.n.split(' ').map(w => w.replace(/[^A-Z0-9-]/g, '')).filter(Boolean).join('[ _]*') + '(?![A-Za-z0-9])[:,]?\\s*', 'i').exec(U); if (m && (!best || a.n.length > best.a.n.length)) best = { a, rest: U.slice(m[0].length) }; }
+  if (!best) { const w = U.split(/\s+/)[0] || '', L = agxList().filter(a => w.length >= 2 && agxFlat(a.n).startsWith(agxFlat(w))); if (L.length === 1) best = { a: L[0], rest: U.slice(w.length).replace(/^[:,]?\s*/, '') }; }
+  return best;
+}
+function agxSay(to, rest) {   // to one of them: a line, or a command of theirs
+  const m = /^\/([a-z?][a-z-]*)\s*(.*)$/i.exec(rest); if (!m) return agxSend(to, 'say', rest);
+  const c = m[1].toLowerCase(); if (c === 'go') return agxGo(agxFind(to)); if (c === 'help' || c === '?') return agxHelp();
+  return AGX_NAMES.includes(AGX_ALSO[c] || c) ? agxDo(c, m[2], to) : agxLine(`/${c.toUpperCase()} IS NOT ONE OF THEIRS · /help`);
+}
+function agxPick(to) { AGX.to = to; if (to !== '*') { AGX.sel = to; AGX.picked = true; } CH.cur = 'ag'; chShow(); if (WORLD.code && performance.now() > AGX.hot) { AGX.hot = performance.now() + 120e3; AGX.pollT = 0; } }
+// what he types: /agent … (and /ag); and, while the chat line is theirs, their own commands
+function agxCommand(c, arg) {
+  const L = agxList(), low = arg.toLowerCase().trim(), w0 = low.split(/\s+/)[0] || '';
+  if (c === 'ag' || c === 'agent' && (!MOD.admin || /^(all|off|panel|go|who)$/.test(w0) || !!agxLead(arg))) {   // (/agent ANYTHING ELSE is the keeper's own, as it was)
+    if (/^(off|close|hide|x|out)$/.test(low)) { AGX.pin = false; AGX.hide = true; if (CH.cur === 'ag') { CH.cur = 'pub'; chShow(); } return true; }
+    if (low === 'help' || low === '?') { agxHelp(); return true; }
+    if (!L.length) { agxLine('NO AGENT OF YOURS LIVES HERE YET · /hamlet connect BRINGS YOUR CLAUDE AND CODEX AGENTS IN'); return true; }
+    if (low === 'panel') { AGX.pin = !AGX.pin; AGX.hide = !AGX.pin; AGX.drawT = 0; return true; }
+    if (low === 'who' || low === 'list') { agxRoster(); return true; }
+    if (w0 === 'go') { agxGo(agxLead(arg.trim().slice(2))?.a || agxFind(AGX.sel)); return true; }
+    if (!low) { AGX.pin = true; AGX.hide = false; agxPick(agxTo() || L[0].n); agxRoster(); agxLine(`TALKING TO ${agxTo() === '*' ? 'ALL OF THEM' : agxTo()} · JUST TYPE · /help: WHAT IT CAN BE ASKED · /agent off`); return true; }
+    if (w0 === 'all' || w0 === '*') { agxPick('*'); const rest = arg.trim().slice(w0.length).trim(); if (rest) agxSay('*', rest); else agxLine('TALKING TO ALL YOUR AGENTS'); return true; }
+    const F = agxLead(arg); if (!F) { agxLine(`NO AGENT OF YOURS IS CALLED ${w0.toUpperCase().slice(0, 14)} · YOU HAVE ${L.map(a => a.n).join(' · ')}`); return true; }
+    agxPick(F.a.n); if (F.rest) agxSay(F.a.n, F.rest); else { agxLine(`TALKING TO ${F.a.n} · JUST TYPE · /help: WHAT IT CAN BE ASKED`); agxRoster([F.a]); } return true;
+  }
+  if (CH.cur !== 'ag' || !L.length) return false;
+  if (c === 'help' || c === 'h' || c === '?' || c === 'commands') { agxHelp(); agxLine('THE GAME’S OWN COMMANDS: TAB TO ANOTHER LINE FIRST, OR /all'); return true; }
+  if (c === 'who' || c === 'list') { agxRoster(); return true; }
+  if (c === 'panel') { AGX.pin = !AGX.pin; AGX.hide = !AGX.pin; AGX.drawT = 0; return true; }
+  if (c === 'go') { agxGo(arg.trim() ? agxLead(arg)?.a : agxFind(agxTo() === '*' ? AGX.sel : agxTo())); return true; }
+  if (AGX_NAMES.includes(AGX_ALSO[c] || c)) { agxDo(c, arg); return true; }
+  return false;
+}
+// @NAME … in what he says: one of his own agents (a flier of that very name comes first)
+function agxAt(text) {
+  const body = text.slice(1); if (/^(agents|all agents)\b/i.test(body)) { const rest = body.replace(/^(agents|all agents)[:,]?\s*/i, ''); if (!agxList().length) return false; if (rest) agxSay('*', rest); else agxPick('*'); return true; }
+  const F = agxLead(body); if (!F || [...NET.peers.values()].some(P => P.seen && P.name === F.a.n && P.s && performance.now() - P.s.t < 15000)) return false;
+  if (F.rest) agxSay(F.a.n, F.rest); else { agxPick(F.a.n); agxLine(`TALKING TO ${F.a.n} · JUST TYPE`); } return true;
+}
+// said aloud with the god in him: "tell NAME to …", "ask NAME …", "agent NAME …"
+function agxHear(text) {
+  const m = /^(?:tell|ask|agent)\s+(.+)$/i.exec(String(text || '').trim().replace(/[.!?]+$/, '')); if (!m || !agxList().length) return false;
+  const F = agxLead(m[1]); if (!F || !F.rest) return false; agxSend(F.a.n, 'say', F.rest.replace(/^to\s+/i, '')); return true;
+}
+// Tab in the chat line: a name after /agent or @, a command of theirs after /
+function agxTab(v) {
+  const T = AGX.tab && AGX.tab.v === v ? AGX.tab : null, step = (base, L) => { const S = T || { base, L, i: -1 }; if (!S.L.length) return null; S.i = (S.i + 1) % S.L.length; S.v = S.base + S.L[S.i]; AGX.tab = S; return S.v; };
+  if (T) return step();
+  let m = /^(\/(?:ag|agent)\s+(?:go\s+)?@?)([a-z0-9 -]*)$/i.exec(v); if (m) { const pre = agxFlat(m[2]); return step(m[1], agxList().map(a => a.n).concat(/go\s+@?$/i.test(m[1]) ? [] : ['all']).filter(n => agxFlat(n).startsWith(pre)).map(n => n + ' ')); }
+  m = /^(@)([a-z0-9 -]*)$/i.exec(v); if (m && agxList().length) { const pre = agxFlat(m[2]), L = agxList().map(a => a.n).filter(n => agxFlat(n).startsWith(pre)); if (L.length && ![...NET.peers.values()].some(P => P.seen && P.name && pre && P.name.startsWith(m[2].toUpperCase()))) return step('@', L.map(n => n + ' ')); }
+  m = /^((?:@[a-z0-9 -]+\s+)?\/)([a-z-]*)$/i.exec(v); if (m && (CH.cur === 'ag' || m[1].length > 1 && agxLead(m[1].slice(1, -1)))) { const pre = m[2].toLowerCase(); return step(m[1], AGX_NAMES.concat(['help', 'go', 'who', 'panel']).filter(n => n.startsWith(pre)).map(n => n + ' ')); }
+  return null;
+}
+// ───────── the marks: with the god in him, each of his agents is marked wherever it is (a press on one goes to it)
+function agxMarks() {
+  const H = agxHam(), on = GODM.on && state === 'play' && realm === 'over' && !!H && H.agents.length > 0;
+  if (!on) { if (AGX.marks.size || AGX.far) { for (const el of AGX.marks.values()) el.remove(); AGX.marks.clear(); AGX.far?.remove(); AGX.far = null; AGX.edge?.remove(); AGX.edge = null; } return; }
+  if (H.site === undefined) H.site = agSite(H.o) || null; const S = H.site; if (!S) return;
+  const now = Date.now(), cam = camera.position, P0 = {}, seen = new Set(), mk = () => { const el = document.createElement('div'); el.className = 'mk'; el.innerHTML = '<b></b><span></span>'; el.style.display = 'none'; $('markers').appendChild(el); return el; };
+  const hd = Math.hypot(S.x - cam.x, S.z - cam.z);
+  if (!AGX.far) AGX.far = mk();
+  placeMarker(AGX.far, S.x, S.y + 30, S.z, hd >= 9000, '⌂', `YOUR AGENTS · ${fmtDist(hd).toUpperCase()}`, true);   // (nearer than that the hamlet says so itself)
+  for (const a of H.agents) { const s = agxSpot(a, P0); if (!s) continue; seen.add(a.id);
+    let el = AGX.marks.get(a.id); if (!el) { el = mk(); AGX.marks.set(a.id, el); el.addEventListener('click', () => { AGX.sel = el._n; AGX.picked = true; if (AGX.to !== '*') AGX.to = el._n; AGX.drawT = 0; }); } el._n = a.n;
+    const P = AGX.st.get(a.n), wait = agxWaits(P, now), f = H.figs.get(a.id), named = !!f && f.el.style.display !== 'none', d = Math.hypot(s.x - cam.x, s.z - cam.z);
+    placeMarker(el, s.x, s.y + 7, s.z, !named && (hd < 2500 || wait || a.n === AGX.sel), wait ? '!' : '◆', `${a.n} · ${agxDoing(a, P, now).toUpperCase().slice(0, 34)} · ${fmtDist(d).toUpperCase()}`, wait || a.n === AGX.sel); }
+  for (const [id, el] of AGX.marks) if (!seen.has(id)) { el.remove(); AGX.marks.delete(id); }
+  // the one waiting on him (else the one he has chosen), when it is off the screen: an arrow at the edge, the way round to it
+  if (!AGX.edge) { AGX.edge = mk(); AGX.edge.classList.add('wp'); }
+  const T = H.agents.find(a => agxWaits(AGX.st.get(a.n), now)) || H.agents.find(a => a.n === AGX.sel), ts = T && agxSpot(T, P0), E = AGX.edge;
+  if (!ts || !markEdge(E, ts.x, ts.y + 7, ts.z, `${agxWaits(AGX.st.get(T.n), now) ? '! ' : ''}${T.n} · ${fmtDist(Math.hypot(ts.x - cam.x, ts.z - cam.z)).toUpperCase()}`)) { if (E.style.display !== 'none') E.style.display = 'none'; }   // (its words short: an arrow's are cut at 26 letters)
+}
+// ───────── the panel: each of them, and for the one chosen everything it has said of itself
+function agxDraw() {
+  const el = $('agx'); if (!el) return;
+  const H = agxHam(), L = H ? H.agents : [], show = (GODM.on && !AGX.hide || AGX.pin) && state === 'play' && L.length > 0 && !MATCH.phase && !AGC.open && !MENU.open;
+  if (el.classList.contains('hidden') === show) el.classList.toggle('hidden', !show); if (!show) return;
+  const now = Date.now(), esc = t => String(t).replace(/[&<>"']/g, ch => `&#${ch.charCodeAt(0)};`), b = (a, t, v = '', cls = '') => `<button type="button" data-a="${a}" data-v="${esc(v)}"${cls ? ` class="${cls}"` : ''}>${esc(t)}</button>`;
+  if (!AGX.picked || !L.some(a => a.n === AGX.sel)) AGX.sel = (L.find(a => agxWaits(AGX.st.get(a.n), now)) || L.find(a => !a.gone && now - a.hb < AG_ACTIVE) || L[0]).n;   // (until he chooses one himself: the one waiting on him, else one at work)
+  let h = `<h4>YOUR AGENTS · ${L.length}</h4>`;
+  for (const a of L.slice(0, 12)) { const P = AGX.st.get(a.n), sel = a.n === AGX.sel, wait = agxWaits(P, now), live = !a.gone && now - a.hb < AG_ACTIVE;
+    h += `<div class="ar${wait ? ' wt' : ''}">${b('sel', a.n, a.n, sel ? 'on' : '')}<i>${esc(agxDoing(a, P, now))}</i></div>`; if (!sel) continue;
+    if (wait) h += `<p class="wt">waiting on you · ${agxAgo(now - P.wait)}</p>`;
+    if (P && P.goal) h += `<p>goal · ${esc(P.goal)}${P.gb === 'boss' ? ' (yours)' : ''}</p>`; else h += `<p class="dim">no goal reported · /goal gives it one</p>`;
+    if (P && P.tn) { const n = Math.min(12, P.tn), f = Math.round(P.td / P.tn * n); h += `<p>todo ${P.td}/${P.tn} [${'#'.repeat(f)}${'-'.repeat(n - f)}]</p>`; }
+    { const t = P ? [P.m, P.pm && 'mode ' + P.pm, P.ef && 'effort ' + P.ef].filter(Boolean) : []; h += t.length ? `<p>${esc(t.join(' · '))}</p>` : a.loc ? '' : `<p class="dim">model and mode not reported</p>`; }
+    { const t = [live ? `at it ${agxAgo(now - (P && P.ws || a.s))}` : a.gone ? 'gone in' : `quiet ${agxAgo(now - a.hb)}`, `${Math.round(agTimber(a, now))} timbers laid`, `${a.d} ${a.d === 1 ? 'turn' : 'turns'} done`]; if (P && P.fl) t.push(`${P.fl} files`); h += `<p>${esc(t.join(' · '))}</p>`; }
+    if (P && P.can) h += `<p class="dim">has · ${esc(P.can)}</p>`;
+    if (P && P.pend) h += `<p class="dim">${P.pend} of your notes not yet read</p>`;
+    if (P && !P.hears && !a.loc) h += `<p class="dim">cannot hear the game yet: run the install line on its computer again</p>`;
+    h += `<div class="row">${b('go', 'go')}${b('talk', 'talk')}${b('ask', 'status', 'status')}${b('ask', 'stop', 'stop')}${b('ask', 'review', 'review')}${b('ask', 'test', 'test')}${b('ask', 'commit', 'commit')}</div>`; }
+  { let u = 0; for (const a of L) u += agTimber(a, now); const st = agStanding(u), homes = st.done.filter(w => w === 'home').length;
+    h += `<p class="dim">built · ${homes} log ${homes === 1 ? 'home' : 'homes'}${st.done.includes('shrine') ? ' · the shrine' : ''}${st.done.includes('tower') ? ' · the tower' : ''}${st.done.includes('hall') ? ' · the hall' : ''}${st.now ? ` · now ${st.now.startsWith('post:') ? 'a post' : st.now === 'home' ? 'a log home' : 'the ' + st.now} ${Math.round(st.f * 100)}%` : ''}</p>`; }
+  h += `<p class="dim">go and talk are yours · the rest are requests: it decides</p>${AGX.err ? `<p class="wt">${esc(AGX.err)}</p>` : ''}<div class="row">${b('x', 'hide')}</div>`;
+  if (el._h !== h) { el._h = h; el.innerHTML = h; }
+}
+function agxAct(a, v) {
+  if (a === 'x') { AGX.pin = false; AGX.hide = true; AGX.drawT = 0; return; }
+  if (a === 'sel') { AGX.sel = v; AGX.picked = true; if (AGX.to !== '*') AGX.to = v; AGX.drawT = 0; return; }
+  const A = agxFind(AGX.sel); if (!A) return;
+  if (a === 'go') return agxGo(A);
+  if (a === 'talk') { agxPick(A.n); openChat(); chatFilter('ag'); return; }
+  if (a === 'ask') agxDo(v, '', A.n);
+}
+$('agx').addEventListener('pointerdown', e => e.stopPropagation());
+$('agx').addEventListener('click', e => { e.stopPropagation(); const B = e.target.closest('button[data-a]'); if (!B) return; B.blur(); audio.sfx.ui?.(); agxAct(B.dataset.a, B.dataset.v || ''); });
+// every frame: the marks; twice a second the panel; and the world is asked only while he is looking or waiting for an answer
+function updateAgx(dt) {
+  const L = agxList(), has = L.length > 0;
+  if (has !== AGX.has) { AGX.has = has; $('chat').classList.toggle('hasag', has); if (!has && CH.cur === 'ag') { CH.cur = 'pub'; chShow(); } if (!has && CHAT.f === 'ag') chatFilter('all'); }
+  if (GODM.on !== AGX.god) { AGX.god = GODM.on; AGX.drawT = 0; if (GODM.on) { AGX.hide = false; AGX.pollT = 0; if (has && !AGX.hinted) { AGX.hinted = true; chatLine('', 'YOUR AGENTS ARE MARKED · PRESS ONE TO GO TO IT · T, THEN @NAME, TALKS TO IT', 'ag sys'); } } }
+  agxMarks();
+  if ((AGX.drawT -= dt) <= 0) { AGX.drawT = 0.5; agxDraw(); }
+  if (!has || !WORLD.code || document.hidden || L.every(a => a.loc)) return;
+  const hot = performance.now() < AGX.hot, watching = (GODM.on && !AGX.hide || AGX.pin) && state === 'play' || CHAT.open && CH.cur === 'ag';
+  if ((hot || watching) && (AGX.pollT -= dt) <= 0) { AGX.pollT = hot ? 5 : 10; agxPoll(); }
 }
 
 // ── Words in the picture. Whatever has something of its own to put on the screen — a name beside a bird, a count, a word
@@ -35297,7 +35559,7 @@ setTimeout(() => {
   warmPrograms();
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { agBuild, agWeb, agReach, agSpans, agWool, agStill, agNear, FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, RR, rrJoin, rrMine, rrFetch, rrPlace, rrLayout, gotRjoin, get RING_DONE() { return RING_DONE; }, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
-  if (window.__icarus) Object.assign(window.__icarus, { cpusCmd, MOD, die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
+  if (window.__icarus) Object.assign(window.__icarus, { cpusCmd, MOD, die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AG, agTake, AGX, agxPoll, agxSend, agxDraw, agxTab, agxAt, agxHear, agxCommand, CH, chShow, sendChat, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { NEWB, newbHear, newbHeard, newbTyped, newbTalk, newbFallback, newbArrive });
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
   if (window.__icarus) Object.assign(window.__icarus, { boomHouse, HB, hbHouse, matchHouse, gotBoom, crash, setTimeK: v => { timeK = v; }, gameTime: () => time, pAlive: () => { let n = 0; for (let i = 0; i < PMAX; i++) if (pLife[i] > 0) n++; return n; } });
