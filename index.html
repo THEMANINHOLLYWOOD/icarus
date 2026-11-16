@@ -5739,6 +5739,59 @@ const keys = {};
 const down = (...codes) => codes.some(c => keys[c]);
 const stick = { x: 0, y: 0 };  // virtual thumbstick, -1..1, y up
 const boosting = () => down('ShiftLeft', 'ShiftRight', 'TouchBoost') || AP.boost || PAD.boost;
+// ── Pilot view. The bird flown the way a racing car is driven, seen from high behind it: the lens up over its back looking
+//    down on it at about forty-five degrees, wide open, level whatever the bird is doing — the bird, the ground under it and
+//    the line ahead all in the one picture. And the controls are a pilot's, not a bird's: the steering is a curve, fine in the
+//    middle and full only at the end of it (a key tapped is a nudge; held, it comes on over a third of a second); the nose goes
+//    where it is put and comes back level when it is let go; the thrust is a lever that stays where it is left (, and . — the
+//    right edge of a phone — the yoke pushed away, in a headset); and the height can be held for him. Drawn into the letters:
+//    a heading tape, speed and height, a pitch ladder, the wheel, the thrust, and the line he is on, a few seconds ahead.
+//    ` (the key under Esc), /pilot, the menu, or "pilot view" said aloud; it is remembered. (See pilotAxes, pilotCam, auiPilot.)
+const PILOT = { on: false, k: 0, thr: 0.5, x: 0, y: 0, kx: 0, ky: 0, hold: false, holdY: null, mouse: false, mx: 0, my: 0, cy: 0, fov: 84, saveT: 0, slide: null, yoke: null, pathN: 0, hit: -1,
+  off: new THREE.Vector3(), pos: new THREE.Vector3(), look: new THREE.Vector3(), path: new Float32Array(36) };
+try { const j = JSON.parse(localStorage.getItem('icarus.pilot') || 'null'); if (j) { PILOT.on = !!j.on; PILOT.hold = !!j.hold; PILOT.mouse = !!j.mouse; if (Number.isFinite(j.thr)) PILOT.thr = clamp(j.thr, 0, 1); } } catch {}
+const pilotSave = () => { try { localStorage.setItem('icarus.pilot', JSON.stringify({ on: PILOT.on, hold: PILOT.hold, mouse: PILOT.mouse, thr: +PILOT.thr.toFixed(2) })); } catch {} };
+// (the bird in the air and his own to fly, with pilot view on: its controls are the pilot's. And while no film is running, its lens and its letters too)
+const pilotFly = () => PILOT.on && state === 'play' && player.form === 'phoenix' && !player.perch && !player.sub && !player.cine && !player.takeoff && !player.perchGo && !COSMOS.on;
+const pilotView = () => pilotFly() && !cinema.on && !mdCamOn();
+function pilotSet(on, quiet) {
+  on = on === undefined ? !PILOT.on : !!on;
+  if (on === PILOT.on) { if (!quiet) toast(on ? 'PILOT VIEW IS ON' : 'PILOT VIEW IS OFF'); return; }
+  PILOT.on = on; PILOT.holdY = null; PILOT.kx = PILOT.ky = PILOT.x = PILOT.y = 0; PILOT.slide = null; pilotSave();
+  if (on) { cinema.manual = false; MENU.cineHeld = false; camYawOff = 0; PILOT.cy = player.yaw; PILOT.off.set(0, 0, 0); if (FLIP.over) flipLevel(); }   // (the film camera and this one are not both on: whichever was asked for last)
+  if (XR.on) { XR.eyeOff = null; XR.hudKey = ''; }
+  if (quiet) return;
+  toast(!on ? 'FOLLOW CAMERA' : XR.on ? 'PILOT VIEW · PINCH AND HOLD: THE YOKE · MOVE IT TO STEER · PUSH IT AWAY: THRUST' : PHONE ? 'PILOT VIEW · LEFT THUMB: THE WHEEL · RIGHT EDGE: THRUST' : PAD.on ? 'PILOT VIEW · LEFT STICK STEERS · RIGHT TRIGGER: THRUST · UP AND DOWN ON THE PAD SET IT' : 'PILOT VIEW · A D STEER · W S THE NOSE · , AND . THRUST · SHIFT: ALL OF IT');
+  (audio.sfx.modeSwitch || audio.sfx.ui)?.();
+}
+function pilotHold(on) { PILOT.hold = on === undefined ? !PILOT.hold : !!on; PILOT.holdY = null; pilotSave(); toast(PILOT.hold ? 'HEIGHT HELD · LET GO OF THE NOSE AND HE KEEPS IT' : 'HEIGHT IS YOURS AGAIN'); }
+function pilotMouse(on) { PILOT.mouse = on === undefined ? !PILOT.mouse : !!on; PILOT.mx = PILOT.my = 0; pilotSave(); toast(PILOT.mouse ? 'THE MOUSE STEERS · LEFT AND RIGHT OF THE MIDDLE, UP AND DOWN' : 'THE MOUSE ONLY LOOKS'); }
+addEventListener('pointermove', e => { if (!PILOT.on || !PILOT.mouse || e.pointerType !== 'mouse') return;   // (the mouse as a wheel: how far it is from the middle of the picture, with a still place in the middle)
+  const dz = (v, d) => Math.abs(v) < d ? 0 : clamp((v - Math.sign(v) * d) / (0.62 - d), -1, 1);
+  PILOT.mx = dz((e.clientX / innerWidth - 0.5) * 2, 0.05); PILOT.my = dz((0.5 - e.clientY / innerHeight) * 2, 0.16); }, { passive: true });
+// what his hands are asking, in pilot view: [turn, nose] as axes() gives them, shaped
+function pilotAxes(dt) {
+  const P = PILOT, p = player, ease = (v, pw) => Math.sign(v) * Math.pow(Math.abs(v), pw);
+  const kx = (down('KeyD', 'ArrowRight') ? 1 : 0) - (down('KeyA', 'ArrowLeft') ? 1 : 0), ky = (down('KeyW', 'ArrowUp') ? 1 : 0) - (down('KeyS', 'ArrowDown') ? 1 : 0);
+  // a key is not a stick: tapped, it is a nudge; held, it comes on over a third of a second, and goes off quicker than it came
+  P.kx = kx ? clamp((P.kx * kx < 0 ? 0 : P.kx) + kx * dt * 3, -1, 1) : P.kx * Math.max(0, 1 - dt * 9);
+  P.ky = ky ? clamp((P.ky * ky < 0 ? 0 : P.ky) + ky * dt * 3.4, -1, 1) : P.ky * Math.max(0, 1 - dt * 9);
+  if (!tilt.wasAir) tilt.p0 = tilt.pitch; tilt.wasAir = true;
+  const m = P.mouse && !TOUCH && !dragging ? 1 : 0;
+  const ax = clamp(stick.x + (tilt.on ? tilt.x : 0) + PAD.x + P.mx * m, -1, 1), ay = clamp(stick.y + (tilt.on ? tilt.y : 0) + PAD.y + P.my * m, -1, 1);
+  P.x = clamp(P.kx * (0.5 + 0.5 * Math.abs(P.kx)) + ease(ax, 1.7), -1, 1);   // (the first third of the wheel is a tenth of the turn)
+  let y = clamp(P.ky + ease(ay, 1.4), -1, 1);
+  // the lever: it stays where it is left
+  { const tk = (down('Period') ? 1 : 0) - (down('Comma') ? 1 : 0) + (PAD.thr || 0); if (tk) { P.thr = clamp(P.thr + tk * dt * 0.6, 0, 1); P.saveT = time + 1.5; } }
+  if (P.saveT && time > P.saveT) { P.saveT = 0; pilotSave(); }
+  // the height held: with the nose let go he keeps the height he was left at (the nose touched, it is his again, and the new height is the one kept)
+  if (P.hold && Math.abs(y) < 0.04 && !AP.kind) { if (P.holdY === null) P.holdY = p.pos.y; y = clamp((P.holdY - p.pos.y) * 0.03 - Math.sin(p.pitch) * 0.8, -0.5, 0.5); }
+  else P.holdY = null;
+  P.y = y;
+  return [clamp(P.x + AP.ax, -1, 1), clamp(y + AP.ay, -1, 1)];
+}
+// how much of the fire is on, 0..1: the lever, or Shift, or the trigger pulled
+const pilotThr = () => Math.max(PILOT.thr, boosting() ? 1 : 0);
 function axes() {
   const kx = (down('KeyD', 'ArrowRight') ? 1 : 0) - (down('KeyA', 'ArrowLeft') ? 1 : 0);
   const ky = (down('KeyW', 'ArrowUp') ? 1 : 0) - (down('KeyS', 'ArrowDown') ? 1 : 0);
@@ -8407,6 +8460,7 @@ const ICON = {
   cam: ic('cam', '<path d="M3.5 8.2h3.4l1.5-2.2h7.2l1.5 2.2h3.4a.9.9 0 0 1 .9.9v9a.9.9 0 0 1-.9.9h-17a.9.9 0 0 1-.9-.9v-9a.9.9 0 0 1 .9-.9z"/><circle cx="12" cy="13.4" r="4.1"/><g class="iris"><path d="M12 9.3l1.9 3M15.9 12.2l-1.6 3.2M13.6 17.2l-3.5-.4M8.3 15l1.4-3.3M9.6 10.2l3.4.5"/></g><circle class="fl f" cx="18" cy="10.6" r=".7"/>'),
   bolt: ic('bolt', '<path class="bolt" d="M13.6 2.6L5.4 13.4h5.2l-1.4 8 8.4-11.6h-5.3z"/>'),
   album: ic('album', '<rect class="c1 bg" x="6.5" y="5.5" width="11" height="13" rx="1.2"/><rect class="c3 bg" x="6.5" y="5.5" width="11" height="13" rx="1.2"/><rect class="c2 bg" x="6.5" y="5.5" width="11" height="13" rx="1.2"/><path class="hill" d="M8.6 15.6l2.6-3 1.8 1.8 1.3-1.3 1.2 2.5"/>'),
+  pilot: ic('pilot', '<circle cx="12" cy="12" r="8.2"/><circle class="f" cx="12" cy="12" r="1.6"/><path d="M4.2 10.6c2.6-.9 5-1.3 7.8-1.3s5.2.4 7.8 1.3M12 13.6v6.4"/>'),
   cine: ic('cine', '<path d="M4 11h16v8.2a.8.8 0 0 1-.8.8H4.8a.8.8 0 0 1-.8-.8z"/><g class="clap"><path class="bg" d="M4 7.6h16V11H4z"/><path d="M8.6 7.6L7 11M12.8 7.6L11.2 11M17 7.6L15.4 11"/></g>'),
   chat: ic('chat', '<path d="M4.4 5h15.2a.9.9 0 0 1 .9.9v9.7a.9.9 0 0 1-.9.9H12l-4.4 3.4v-3.4H4.4a.9.9 0 0 1-.9-.9V5.9a.9.9 0 0 1 .9-.9z"/><circle class="d d1 f" cx="8.4" cy="10.8" r="1"/><circle class="d d2 f" cx="12" cy="10.8" r="1"/><circle class="d d3 f" cx="15.6" cy="10.8" r="1"/>'),
   size: ic('size', '<path d="M3.5 18.5l4-11 4 11M5 14.5h5"/><path class="f1" d="M13.5 18.5l3-8 3 8M14.6 15.6h3.8"/>'),
@@ -8436,6 +8490,7 @@ function menuItems() {
     { g: 'C', ic: 'cam', label: 'camera', key: 'F', f: () => { if (state === 'play') openPhoto(true); } },
     // (the film of his flight is already running while the strip is down: this says whether it stays when the strip goes)
     { g: 'C', ic: 'cine', label: 'film', key: 'C', on: cine, keep: true, f: () => { TUT.cineOpen = true; MENU.cineHeld = false; cinema.manual = !cine; toast(cinema.manual ? 'CINEMATIC CAMERA · IT STAYS' : 'FOLLOW CAMERA'); } },
+    { g: 'C', ic: 'pilot', label: 'pilot', key: '`', on: PILOT.on, keep: true, f: () => { MENU.cineHeld = false; pilotSet(); } },
     { g: 'C', ic: 'rec', label: REC.on ? 'stop' : 'record', key: 'O', on: REC.on, f: () => { REC.on ? recStop() : recStart(); } },
     { g: 'C', ic: 'album', label: 'album', f: () => albumShow(true) },
     { g: 'A', ic: 'map', label: 'map', key: 'M', f: () => { if (state === 'play') openMap(); } },
@@ -8577,6 +8632,7 @@ const AIC = {
   bolt: [["  _/ ", " /_  ", "  /  "], ["  _/ ", " /_ *", " */  "]],
   album: [[" ___ ", "| ^ |", "|___|"], [" ___ ", "|^o^|", "|___|"]],
   cine: [["/////", "|   |", "|___|"], ["_____", "|///|", "|___|"]],
+  pilot: [[" ___ ", "(-o-)", " '|' "], [" ___ ", "(\\o/)", " '|' "], [" ___ ", "(-o-)", " '|' "], [" ___ ", "(/o\\)", " '|' "]],
   chat: [[" ___ ", "(.  )", " v   "], [" ___ ", "(.. )", " v   "], [" ___ ", "(...)", " v   "]],
   stats: [["   / ", " |/| ", "_|||_"], ["  _/ ", " |||/", "_|||_"]],
   size: [["     ", "A    ", "A  A "], ["    A", "  A A", "A A A"]],
@@ -8817,6 +8873,62 @@ function auiSay() {
   if (title) { const t = title.toUpperCase().slice(0, max), r = base + show.length, c0 = (bx - t.length) >> 1, g = gods.find(g => title.startsWith(g.name)) || (title.startsWith('Hades') ? hades : null), ink = g && godInk(g);
     if (ink) postMat.uniforms.uSayCol.value.set(ink).lerp(_wtW, 0.4); uibPlate(c0 - 1, r, c0 + t.length, r, 140); uibText(c0, r, t, ink ? 3 : 1, 225); }
 }
+// The pilot's instruments, typed into the picture (see PILOT). Nothing here is a box laid over the game: it is letters in the
+// grid, in the fire's colour and the god's, and it goes through the glow and the afterimage like everything else. Across the
+// top of the middle, the heading tape, with the heading itself in the gap; either side of the middle, speed and height in
+// the big letters, and whether he is going up or down; between them the pitch ladder, the rungs ten degrees apart sliding
+// past a mark that stays put; under the bird the wheel — an arc, a ring on it where his hands are and a tick where the bird
+// has got to; the thrust, a column that fills (on a phone a tall one down the right edge, where the thumb pulls it); and in
+// the world itself, the line he is on: where he will be over the next three and a half seconds, a cross where it meets the
+// ground, and a small mark on the ground straight under him.
+const PILOT_PTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+function auiPilot() {
+  const P = PILOT, p = player, A = P.k; if (A < 0.35 || MENU.open || who.open || QL.open || GUIDE.open || STV.on) return;
+  const nx = UIL.nx, ny = UIL.ny, cx = nx >> 1, B = v => Math.round(v * smoothstep(0.35, 1, A)), phone = PHONE, tall = innerHeight > innerWidth;
+  const say = Math.ceil((UIB.h || 0) / UIL.ch), base = Math.max(2, say + 1);   // (above whatever is being said at the foot of the picture)
+  const kmh = Math.round(p.speed * 3.6), alt = Math.round(p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER)), vs = Math.sin(p.pitch) * p.speed + p.vy;
+  const hd = ((-p.yaw * 180 / Math.PI) % 360 + 360) % 360, thr = pilotThr(), hot = thr > 0.86;
+  const yc = Math.min(ny - 9, Math.round(ny * (tall ? 0.6 : 0.57))), hw = Math.max(8, Math.min(20, cx - 3)), side = Math.min(hw, Math.max(9, Math.round(nx * 0.11)));
+  // the heading tape: a point of the compass every forty-five degrees, a dot every fifteen, three degrees to a letter
+  { const r = Math.min(ny - 5 - (QL.rows && nx < 70 ? QL.rows : 0), yc + Math.max(6, Math.round(ny * 0.2))), q0 = Math.round(hd / 3);
+    for (let d = -hw; d <= hw; d++) { if (Math.abs(d) < 3) continue; const a = (((q0 + d) * 3) % 360 + 360) % 360, f = 1 - Math.abs(d) / (hw + 4);
+      if (a % 45 === 0) { const t = PILOT_PTS[a / 45]; uilText(cx + d - (t.length > 1 && d > 0 ? 1 : 0), r, t, a % 90 === 0 ? 2 : 1, B(245 * f)); if (t.length > 1) d += d > 0 ? 0 : 1; }
+      else if (a % 15 === 0) uilPut(cx + d, r, 127, 0, B(150 * f)); }
+    const t = String(Math.round(hd) % 360).padStart(3, '0'); uilPlate(cx - 2, r, cx + 2, r, B(150)); uilText(cx - 1, r, t, 0, B(255)); uilPut(cx - 2, r, 91, 1, B(200)); uilPut(cx + 2, r, 93, 1, B(200)); uilPut(cx, r - 1, 94, 2, B(230)); }
+  // speed and height, either side
+  { const big = UIB.nx >= 34 && UIB.buf, s = String(kmh), a = String(alt), cl = cx - side, cr = cx + side;
+    if (big) { const br = yc >> 1; uibPlate(((cl - 2 * s.length) >> 1) - 1, br, cl >> 1, br, B(110)); uibText((cl >> 1) - s.length + 1, br, s, hot ? 2 : 0, B(255)); uibPlate((cr >> 1), br, (cr >> 1) + a.length, br, B(110)); uibText(cr >> 1, br, a, 0, B(255));
+      uilText(cl - 3, 2 * br - 1, 'KM/H', 1, B(170)); uilText(cr, 2 * br - 1, 'M', 1, B(170)); if (Math.abs(vs) > 2.5) uilText(cr + 2, 2 * br - 1, (vs > 0 ? '^' : 'v') + Math.round(Math.abs(vs)), vs > 0 ? 1 : 2, B(210)); }
+    else { uilPlate(cl - s.length, yc - 1, cl, yc, B(120)); uilText(cl - s.length + 1, yc, s, hot ? 2 : 0, B(255)); uilText(cl - 3, yc - 1, 'KM/H', 1, B(170)); uilPlate(cr, yc - 1, cr + a.length, yc, B(120)); uilText(cr, yc, a, 0, B(255)); uilText(cr, yc - 1, 'M', 1, B(170)); if (Math.abs(vs) > 2.5) uilPut(cr + 2, yc - 1, vs > 0 ? 94 : 118, vs > 0 ? 1 : 2, B(210)); }
+    if (P.hold) uilText(cr, yc - (big ? 3 : 2), P.holdY !== null ? 'HELD' : 'HOLD', 1, B(P.holdY !== null ? 230 : 140)); }
+  // the pitch ladder: a rung every ten degrees, the level one longest, sliding past his own mark
+  { const deg = Math.asin(clamp(Math.sin(p.pitch), -1, 1)) * 180 / Math.PI, per = tall ? 0.34 : 0.3, span = Math.max(3, Math.min(6, yc - base - 8));
+    for (let g = -60; g <= 60; g += 10) { const dr = Math.round((g - deg) * per); if (Math.abs(dr) > span) continue; const r = yc + dr, f = 1 - Math.abs(dr) / (span + 2), n = g === 0 ? 4 : 2;
+      for (let i = 0; i < n; i++) { if (g < 0 && (i & 1)) continue; uilPut(cx - 3 - i, r, 45, 0, B((g === 0 ? 225 : 150) * f)); uilPut(cx + 3 + i, r, 45, 0, B((g === 0 ? 225 : 150) * f)); }
+      if (g !== 0) uilText(cx + 4 + n, r, String(Math.abs(g)), 0, B(120 * f)); }
+    uilPut(cx - 1, yc, 62, 2, B(255)); uilPut(cx + 1, yc, 60, 2, B(255)); uilPut(cx, yc, 127, 2, B(255)); }
+  // the wheel: an arc, the ends of it turned up; a ring where his hands are, a tick where the bird has got to
+  { const wc = phone ? Math.round(nx * (tall ? 0.3 : 0.2)) : cx, h = Math.max(6, Math.min(phone ? 11 : 15, wc - 2, nx - 3 - wc)), r0 = phone ? Math.max(base + 1, Math.round(ny * (tall ? 0.13 : 0.2))) : base, lift = i => Math.round(Math.pow(Math.abs(i) / h, 2.2) * (phone ? 4 : 3));
+    for (let i = -h; i <= h; i++) uilPut(wc + i, r0 + lift(i), i === 0 ? 124 : i % 5 === 0 ? 58 : 127, 0, B(i === 0 ? 200 : 115));
+    uilPut(wc - h - 1, r0 + lift(h), 60, 1, B(150)); uilPut(wc + h + 1, r0 + lift(h), 62, 1, B(150));
+    const it = clamp(Math.round(-p.turn * h), -h, h), ii = clamp(Math.round(P.x * h), -h, h);
+    uilPut(wc + it, r0 + lift(it) - 1, 94, 1, B(200));
+    uilPlate(wc + ii - 1, r0 + lift(ii), wc + ii + 1, r0 + lift(ii), B(170)); uilPut(wc + ii, r0 + lift(ii), 79, 2, B(255)); uilPut(wc + ii - 1, r0 + lift(ii), 40, 2, B(230)); uilPut(wc + ii + 1, r0 + lift(ii), 41, 2, B(230));
+    P.wheelRow = r0; P.wheelCol = wc; }
+  // the thrust: a column that fills from the foot; the top of it is all the fire he has
+  { const c = phone ? nx - 3 : cx - side - (UIB.nx >= 34 ? 10 : 7), r0 = phone ? Math.round(ny * 0.2) : yc - 3, n = phone ? Math.max(8, Math.round(ny * 0.34)) : 7, f = Math.round(thr * (n - 1));
+    for (let i = 0; i < n; i++) { const on = i <= f; uilPut(c, r0 + i, on ? (i >= Math.round(0.86 * (n - 1)) ? 35 : 61) : 58, on ? (i >= Math.round(0.86 * (n - 1)) ? 2 : 1) : 0, B(on ? 240 : 95), phone ? B(110) : -1); if (phone) { uilPut(c - 1, r0 + i, on ? 61 : 32, 1, B(on ? 200 : 0), B(110)); uilPut(c + 1, r0 + i, on ? 61 : 32, 1, B(on ? 200 : 0), B(110)); } }
+    uilPut(c - (phone ? 2 : 1), r0 + f, 62, 2, B(255)); uilText(c - 1, r0 - 1, 'THR', hot ? 2 : 1, B(170)); if (phone) uilText(c - 1, r0 + n, hot ? 'MAX' : String(Math.round(thr * 100)).padStart(3, ' '), hot ? 2 : 0, B(220)); }
+  // the line he is on, in the world: dots that open out into rings as they come nearer, and a cross where it meets the ground
+  if (P.pathN) { camera.updateMatrixWorld(); const W = innerWidth, H = innerHeight;
+    const at = (x, y, z) => { _v.set(x, y, z).project(camera); return _v.z < 1 && Math.abs(_v.x) < 1 && Math.abs(_v.y) < 1 ? [uilCol((_v.x * 0.5 + 0.5) * W), uilRow((0.5 - _v.y * 0.5) * H)] : null; };
+    let lc = -9, lr = -9;
+    for (let i = 1; i < P.pathN; i++) { const hit = P.hit === i, q = at(P.path[i * 3], P.path[i * 3 + 1], P.path[i * 3 + 2]); if (!q) { if (hit) break; continue; }
+      if (hit) { uilPlate(q[0] - 1, q[1], q[0] + 1, q[1], B(160)); uilPut(q[0], q[1], 88, 2, B(255)); uilPut(q[0] - 1, q[1], 62, 2, B(230)); uilPut(q[0] + 1, q[1], 60, 2, B(230)); break; }
+      if (q[0] === lc && q[1] === lr) continue; lc = q[0]; lr = q[1];
+      uilPut(q[0], q[1], i < 3 ? 111 : i % 3 === 0 ? 43 : 127, i % 3 === 0 ? 2 : 1, B(235 - i * 9)); }
+    const g = Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER); if (p.pos.y - g > 12) { const q = at(p.pos.x, g + 0.5, p.pos.z); if (q) { uilPut(q[0], q[1], 43, 1, B(210)); uilPut(q[0] - 1, q[1], 45, 1, B(150)); uilPut(q[0] + 1, q[1], 45, 1, B(150)); } } }
+}
 function drawAsciiUi(dt) {
   const cl = document.body.classList, on = asciiOn && !XR.on && !!UIL.buf;
   { // how many letters wide the boy is on the screen just now: his name is run along that many to a row, so it can be read
@@ -8839,6 +8951,7 @@ function drawAsciiUi(dt) {
     if (state === 'stats' || STV.map) auiStats(dt);
     if (state === 'map' && mapV.open) auiMapChrome();
     if (state === 'play' && !cl.contains('pro')) auiMarks();
+    if (state === 'play' && PILOT.k > 0.35 && !cl.contains('pro')) auiPilot();
     if (state !== 'title' && state !== 'stats' && !cl.contains('pro') && !cl.contains('photo')) { auiDom(); auiArea(dt); } else if (state === 'title' && AGC.open) auiDom('agentCard');
     if (shown && !REC.on && !STV.on) auiMark();
     if (state !== 'title' && !REC.on) { auiMenu(); auiToast(); }
@@ -9536,6 +9649,7 @@ function closeChat() {
 const CMD_HELP = [
   ['MOVE', '/takeoff  /land  /perch  /glide  /dive  /bird  /human  /stop'],
   ['FLY', 'hold W (the stick up) past straight up and over: a loop · let go on your back: he rolls the right way up (an Immelmann) · Q / E roll (let go half way: knife-edge) · on your back, hold S: a split-S · straight up, let go and turn: a stall turn · Z (held flip button) brakes and hovers · /level off stays on your back after a loop · or say it: loop, go over the top, immelmann, split-s, barrel roll, knife edge, stall turn, upside down, brake · /loop /immelmann /splits /barrel /knife /stall /brake'],
+  ['PILOT', '/pilot (or the key under Esc): the lens high over his back, a pilot’s controls and instruments · , and . set the thrust · /pilot hold keeps his height · /pilot mouse steers with the mouse · /pilot off'],
   ['GO', '/tp NAME or PLACE · /tp X Z · /tp X Y Z · /goto PLACE (flown, not carried) · /where'],
   ['MISSION', '/mission (carried straight to what you are doing) · J the list, a GO button on each · shift+J goes to the one you follow'],
   ['PLACES', 'summit · crete · volcano · temple · parthenon · monasteries · cave · my island · objective · any god · any flier'],
@@ -9703,6 +9817,8 @@ function chatCommand(text) {
     case 'quality': run(off ? 'quality_down' : 'quality_up'); return true;
     case 'letters': run(off ? 'letters_down' : 'letters_up'); return true;
     case 'film': case 'cinematic': case 'cine': run(off ? 'normalcam' : 'cinematic'); return true;
+    case 'pilot': case 'cockpit': case 'jet': case 'f1': if (/^(hold|height|alt|altitude)\b/.test(low)) pilotHold(/\b(off|no)$/.test(low) ? false : /\bon$/.test(low) ? true : undefined); else if (/^mouse\b/.test(low)) pilotMouse(/\b(off|no)$/.test(low) ? false : /\bon$/.test(low) ? true : undefined);
+      else if (/^(thrust|thr|power)\s+\d+/.test(low)) { PILOT.thr = clamp(+low.replace(/\D+/g, '') / 100, 0, 1); pilotSave(); sys(`THRUST ${Math.round(PILOT.thr * 100)}%`); } else pilotSet(arg ? !off : undefined); return true;   // (/pilot · /pilot off · /pilot hold · /pilot mouse · /pilot thrust 70)
     case 'camera': case 'photo': case 'cam': run('photo'); return true;
     case 'record': case 'rec': if (/^(stop|off|end)\b/.test(low)) stopCmd('recording'); else REC.on ? stopCmd('recording') : recStart(); return true;
     case 'stop': case 'end': case 'cancel': case 'quit': stopCmd(arg); return true;
@@ -11568,7 +11684,7 @@ function flipNet(p) {
 const PAD = { x: 0, y: 0, roll: 0, brake: 0, boost: false, on: false, b: [] };
 function padTick() {
   const gp = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g && g.connected && g.axes.length >= 2) : null;
-  if (!gp) { if (PAD.on) { PAD.on = false; PAD.x = PAD.y = PAD.roll = PAD.brake = 0; PAD.boost = false; } return; }
+  if (!gp) { if (PAD.on) { PAD.on = false; PAD.x = PAD.y = PAD.roll = PAD.brake = PAD.thr = 0; PAD.boost = false; } return; }
   if (!PAD.on) { PAD.on = true; toast('A PAD · LEFT STICK FLIES · BUMPERS ROLL · TRIGGERS: FIRE AND BRAKE · IN A FIGHT X THROWS FIRE, B IS YOUR WIND'); }
   const dz = v => Math.abs(v) < 0.15 ? 0 : (v - Math.sign(v) * 0.15) / 0.85, btn = i => !!(gp.buttons[i] && gp.buttons[i].pressed), val = i => gp.buttons[i] ? gp.buttons[i].value : 0;
   PAD.x = dz(gp.axes[0]); PAD.y = -dz(gp.axes[1]); PAD.roll = (btn(4) ? 1 : 0) - (btn(5) ? 1 : 0); PAD.brake = val(6); PAD.boost = val(7) > 0.3;
@@ -11576,6 +11692,8 @@ function padTick() {
   const was = PAD.b; PAD.b = gp.buttons.map(b => b.pressed);
   if (state === 'play' && PAD.b[0] && !was[0]) { const M = MATCH; if (M.phase === 'count' && M.placed && MD.id === M.id && Date.now() < M.t0) { if (MD.ask === 'ready') mdReady(); if (mdCamOn()) mdSkip(); } else pressSpace(); }   // (in a fight's opening, A is Space there: a yes when asked, and his own lens)
   if (state === 'play' && PAD.b[3] && !was[3] && player.form === 'phoenix') birdTrick('');
+  PAD.thr = (btn(12) ? 1 : 0) - (btn(13) ? 1 : 0);   // (up and down on the pad: the pilot's thrust lever)
+  if (state === 'play' && PAD.b[8] && !was[8]) pilotSet();   // (the view button: pilot view)
   if (state === 'play' && PAD.b[2] && !was[2] && fbOn()) fbFire();   // (X: fire, in a fight)
   if (state === 'play' && PAD.b[1] && !was[1] && fbOn()) fbWind();   // (B: the wind)
 }
@@ -11882,19 +12000,20 @@ function updatePhoenix(dt) {
   if (p.perch) return updatePerch(dt);
   if (p.sub) return updateSub(dt);
   if (p.perchGo) return updatePerchGo(dt);
-  const [ax, pin] = state === 'play' ? axes() : [0, 0], turn = -ax;
-  const boost = boosting() && p.flame > 0.05 && !GODM.spent, diving = pin < -0.15;   // (spent, after the god in him: no fire to push with)
+  const PV = pilotFly();   // (pilot view: the same bird, flown with a pilot's controls — see PILOT)
+  const [ax, pin] = state === 'play' ? (PV ? pilotAxes(dt) : axes()) : [0, 0], turn = -ax;
+  const boost = (boosting() || PV && PILOT.thr > 0.86) && p.flame > 0.05 && !GODM.spent, diving = pin < (PV ? -0.55 : -0.15);   // (spent, after the god in him: no fire to push with)   // (a pilot's nose goes down a long way before the wings fold)
   // let go, and he glides: the wings held out and still, hardly sinking, the fire hardly burning. It is the way to rest in the air
   p.glideT = !boost && Math.abs(pin) < 0.15 && !p.wasRiding ? (p.glideT || 0) + dt : 0;
   const glide = smoothstep(0.7, 2.2, p.glideT);
   if (glide > 0.98 && !SESSION.glideTold && state === 'play' && flags.morphed) { SESSION.glideTold = true; toast('GLIDING · YOUR FIRE HARDLY BURNS'); }
   const stag = p.stagger = Math.max(0, (p.stagger || 0) - dt);   // just hit something: half in control, rolling
-  p.turn = lerp(p.turn, turn * (stag > 0 ? 0.35 : 1) * (FLIP.cu.y < -0.25 ? -1 : 1), damp(4, dt));   // (the lens upside down with him, over the top: left is still the left of the picture)
+  p.turn = lerp(p.turn, turn * (stag > 0 ? 0.35 : 1) * (FLIP.cu.y < -0.25 ? -1 : 1), damp(PV ? 8 : 4, dt));   // (the lens upside down with him, over the top: left is still the left of the picture)
   const elev = Math.asin(clamp(Math.sin(p.pitch), -1, 1)), brk = FLIP.brake;   // (how steeply he is going, however the pitch is written)
   const pivot = FLIP.over ? 0 : FLIP.hangT > 0 ? 1 : smoothstep(0.75, 1.25, elev) * smoothstep(55, 28, p.speed);   // straight up and slowing: a turn swings him round where he hangs (the stall turn)
   p.yaw += p.turn * (diving ? 0.85 : 1.25) * (1 + 2.6 * pivot) * (1 + 0.6 * brk) * dt;
   // S folds the wings and drops him out of the sky; W climbs, and climbing takes wingbeats
-  p.climbT = pin > 0.6 ? (p.climbT || 0) + dt : Math.max(0, (p.climbT || 0) - dt * 3);   // (held: the nose keeps coming up, past a climb to straight up)
+  p.climbT = pin > 0.6 && !PV ? (p.climbT || 0) + dt : Math.max(0, (p.climbT || 0) - dt * 3);   // (held: the nose keeps coming up, past a climb to straight up)
   const up = smoothstep(0.5, 1.6, p.climbT) * Math.max(smoothstep(35, 70, p.speed), smoothstep(1.4, 2.4, p.climbT)) + (FLIP.vert || 0);   // (fast, the nose comes right up; slower, it takes a longer hold)
   // held on, past straight up: over the top (or, on his back, S past straight down). Only his own hands do it, never the autopilot's
   if (!FLIP.over && state === 'play' && !GODM.spent && !p.wasRiding && Math.abs(AP.ay || 0) < 0.05 && brk < 0.3) {
@@ -11910,7 +12029,7 @@ function updatePhoenix(dt) {
     // let go nearly straight up: he hangs there a moment, slowing — turn then, and he swings round on a wingtip before the nose falls
     if (pin < 0.2 && p.pitch > 1.15 && !FLIP.hung && brk < 0.2 && state === 'play') { FLIP.hung = true; FLIP.hangT = 1.1; }
     if (FLIP.hangT > 0) FLIP.hangT = pin > 0.2 || pin < -0.2 ? 0 : FLIP.hangT - dt; else if (p.pitch < 0.6) FLIP.hung = false;
-    p.pitch = lerp(p.pitch, lerp(pin > 0 || FLIP.vert > 0 ? lerp(Math.max(0, pin) * 0.6, 1.45, Math.min(1, up)) : pin * 1.38, 0, brk), damp(FLIP.hangT > 0 ? 0.25 : p.pitch > 1.0 && pin < 0.2 && brk < 0.2 ? 0.6 : diving ? 4.5 : up > 0.2 ? 2.4 : 1.8, dt));   // (let go straight up and he carries on up a while, slowing)
+    p.pitch = lerp(p.pitch, lerp(pin > 0 || FLIP.vert > 0 ? lerp(Math.max(0, pin) * 0.6, 1.45, Math.min(1, up)) : pin * (PV ? 1.05 : 1.38), 0, brk), damp(FLIP.hangT > 0 ? 0.25 : p.pitch > 1.0 && pin < 0.2 && brk < 0.2 ? 0.6 : diving ? 4.5 : PV ? 3.2 : up > 0.2 ? 2.4 : 1.8, dt));   // (let go straight up and he carries on up a while, slowing)
     if (p.speed < 30 && !diving && brk < 0.2 && !(FLIP.hangT > 0)) p.pitch = lerp(p.pitch, -0.45, damp(2.5, dt));  // stall: the nose drops
     if (GODM.spent) p.pitch = Math.min(p.pitch, -0.06);   // spent: the wings are heavy, and will not take him up
   }
@@ -11951,8 +12070,8 @@ function updatePhoenix(dt) {
   const sp = Math.sin(p.pitch);
   const BK = 1 + (birdK() - 1) * 0.3, RK = 1 + (birdK() - 1) * 0.6;   // (the big bird: a stronger stroke, and the currents take it further and faster)
   p.overT = boost && sp < -0.25 ? (p.overT || 0) + dt : Math.max(0, (p.overT || 0) - dt * 1.5);   // (no top speed: the longer a dive is held with the boost, the faster it goes, without end)
-  const target = lerp(((boost ? 125 : 64) - (sp > 0 ? sp * (GODM.on ? 30 : boost ? 55 : 75) : sp * 240)) * (1 + 0.12 * perks.swift + IS.swift) * BK * (1 + p.overT * 0.14) * (GODM.spent ? 0.6 : 1), 3, brk);   // nose down: ~300 m/s, then on past it   // (braking: down to a hover)
-  p.speed = Math.max(lerp(18, 1.5, brk), lerp(p.speed, target * MOD.speed, damp(lerp(sp < -0.3 ? 1.7 : boost ? 1.1 : 0.55, 1.5, brk), dt)));
+  const target = lerp(((boost ? 125 : PV ? lerp(40, 112, Math.min(1, PILOT.thr / 0.86)) : 64) - (sp > 0 ? sp * (GODM.on ? 30 : boost ? 55 : PV ? 34 : 75) : sp * 240)) * (1 + 0.12 * perks.swift + IS.swift) * BK * (1 + p.overT * 0.14) * (GODM.spent ? 0.6 : 1), 3, brk);   // nose down: ~300 m/s, then on past it   // (braking: down to a hover)
+  p.speed = Math.max(lerp(18, 1.5, brk), lerp(p.speed, target * MOD.speed, damp(lerp(sp < -0.3 ? 1.7 : boost ? 1.1 : PV ? 0.95 : 0.55, 1.5, brk), dt)));
   if (FLIP.over || sp > 0.8 && pin < 0.2) p.speed = Math.max(14, p.speed - sp * 24 * dt);   // going round (or hanging straight up, the wings still): the way up costs him speed and the way down gives it back
   if (p.riding) p.speed = lerp(p.speed, 310 * RK, damp(1.6 * RK, dt));
   const knife = FLIP.over ? 0 : smoothstep(0.8, 0.98, Math.abs(Math.sin(FLIP.a)));   // (on his side the wings hold nothing up: he sinks)
@@ -20790,6 +20909,7 @@ function voiceRun(a) {
     case 'close': if (XF.open) xfList(false); else if (ALBUM.open) albumShow(false); else if (GUIDE.open) guideShow(false); else if (MENU.open) menuShow(false); else if (state === 'photo') closePhoto(); else if (state === 'map') closeMap(); else if (CHAT.open) closeChat(); else if (EXPLAIN.i >= 0) { EXPLAIN.i = 1e9; explainPanel(); } else if (who.pinned) who.pinned = false; else if (HEALTH.open) healthShow(false); break;
     case 'godmode': godMode(true); break; case 'godmode_off': godMode(false); break; case 'warzone': matchWar(); break;
     case 'cinematic': TUT.cineOpen = true; cinema.manual = true; toast('CINEMATIC CAMERA'); break;
+    case 'pilot': pilotSet(true); break; case 'pilot_off': pilotSet(false); break; case 'pilot_hold': pilotSet(true, true); pilotHold(true); break; case 'pilot_free': pilotHold(false); break;
     case 'normalcam': cinema.manual = false; toast('FOLLOW CAMERA'); break;
     case 'players': who.pinned = !who.pinned; who.t = 0; toast(who.pinned ? 'WHO IS FLYING' : 'LIST CLOSED'); break;
     case 'chat': openChat(''); break;
@@ -20881,6 +21001,10 @@ const V_RULES = [
   [/\b(run|sprint)\b/, 'run'],
   [/\b(walk|go forward|move forward|keep going|forward|go ahead)\b/, 'walk'],
   [/\b(stop|halt|wait|hold on|freeze|stay|cancel|enough|never ?mind)\b/, 'stop'],
+  [/\b((leave|stop|end|exit|no more) (the )?(pilot|cockpit|jet|racing|f ?1)( view| mode| camera)?|(pilot|cockpit|jet|racing|f ?1) (view |mode |camera )?off)\b/, 'pilot_off'],
+  [/\b((stop|don'?t) hold(ing)? (my |the |this )?(height|altitude)|(height|altitude) hold off|let go of (my |the )?(height|altitude))\b/, 'pilot_free'],
+  [/\b(hold (my |the |this )?(height|altitude)|(height|altitude) hold|keep (me at )?this (height|altitude))\b/, 'pilot_hold'],
+  [/\b((pilot|cockpit|jet|racing|f ?1|formula (one|1)) (view|mode|camera|cam|controls)|top.?down( view| mode| camera)?|fly (it )?like a (jet|plane|car))\b/, 'pilot'],
   [/\b(cinematic|movie mode|film (it|me|this)|cinema mode|movie camera)\b/, 'cinematic'],
   [/\b(normal camera|follow camera|regular camera|stop (the )?cinematic|camera back)\b/, 'normalcam'],
   [/\b(take (a |the |my )?(picture|photo|shot|snap)|snap( it)?|cheese|shoot)\b/, 'snap'],
@@ -20971,7 +21095,7 @@ async function voiceAsk(text) {
   } catch { spoke(text); }
 }
 // every frame: the next order in line, and whatever he is in the middle of being told to do
-const V_SCREEN = new Set(['look_share', 'look_wear', 'look_keep', 'map_bigger', 'map_smaller', 'xr_leave', 'map', 'photo', 'snap', 'close', 'cinematic', 'normalcam', 'players', 'chat', 'explain', 'mute', 'unmute', 'help', 'objective', 'closer', 'further', 'face', 'wide', 'mapme',
+const V_SCREEN = new Set(['look_share', 'look_wear', 'look_keep', 'map_bigger', 'map_smaller', 'xr_leave', 'map', 'photo', 'snap', 'close', 'cinematic', 'normalcam', 'pilot', 'pilot_off', 'pilot_hold', 'pilot_free', 'players', 'chat', 'explain', 'mute', 'unmute', 'help', 'objective', 'closer', 'further', 'face', 'wide', 'mapme',
   'menu', 'hands_on', 'hands_off', 'mic_off', 'tilt', 'thumb', 'quality_up', 'quality_down', 'letters_up', 'letters_down', 'letters_fit', 'visuals', 'album', 'hover', 'map3d', 'map2d', 'map_left', 'map_right', 'map_up', 'map_down', 'map_north', 'watch']);
 function apPump() {
   while (AP.q.length && (state === 'play' || state === 'photo' || state === 'map')) {
@@ -25964,13 +26088,37 @@ function camFloor() {
   if (state === 'dead' || state === 'title' || state === 'loading' || p.sub || p.dive || SEA.trans) return;   // (falling through the world, or under the sea with him: the lens goes where he goes)
   const g = terrainAt(c.x, c.z) + 0.9; if (c.y < g) c.y = g;
 }
+// The pilot's lens: where it stands (PILOT.pos) and what it looks at (PILOT.look). Up over his back at about forty-five
+// degrees (lower in a headset, where looking down for long is a sore neck), further off the faster he goes, and looking not
+// at him but at the air ahead of him at his own height: he sits in the lower third, the horizon lies level across the top,
+// and the line he is on runs up the middle. It keeps its place over him exactly (nothing drags behind at speed) and turns
+// after his heading a moment late, so a quick correction moves the bird in the picture and not the picture.
+function pilotCam(dt, camK, clear) {
+  const P = PILOT, p = player, rs = smoothstep(60, 300, p.speed);
+  P.cy += wrapAngle(p.yaw + camYawOff - P.cy) * damp(6, dt);
+  const el = XR.on ? 0.5 : camera.aspect < 1 ? 0.86 : 0.78, D = phxDist * camK * (1.45 + 0.6 * rs + (XR.on ? 0.5 : 0)), sy = Math.sin(P.cy), cy = Math.cos(P.cy);
+  _pcO.set(sy * Math.cos(el) * D, Math.sin(el) * D, cy * Math.cos(el) * D);
+  if (P.off.lengthSq() < 1 || P.off.distanceTo(_pcO) > D * 3) P.off.copy(_pcO); else P.off.lerp(_pcO, damp(5, dt));
+  P.pos.copy(p.pos).add(P.off);
+  if (clear && !p.sub) { camClear(P.pos, p.pos, dt, 3, true); if (realm === 'under') P.pos.y = Math.min(P.pos.y, underRoof(P.pos.x, P.pos.z) - 4); }
+  const lead = D * (0.85 + 0.9 * rs);
+  P.look.set(p.pos.x - sy * lead, p.pos.y, p.pos.z - cy * lead);
+  P.fov = 84 + 8 * rs;
+  // the line he is on: where he will be over the next three and a half seconds, flown as he is flying now
+  { const n = 12, h = 0.3, w = p.turn * 1.25; let x = p.pos.x, y = p.pos.y, z = p.pos.z, yaw = p.yaw; const cp = Math.cos(p.pitch), sp = Math.sin(p.pitch); P.hit = -1;
+    for (let i = 0; i < n; i++) { yaw += w * h; x -= Math.sin(yaw) * cp * p.speed * h; z -= Math.cos(yaw) * cp * p.speed * h; y += (sp * p.speed + p.vy) * h; P.path[i * 3] = x; P.path[i * 3 + 1] = y; P.path[i * 3 + 2] = z;
+      if (P.hit < 0 && y < Math.max(terrainAt(x, z), WATER) + 2) P.hit = i; }
+    P.pathN = n; }
+}
+const _pcO = new THREE.Vector3();
 function updateCamera(dt) {
   const p = player;
+  { const on = pilotView(); PILOT.k = Math.abs(PILOT.k - (on ? 1 : 0)) < 0.002 ? (on ? 1 : 0) : lerp(PILOT.k, on ? 1 : 0, damp(on ? 3.4 : 5, dt)); }   // (how far the lens has gone over to the pilot's)
   if (mdCamOn()) return mdCam(dt); if (MD.cam) mdCamOff();   // (a fight opening: the lens is the fight's, until it goes live — see MD)
   if (state === 'watch') return camWatch(dt);
   if (state === 'stats') return statsCam(dt);   // (his record in the sky: a wide shot of where he is)
   if (state === 'photo') { camera.position.copy(photo.pos); camera.rotation.set(photo.pitch, photo.yaw, photo.roll, 'YXZ'); camera.fov = photo.fov; camera.updateProjectionMatrix(); return; }
-  if (xrFP()) { camera.position.copy(XR.eye || xrEye(_v)); camera.quaternion.copy(XR.rig.quaternion).multiply(XR.cam.quaternion); camera.fov = 70; camera.updateProjectionMatrix(); return; }   // (in the headset the game's camera is his eyes)
+  if (xrFP()) { PILOT.k = 0; camera.position.copy(XR.eye || xrEye(_v)); camera.quaternion.copy(XR.rig.quaternion).multiply(XR.cam.quaternion); camera.fov = 70; camera.updateProjectionMatrix(); return; }   // (in the headset the game's camera is his eyes)
   if (state === 'title' && titleFly.on) return;   // (the title flies its own lens: updateTitle)
   if (state === 'title' || state === 'loading') {
     const a = time * 0.035;
@@ -26069,17 +26217,20 @@ function updateCamera(dt) {
     camWant.set(p.pos.x + Math.sin(y) * cd, p.pos.y + cd * lerp(0.42, 0.16, rush) - Math.asin(clamp(Math.sin(p.pitch), -1, 1)) * lerp(12, 5, rush) * camK, p.pos.z + Math.cos(y) * cd);
     // going over the top (or straight up): behind him along his line of flight instead, a little off his back
     { const A = p.sub ? 0 : flipCam(dt); if (A > 0.001) { _p.copy(p.pos).addScaledVector(dir3, -cd).addScaledVector(FLIP.cu, cd * lerp(0.3, 0.14, rush)); camWant.lerp(_p, A); } }
-    if (!p.sub) {
+    const pk = PILOT.k;   // (pilot view: see pilotCam. The two lenses are eased one into the other)
+    if (pk > 0) pilotCam(dt, camK, pk >= 0.5);
+    if (!p.sub && pk < 0.5) {
       camClear(camWant, p.pos, dt, 3, true);
       if (realm === 'under') camWant.y = Math.min(camWant.y, underRoof(camWant.x, camWant.z) - 4);
     }
     camera.position.lerp(camWant, damp(p.sub || SEA.trans ? 8 : 4.5, dt));
     lookAt.copy(p.pos).addScaledVector(dir3, 14 + rush * 26);
+    if (pk > 0) { const e = pk * pk * (3 - 2 * pk); camera.position.lerp(PILOT.pos, e); lookAt.lerp(PILOT.look, e); }
     camera.up.copy(FLIP.cu); camera.lookAt(lookAt); camera.up.set(0, 1, 0);   // (its up eased round with his over the top: the horizon turns with the loop, it never flips)
-    camera.rotateZ(-p.bank * (0.12 + 0.3 * rush));
-    camera.fov = lerp(camera.fov, (68 + rush * 32 + wide * 16 - (p.danger || 0) * 12) * fovK(), damp(2.4, dt));   // (the ground rushing up: tunnel vision)
-    if (rush > 0.5) { const k = (rush - 0.5) * 0.12; camera.position.x += rnd(k); camera.position.y += rnd(k); }
-    if ((p.danger || 0) > 0.15) { const k = p.danger * 0.2; camera.position.x += rnd(k); camera.position.y += rnd(k); }
+    camera.rotateZ(-p.bank * (0.12 + 0.3 * rush) * (1 - pk));   // (the pilot's horizon stays level)
+    camera.fov = lerp(camera.fov, Math.min(118, lerp(68 + rush * 32 + wide * 16 - (p.danger || 0) * 12, PILOT.fov - (p.danger || 0) * 8, pk) * fovK()), damp(2.4, dt));   // (the ground rushing up: tunnel vision)
+    if (rush > 0.5 && pk < 1) { const k = (rush - 0.5) * 0.12 * (1 - pk); camera.position.x += rnd(k); camera.position.y += rnd(k); }
+    if ((p.danger || 0) > 0.15) { const k = p.danger * 0.2 * (1 - 0.6 * pk); camera.position.x += rnd(k); camera.position.y += rnd(k); }
     postMat.uniforms.uSpeed.value = lerp(postMat.uniforms.uSpeed.value, rush, damp(3, dt));
   }
   if (camShake > 0) {
@@ -26122,11 +26273,12 @@ canvas.addEventListener('pointerdown', e => {
     taps.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now(), moved: false });
     if (MENU.open) menuShow(false);
     // held still on the world (not the stick): that place is marked, for "go there"
-    { const id = e.pointerId, tp = taps.get(id); tp.lp = setTimeout(() => { const q = taps.get(id); if (!q || q.moved || q.pair || (joy && joy.id === id) || state !== 'play') return; q.long = true;
+    { const id = e.pointerId, tp = taps.get(id); tp.lp = setTimeout(() => { const q = taps.get(id); if (!q || q.moved || q.pair || (joy && joy.id === id) || (PILOT.slide && PILOT.slide.id === id) || state !== 'play') return; q.long = true;
         TAPAT.x = q.x; TAPAT.y = q.y; TAPAT.t = performance.now(); { const w = gazePoint(); apMark(w); AP.kind = 'go'; AP.t0 = time; TUT.heldGo = true; AP.thenLand = landable(w); }
         toast(player.form === 'phoenix' ? 'FLYING THERE · STEER TO TAKE OVER' : 'GOING THERE · STEER TO TAKE OVER'); audio.sfx.ui?.(); }, 480); }
     { const me = taps.get(e.pointerId); for (const [id, o] of taps) if (id !== e.pointerId && !o.pair && performance.now() - o.t < 180) { const pr = { n: 2, ok: true }; o.pair = me.pair = pr; } }   // (two fingers at once: a breath)
-    if (!joy && e.clientX < innerWidth * 0.5) { joy = { id: e.pointerId, x0: e.clientX, y0: e.clientY }; joyShow(e.clientX, e.clientY, 0, 0); return; }
+    if (!PILOT.slide && pilotFly() && e.clientX > innerWidth * (innerHeight > innerWidth ? 0.76 : 0.84)) { PILOT.slide = { id: e.pointerId, y0: e.clientY, t0: PILOT.thr }; return; }   // (pilot view: the right edge is the thrust lever)
+    if (!joy && e.clientX < innerWidth * 0.5) { joy = { id: e.pointerId, x0: e.clientX, y0: e.clientY }; if (!pilotFly()) joyShow(e.clientX, e.clientY, 0, 0); return; }
   }
   looks.set(e.pointerId, { x: e.clientX, y: e.clientY });
   dragging = true; canvas.classList.add('drag');
@@ -26135,6 +26287,11 @@ canvas.addEventListener('pointerdown', e => {
 canvas.addEventListener('pointermove', e => {
   const tp = taps.get(e.pointerId);
   if (tp && !tp.moved && Math.hypot(e.clientX - tp.x, e.clientY - tp.y) > 14) tp.moved = true;
+  if (PILOT.slide && e.pointerId === PILOT.slide.id) { const S = PILOT.slide; PILOT.thr = clamp(S.t0 + (S.y0 - e.clientY) / (innerHeight * 0.34), 0, 1); return; }
+  if (joy && e.pointerId === joy.id && pilotFly()) {   // (pilot view: the thumb is on a wheel — a long throw from side to side, and up and down only once it has plainly been moved that way)
+    const R = Math.max(72, Math.min(innerWidth, innerHeight) * 0.26), dx = e.clientX - joy.x0, dy = e.clientY - joy.y0, ey = Math.abs(dy) < 18 ? 0 : dy - Math.sign(dy) * 18;
+    stick.x = clamp(dx / R, -1, 1); stick.y = clamp(-ey / (R * 0.8), -1, 1); keys.TouchBoost = false; joyShow(); return;
+  }
   if (joy && e.pointerId === joy.id) {
     let dx = e.clientX - joy.x0, dy = e.clientY - joy.y0;
     const d = Math.hypot(dx, dy);
@@ -26159,6 +26316,7 @@ canvas.addEventListener('pointermove', e => {
 });
 function pointerEnd(e) {
   const tp = taps.get(e.pointerId); taps.delete(e.pointerId);
+  if (PILOT.slide && e.pointerId === PILOT.slide.id) { PILOT.slide = null; pilotSave(); }
   if (tp) { clearTimeout(tp.lp); if (!tp.moved && !tp.long) { TAPAT.x = tp.x; TAPAT.y = tp.y; TAPAT.t = performance.now(); } }
   if (tp && tp.long) { if (joy && e.pointerId === joy.id) { joy = null; stick.x = stick.y = 0; keys.TouchBoost = false; joyShow(); } else { looks.delete(e.pointerId); pinchD = looks.size === 2 ? pinchDist() : 0; dragging = looks.size > 0; canvas.classList.toggle('drag', dragging); } return; }   // (a hold marks a place; it isn't the button)
   if (joy && e.pointerId === joy.id) { joy = null; stick.x = stick.y = 0; keys.TouchBoost = false; joyShow(); }
@@ -28585,7 +28743,8 @@ addEventListener('keydown', e => {
   switch (e.code) {
     case 'Space': pressSpace(); break;
     case 'KeyH': handsToggle(); break;
-    case 'KeyC': TUT.cineOpen = true; cinema.manual = !cinema.manual; toast(cinema.manual ? 'CINEMATIC CAMERA' : 'FOLLOW CAMERA'); break;
+    case 'KeyC': TUT.cineOpen = true; cinema.manual = !cinema.manual; toast(cinema.manual ? 'CINEMATIC CAMERA' : PILOT.on ? 'PILOT VIEW' : 'FOLLOW CAMERA'); break;
+    case 'Backquote': pilotSet(); break;   // (the key under Esc: pilot view, on and off)
     case 'Enter': dlgAdvance(); break;
     case 'KeyG': applyTier((tierIdx + 2) % 3, true); break;
     case 'Delete': case 'Backspace': if (!e.repeat) respawnTop(); break;
@@ -28849,7 +29008,7 @@ function xrCull(off) {
 // (also how the tests open it without a headset: XR.on, then xrFrame by hand, with XR.fake hands)
 function xrStart() { GRASS.R = 38; GRASS.key = ''; XR.h0 = null; XR.frames = 0; XR.armK = 0; XR.manOpen = 0; XR.yaw = player.form === 'phoenix' ? player.yaw : human.group.rotation.y; }
 // first person while he is playing or talking; the death, the warp, the ending and the title keep their own camera
-const xrFP = () => XR.on && (state === 'play' || state === 'talk') && !player.gone && !XR.third;
+const xrFP = () => XR.on && (state === 'play' || state === 'talk') && !player.gone && !XR.third && !(PILOT.on && player.form === 'phoenix' && !player.perch && !player.cine);   // (pilot view is from outside him, in a headset as on a screen)
 // where his eyes are: in the boy's head, or just above and ahead of the bird's
 function xrEye(out) {
   const p = player;
@@ -29023,11 +29182,12 @@ function xrInput(dt) {
     // he goes where you look: turn your head and he turns that way (and the world comes round to meet it), look up and he
     // climbs, down and he dives. Your arms add to it — tipped, he banks harder; lifted or lowered, he climbs or drops.
     const dzf = (v, d, r) => Math.abs(v) < d ? 0 : clamp((v - Math.sign(v) * d) / r, -1, 1);
-    const bird = p.form === 'phoenix' && !p.perch, riding = XR.mode === 'rider' && bird, map = XMAP.on;
+    const pilot = PILOT.on && p.form === 'phoenix' && !p.perch, bird = p.form === 'phoenix' && !p.perch, riding = XR.mode === 'rider' && bird && !pilot, map = XMAP.on;
     // riding, or with the map out, the bird flies itself — straight on, at this height — until something is asked of it
     if ((riding || map && bird) && !BIRD.auto && !AP.kind && !XR.land && birdCan()) { birdAuto('cruise', ''); XR.autoCr = true; }
     if (XR.autoCr && BIRD.auto === 'cruise' && (AP.kind || XR.land || !riding && !map)) { birdAuto('', ''); XR.autoCr = false; }
     if (riding) { const R = xrRein(o, dt, map && time - XMAP.busyT < 1.5); stick.x = R.x; stick.y = R.y; }
+    else if (pilot) { const Y = xrYoke(o, dt, map && time - XMAP.busyT < 1.5); stick.x = Y.x; stick.y = Y.y; }
     else {
       // being the bird: his arms steer, lift and lower it. Where he looks does nothing (unless he has asked for it to); and
       // with nothing asked of it, it keeps the height he left it at
@@ -29039,7 +29199,7 @@ function xrInput(dt) {
       else { if (C.y === null) C.y = p.pos.y; sy = clamp((C.y - p.pos.y) * 0.03 - Math.sin(p.pitch) * 0.7, -0.5, 0.5); }
       stick.x = clamp(sx, -1, 1); stick.y = clamp(sy, -1, 1);
     }
-    xrAero(o, dt, bird, riding);
+    if (pilot) { FLIP.xrBrake = 0; if (XR.tw) { XR.tw = null; FLIP.xrTo = null; } } else xrAero(o, dt, bird, riding);
   }
   else if (fall && o.hands.l && o.hands.r) {
     if (o.pose === 'wings') { stick.x = o.axes[0]; stick.y = clamp(0.55 - o.axes[1] * 0.45, 0, 1); }   // spread out: slower, and the higher the arms the slower
@@ -29047,11 +29207,40 @@ function xrInput(dt) {
   }
   else { stick.x = 0; stick.y = 0; }
   if (!fly) { FLIP.xrBrake = 0; if (XR.tw) { XR.tw = null; FLIP.xrTo = null; } }
-  keys.TouchBoost = state === 'play' && (fly ? (XR.mode === 'rider' && p.form === 'phoenix' ? !!XR.rein?.boost : o.boost) : (o.pose === 'point' || o.pose === 'walk') && o.run);
+  keys.TouchBoost = state === 'play' && (fly ? (PILOT.on && p.form === 'phoenix' ? false : XR.mode === 'rider' && p.form === 'phoenix' ? !!XR.rein?.boost : o.boost) : (o.pose === 'point' || o.pose === 'walk') && o.run);
   XR.flapV = o.flapV || 0; XR.flapRate = o.flapRate || 0;
   if (XR.land) { if (!fly || AP.kind !== 'land' || (XR.land.t += dt) > 90) XR.land = null; else keys.TouchBoost = false; }   // (coming down to land: the game flies him in; a flap takes him back)
   xrMirror(o, hy);
+  xrYokeShow(fly);
   for (const ev of o.events) xrMove(ev);
+}
+// ── The yoke, in the room (pilot view). There is nothing to reach for: pinch thumb and finger anywhere, hold, and the yoke
+//    is where the hand is. Moved from there to the left or right it steers (a hand's breadth is a gentle turn, a forearm's
+//    length all of it); lifted, the nose comes up; lowered, it goes down; pushed away it opens the thrust, drawn back it
+//    closes it, and the thrust stays where it was left. Let go, and he flies level on his own. A thin ring hangs in the air
+//    where the pinch began, a bead on it where the hand is now. (A pinch let go at once is still the headset's tap.)
+function xrYoke(o, dt, busy) {
+  const Y = PILOT.yoke || (PILOT.yoke = { side: '', a: null, w: new THREE.Vector3(), t: 0, x: 0, y: 0, t0: 0 }), dzf = (v, d, r) => Math.abs(v) < d ? 0 : clamp((v - Math.sign(v) * d) / r, -1, 1);
+  let h = Y.side ? o.hands[Y.side] : null;
+  if (!h || !h.pinch || busy || XM.open) { Y.side = ''; h = null;
+    if (!busy && !XM.open) for (const sd of ['r', 'l']) { const H = o.hands[sd]; if (H && H.pinch) { Y.side = sd; Y.a = { x: H.palm.x, y: H.palm.y, z: H.palm.z }; Y.w.set(H.palmW.x, H.palmW.y, H.palmW.z); Y.t = 0; Y.t0 = PILOT.thr; h = H; break; } } }
+  if (!h) { const k = damp(8, dt); Y.x = lerp(Y.x, 0, k); Y.y = lerp(Y.y, 0, k); if (Y.was) { Y.was = false; pilotSave(); } return Y; }
+  Y.t += dt; Y.was = true; if (Y.t > 0.3) XR.twistedT = time;   // (held: a grip, not a tap)
+  const k = smoothstep(0.1, 0.32, Y.t);   // (the pinch itself moves the hand: nothing is read from it for a moment)
+  Y.x = dzf(h.palm.x - Y.a.x, 0.012, 0.15) * k; Y.y = dzf(h.palm.y - Y.a.y, 0.022, 0.13) * k;
+  PILOT.thr = clamp(Y.t0 + dzf(h.palm.z - Y.a.z, 0.035, 0.2) * 0.75 * k, 0, 1);
+  Y.hw = h.palmW;
+  return Y;
+}
+function xrYokeShow(fly) {
+  const Y = PILOT.yoke, on = !!(fly && PILOT.on && Y && Y.side && XR.on);
+  if (!XR.yokeM) { if (!on) return;
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.0, 0.35), transparent: true, opacity: 0.85, depthTest: false, depthWrite: false, fog: false, toneMapped: false }), g = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.003, 6, 40), mat), bar = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.002, 0.002), mat), bead = new THREE.Mesh(new THREE.SphereGeometry(0.011, 10, 8), mat);
+    g.add(ring, bar); g.renderOrder = 9997; ring.renderOrder = bar.renderOrder = bead.renderOrder = 9997; g.frustumCulled = ring.frustumCulled = bar.frustumCulled = bead.frustumCulled = false; XR.rig.add(g, bead); XR.yokeM = g; XR.yokeB = bead; }
+  XR.yokeM.visible = XR.yokeB.visible = on; if (!on) return;
+  XR.yokeM.position.copy(Y.w); XR.yokeM.rotation.set(0, XR.out ? XR.out.bodyYaw || 0 : 0, -Y.x * 1.2, 'YXZ');   // (the ring turns with the hand, as a wheel would)
+  if (Y.hw) XR.yokeB.position.set(Y.hw.x, Y.hw.y, Y.hw.z);
 }
 // the moves past steering, whichever way he is flying. Arms raised high and held: up, over the top and down the back, as W
 // held does (see FLIP); the palms turned right over, held: on his back (turned back down: the right way up); a pinch turned
@@ -29069,7 +29258,7 @@ const FLICK_TRICK = { up: 'loop', down: 'splits', out: 'barrel', in: 'barrel', a
 // what each move does, where he is
 function xrMove(ev) {
   if (ev === 'flick') {   // one hand flicked: a trick, the way it was thrown (sideways, a barrel roll that way)
-    const F = XR.out?.flick, p = player; if (!F || state !== 'play' || p.form !== 'phoenix' || p.perch || p.cine) return;
+    const F = XR.out?.flick, p = player; if (!F || state !== 'play' || p.form !== 'phoenix' || p.perch || p.cine || PILOT.on) return;   // (in pilot view a quick hand is the yoke moved, not a trick)
     XR.move = 'flick'; XR.moveT = time + 1.2; birdTrick(FLICK_TRICK[F.dir] || 'roll', F.x < 0 ? 1 : -1); return;
   }
   XR.move = ev; XR.moveT = time + 1.2;
@@ -29253,6 +29442,7 @@ function xrMenuItems() {
     ...(fly ? [{ label: XR.horizon === 'free' ? 'HORIZON FREE' : 'HORIZON LEVEL', on: XR.horizon !== 'free', keep: true, f: () => xrHorizon() }] : []),
     ...(XR.mode === 'bird' ? [{ label: XR.gazeSteer ? 'LOOK STEERS' : 'FREE LOOK', on: !XR.gazeSteer, keep: true, f: () => { XR.gazeSteer = !XR.gazeSteer; try { localStorage.setItem('icarus.xrgaze', XR.gazeSteer ? '1' : '0'); } catch {} } }] : []),
     { label: XR.third ? 'MY EYES' : 'WATCH US', f: () => { XR.third = !XR.third; XR.eyeOff = null; } },
+    ...(fly ? [{ label: 'PILOT VIEW', on: PILOT.on, f: () => pilotSet() }] : []),
     { label: fly ? 'LAND' : 'FLY', f: () => { if (fly) { XR.land = { t: 0 }; voiceRun('land'); } else voiceRun('fly'); } },
     { label: fly ? 'A MAN AGAIN' : 'HOME', f: () => voiceRun(fly ? 'human' : 'home') },
     { label: 'PLAYERS', keep: true, f: () => { XM.page = 'who'; } },
@@ -29502,8 +29692,10 @@ function xrHud(dt, sc) {
   const act = state === 'play' && spaceAction();
   const fpHint = xrFP() && state === 'play' ? xrHint(act) : null;
   if (XR.err) lines.push(['XR', XR.err]);
+  const pilot = PILOT.on && pilotFly();   // (pilot view: the instruments, in a line, and what the yoke does)
+  if (pilot && lines.length < 2) { const p = player; lines.push(['PILOT', `${Math.round(p.speed * 3.6 / 5) * 5} KM/H · ${Math.round((p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER)) / 5) * 5} M · ${String(Math.round((((-p.yaw * 180 / Math.PI) % 360) + 360) % 360 / 5) * 5 % 360).padStart(3, '0')} · THRUST ${Math.round(pilotThr() * 10) * 10}%${PILOT.hold ? ' · HEIGHT HELD' : ''}`]); }
   if (!PATRON.id && state === 'play' && !player.cine) lines.push(['PRAY', 'say the name of the god you pray to: Zeus, Hera, Poseidon, Demeter, Athena, Apollo, Artemis, Ares, Aphrodite, Hephaestus, Hermes or Dionysus']);
-  const hint = fpHint !== null ? fpHint : state === 'prologue' ? (pro.act ? pro.act.replace(/SPACE|TAP/, 'CLAP').replace('HOLD  —', 'FLAP  —').replace('HOLD CLAP', 'FLAP') : 'push both palms out to skip')
+  const hint = fpHint !== null ? fpHint : pilot ? 'pinch and hold: the yoke · move it to steer, lift it to climb · push it away: thrust · let go: he flies level' : state === 'prologue' ? (pro.act ? pro.act.replace(/SPACE|TAP/, 'CLAP').replace('HOLD  —', 'FLAP  —').replace('HOLD CLAP', 'FLAP') : 'push both palms out to skip')
     : state === 'talk' ? 'speak aloud · push both palms out to leave'
     : !act ? '' : act.kind === 'talk' || act.kind === 'kindle' || act.kind === 'animal' ? `hold out a palm: ${act.label}`
     : act.kind === 'swoop' ? 'push both palms out: land' : act.kind === 'jump' ? 'clap, or throw both hands up: jump'
@@ -34054,6 +34246,7 @@ setTimeout(() => {
   if (window.__icarus) Object.assign(window.__icarus, { MD, PW, INKW, inkSay, inkNow, mdReady, mdHeard, mdShotAt, mdCamOn, mdSkip, matchBusy, matchWait, matchFire, matchUnqueue, matchFirst, matchRAt, matchWhere, matchParty, pwTake, pwShatter, matchBar, aresScript, miPose, MODEBAR, queueOf: () => MATCH.queue });   // (tests: the fight's opening, its words, one at a time)
   if (window.__icarus) Object.assign(window.__icarus, { SONIC, SOUND, sonicBoom, sonicTaps, sonicCone, peerBoom, nearMissTick });   // (tests: the sound barrier)
   if (window.__icarus) Object.assign(window.__icarus, { FAR, TIERS, sightFar, farStep, xrLeave, tick, get dir3() { return dir3; } });   // (tests: the far country)
+  if (window.__icarus) Object.assign(window.__icarus, { PILOT, PAD, pilotSet, pilotHold, pilotMouse, pilotFly, pilotView, pilotAxes, pilotThr, xrYoke, voiceRun, UIL, menuItems, get camYawOff() { return camYawOff; } });   // (tests: pilot view)
   frame();
 }, 30);
 </script>
