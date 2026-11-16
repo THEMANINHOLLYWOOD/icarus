@@ -14176,7 +14176,6 @@ function updateGods(dt) {
       if (Math.abs(level(nx, nz) - g.gy) < 1.2) { g.x = nx; g.z = nz; } else { v = 0; g.t = 0; }   // gods don't walk off ledges
     }
     const h = level(g.x, g.z), floats = form === 'animal' && g.look === 'swan' && h < WATER;
-    g.gy = floats ? WATER + 0.1 : h;
     g.gy = floats ? waterY(g.x, g.z) + 0.05 : h;
     // unmasked, they don't quite touch the ground
     const hover = form === 'god' && !g.morph ? 0.3 + Math.sin(time * 1.1 + g.x) * 0.1 : 0;
@@ -29359,7 +29358,6 @@ addEventListener('keydown', e => {
     case 'KeyR': gustBlow(); break;
     case 'KeyQ': if (!humanDive() && !e.repeat && (player.form === 'human' ? player.grounded : player.perch)) turnForm(); break;   // (on his feet, or on a perch: the other body, there. In the air it is Space, as it always was, and Q is the roll)
     case 'KeyO': if (!e.repeat) { REC.on ? recStop() : recStart(); } break;   // record what the lens sees (and again to stop)
-    case 'KeyJ': if (!e.repeat) wpMarkHere(); break;   // keep this place
     case 'KeyN': if (!e.repeat) wpCycle(); break;      // the next of his marks (and, after the last, none)
     case 'Home': if (!e.repeat) wpSelect(0, true); break;   // home: the summit, and he flies it himself
   }
@@ -29367,7 +29365,7 @@ addEventListener('keydown', e => {
 addEventListener('keydown', e => { if (e.code === 'Tab' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); if (!e.repeat) { if (who.pinned) { who.pinned = false; who.open = false; who.tabAt = 0; } else { who.open = true; who.tabAt = performance.now(); } who.t = 0; } }   // (a tap keeps the panel open, so its buttons can be pressed; held, it shows only while held)
   else if (e.code === 'Escape' && who.pinned && state === 'play' && !(e.target instanceof HTMLInputElement)) { who.pinned = false; who.open = false; e.preventDefault(); e.stopPropagation(); } }, true);
 addEventListener('keyup', e => { if (e.code !== 'Tab') return; if (who.tabAt && performance.now() - who.tabAt < 320) { who.pinned = true; who.open = true; } else who.open = false; who.tabAt = 0; });
-addEventListener('keyup', e => { keys[e.code] = false; if (['KeyA', 'ArrowLeft'].includes(e.code)) pro.kl = false; if (['KeyD', 'ArrowRight'].includes(e.code)) pro.kr = false; if (['KeyW', 'ArrowUp'].includes(e.code)) pro.ku = false; if (['KeyS', 'ArrowDown'].includes(e.code)) pro.kd = false; if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { if (state === 'prologue' && (e.code === 'Space' || !pro.pov)) proPress(false); if (state === 'title') titlePress(false); } });
+addEventListener('keyup', e => { if (['KeyA', 'ArrowLeft'].includes(e.code)) pro.kl = false; if (['KeyD', 'ArrowRight'].includes(e.code)) pro.kr = false; if (['KeyW', 'ArrowUp'].includes(e.code)) pro.ku = false; if (['KeyS', 'ArrowDown'].includes(e.code)) pro.kd = false; if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { if (state === 'prologue' && (e.code === 'Space' || !pro.pov)) proPress(false); if (state === 'title') titlePress(false); } });
 $('proSkip').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); proSkip(); });
 // the two choices before the story
 $('primerNote').textContent = (TOUCH ? 'turn it on or off any time from the word ICARUS' : 'press V any time to turn it on or off') + ' · players near you hear your voice, and what you say is shown to everyone as text';
