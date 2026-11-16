@@ -23109,7 +23109,7 @@ async function startEar() {
 async function uttered(blob, dur, peak, at) {
   if (mic.mode !== 'sr' && API.stt && dur > 350)   // no speech recognition in this browser: have the words read off the recording
     fetch('/api/transcribe', { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob }).then(x => x.json()).then(j => j.text && heard(j.text, true)).catch(() => {});
-  const now = performance.now(), playing = state === 'play' || state === 'talk';
+  const now = performance.now(), playing = state === 'talk';   // (his own sounds come back in his voice only in a conversation: in plain play nothing he says is repeated aloud)
   // short: it comes back out of him as it went in — the same cough, the same "hey", in his voice
   if (playing && dur < 2200 && API.sts && ear.sent < 160 && now - ear.sentAt > 900 && blob.size < 380000) {
     ear.sent++; ear.sentAt = now; ear.voicedAt = now;
@@ -23168,7 +23168,7 @@ function spoke(text) {
     }
     if (who) return hail(who, text);
   }
-  if (performance.now() - ear.voicedAt > 3500 && API.tts && !voiceSrc) {   // in his voice, once: for himself, and for anyone near enough to hear
+  if (false && performance.now() - ear.voicedAt > 3500 && API.tts && !voiceSrc) {   // (in plain play his words are no longer said back in his voice: only in a conversation, see uttered)
     const loud = ear.loud;
     fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice: 'hero', text: text.slice(0, 220), flash: true }) })
       .then(r => r.ok ? r.arrayBuffer() : null).then(raw => {
