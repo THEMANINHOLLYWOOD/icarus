@@ -7978,6 +7978,7 @@ const now = () => performance.now() / 1000;
 function netCollide() {
   const p = player;
   if (!NET.on || p.form !== 'phoenix' || p.sub || p.cine || state !== 'play' || p.shade) return;
+  if (MATCH.phase === 'count' && MATCH.me.in) return;   // (flown by a fight's opening and its glide in, wing over wing with the others in it: nobody is run into)
   const me = realm === 'under' ? 1 : 0;
   for (const P of NET.peers.values()) {
     if (!P.s || P.form !== 'p' || P.realm !== me || P.menu || (P.ma || '') !== (MATCH.phase === 'live' && MATCH.me.alive ? MATCH.id : '')) continue;   // (a bird flying on its own is not run into; nor is one in a fight he is not in)
@@ -7994,7 +7995,7 @@ function gotHit(m) {
   const P = NET.peers.get(m.i); if (!P || flood(P)) return;
   if ((NET.hits.get(P.id) || 0) > time) return;
   NET.hits.set(P.id, time + 4);
-  if (player.form === 'phoenix' && !player.sub && state === 'play') knocked(P);
+  if (player.form === 'phoenix' && !player.sub && state === 'play' && !player.shade && !(MATCH.phase === 'count' && MATCH.me.in)) knocked(P);   // (not a ghost, nor one being flown into a fight)
 }
 function knocked(P) {
   const p = player, x = p.pos.x, y = p.pos.y, z = p.pos.z;
@@ -9405,7 +9406,7 @@ function chatCommand(text) {
     case 'challenge': case 'duel': if (/^(end|stop|quit|leave|off)$/i.test((arg || '').trim())) matchStop(); else if (/^again$/i.test((arg || '').trim())) matchAgain(); else matchChallenge(arg); return true;
     case 'again': case 'rematch': matchAgain(); return true;
     case 'rings': case 'ringrace': ringsCmd(arg); return true;
-    case 'race': if (/^(end|stop|quit|leave|off)$/i.test((arg || '').trim())) matchStop(); else matchChallenge(arg, 'rings'); return true;
+    case 'race': if (/^(end|stop|quit|leave|off)$/i.test((arg || '').trim())) matchStop(); else { const tm = teamParse((arg || '').trim().toLowerCase().split(/\s+/).filter(Boolean)); if (tm) teamCmd(tm, 'rings'); else matchChallenge(arg, 'rings'); } return true;   // (/race 2v2, /race A B vs C D: a ring race in sides)
     case 'bird': if (!arg) birdSay(); else if (!birdHear(String(arg).toLowerCase(), String(arg).trim().split(/\s+/).length)) chatLine('', 'IT DOES NOT KNOW THAT ONE · /bird ALONE SAYS WHAT IT DOES', 'sys'); return true;
     case 'pet': if (player.form === 'phoenix') birdPet(1); else chatLine('', 'THERE IS NO BIRD TO STROKE', 'sys'); return true;
     case 'loop': case 'immelmann': case 'splits': case 'split-s': case 'barrel': case 'knife': case 'knife-edge': case 'stall': case 'hammerhead': case 'roll': {   // the aerobatics, flown for him (see FLIP for flying them by hand)
@@ -11363,7 +11364,7 @@ function padTick() {
   PAD.x = dz(gp.axes[0]); PAD.y = -dz(gp.axes[1]); PAD.roll = (btn(4) ? 1 : 0) - (btn(5) ? 1 : 0); PAD.brake = val(6); PAD.boost = val(7) > 0.3;
   if (gp.axes.length >= 4 && player.form === 'phoenix' && !dragging) camYawOff = clamp(camYawOff - dz(gp.axes[2]) * 0.04, -Math.PI, Math.PI);
   const was = PAD.b; PAD.b = gp.buttons.map(b => b.pressed);
-  if (state === 'play' && PAD.b[0] && !was[0]) pressSpace();
+  if (state === 'play' && PAD.b[0] && !was[0]) { const M = MATCH; if (M.phase === 'count' && M.placed && MD.id === M.id && Date.now() < M.t0) { if (MD.ask === 'ready') mdReady(); if (mdCamOn()) mdSkip(); } else pressSpace(); }   // (in a fight's opening, A is Space there: a yes when asked, and his own lens)
   if (state === 'play' && PAD.b[3] && !was[3] && player.form === 'phoenix') birdTrick('');
   if (state === 'play' && PAD.b[2] && !was[2] && fbOn()) fbFire();   // (X: fire, in a fight)
   if (state === 'play' && PAD.b[1] && !was[1] && fbOn()) fbWind();   // (B: the wind)
@@ -20823,6 +20824,7 @@ function updateAuto(dt) {
 const photo = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, roll: 0, fov: 50, snap: false, back: 'play' };
 function openPhoto(free) {
   if (state !== 'play') return;
+  if (MATCH.phase === 'live' && MATCH.me.alive) { toast('NOT IN THE MIDDLE OF A FIGHT'); return; }   // (the world stood still for him alone: nothing could reach him)
   state = 'photo'; timeK = 0.02; for (const k in keys) keys[k] = false;
   photo.pos.copy(camera.position); _e.setFromQuaternion(camera.quaternion, 'YXZ'); photo.yaw = _e.y; photo.pitch = _e.x; photo.roll = 0; photo.fov = camera.fov;
   document.body.classList.add('photo'); document.body.classList.remove('cinema');
@@ -28330,7 +28332,8 @@ addEventListener('keydown', e => {
     else if (live() && e.code === 'Space' && !e.repeat) staySilent();
     return;
   }
-  if (state === 'watch') { if (!e.repeat && ['Space', 'Enter', 'ArrowRight', 'ArrowLeft', 'Tab'].includes(e.code)) { e.preventDefault(); matchWatchNext(); } return; }
+  if (state === 'watch') { if (!e.repeat && !e.metaKey && !e.ctrlKey && (e.code === 'KeyT' || e.code === 'Slash')) { e.preventDefault(); return openChat(e.code === 'Slash' ? '/' : ''); }   // (out and watching, the chat is still his: /leave, /fly watch)
+    if (!e.repeat && ['Space', 'Enter', 'ArrowRight', 'ArrowLeft', 'Tab'].includes(e.code)) { e.preventDefault(); matchWatchNext(); } return; }
   if (state === 'map') {   // M closes it, R lays it flat or stands it up; the arrows or WASD move over it, Q and E turn it, Z and X tip it, + and - push in and out, N squares it north
     const V = mapV, st = innerHeight * 0.16 / V.ts, mv = (u, v) => { V.tx += (u * mapP.c + v * mapP.s) * st; V.tz += (-u * mapP.s + v * mapP.c) * st; audio.sfx.mapMove?.(); };
     if (M3.on && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyQ', 'KeyE', 'KeyZ', 'KeyX', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract', 'ShiftLeft', 'ShiftRight'].includes(e.code)) { e.preventDefault(); if (!M3.keys[e.code] && !e.code.startsWith('Shift')) audio.sfx.mapMove?.(); M3.keys[e.code] = true; return; }   // (standing: held, they fly it about)
@@ -30119,7 +30122,7 @@ function tronTake(P, ts, pts) {
     tronPut(T, x, y, z); }
 }
 // did flying from a to b go through a wall? (not his own last second of it). Which one, if so.
-function tronHit(ax, ay, az, bx, by, bz, selfId, matchId) {
+function tronHit(ax, ay, az, bx, by, bz, selfId, matchId, K = birdK()) {   // (K: how big the bird flying it is; his own, unless said)
   const C = TRON.CELL, x0 = Math.floor(Math.min(ax, bx) / C) - 1, x1 = Math.floor(Math.max(ax, bx) / C) + 1, z0 = Math.floor(Math.min(az, bz) / C) - 1, z1 = Math.floor(Math.max(az, bz) / C) + 1, dx = bx - ax, dz = bz - az;
   for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { const L = TRON.grid.get(x * 73856093 ^ z * 19349663); if (!L) continue;
     for (let q = 0; q < L.length; q += 2) { const T = L[q], i = L[q + 1] - T.base; if (i <= T.start || i >= T.n || T.match !== matchId) continue;
@@ -30127,7 +30130,7 @@ function tronHit(ax, ay, az, bx, by, bz, selfId, matchId) {
       if (T.match && sameSide(T.id, selfId)) continue;   // (a friend's wall lets him through: see teamParse)
       const P = T.pts, c = (i - 1) * 3, d = i * 3, ex = P[d] - P[c], ez = P[d + 2] - P[c + 2], den = dx * ez - dz * ex; if (Math.abs(den) < 1e-6) continue;
       const s = ((P[c] - ax) * ez - (P[c + 2] - az) * ex) / den, u = ((P[c] - ax) * dz - (P[c + 2] - az) * dx) / den; if (s < 0 || s > 1 || u < -0.05 || u > 1.05) continue;
-      const wy = P[c + 1] + (P[d + 1] - P[c + 1]) * clamp(u, 0, 1), y = ay + (by - ay) * s; if (Math.abs(y - wy) < T.h / 2 + 1.6 * birdK()) return T; } }
+      const wy = P[c + 1] + (P[d + 1] - P[c + 1]) * clamp(u, 0, 1), y = ay + (by - ay) * s; if (Math.abs(y - wy) < T.h / 2 + 1.6 * K) return T; } }
   return null;
 }
 function updateTron(dt) {
@@ -30735,7 +30738,7 @@ function matchAgain() {
 const flyBoss = () => !!MATCH.phase && (MATCH.host || !!MOD.admin);
 function flyCtl(op) {
   const sys = t => chatLine('', t, 'sys'), M = MATCH, id = M.phase ? M.id : M.seen?.m.id || '', host = M.host && !!M.phase;
-  if (op === 'restart' && !M.phase && M.last) return matchAgain();   // (it is over and gone: the same fight once more)
+  if (op === 'restart' && !M.phase && M.last && !matchBusy()) return matchAgain();   // (it is over and gone: the same fight once more; one he has only left is still someone else's)
   if (op === 'shuffle') return teamsShuffle();
   if (!id) return sys('NOTHING IS BEING FOUGHT');
   if (!host && !MOD.admin) return op === 'end' ? matchStop() : sys('ONLY WHOEVER CALLED IT, OR THE KEEPER, CAN DO THAT');
@@ -30760,7 +30763,7 @@ function flyCtlDo(op, id, by, t0) {
     MINTRO.clashed = true; MINTRO.hit = true; MD.ask = 'done'; MD.rdy = true; mdReadyBtn(false);
     if (matchSees()) { aresSay(pick(ARES_L.go), true); toast(`${by} SKIPS THE OPENING`); } modeBarSet(); return; }
   if (op !== 'restart') return;
-  ringsClear(); pwClear(); miEnd(); if (MD.cam) mdCamOff(); mdReadyBtn(false);
+  ringsClear(); pwClear(); miEnd(); if (MD.cam) mdCamOff(); mdReadyBtn(false); aresHush();
   for (const k of M.roster.keys()) { const T = TRON.trails.get(k); if (T) tronClear(T); } trailRib.key = null;
   for (const r of M.roster.values()) if (!r.left) Object.assign(r, { alive: true, lives: 0, kills: 0, glass: 0, outAt: 0, by: '' });
   for (const C of M.cpus) Object.assign(C, { alive: true, reAt: 0, lives: 0, glass: 0, immune: 0 });
@@ -30908,6 +30911,7 @@ const matchYields = m => MATCH.phase === 'count' && Date.now() < MATCH.lock - 25
 function matchYield(m) {   // the one on this screen gives way to one asked for sooner (and if it was his, it waits for that one)
   const M = MATCH, q = M.host && M.last && !M.sim ? { ...M.last, at: matchKey(M.go) } : null;
   chatLine('', `TWO FIGHTS WERE CALLED AT ONCE · ONE AT A TIME · ${cleanName(m.n)}’S GOES ON`, 'sys');
+  if (NPCS.fight?.id === M.id) NPCS.fight = null;   // (the regulars called into the one given up go back to their own flying)
   matchLeave(); M.cool = 0; M.againUntil = 0; if (!M.inv) $('matchAsk').classList.remove('on'); M.seen = null; M.yq = q;
 }
 function matchWait(B, call) {
@@ -30922,7 +30926,7 @@ function matchUnqueue() { const M = MATCH; if (!M.queue) return chatLine('', 'YO
 function matchFire() {   // the one he waited for is over: his is called
   const M = MATCH, Q = M.queue; M.queue = null; M.qGo = 0; if (!Q) return; M.cool = 0;
   chatLine('', 'YOUR TURN · THE FIGHT YOU ASKED FOR IS CALLED', 'sys');
-  if (Q.kind === 'duel') matchChallenge(Q.vs, Q.game, Q.at); else matchWar(Q.cpus || 0, !!Q.sim, Q.game, Q.party, Q.at, Q.near);
+  if (Q.kind === 'duel') matchChallenge(Q.vs, Q.game, Q.at); else matchWar(Q.cpus || 0, !!Q.sim, Q.game, Q.party, Q.at, Q.near, Q.tm || null);
 }
 function matchQueueStep(dt) {   // every second or so, while he waits and nothing of his is on
   const M = MATCH; if (!M.queue || M.phase || (M.qT = (M.qT || 0) - dt) > 0) return; M.qT = 1; modeBarSet();
@@ -31080,7 +31084,7 @@ function matchWar(cpus = 0, sim = false, game = 'tron', party = false, at = 0, n
   if (MATCH.phase) return sys('ONE FIGHT AT A TIME');
   if (!sim && !matchFree()) return sys(flags.morphed ? 'NOT NOW' : 'YOU HAVE TO HAVE FLOWN FIRST');
   if (sim && (state !== 'play' || realm !== 'over')) return sys('NOT NOW');
-  { const B = matchBusy(); if (B) return matchWait(B, { kind: 'war', cpus, sim, game, party, near, at }); }
+  { const B = matchBusy(); if (B) return matchWait(B, { kind: 'war', cpus, sim, game, party, near, at, tm }); }   // (sides and all, for when it is called)
   if (performance.now() < MATCH.cool && !at) return sys(`THE WARZONE IS RESTING · ${Math.ceil((MATCH.cool - performance.now()) / 1000)} S`);
   const named = Array.isArray(party) ? [...new Set(party.map(x => peerNamed(String(x).replace(/^@/, '').toLowerCase())).filter(P => P && P.s && P.id !== NET.id).map(P => P.id))].slice(0, 23) : null;
   if (named && !named.length) return sys('NOBODY BY THOSE NAMES IS FLYING');
@@ -31143,6 +31147,9 @@ function gotMatch(m) {
     const W = matchWhere(), g = { k: 'go', id: I.id, kind: 'duel', t0: Date.now() + 5000 + miLen('duel'), at: I.at || Date.now(), ids: [NET.id, I.to], names: [heroName, I.name], host: NET.id, cfg: MATCH.cfg, cx: W.cx, cz: W.cz, ol: W.ol || undefined, game: I.game || 'tron' }; matchSend(g); matchGo({ ...g, i: NET.id, n: heroName }, true); MATCH.last = { kind: 'duel', vs: I.name, game: I.game || 'tron' }; return; }
   if (m.k === 'ctl') { const boss = m.id === MATCH.id && MATCH.phase ? MATCH.hostId : MATCH.seen?.m.id === m.id ? MATCH.seen.m.host : '';   // (end, restart, skip: from whoever called it, and nobody else)
     if (boss && m.i === boss && (m.op === 'restart' || m.op === 'skip')) flyCtlDo(m.op, m.id, nm, +m.t0); return; }
+  if (m.k === 'out' && !m.left && m.id !== MATCH.id && MATCH.seen?.m.id === m.id && m.by !== 'gone') {   // (one put out of a fight this screen only heard of: told, as any death is told)
+    const who = typeof m.who === 'string' && m.i === MATCH.seen.m.host ? m.who : m.i, name = who === m.i ? nm : cleanName(NET.peers.get(who)?.name || ''), by = String(m.by || '').replace(/[<>]/g, '').slice(0, 30);
+    if (name && name !== 'SOMEONE' && !SHUN.block.has(name)) chatLine('', deathLine(name, 'out', 0, '', by), 'sys death'); return; }
   if (m.k === 'go') { matchGo(m); if (MATCH.yq) { if (!MATCH.me.in && !MATCH.queue) { MATCH.queue = MATCH.yq; chatLine('', 'YOURS WAITS FOR THIS ONE · IT IS CALLED WHEN THIS ONE ENDS', 'sys'); modeBarSet(); } MATCH.yq = null; } return; }
   if (m.id !== MATCH.id) return;
   if (m.k === 'teams') return gotTeams(m);
@@ -31153,9 +31160,10 @@ function gotMatch(m) {
     if (Q) pwTake(Q, who, false, l); else { const r = MATCH.roster.get(who); if (r) { r.lives = l ?? (r.lives || 0) + 1; r.glass = performance.now() + PW.GLASS * 1000; } } return; }
   if (m.k === 'gl' && MATCH.phase === 'live' && Array.isArray(m.p) && m.p.length === 3) { const [x, y, z] = m.p.map(v => +v || 0); pwShatter(x, y, z, false); return; }
   if (m.k === 'join' && MATCH.kind === 'war' && MATCH.phase === 'count' && Date.now() < MATCH.lock) { const list = m.cpu && Array.isArray(m.cpu) ? m.cpu.slice(0, 16) : [[m.i, nm]];
+    if (Array.isArray(m.rg) && m.i === MATCH.hostId) npcsFight(m.rg.slice(0, 8), []);   // (regulars he has called in: flown in it, not in the world)
     for (const [id, name] of list) if (typeof id === 'string' && id.length < 40 && MATCH.roster.size < 24 && !MATCH.roster.has(id)) MATCH.roster.set(id, { id, name: cleanName(name), alive: true, cpu: !!m.cpu }); return; }
   if (m.k === 'out') { const who = typeof m.who === 'string' && MATCH.roster.get(m.who)?.cpu ? m.who : m.i, r = MATCH.roster.get(who);   // (a bird that flies itself is told out by whoever is flying it)
-    if (MATCH.phase === 'count') { if (r) { r.alive = false; r.left = !!m.left; } return; }   // (left before it began)
+    if (MATCH.phase === 'count') { if (r && r.cpu && m.left && m.i === MATCH.hostId) MATCH.roster.delete(who); else if (r) { r.alive = false; r.left = !!m.left; } if (typeof m.npc === 'string' && m.i === MATCH.hostId) npcsFight([], [m.npc]); return; }   // (left before it began; a regular sent away flies on in the world)
     return matchSetOut(who, String(m.by || '').slice(0, 24), false, { soft: !!m.left, v: Number.isFinite(+m.v) ? clamp(+m.v, 0, 3000) : undefined }); }
   if (m.k === 're' && MATCH.phase === 'live') { const who = typeof m.who === 'string' && MATCH.roster.get(m.who)?.cpu && m.i === MATCH.hostId ? m.who : m.i, r = MATCH.roster.get(who); if (!r || !r.alive) return;   // (a practice hit, in the warm-up: the fire, and the wall it had drawn goes out)
     if (Number.isFinite(+m.l)) r.lives = clamp(m.l | 0, 0, 9);   // (an extra life spent: the fire, and back on their line)
@@ -31175,7 +31183,8 @@ function cpusCmd(arg) {
   const off = /^(off|none|0|remove|away|no)$/.test(String(arg || '').trim()), say = t => chatLine('', t, 'sys');
   if (MATCH.phase === 'count' && (MATCH.host || MOD.admin)) {
     if (off && [...MATCH.roster.values()].filter(r => !r.cpu).length < 2) return say('ONLY YOU ARE IN IT · WITHOUT THEM THERE IS NOBODY TO FIGHT · KEEP THEM, OR /fly end');
-    if (off) { const ids = MATCH.cpus.map(c => c.id); for (const id of ids) { matchSend({ k: 'out', id: MATCH.id, who: id, left: true }); MATCH.roster.delete(id); } MATCH.cpus.length = 0;
+    if (off) { const ids = MATCH.cpus.map(c => c.id); for (const C of MATCH.cpus) { matchSend({ k: 'out', id: MATCH.id, who: C.id, left: true, npc: C.npc }); MATCH.roster.delete(C.id); cpuShow(C, false); const P = NET.peers.get(C.id); if (P) { P.seen = false; dropPeer(C.id, P); NET.peers.delete(C.id); } tronDrop(C.id); }   // (gone from here as matchLeave lets them go)
+      npcsFight([], MATCH.cpus.map(c => c.npc).filter(Boolean)); MATCH.cpus.length = 0;   // (the regulars among them go back to their own flying)
       return say(ids.length ? `${ids.length} ${ids.length === 1 ? 'BIRD' : 'BIRDS'} THAT FLY THEMSELVES SENT AWAY · /cpus on BRINGS THE USUAL ONES BACK` : 'NO BIRDS THAT FLY THEMSELVES IN THIS ONE'); }
     const rg = NPCS.list.filter(C => C && C.on && C.px != null).slice(0, 8).map(C => C.id); if (rg.length) matchRegulars(rg); else matchCpu(3);
     return; }
@@ -31198,7 +31207,14 @@ function matchRegulars(ids) {
   for (const id of ids) { const R = NPCS.list.find(C => C && C.id === id); if (!R || MATCH.roster.size >= 24 || MATCH.cpus.some(c => c.npc === id)) continue;
     const cid = 'cpu' + Math.random().toString(36).slice(2, 8), pat = PATRONS[R.pat] ? R.pat : Object.keys(PATRONS)[MATCH.cpus.length % 12];
     MATCH.roster.set(cid, { id: cid, name: R.name, alive: true, cpu: true }); MATCH.cpus.push({ id: cid, name: R.name, npc: id, pat, pos: new THREE.Vector3(R.px, R.py, R.pz), prev: new THREE.Vector3(), yaw: 0, pitch: 0, bank: 0, speed: 66 + Math.random() * 14, v0: 0, tgt: new THREE.Vector3(), tgtT: 0, probeT: Math.random() * 0.15, turn: 0, climb: 0, sendT: Math.random() * 0.5, skill: 0.55 + Math.random() * 0.45, alive: true }); list.push([cid, R.name]); }
-  if (!list.length) return; matchSend({ k: 'join', id: MATCH.id, cpu: list }); chatLine('', `THE REGULARS FLY IT TOO · ${list.map(x => x[1]).join(' · ')}`, 'sys');
+  if (!list.length) return; const rg = MATCH.cpus.filter(c => list.some(x => x[0] === c.id)).map(c => c.npc); npcsFight(rg, []);
+  matchSend({ k: 'join', id: MATCH.id, cpu: list, rg }); chatLine('', `THE REGULARS FLY IT TOO · ${list.map(x => x[1]).join(' · ')}`, 'sys');
+}
+// which of the regulars are in it (so they are flown in it, and not in the world as well, on every screen: see updateNpcs)
+function npcsFight(add, rm, id = MATCH.id) {
+  if (NPCS.fight?.id !== id) { if (!add.length) return; const c = warCfg(MATCH.go?.cfg); NPCS.fight = { id, ids: new Set(), until: MATCH.t0 + (c.warm + c.close * 1.6 + 240) * 1000 }; }
+  for (const x of add) if (typeof x === 'string' && x.length < 40 && NPCS.fight.ids.size < 24) NPCS.fight.ids.add(x);
+  for (const x of rm) NPCS.fight.ids.delete(x);
 }
 // where each one starts: on a wide circle round the middle, evenly, each facing a little to the left of it
 function matchSlot(id) { const ids = [...MATCH.roster.keys()].sort((a, b) => teamOf(a) - teamOf(b) || (a < b ? -1 : a > b ? 1 : 0)),   // (a side together, one after another round it)
@@ -31283,7 +31299,7 @@ function updateBooms(dt) {
 //    middle at once — down and in, wing over wing, up the same column of air in a braid of fire, with the sky splitting
 //    where they meet — and are thrown back out to their own places; then the count, and the glide in. Every one of them
 //    flies the same figure from the same clock and the fight's own name, so it is the same opening on every screen.
-const MINTRO = { roll: { duel: 3400, war: 6800 }, hold: 20000, clash: 3600, card: '', shown: -1, hit: false, clashed: false, seed: 1, drift: 0.5, style: 0,
+const MINTRO = { roll: { duel: 3400, war: 6800 }, hold: 24000, clash: 3600, card: '', shown: -1, hit: false, clashed: false, seed: 1, drift: 0.5, style: 0,
   pose: { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, bank: 0, sp: 60 }, a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3(), d: new THREE.Vector3() };
 const miRoll = (kind = MATCH.kind) => MINTRO.roll[kind === 'duel' ? 'duel' : 'war'];
 const miLen = kind => miRoll(kind) + MINTRO.hold + MINTRO.clash;   // (the longest it can be: the wait for "good to start?" is cut short by the answer)
@@ -31396,7 +31412,7 @@ function mdPlan() {
   for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
   const cpu = id => M.roster.get(id)?.cpu ? 1 : 0, boss = M.hostId && M.roster.has(M.hostId) ? M.hostId : sorted[0];
   ids.sort((a, b) => (b === boss) - (a === boss) || cpu(a) - cpu(b));   // (whoever called it first; then the others who came; then the house's own birds)
-  Object.assign(MD, { id: M.id, ids, q: 0, skip: false, ask: '', askT: 0, rdy: false, said: false, busy: false, card: '', cueLine: null, cueWant: '', lastCut: '', side: R() < 0.5 ? -1 : 1, glass: null }); MD.slots.clear();
+  Object.assign(MD, { id: M.id, ids, q: 0, skip: false, ask: '', askT: 0, rdy: false, said: false, trim: false, busy: false, card: '', cueLine: null, cueWant: '', lastCut: '', side: R() < 0.5 ? -1 : 1, glass: null }); MD.slots.clear();
   const n = ids.length, duel = n <= 2, G = Math.max(1, Math.ceil(n / 3)), three = g => sorted.slice(g * 3, g * 3 + 3), other = k => ids[k % n];
   // the fly-in: the first shot craned up out of his own lens; the rest whipped or turned to
   let roll;
@@ -31616,19 +31632,24 @@ const ARES_L = {
   ask: ['Anyone have any questions?', 'Questions? Now\'s the time.', 'Anything you don\'t get? Ask me.', 'Any questions before we start?'],
   ready: n => [`${n}, you good to start?`, `${n}. Ready?`, `You good to start, ${n}?`, `Well, ${n}? Good to go?`],
   go: ['Good. Let\'s go.', 'That\'s what I like.', 'Then fight.', 'Go on, then.'],
+  rings: ['No fire this time. Gold rings come in chains: be first through them.', 'A whole chain is worth three more. Most rings when the clock stops wins.'],   // (a ring race: nothing puts anyone out of it)
+  rvet: ['Rings, not fire. Most rings when the clock stops wins.', 'You know this one. Chains of gold. Take the most.'],
 };
 const ARES_CTX = 'You are Ares, opening a fight of fire in the sky over Olympus, and one of the fighters asks you something before it starts. The rules: every bird leaves a wall of fire behind it; touching any wall, even your own, puts you out; the ring closes in over four minutes and its edge burns; glass rings in the air give one extra life and a few seconds of smashing through walls (not the ground); F (or FIRE) throws a fireball that hunts the nearest enemy, flies faster than a bird but turns slower, so a hard turn, dive or loop shakes it, one every four seconds; R (or WIND) once a life is a burst of speed that blows any fireball off you; the first half minute is a warm-up when nothing counts; the last one flying wins, and at four minutes the one with the most fires wins it. Answer in one or two short, plain sentences, in your own voice.';
 function aresSay(text, cut = false, cue = '') { if (!matchSees()) return; say([{ text, voice: 'ares', title: 'Ares', cue }], 'Ares', cut); }   // (cue: what the line is about, for the lens: see mdHoldTo)
+function aresHush() { for (let i = dlg.queue.length - 1; i >= 0; i--) if (dlg.queue[i].title === 'Ares') dlg.queue.splice(i, 1); if (dlg.cur?.title === 'Ares') { dlg.cur = null; stopVoice(); } }   // (the fight is gone, or begun again: what he had still to say goes with it)
 const ARES_CUE = ['walls', 'ring', 'glass', 'warm'];
 function aresStep(now) {
   const M = MATCH, pk = a => a[Math.floor(Math.random() * a.length)], idle = !dlg.cur && !dlg.queue.length && !MD.busy;
   if (now >= M.cs) { if (MD.ask && MD.ask !== 'done') MD.ask = 'done'; return; }
   if (!MD.said) { MD.said = true; const W = warStat(), vet = (W.n || 0) + (W.duels || 0) + (W.rn || 0) > 0, lines = [[pk(ARES_L.open), 'open']];
-    if (M.tm) lines.push([`${['', '', 'Two', 'Three', 'Four'][M.tm.n]} sides. Your own side's fire lets you through. Theirs does not.`, 'teams']);   // (sides: who is with whom, first)
-    if (vet) lines.push([pk(ARES_L.vet), 'vet'], [TOUCH ? 'FIRE throws, WIND saves you.' : 'F throws fire. R is your wind.', 'fire']); else { for (const t of ARES_L.rules[0]) lines.push([t, 'walls']); if (M.game !== 'rings') for (const t of ARES_L.fire()) lines.push([t, 'fire']); const k = 1 + Math.floor(Math.random() * 3); for (const t of ARES_L.rules[k].slice(0, 1)) lines.push([t, ARES_CUE[k]]); }   // (the walls, always; the fire and the wind; and one more thing)
+    if (M.tm) lines.push([`${['', '', 'Two', 'Three', 'Four'][M.tm.n]} sides. ${M.game === 'rings' ? 'Every ring your side takes counts for all of it.' : 'Your own side\'s fire lets you through. Theirs does not.'}`, 'teams']);   // (sides: who is with whom, first)
+    if (M.game === 'rings') { if (vet) lines.push([pk(ARES_L.rvet), 'vet']); else for (const t of ARES_L.rings) lines.push([t, 'ring']); }   // (a ring race: no walls, no fire, no glass, no warm-up)
+    else if (vet) lines.push([pk(ARES_L.vet), 'vet'], [TOUCH ? 'FIRE throws, WIND saves you.' : 'F throws fire. R is your wind.', 'fire']); else { for (const t of ARES_L.rules[0]) lines.push([t, 'walls']); if (M.game !== 'rings') for (const t of ARES_L.fire()) lines.push([t, 'fire']); const k = 1 + Math.floor(Math.random() * 3); for (const t of ARES_L.rules[k].slice(0, 1)) lines.push([t, ARES_CUE[k]]); }   // (the walls, always; the fire and the wind; and one more thing)
     for (const [t, c] of lines) aresSay(t, false, c); MD.askT = now; return; }
-  const h = M.lock + miRoll();   // (the questions when they have all arrived and he has said his piece — cutting him short only if he goes on — and then "good to start?")
-  if (!MD.ask && now >= h && (idle || now >= h + 6000)) { MD.ask = 'q'; MD.askT = now; aresSay(pk(ARES_L.ask), !idle, 'ask'); return; }
+  const h = M.lock + miRoll();   // (the questions when they have all arrived and he has said his piece, and then "good to start?")
+  if (!MD.ask && now >= h && !idle && !MD.trim && now >= Math.max(h + 6000, M.cs - 12000)) { MD.trim = true; for (let i = dlg.queue.length - 1; i >= 0; i--) if (dlg.queue[i].title === 'Ares') dlg.queue.splice(i, 1); }   // (going on so long there would be no time left to ask: what he has not begun is let go, and what he is saying he finishes)
+  if (!MD.ask && now >= h && (idle || now >= Math.max(h + 6000, M.cs - 8000))) { MD.ask = 'q'; MD.askT = now; aresSay(pk(ARES_L.ask), !idle, 'ask'); return; }
   if (MD.ask === 'q' && !MD.busy && (idle && now - MD.askT > 4000 || now - MD.askT > 7500)) { MD.ask = 'ready'; MD.askT = now; aresSay(pk(ARES_L.ready(M.host ? heroName : matchName(M.hostId))), !idle, 'ready'); }
 }
 // what he says (or types) while it opens: a yes is a yes; a question goes to Ares
@@ -31851,7 +31872,8 @@ function fbStep(dt) {
   let warn = null, wd = 1e9;
   for (const F of FB.list) { if (F.dead) continue;
     const T = F.lock ? fbAt(F.to) : null; if (F.lock && !T) F.lock = false;
-    const d = fbSteer(F, T ? T.x : null, T ? T.y : 0, T ? T.z : 0, dt), hitR = 9 + 4 * mdK(F.to || F.by);
+    const ox = F.pos.x, oy = F.pos.y, oz = F.pos.z; let d = fbSteer(F, T ? T.x : null, T ? T.y : 0, T ? T.z : 0, dt); const hitR = 9 + 4 * mdK(F.to || F.by);
+    if (T) { const sx = F.pos.x - ox, sy = F.pos.y - oy, sz = F.pos.z - oz, L2 = sx * sx + sy * sy + sz * sz, u = L2 > 1e-6 ? clamp(((T.x - ox) * sx + (T.y - oy) * sy + (T.z - oz) * sz) / L2, 0, 1) : 1; d = Math.min(d, Math.hypot(ox + sx * u - T.x, oy + sy * u - T.y, oz + sz * u - T.z)); }   // (the nearest it came on the way, this frame: a slow frame does not let it fly through him)
     const g = Math.max(groundAt(F.pos.x, F.pos.z, F.pos.y + 20), WATER); if (F.t > FB.life || F.pos.y < g + 1) { F.dead = true; fbPop(F, F.pos.y < g + 1); continue; }
     if (T && d < hitR) {
       if (F.to === NET.id && !M.glide) { F.dead = true; fbPop(F, true); matchSend({ k: 'fbx', id: M.id, f: F.f }); matchOut(`${matchName(F.by)}’s fireball`); continue; }
@@ -32091,7 +32113,7 @@ function matchEnd(win) {
   M.fin = { t: performance.now(), L, win }; M.overFor = win ? 15500 : 6500; if (win && !mine) M.watch = win;
   for (const id of M.roster.keys()) { const T = TRON.trails.get(id); if (T) { tronClear(T); T.sign = id === win; } }   // (every wall goes out; the winner's sky is clean)
   if (L) { matchBoom(L.x, L.y, L.z, L.col, 1.6 * (L.K || 1), L.v, false, L.h); chatLine('', `THE LAST ONE OUT · ${L.name}${L.by ? ' · ' + L.by.toUpperCase() : ''}`, 'sys'); }
-  M.seen = null; if (matchSees()) { timeK = 0.3; const t0 = performance.now(), id = M.id, back = () => { const u = (performance.now() - t0) / 2300; if (u >= 1 || MATCH.id !== id) { timeK = 1; return; } timeK = 0.3 + 0.7 * u * u; requestAnimationFrame(back); }; requestAnimationFrame(back); }
+  M.seen = null; if (matchSees()) { timeK = 0.3; const t0 = performance.now(), id = M.id, back = () => { if (state === 'photo') return; const u = (performance.now() - t0) / 2300; if (u >= 1 || MATCH.id !== id) { timeK = 1; return; } timeK = 0.3 + 0.7 * u * u; requestAnimationFrame(back); }; requestAnimationFrame(back); }
   matchBig(L ? 'THE LAST FIRE' : nm ? `${nm} WINS` : 'NOBODY WINS', L ? 1700 : 4200, L ? L.col : win ? matchCol(win) : null); pwClear();
   if (L) setTimeout(() => { if (MATCH.id === M.id && MATCH.phase === 'over') { matchBig(nm ? `${nm} WINS` : 'NOBODY WINS', 4200, win ? matchCol(win) : null); audio.sfx.halo?.(); } }, 1800);
   if (rg) { chatLine('', nm ? `${nm} WINS THE RING RACE · ${RG.sc.get(win) || 0} RINGS` : 'THE RING RACE IS A TIE', 'sys'); const b = ringsBoard(6); if (b) chatLine('', b, 'sys');
@@ -32127,12 +32149,12 @@ function updatePylonBlaze(dt) {
     if ((P.shockT -= dt) <= 0 && k > 0.3) { P.shockT = 2.4; shock(P.x, P.top + 4, P.z, new THREE.Color(P.hex).getHex(), 110, 1.3, false); } }
 }
 function matchLeave() {
-  const p = player, wasIn = MATCH.me.in, ghost = MATCH.ghost, over = MATCH.phase === 'over'; ringsClear(); pwClear(); if (MD.cam) mdCamOff(); MD.plan = null; MD.id = ''; mdReadyBtn(false);
+  const p = player, wasIn = MATCH.me.in, ghost = MATCH.ghost, over = MATCH.phase === 'over'; ringsClear(); pwClear(); if (MD.cam) mdCamOff(); MD.plan = null; MD.id = ''; mdReadyBtn(false); if (MATCH.phase === 'count') aresHush();
   for (const id of MATCH.roster.keys()) { const T = TRON.trails.get(id); if (!T) continue; if (T.sign && MATCH.win === id) { T.match = ''; T.signAt = time; continue; } tronClear(T); T.match = ''; T.sign = false; }   // (what the winner wrote on the sky is left there)
   for (const C of MATCH.cpus) { cpuShow(C, false); const P = NET.peers.get(C.id); if (P) { P.seen = false; dropPeer(C.id, P); NET.peers.delete(C.id); } tronDrop(C.id); }
   if (MATCH.ring) MATCH.ring.visible = false;
   if (MATCH.kind === 'war') MATCH.cool = performance.now() + 6000;
-  if (timeK < 1) timeK = 1;
+  if (timeK < 1 && state !== 'photo') timeK = 1;   // (a picture being taken keeps its own still time)
   if (MATCH.last && (wasIn || MATCH.host) && over) { MATCH.againUntil = performance.now() + 25000; const el = $('matchAsk'); el.textContent = `${MATCH.last.game === 'rings' ? 'THE RING RACE' : MATCH.last.kind === 'duel' ? 'THE DUEL' : MATCH.last.party ? 'THE PARTY FIGHT' : 'THE WARZONE'} AGAIN · ${TOUCH ? 'TAP' : 'CLICK'} · OR /again`; el.classList.add('on'); }
   if (ghost) { matchUnghost(); toast(over ? 'THE FIGHT IS OVER · YOU FLY ON' : 'YOU FLY ON'); }
   if (over) { MATCH.seen = null; if (NPCS.fight?.id === MATCH.id) NPCS.fight = null; }
@@ -32191,7 +32213,7 @@ function cpuFly(C, dt) {
   // what is in the way: looked for a few times a second, straight ahead and to either side
   if ((C.probeT -= dt) <= 0) { C.probeT = 0.1 + (1 - C.skill) * 0.16;
     const L = C.speed * (1.0 + C.skill * 0.9), blocked = (dy, dp) => { const y = C.yaw + dy, p = clamp(C.pitch + dp, -0.7, 0.7), cp = Math.cos(p), x = C.pos.x - Math.sin(y) * cp * L, yy = C.pos.y + Math.sin(p) * L, z = C.pos.z - Math.cos(y) * cp * L;
-      if (yy < Math.max(groundAt(x, z, yy + 200), WATER) + 26 || yy > M.base + 1500) return true; if (Math.hypot(x - M.cx, z - M.cz) > M.R - 40) return true; return !!tronHit(C.pos.x, C.pos.y, C.pos.z, x, yy, z, C.id, M.id); };
+      if (yy < Math.max(groundAt(x, z, yy + 200), WATER) + 26 || yy > M.base + 1500) return true; if (Math.hypot(x - M.cx, z - M.cz) > M.R - 40) return true; return !!tronHit(C.pos.x, C.pos.y, C.pos.z, x, yy, z, C.id, M.id, 1); };
     const want = wrapAngle(Math.atan2(-(C.tgt.x - C.pos.x), -(C.tgt.z - C.pos.z)) - C.yaw), wp = clamp(Math.atan2(C.tgt.y - C.pos.y, Math.hypot(C.tgt.x - C.pos.x, C.tgt.z - C.pos.z) + 60), -0.5, 0.5) - C.pitch;
     C.turn = clamp(want * 1.6, -1.5, 1.5); C.climb = clamp(wp * 2, -0.9, 0.9);
     if (blocked(C.turn * 0.25, 0)) { const l = blocked(0.7, 0), r = blocked(-0.7, 0);
@@ -32201,7 +32223,7 @@ function cpuFly(C, dt) {
   C.prev.copy(C.pos); const cp = Math.cos(C.pitch); C.pos.x -= Math.sin(C.yaw) * cp * C.speed * dt; C.pos.y += Math.sin(C.pitch) * C.speed * dt; C.pos.z -= Math.cos(C.yaw) * cp * C.speed * dt;
   const T = tronTrail(C.id, C.name, teamOf(C.id) >= 0 ? teamCol(teamOf(C.id)) : PATRONS[C.pat][0]); T.match = M.id; T.h = tronH(C.name); tronLay(T, C.pos.x, C.pos.y, C.pos.z);
   // and what it has flown into
-  let hit = tronHit(C.prev.x, C.prev.y, C.prev.z, C.pos.x, C.pos.y, C.pos.z, C.id, M.id);
+  let hit = tronHit(C.prev.x, C.prev.y, C.prev.z, C.pos.x, C.pos.y, C.pos.z, C.id, M.id, 1);   // (the house's birds are all of the usual size)
   if (hit && C.glass > time && !M.warm) { pwShatter(C.pos.x, C.pos.y, C.pos.z, true); hit = null; }   // (through the glass)
   const by = hit ? (hit.id === C.id ? 'its own fire' : `${hit.name}’s fire`) : C.pos.y < Math.max(groundAt(C.pos.x, C.pos.z, C.pos.y + 100), WATER) + 3 ? 'the ground' : Math.hypot(C.pos.x - M.cx, C.pos.z - M.cz) > M.R + 30 ? 'the ring' : '';
   cpuShow(C, true);
@@ -32285,6 +32307,7 @@ function updateMatch(dt) {
 function matchLive(now) {
   const M = MATCH, p = player, sees = matchSees() && (!M.late || now - M.t0 < 3000);
   miEnd(); if (!M.late) for (const id of M.roster.keys()) { const T = TRON.trails.get(id); if (T) tronClear(T); } trailRib.key = null;
+  if (state === 'photo' && M.me.alive) closePhoto();   // (a picture of the opening, and then he flies it)
   M.phase = 'live'; M.lastS = 0; M.goAt = M.t0 + (M.game === 'rings' ? 0 : M.warmS * 1000); M.warm = now < M.goAt;
   M.liveAt = performance.now() - Math.max(0, now - (M.warm ? M.t0 : M.goAt));
   if (sees) { matchBig(M.warm ? `WARM-UP · ${Math.ceil((M.goAt - now) / 1000)}` : 'FLY', M.warm ? 1800 : 1100); audio.sfx.rebirth?.(); }
