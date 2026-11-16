@@ -4357,14 +4357,14 @@ function animateCape(dt) {
     for (let t = 0; t < idx.length; t += 3) {
       const ia = idx[t] * 3, ib = idx[t + 1] * 3, ic = idx[t + 2] * 3;
       const ux = x[ib] - x[ia], uy = x[ib + 1] - x[ia + 1], uz = x[ib + 2] - x[ia + 2], vx = x[ic] - x[ia], vy = x[ic + 1] - x[ia + 1], vz = x[ic + 2] - x[ia + 2];
-      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const nl = Math.hypot(nx, ny, nz); if (nl < 1e-9) continue;
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const nl = Math.sqrt(nx * nx + ny * ny + nz * nz); if (nl < 1e-9) continue;
       nx /= nl; ny /= nl; nz /= nl;
       const cx = (x[ia] + x[ib] + x[ic]) / 3, cz = (x[ia + 2] + x[ib + 2] + x[ic + 2]) / 3;
       const ed = Math.sin(time * 2.3 + cx * 1.9 + cz * 0.7) * 0.9 + Math.sin(time * 5.1 - cz * 2.6) * 0.45;   // eddies
       const rx = wx * (1 + ed * 0.35) + ed * 0.5 - ((x[ia] - px[ia]) + (x[ib] - px[ib]) + (x[ic] - px[ic])) / (3 * h) - bx;
       const ry = wy + ed * 0.35 - ((x[ia + 1] - px[ia + 1]) + (x[ib + 1] - px[ib + 1]) + (x[ic + 1] - px[ic + 1])) / (3 * h) - by;
       const rz = wz * (1 + ed * 0.35) - ((x[ia + 2] - px[ia + 2]) + (x[ib + 2] - px[ib + 2]) + (x[ic + 2] - px[ic + 2])) / (3 * h) - bz;
-      const sp = Math.hypot(rx, ry, rz), dn = rx * nx + ry * ny + rz * nz;
+      const sp = Math.sqrt(rx * rx + ry * ry + rz * rz), dn = rx * nx + ry * ny + rz * nz;
       // fast air makes cloth flutter: ripples that run from the collar to the hem, bigger toward the free end
       const q = (t / 6) | 0, row = (q / (W - 1)) | 0, fl = Math.sin(time * (6 + sp * 0.45) - row * 0.8 + (q % (W - 1)) * 0.45) * row / C.H;
       let f = 0.55 * C.aero * sp * (dn + fl * Math.min(sp, 30) * 0.09); f = clamp(f, -220, 220);
@@ -4388,7 +4388,7 @@ function animateCape(dt) {
     for (let it = 0, its = TOUCH || XR.on ? 5 : 8; it < its; it++) {
       for (let q = 0; q < nc; q += 4) {
         const i = cons[q], j = cons[q + 1], L = cons[q + 2] * sc, k = cons[q + 3], a3 = i * 3, b3 = j * 3;
-        const dx = x[b3] - x[a3], dy = x[b3 + 1] - x[a3 + 1], dz = x[b3 + 2] - x[a3 + 2], d = Math.hypot(dx, dy, dz);
+        const dx = x[b3] - x[a3], dy = x[b3 + 1] - x[a3 + 1], dz = x[b3 + 2] - x[a3 + 2], d = Math.sqrt(dx * dx + dy * dy + dz * dz);   // (sqrt, not hypot: this runs tens of thousands of times a frame, and hypot is many times slower)
         if (d < 1e-9) continue;
         const wi = i < W ? 0 : 1, wj = j < W ? 0 : 1, ws = wi + wj; if (!ws) continue;
         const g = (d - L) / d * k / ws;
@@ -4399,7 +4399,7 @@ function animateCape(dt) {
     // cloth barely stretches: one pass down from the collar holds each point within a tenth of its length of the one above
     for (let i = W; i < n; i++) {
       const j = i * 3, k = (i - W) * 3, L = C.vl[i] * sc;
-      const dx = x[j] - x[k], dy = x[j + 1] - x[k + 1], dz = x[j + 2] - x[k + 2], d = Math.hypot(dx, dy, dz);
+      const dx = x[j] - x[k], dy = x[j + 1] - x[k + 1], dz = x[j + 2] - x[k + 2], d = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (d > L) { const g = L / d; x[j] = x[k] + dx * g; x[j + 1] = x[k + 1] + dy * g; x[j + 2] = x[k + 2] + dz * g; }
     }
     // his body, and the ground
