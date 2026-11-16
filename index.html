@@ -24455,7 +24455,8 @@ function qlWhere(e) {
   if (!e || realm === 'under') return null; if (e.to) return { x: e.to.x, z: e.to.z }; const P = player.pos, d2 = (x, z) => (x - P.x) ** 2 + (z - P.z) ** 2;
   const best = (L, f) => { let b = null, bd = Infinity; for (const o of L) { const w = f(o); if (!w) continue; const d = d2(w.x, w.z); if (d < bd) { bd = d; b = w; } } return b; };
   if (realm === 'over') switch (e.kind) {
-    case 'skim': case 'under': { const s = flySea(20000); if (s) return { x: s.x, z: s.z }; break; }   // (the sea for skimming; and for going under it, burning)
+    case 'under': if (overHeight(P.x, P.z) < WATER - 8) return { x: P.x, z: P.z };   // (going under, burning: over deep water already, it is here; else the nearest sea)
+    case 'skim': { const s = flySea(20000); if (s) return { x: s.x, z: s.z }; break; }
     case 'waterfall': { const f = best(waterfalls, f => ({ x: f.position.x, z: f.position.z })); if (f) return f; break; }
     case 'island': { const i = best(skyIslands, s => Math.hypot(s.x - MYKONOS.x, s.z - MYKONOS.z) > 50 ? { x: s.x, z: s.z } : null); if (i) return i; break; }
     case 'beacon': { const b = best(BEACONS, b => b.lit || !b.group ? null : { x: b.group.position.x, z: b.group.position.z }); if (b) return b; break; }
