@@ -438,6 +438,8 @@
   @media (max-width: 520px) { #album .gr { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px; } #album { font-size:10px; letter-spacing:.1em; } #album u { padding:14px 7px; } }
   #diveBtn { display:none; position:fixed; left:50%; bottom:calc(var(--sb) + 64px); transform:translateX(-50%); z-index:7; min-height:40px; padding:8px 16px; border:1px solid rgba(160,210,255,.4); border-radius:20px; background:rgba(5,7,13,.5); color:#cfe6ff; font:inherit; font-size:10px; letter-spacing:.22em; cursor:pointer; -webkit-tap-highlight-color:transparent; }
   #diveBtn.on { display:block; } .photo #diveBtn { display:none; }
+  #formBtn { display:none; position:fixed; left:50%; bottom:calc(var(--sb) + 64px); transform:translateX(-50%); z-index:7; min-height:40px; padding:8px 16px; border:1px solid rgba(255,200,140,.4); border-radius:20px; background:rgba(5,7,13,.5); color:#ffe2c0; font:inherit; font-size:10px; letter-spacing:.22em; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  #formBtn.on { display:block; } .photo #formBtn { display:none; } body.statsv #formBtn { visibility:hidden !important; }
   #photoBar { position:fixed; left:50%; bottom:calc(var(--sb) + 12px); transform:translateX(-50%); z-index:7; display:none; gap:10px; }
   .touch .photo #photoBar { display:flex; }
   #photoBar button { width:44px; height:44px; border-radius:22px; border:1px solid rgba(255,200,140,.3); background:rgba(5,7,13,.5); color:#ffd8a8; font:inherit; font-size:15px; padding:0; -webkit-tap-highlight-color:transparent; }
@@ -958,7 +960,7 @@
 <div id="photoGrid" class="on"><i></i><i></i><i></i><i></i><b></b></div><div id="photoLens"></div>
 <div id="photoBar"><button type="button" data-a="exit" aria-label="Leave the camera">✕</button><button type="button" data-a="prev" aria-label="Previous view">◂</button><button type="button" data-a="next" aria-label="Next view">▸</button><button type="button" data-a="grid" aria-label="Grid">▦</button><button type="button" data-a="run" aria-label="Hold to let time run">▶</button><button type="button" data-a="live" aria-label="Hover while the world goes on">≈</button><button type="button" data-a="rec" aria-label="Record">●</button><button type="button" data-a="album" aria-label="Your photographs">▤</button></div>
 <button id="recChip" type="button" aria-label="Stop recording"><i></i><span></span></button>
-<div id="album" role="dialog" aria-label="Your photographs"></div><button id="diveBtn" type="button">DIVE UNDER</button>
+<div id="album" role="dialog" aria-label="Your photographs"></div><button id="diveBtn" type="button">DIVE UNDER</button><button id="formBtn" type="button"></button>
 <div id="photoHint">WASD MOVE · DRAG TO LOOK · Q / E DOWN / UP · Z / X TILT · WHEEL LENS · [ ] LENSES · 1–9 VIEWS · G GRID · H HOVER OR STILL · . LETS TIME RUN · P YOUR PHOTOGRAPHS · SPACE TAKES IT · + GOES BACK</div>
 <div id="patron" class="hidden"><b>CHOOSE YOUR PATRON</b><i>one of the Twelve will stand for you — and your fire will burn in their colour</i><div id="patronGrid"></div><u id="patronAny">let the gods decide</u></div>
 <button id="menuBtn" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu"><canvas id="markFire" aria-hidden="true"></canvas><span class="wm" aria-hidden="true"><i style="--n:0">I</i><i style="--n:1">C</i><i style="--n:2">A</i><i style="--n:3">R</i><i style="--n:4">U</i><i style="--n:5">S</i></span><small id="menuCount"></small></button><div id="menu" role="menu" aria-label="Menu"><canvas id="menuFire" aria-hidden="true"></canvas><div id="menuRow"></div><div id="menuSub" role="group"></div></div>
@@ -1629,8 +1631,18 @@ MYKONOS.top = Math.max(height(MYKONOS.x, MYKONOS.z), WATER) + 300;
 const skyIslands = [];   // filled by chunks as they stream in
 // a place with a name and a view, for something with wings to come down on: the top of a pylon, a terrace, a keep
 function lookout(name, x, top, z, r, rl, list) { const isl = { x, z, r2: r * r, top, name, realm: rl }; skyIslands.push(isl); if (list) list.push(isl); return isl; }
+// (and whatever else he has come down on: the crown of a tree, a roof, the top of a column, a deck. One thing at a time, and
+//  only while he is on it: see roostFind, where it is chosen)
+const ROOST = { on: false, kind: '', x: 0, z: 0, r: 0, top: 0, c: 1, s: 0, hw: 0, hd: 0, R: 0, px: 0, pz: 0, t: 0, realm: 'over' };
+function roostHas(x, z) {
+  const R = ROOST, ex = x - R.x, ez = z - R.z;
+  if (R.kind === 'box') return Math.abs(ex * R.c - ez * R.s) < R.hw && Math.abs(ex * R.s + ez * R.c) < R.hd;
+  if (R.kind === 'ring') return Math.abs(Math.hypot(ex, ez) - R.R) < R.hw;
+  return ex * ex + ez * ez < R.r * R.r;
+}
 function groundAt(x, z, y = Infinity) {
   let g = terrainAt(x, z);
+  if (ROOST.on && ROOST.realm === realm && y >= ROOST.top - 2.5 && roostHas(x, z)) g = Math.max(g, ROOST.top);
   if (ISLE && realm === 'over') {
     const d = Math.hypot(x - ISLE.x, z - ISLE.z);
     if (d < 72 && y >= ISLE.top - 2.5) g = Math.max(g, ISLE.top);
@@ -6044,7 +6056,7 @@ function spaceAction() {
     }
     if (p.perchGo) return { kind: 'perchoff', label: 'fly on' };
     if (PERCH.spot) return { kind: 'perch', label: PERCH.spot.name ? `perch on ${PERCH.spot.name.toLowerCase()}` : 'perch here' };
-    const g0 = groundAt(p.pos.x, p.pos.z, p.pos.y), alt = p.pos.y - Math.max(g0, WATER);
+    const g0 = Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), topAt(p.pos.x, p.pos.z, p.pos.y - 2.5)), alt = p.pos.y - Math.max(g0, WATER);   // (what is under him: the ground, or the top of whatever stands on it)
     if (alt < 12 && g0 > WATER + 0.5 && p.speed < 160) return { kind: 'perch', label: 'land as the bird' };
     if (KEEP_ON && alt >= ROLL_ALT && birdK() > 1.5 && !BIG.anim && SMALL.k >= 0.98) return { kind: 'shrink', label: 'the size of any bird' };   // (the keeper's bird: Space first makes it an ordinary size, then the wings, then the fall)
     return alt < ROLL_ALT ? { kind: 'swoop', label: 'land' } : { kind: 'wings', label: 'open your wings' };
@@ -6103,7 +6115,7 @@ function pressSpace() {
     return;
   }
   if (act.kind === 'wings') return openWings(false);
-  if (act.kind === 'perch') return PERCH.spot ? perchGo(PERCH.spot) : perchLand();
+  if (act.kind === 'perch') return perchGo(PERCH.spot || perchUnder());
   if (act.kind === 'perchoff') { p.perchGo = null; p.speed = Math.max(p.speed, 46); audio.sfx.flap?.(0.8); WR.beat = 1; return; }   // (changed his mind: on he goes)
   if (act.kind === 'takeoff') return perchUp();
   if (act.kind === 'swoop') return openWings(true);
@@ -6128,6 +6140,7 @@ function pressSpace() {
   if (act.kind === 'breach') return leapFromWater();
   if (act.kind === 'wingleap') return wingLeap();
   if (act.kind === 'jumpoff') return jumpOff();
+  if (act.kind === 'rebirth' && (time - (p.turnAt ?? -9) < 0.35 && time >= (p.turnAt ?? -9) || turnBird())) return;   // (every burn but the first, and the one that brings the title: he is the bird, going on as he was)
   const cost = COST[act.kind];
   if (p.burnout || p.flame < cost) {
     if (time - flags.faint > 3) {
@@ -6484,15 +6497,17 @@ function setManWings(f, fold, sweep, open, pitch) {
 }
 // phoenix → winged man: the bird's body burns off him, the wings stay, and they have to stop him in time
 function openWings(quick) {
-  const p = player;
-  p.quick = quick;
-  p.form = 'human'; p.wings = true; p.wingOpen = 0; p.tumble = false; p.grounded = false; p.sliding = false; p.cine = null;
+  const p = player, f0 = p.wingF || 0, th = WR.th, A0 = WR.A, bank0 = p.bank, el0 = Math.asin(clamp(Math.sin(p.pitch), -1, 1));
+  p.quick = quick; turnCamFrom(0.45); p.turnAt = time;
+  p.form = 'human'; p.wings = true; p.wingOpen = 0.5; p.tumble = false; p.grounded = false; p.sliding = false; p.cine = null;   // (the wings are out already: they are his in a blink)
   p.vel.set(dir3.x * p.speed, dir3.y * p.speed + p.vy, dir3.z * p.speed);
   p.flame = Math.max(0, p.flame - COST.wings);
-  human.group.rotation.y = p.yaw; camYaw = p.yaw; camYawOff = 0;
-  resetPose(); setBurn(0); p.fallTop = p.pos.y; p.morphT = 0; p.scale = 1; p.fallCause = '';
-  p.ghost = { form: 'phoenix', t: 0, T: 0.3 };
-  human.rig.rotation.x = -1.0;
+  human.group.rotation.y = p.yaw; camYaw = p.yaw + camYawOff; camYawOff = 0;
+  const dy = clamp(p.pos.y - groundAt(p.pos.x, p.pos.z, p.pos.y) - 0.3, 0, 1); p.pos.y -= dy;   // (the bird is placed by its breast, the man by his feet: his middle is where the bird's was)
+  resetPose(); setBurn(0); p.fallTop = p.pos.y; p.morphT = 0; p.scale = 1; p.fallCause = ''; p.armsOut = 0; p.perchGo = null;
+  p.ghost = { form: 'phoenix', t: 0, T: 0.25, quick: true, dy };
+  human.rig.rotation.x = clamp(-1.05 + el0 * 0.7, -2.2, 0.1); human.rig.rotation.z = clamp(bank0, -0.9, 0.9); armsSet(1, f0);   // (as the bird lay in the air, so does he: nose, bank, and his arms where the wings were)
+  p.wbPh = th < Math.PI ? th / Math.PI * 0.4 : 0.4 + (th - Math.PI) / Math.PI * 0.6; p.wbRate = A0 > 0.2 ? 2.4 : 0; p.wbCarry = A0 > 0.2 ? Math.min(1, A0) : 0; p.wbDown = p.wbPh < 0.4; p.aero = null; NET.sendT = 0;   // (and a beat goes on from where it was)
   for (let i = 0; i < 90; i++)
     emit(p.pos.x + rnd(2.5), p.pos.y + rnd(1), p.pos.z + rnd(2.5), rnd(6) + p.vel.x * 0.5, rnd(6) + p.vel.y * 0.5, rnd(6) + p.vel.z * 0.5, 0.5 + Math.random() * 0.6, i % 3 ? pick(EMBER) : pick(ASH));
   flash = 0.22; if (quick) audio.sfx.swoop(); else audio.sfx.wingsOpen(); netFx(quick ? 'swoop' : 'wings');
@@ -6619,6 +6634,108 @@ function burnOut(reason) {
   becomeHuman();
 }
 
+// ── One body into the other, and whatever it was doing goes on. A change he chooses is not a scene: for a quarter of a second
+//    the old body folds, white, into the new one with a breath of sparks, and the new one is already doing what the old one
+//    was. Wings out are arms out and arms out are wings out, at the same lift (a beat is taken up where it was); folded is
+//    arms down. A bird on a perch is a man standing on that spot, and back. A glide is a glide at the same bank; a fall is a
+//    dive and a run is low fast flight, along the same line at the same speed. The lens stays where it was and eases to its
+//    new place. (The first time he burns, and the burn that brings the title, are still the whole fire: see updateCine.)
+const TURNC = { T: 0, t: 0, off: new THREE.Vector3(), q: new THREE.Quaternion(), q1: new THREE.Quaternion(), fov: 60 };
+const midY = () => player.pos.y + (player.form === 'human' ? 1 : 0);   // (the middle of him, whichever he is: the bird is placed by its breast, the man by his feet)
+function wingsOut() { const W = phoenix.wings; return clamp(1 - ((W[0].root.rotation.y - W[1].root.rotation.y) / 2 - 0.3) / 0.4, 0, 1); }   // (how far out the bird's wings are, off the joints themselves: 0 folded along him or swept back in a dive, 1 spread)
+function armsOut() { return clamp(((Math.abs(human.armL.rotation.z) + Math.abs(human.armR.rotation.z)) / 2 - 0.5) / 0.9, 0, 1); }   // (and the man's arms: 0 at his sides, 1 straight out)
+function armsSet(k, f) {   // his arms, k of the way out to his sides, lifted as the wings were
+  const z = lerp(0.07, 1.57 + clamp(f, -0.6, 0.9) * 0.7, k);
+  human.armL.rotation.set(0.05 * k, 0, -z); human.armR.rotation.set(0.05 * k, 0, z); human.foreL.rotation.set(0.15 - 0.05 * k, 0, 0); human.foreR.rotation.set(0.15 - 0.05 * k, 0, 0);
+}
+function wingsSet(k, f) {   // and the bird's wings, k of the way out from folded, lifted as his arms were
+  const W = FOLDW;
+  for (let i = 0; i < 2; i++) setWingSide(i, lerp(W[0], f, k), lerp(W[1], -0.34, k), lerp(W[2], -0.2, k), lerp(W[3], 0.06, k), lerp(W[4], 1.14, k));
+  WR.t = -9; player.wingF = lerp(W[0], f, k);   // (flyWings takes them up from where they are)
+}
+function turnOk() {
+  const p = player;
+  return state === 'play' && !p.cine && !p.sub && !p.dive && !p.swim && !p.climb && !p.mount && !p.ferry && !p.gone && !p.shade && !p.trip && !(p.stumbleT > 0) && !(p.rollT > 0)
+    && !SH.def && !MORPH.kind && !COSMOS.on && !LIVE.on && !MOD.noclip && !(MATCH.phase && MATCH.me.in)   // (in a fight the change belongs to the fight)
+    && !(time - (p.turnAt ?? -9) < 0.35 && time >= (p.turnAt ?? -9));   // (and one change is over before the next: a held key does not flicker him)
+}
+// (the first burn of a visit is still the whole fire and the name: no quiet change takes its place)
+const titleDue = () => !SESSION.titled && (story.phase === 'leap' && !flags.titled || resumed && story.phase !== 'summit' && story.phase !== 'leap');
+function turnCamFrom(T, out = false) { const B = TURNC, p = player; if (xrFP() || cinema.on) return; B.T = T; B.t = 0; B.out = out; B.off.set(camera.position.x - p.pos.x, camera.position.y - midY(), camera.position.z - p.pos.z); B.q.copy(camera.quaternion); B.fov = camera.fov; }
+function turnCam(dt) {   // the lens, from where it was to where the new body's lens wants it, with no cut
+  const B = TURNC, p = player; B.t += dt; const u = B.t / B.T;
+  if (u >= 1 || state !== 'play' || p.cine || xrFP()) { B.T = 0; return; }
+  const e = B.out ? 1 - (1 - u) ** 3 : u * u * (3 - 2 * u), my = midY();   // (out to a bigger body, the lens gets back at once and settles; otherwise it eases both ways)
+  _v.set(camera.position.x - p.pos.x, camera.position.y - my, camera.position.z - p.pos.z).lerp(B.off, 1 - e); camera.position.set(p.pos.x + _v.x, my + _v.y, p.pos.z + _v.z);
+  B.q1.copy(camera.quaternion); camera.quaternion.copy(B.q).slerp(B.q1, e); camera.fov = lerp(B.fov, camera.fov, e); camera.updateProjectionMatrix();
+}
+function turnStart(T, out) {   // (called while he is still the old body)
+  const p = player, bird = p.form === 'phoenix', vx = bird ? dir3.x * p.speed : p.vel.x, vy = bird ? dir3.y * p.speed + p.vy : p.vel.y, vz = bird ? dir3.z * p.speed : p.vel.z, y = midY();
+  turnCamFrom(T, out); p.ghost = { form: p.form, t: 0, T: 0.25, quick: true, dy: 0 }; p.turnAt = time;
+  for (let i = 0; i < 28; i++) emit(p.pos.x + rnd(1.3), y + rnd(1), p.pos.z + rnd(1.3), rnd(5) + vx * 0.6, 1 + Math.random() * 3.5 + vy * 0.6, rnd(5) + vz * 0.6, 0.25 + Math.random() * 0.35, pick(EMBER));
+  flash = Math.max(flash, 0.1); audio.sfx.morph?.(0.25); NET.sendT = 0;   // (and everyone near is told at once)
+}
+function turnMan() {
+  const p = player; if (p.form !== 'phoenix' || !turnOk()) return false;
+  const out = wingsOut(), f = p.wingF || 0, perched = !!p.perch && !p.takeoff, yaw = p.yaw;
+  if (!perched && out > 0.5) { openWings(false); return true; }   // (in the air with his wings out: the man under them, gliding on)
+  turnStart(perched ? 0.6 : 0.45);
+  const dy = perched ? p.pos.y - groundAt(p.pos.x, p.pos.z, p.pos.y + 2) : 1; p.ghost.dy = dy;
+  p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.perchGo = null; p.takeoff = null; p.look = null; p.perchIdle = 0; p.sliding = false; p.morphT = 0; p.land = null; fireLight.intensity = 0;
+  human.group.rotation.y = yaw; resetPose(); setBurn(0); setManWings(0, 0, 0, 0, 0); p.wingStow = 0;
+  p.pos.y -= dy; p.fallTop = p.pos.y; p.fallCause = ''; p.safeT = 0;
+  if (perched) { p.grounded = true; p.tumble = false; p.vel.set(0, 0, 0); p.armsOut = out; p.armsF = f; armsSet(out, f); p.turnedT = time; }   // (on the same spot, his arms where the wings were)
+  else {   // (in the air with his wings folded: a man falling the way the bird was going, as fast, head first if it was)
+    camYaw = yaw + camYawOff; camYawOff = 0;
+    p.grounded = false; p.tumble = true; p.skyK = 1; p.ffTurn = 0; p.ffPull = -1 + out; p.diveK = 0; p.spin.set(0, 0, 0); p.armsOut = 0;
+    p.vel.set(dir3.x * p.speed, dir3.y * p.speed + p.vy, dir3.z * p.speed);
+    human.rig.rotation.set(clamp(-Math.PI / 2 + Math.asin(clamp(Math.sin(p.pitch), -1, 1)), -3, -0.6), 0, clamp(p.bank, -0.8, 0.8) * 0.5);
+    human.armL.rotation.set(0.3, 0, -0.3); human.armR.rotation.set(0.3, 0, 0.3);
+  }
+  return true;
+}
+function turnBird() {
+  const p = player; if (p.form !== 'human' || !turnOk() || !flags.morphed || story.phase === 'summit' || story.phase === 'leap' || titleDue()) return false;
+  const K = birdK(), H = human, yaw = H.group.rotation.y, hs = Math.hypot(p.vel.x, p.vel.z), v = Math.hypot(hs, p.vel.y), out = armsOut();
+  const still = p.grounded && hs < 2.5, glide = !!p.wings && !p.grounded, fall = !p.grounded && !glide && (p.tumble || v > 30);
+  if (!still && (p.burnout || p.flame < COST.rebirth)) return false;   // (no fire to fly on: Space says so)
+  const W = glide && H.wings.visible ? H.wingParts.map((w, i) => [-w.shoulder.rotation.z, -w.elbow.rotation.z, -w.wrist.rotation.z, w.root.rotation.y * (i === 0 ? 1 : -1)]) : null;
+  const armF = clamp(((Math.abs(H.armL.rotation.z) + Math.abs(H.armR.rotation.z)) / 2 - 1.57) / 0.7, -0.6, 0.9), rz = H.rig.rotation.z;
+  turnStart(still ? 0.6 : 0.45, true); if (still) p.ghost.s0 = 0.3;   // (on the ground the bird comes up out of the man, from his size to its own)
+  const dy = still ? 0.9 * K : Math.max(1, 0.9 * K); p.ghost.dy = dy;   // (standing, the bird's feet where his were; moving, its breast where his middle was)
+  if (!still) { p.flame -= COST.rebirth; STATS.d.flights++; }
+  p.form = 'phoenix'; p.cine = null; p.scale = 1; p.morphT = 0; p.burnout = false; p.skyT = 0; p.armed = false; p.wings = false; p.tumble = false; p.climb = null; p.sliding = false; p.land = null;
+  p.turn = 0; p.stagger = 0; p.glideT = 0; p.climbT = 0; p.flapCD = 0; p.perchGo = null; p.takeoff = null; p.look = null; p.armsOut = 0; p.perchOpen = 0; if (FLIP.over) flipLevel();
+  p.pos.y += dy; p.fallTop = p.pos.y; p.yaw = yaw; p.bank = 0; p.pitch = 0; p.vy = 0;
+  if (still) {   // (standing: the bird stands there, its wings where his arms were)
+    p.perch = true; p.perchT = 1.6; p.perchIdle = 0; p.grounded = true; p.speed = 0; p.perchRoom = 1; p.perchRoomT = 0; p.perchOpen = out; wingsSet(out, 0.24 + armF * 0.5); p.turnedT = time;
+  } else {
+    p.perch = false; p.grounded = false; if (hs > 3) p.yaw = Math.atan2(-p.vel.x, -p.vel.z);
+    camYawOff = wrapAngle(camYaw - p.yaw);   // (the lens stays where it is, and comes round behind him in its own time)
+    if (glide || fall) {   // a glide is a glide, a fall is a dive: the same line through the air at the same speed
+      const sp = Math.max(v, 18); p.pitch = clamp(Math.asin(clamp(p.vel.y / sp, -1, 1)), -1.38, 1.2); p.speed = sp; p.vy = p.vel.y - Math.sin(p.pitch) * sp; p.bank = clamp(glide ? rz : rz * 0.6, -1, 1);
+      if (W) { for (let i = 0; i < 2; i++) setWingSide(i, W[i][0], W[i][1], W[i][2], W[i][3], 1.12); WR.t = -9; p.wingF = (W[0][0] + W[1][0]) / 2;
+        const ph = p.wbPh || 0; WR.th = ph < 0.4 ? ph / 0.4 * Math.PI : Math.PI + (ph - 0.4) / 0.6 * Math.PI; WR.A = (p.wbRate || 0) > 0.8 ? 0.6 : 0; WR.beat = 0; }   // (the very wings, joint for joint, and the beat where it was)
+      else wingsSet(out, 0.24 + armF * 0.5);
+    } else {   // off the ground at a run, or just off it: low and fast the way he was going (see updateTakeoff)
+      p.speed = Math.max(hs, 4); p.vy = p.vel.y; p.takeoff = { t: 0, sq: 0, sprung: true, beatT: 0, y0: p.pos.y, low: true }; wingsSet(Math.max(out, 0.7), 0.55); WR.th = 0;
+    }
+  }
+  dir3.set(-Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(p.yaw) * Math.cos(p.pitch));
+  return true;
+}
+function turnForm(to) {   // (to: 'human', 'bird', or nothing for whichever he is not)
+  const bird = player.form === 'phoenix'; if (to && (to === 'bird') === bird) return false;
+  return bird ? turnMan() : turnBird();
+}
+// the one thing on the screen for it: where he could change on the spot (a bird on a perch; the man it turned into), a small
+// word to press, with its key. And the things that are his only for a while are let go of here
+const turnShown = () => { const p = player; if (!turnOk()) return ''; if (p.form === 'phoenix') return p.perch && !p.takeoff ? 'THE MAN' : ''; return p.grounded && flags.morphed && story.phase !== 'summit' && story.phase !== 'leap' && !titleDue() && (ROOST.on || time - (p.turnedT ?? -99) < 30) ? 'THE BIRD' : ''; };
+function turnTick(dt) {
+  const p = player; roostTick();
+  if (p.armsOut > 0 && (p.form !== 'human' || !p.grounded || state !== 'play' || p.swim || p.climb || Math.hypot(p.vel.x, p.vel.z) > 1.2)) p.armsOut = Math.max(0, p.armsOut - dt / 0.35);   // (his arms come down as he walks off)
+  const show = turnShown(); if (show !== HUDQ.turn) { HUDQ.turn = show; const b = $('formBtn'); b.classList.toggle('on', !!show); if (show) b.textContent = TOUCH ? show : 'Q · ' + show; }
+}
 // a burnout: the bird comes apart into ash; high up, the man falls
 function becomeHuman() {
   const p = player;
@@ -6927,7 +7044,7 @@ function updateHuman(dt) {
     // they beat: a hard, fast downstroke with the hand spread wide, a slower upstroke with the wrist folded to slip back
     // through the air; harder braking, quicker strokes. In a turn the inside wing drops and half-folds and the outside one
     // lifts; diving, both sweep back. His arms reach up and out along them, holding on.
-    const work = Math.max(flare, near * 0.85);
+    const work = Math.max(flare, near * 0.85, p.wbCarry || 0); p.wbCarry = Math.max(0, (p.wbCarry || 0) - dt / 0.45);   // (a beat the bird was in the middle of is finished)
     p.wbRate = lerp(p.wbRate || 0, work > 0.12 ? 1.5 + work * 1.7 : 0, damp(3, dt));
     p.wbPh = ((p.wbPh || 0) + dt * p.wbRate) % 1;
     const amp = clamp((p.wbRate - 0.3) / 1.2, 0, 1) * Math.min(1, 0.4 + work), ph = p.wbPh, down = ph < 0.4, u = down ? ph / 0.4 : (ph - 0.4) / 0.6;
@@ -7480,6 +7597,8 @@ function bodyLanguage(dt, hs, swimming) {
   }
   if (CHOP.swing > 0 && p.form === 'human') { const u = 1 - CHOP.swing / 0.52, up = smoothstep(0, 0.42, u) * (1 - smoothstep(0.42, 0.56, u)), dn = smoothstep(0.42, 0.56, u) * (1 - smoothstep(0.75, 1, u));   // (the swing: up over the shoulder, and down into the trunk)
     T.arx += 2.6 * up + 0.9 * dn; T.alx += 2.2 * up + 0.8 * dn; T.frx += 0.6 * up; T.flx += 0.6 * up; T.arz -= 0.25 * up; T.alz += 0.25 * up; T.cx += -0.2 * up + 0.35 * dn; T.cy += 0.25 * up - 0.2 * dn; curlL = curlR = GRIP; rate = 18; }
+  if (p.armsOut > 0.01) { const k = p.armsOut, z = 1.57 + (p.armsF || 0) * 0.7;   // (arms out, as the wings were: held while he stands, let down as he walks off)
+    T.alx = lerp(T.alx, 0.05, k); T.arx = lerp(T.arx, 0.05, k); T.alz = lerp(T.alz, -z, k); T.arz = lerp(T.arz, z, k); T.flx = lerp(T.flx, 0.1, k); T.frx = lerp(T.frx, 0.1, k); if (k > 0.5) curlL = curlR = SPREAD; }
   applyBody(dt, rate);
   const ck = damp(rate, dt);
   setCurl(H.handL, curlL, ck); setCurl(H.handR, curlR, ck);
@@ -8097,7 +8216,7 @@ function netSend(dt) {
   NET.lastSent = { x: p.pos.x, y: p.pos.y, z: p.pos.z, f, yaw, fc, t: performance.now() };
   let tp, ts; { const T = TRON.trails.get(NET.id); if (T && T.n > T.start) { const end = T.base + T.n, g0 = Math.max(TRON.sent, T.base + T.start, end - 40); if (g0 < end) { ts = g0; tp = []; for (let gi = g0; gi < end; gi++) { const i = (gi - T.base) * 3; tp.push(r1(T.pts[i]), r1(T.pts[i + 1]) + (T.gap[gi - T.base] ? 2e6 : 0), r1(T.pts[i + 2])); } TRON.sent = end; } } }   // (a point of a gap told with its height raised out of the world: see tronTake)   // (the wall behind him: the pieces laid since he last said)
   NET.ch.send({ type: 'broadcast', event: 's', payload: { i: NET.id, n: heroName, p: [r1(p.pos.x), r1(p.pos.y), r1(p.pos.z)], v: [r1(v.x), r1(v.y), r1(v.z)],
-    ...(p.form === 'phoenix' ? (([a, b, c]) => ({ y: r2(a), pi: r2(b), b: r2(c) }))(flipNet(p)) : { y: r2(yaw), pi: r2(p.pitch || 0), b: r2(p.bank || 0) }), f, r: realm === 'under' ? 1 : 0, gm: GODM.on ? 1 : undefined, sm: SMALL.want < 1 ? 1 : undefined, bk: BIG.k && BIG.k < bigName(heroName) - 0.5 && !BIG.anim ? Math.round(BIG.k * 10) / 10 : undefined, fa: FAC.tag || undefined, rd: XR.on && XR.mode === 'rider' && p.form === 'phoenix' ? 1 : undefined, gf: GFLY.on ? [GFLY.g.id, Math.round(GFLY.B.pos.x), Math.round(GFLY.B.pos.y), Math.round(GFLY.B.pos.z)] : undefined, ma: MATCH.phase === 'live' && MATCH.me.alive ? MATCH.id : undefined, ts, tp, m: LIVE.on ? 1 : undefined, tk: LIVE.on && LIVE.tk ? LIVE.tk : undefined, g: p.grounded ? 1 : 0, w: r2(p.wingF || 0), pt: PATRON.id || undefined, fc: fc || undefined,
+    ...(p.form === 'phoenix' ? (([a, b, c]) => ({ y: r2(a), pi: r2(b), b: r2(c) }))(flipNet(p)) : { y: r2(yaw), pi: r2(p.pitch || 0), b: r2(p.bank || 0) }), f, r: realm === 'under' ? 1 : 0, gm: GODM.on ? 1 : undefined, sm: SMALL.want < 1 ? 1 : undefined, bk: BIG.k && BIG.k < bigName(heroName) - 0.5 && !BIG.anim ? Math.round(BIG.k * 10) / 10 : undefined, fa: FAC.tag || undefined, rd: XR.on && XR.mode === 'rider' && p.form === 'phoenix' ? 1 : undefined, gf: GFLY.on ? [GFLY.g.id, Math.round(GFLY.B.pos.x), Math.round(GFLY.B.pos.y), Math.round(GFLY.B.pos.z)] : undefined, ma: MATCH.phase === 'live' && MATCH.me.alive ? MATCH.id : undefined, ts, tp, m: LIVE.on ? 1 : undefined, tk: LIVE.on && LIVE.tk ? LIVE.tk : undefined, g: p.grounded ? 1 : 0, w: r2(p.form === 'human' ? (a => a > 0.5 ? a : 0)((Math.abs(human.armL.rotation.z) + Math.abs(human.armR.rotation.z)) / 2) : p.wingF || 0), pt: PATRON.id || undefined, fc: fc || undefined,
     vk: VK.pub || undefined } });   // (in every one: someone just arrived has it at once, before anyone else can claim this id)
 }
 // ── what other people look like: a man, or a burning bird, with their name over them
@@ -8219,7 +8338,9 @@ function updatePeers(dt) {
     P.pos.lerp(_p, damp(P.form === 'p' ? 7 : 10, dt));
     P.yaw += wrapAngle(P.yawT - P.yaw) * damp(8, dt); P.pitch += wrapAngle(P.pitchT - P.pitch) * damp(6, dt); P.bank += wrapAngle(P.bankT - P.bank) * damp(6, dt);   // (round the shorter way: a bird on its own loops and rolls right over)
     const bird = P.form === 'p', sp = Math.hypot(P.s.vx, P.s.vz), far = P.pos.distanceToSquared(camera.position) > (fogFar + 300) ** 2;   // (out past the fog: the mark on the edge of the screen says where; the figure is not drawn, nor worked out)
-    teamPaint(P, A); A.bird.group.visible = bird && !far; A.man.group.visible = !bird && !far; xrayStep(P, A, bird && !far);
+    if (P.wasBird !== undefined && P.wasBird !== bird && !far) { P.turnT = 0.25; for (let i = 0; i < 20; i++) emit(P.pos.x + rnd(1.3), P.pos.y + (bird ? 0 : 1) + rnd(1), P.pos.z + rnd(1.3), rnd(5) + P.s.vx * 0.6, 1 + Math.random() * 3.5, rnd(5) + P.s.vz * 0.6, 0.25 + Math.random() * 0.35, pick(EMBER)); }   // (they changed: for a quarter of a second the old body folds into the new, as it does for them)
+    P.wasBird = bird; const tk = P.turnT > 0 ? (P.turnT = Math.max(0, P.turnT - dt)) / 0.25 : 0;
+    teamPaint(P, A); A.bird.group.visible = (bird || tk > 0) && !far; A.man.group.visible = (!bird || tk > 0) && !far; xrayStep(P, A, bird && !far);
     if (P.rode && !(bird && P.rider && !far)) { P.rode = false; reinsHide(P.reins); A.man.group.scale.setScalar(MAN_SCALE); A.man.group.rotation.set(0, P.yaw || 0, 0); }
     if (!bird && !far) humanLod(A.man, Math.sqrt(P.pos.distanceToSquared(camera.position)));
     if (bird) {
@@ -8239,6 +8360,10 @@ function updatePeers(dt) {
         for (let i = 0; i < 3; i++) { const b = 2 + Math.random() * 4, sd = i ? 1 : -1; emit(P.pos.x - P.s.vx / v3 * b + rnd(2.2), P.pos.y - P.s.vy / v3 * b + rnd(1.4), P.pos.z - P.s.vz / v3 * b + rnd(2.2), P.s.vx * 0.05 + rnd(0.6), P.s.vy * 0.05, P.s.vz * 0.05 + rnd(0.6), 1.8 + Math.random() * 0.8, c, 0, 2.2); }
       }
     } else animPeer(P, A.man, dt, sp);
+    if ((tk > 0 || P.turned) && !P.rider) { const G = A.bird.group, M = A.man.group, wantB = PHX_S * (P.bk || bigName(P.name)) * (P.gm ? 1.12 : 1) * (P.sm ? SMALL.MIN : 1), k2 = tk * tk;
+      if (bird) { M.position.copy(P.pos); M.position.y -= 0.9; M.scale.setScalar(MAN_SCALE * Math.max(0.001, k2)); G.scale.setScalar(wantB * (1 - 0.25 * k2)); }
+      else { G.position.copy(P.pos); G.position.y += 1; G.scale.setScalar(wantB * Math.max(0.001, k2)); M.scale.setScalar(MAN_SCALE * (1 - 0.25 * k2)); }
+      P.turned = tk > 0; }
     // their name over them; what they just said, under it
     const d = camera.position.distanceTo(P.pos), said = now - P.saidT < 5500 && d < 400 ? P.said : '';
     placeWaypoint(P, d, said, bird);
@@ -8358,6 +8483,9 @@ function animPeer(P, H, dt, sp) {
   H.armL.rotation.set(air ? 2 : -s1 * lerp(0.42, 1.05, run) * mv, 0, air ? -0.6 : -0.07); H.armR.rotation.set(air ? 2 : s1 * lerp(0.42, 1.05, run) * mv, 0, air ? 0.6 : 0.07);
   H.foreL.rotation.x = H.foreR.rotation.x = lerp(0.18, 1.5, run * mv);
   H.chest.rotation.set(-0.26 * run * mv + Math.sin(time * 1.6 + P.ph) * 0.01, -s1 * 0.15 * mv, 0);
+  // (standing with their arms held out, as someone does who was a bird with its wings spread a moment ago)
+  if (P.wing > 0.5) P.armZ = P.wing; const ak = P.armK = lerp(P.armK || 0, P.wing > 0.5 && !air ? 1 : 0, damp(10, dt));
+  if (ak > 0.01) { const z = P.armZ || 1.6; H.armL.rotation.set(lerp(H.armL.rotation.x, 0.05, ak), 0, lerp(H.armL.rotation.z, -z, ak)); H.armR.rotation.set(lerp(H.armR.rotation.x, 0.05, ak), 0, lerp(H.armR.rotation.z, z, ak)); H.foreL.rotation.x = H.foreR.rotation.x = lerp(H.foreL.rotation.x, 0.1, ak); }
 }
 const now = () => performance.now() / 1000;
 // two birds meet in the air: both come down as men
@@ -9267,7 +9395,7 @@ addEventListener('keydown', e => {
 // typed into the grid too. The page keeps every one of them, laid out as before but in letters the size of the grid's
 // (so where a word is on the page is where it is typed), unseen; a press still lands on the real thing. A panel is
 // looked at afresh when something in it changes, or every quarter of a second, and typed in again every frame from that.
-const AUID = { ids: ['agentCard', 'agx', 'chat', 'who', 'prompt', 'warn', 'mic', 'modeBar', 'newcomer', 'friendAsk', 'xfCard', 'xfList', 'waveBtn', 'flipBtn', 'diveBtn', 'bag', 'bldBar', 'matchBig', 'fightCard', 'matchAsk', 'dpBar', 'dpExit', 'recChip', 'guide', 'qlog', 'healthPill', 'looks', 'patron', 'tut'],
+const AUID = { ids: ['agentCard', 'agx', 'chat', 'who', 'prompt', 'warn', 'mic', 'modeBar', 'newcomer', 'friendAsk', 'xfCard', 'xfList', 'waveBtn', 'flipBtn', 'diveBtn', 'formBtn', 'bag', 'bldBar', 'matchBig', 'fightCard', 'matchAsk', 'dpBar', 'dpExit', 'recChip', 'guide', 'qlog', 'healthPill', 'looks', 'patron', 'tut'],
   panels: new Set(['agentCard', 'agx', 'who', 'xfCard', 'xfList', 'bag', 'bldBar', 'guide', 'qlog', 'looks', 'patron', 'fightCard']), roots: [], mo: null };
 const UIASC = { '⟲': '@', '✕': 'X', '×': 'x', '◂': '<', '▸': '>', '‹': '<', '›': '>', '«': '<<', '»': '>>', '→': '->', '←': '<-', '↑': '^', '↓': 'v', '●': '*', '◉': '@', '◎': '@', '◆': '<>', '◇': '<>', '✦': '*', '✧': '+', '⌂': 'n', '♣': '&', '△': '^', '▲': '^', '▶': '>', '▦': '#', '▣': '#', '†': '+', '—': '-', '–': '-', '…': '...', '’': "'", '‘': "'", '“': '"', '”': '"', '·': '\x7f', '•': '\x7f', '\x7f': '\x7f', '²': '2', '³': '3', '°': 'o', '✓': 'v', '★': '*', '☆': '*', '♥': '<3', '✎': '>_', '⚑': 'P', '⏵': '>', '⏸': '||' };
 const uiAsc = s => String(s || '').replace(/[^\x20-\x7e]/g, ch => UIASC[ch] ?? (/[À-ÿ]/.test(ch) ? ch.normalize('NFD')[0] : ''));
@@ -11757,7 +11885,7 @@ function padTick() {
   if (state === 'play' && PAD.b[0] && !was[0]) { const M = MATCH; if (M.phase === 'count' && M.placed && MD.id === M.id && Date.now() < M.t0) { if (MD.ask === 'ready') mdReady(); if (mdCamOn()) mdSkip(); } else pressSpace(); }   // (in a fight's opening, A is Space there: a yes when asked, and his own lens)
   if (state === 'play' && PAD.b[3] && !was[3]) { if (fshOn()) fshTo('next'); else if (player.form === 'phoenix') birdTrick(''); }   // (Y: a trick; in a fight, the next shape)
   if (state === 'play' && PAD.b[2] && !was[2] && fbOn()) fbFire();   // (X: fire, in a fight)
-  if (state === 'play' && PAD.b[1] && !was[1] && fbOn()) fbWind();   // (B: the wind)
+  if (state === 'play' && PAD.b[1] && !was[1]) { if (fbOn()) fbWind(); else turnForm(); }   // (B: the wind, in a fight; out of one, the other body)
 }
 function sendChat(raw) {
   const text = String(raw || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
@@ -11831,15 +11959,96 @@ const perchR = () => 1.55 * birdK(), _pz = new THREE.Vector3(), _pq = new THREE.
 function perchClear(pos) {   // moved out of whatever it is in, a few times over (a corner takes more than one push)
   for (let k = 0; k < 5; k++) { _pz.set(0, 0, 0); if (!pushOut(pos, _pz, perchR())) break; }
 }
+// ── Anywhere solid is somewhere to come down: not only the ground and the places with names, but the crown of a tree, a
+//    roof, the top of a column or a wall, a rock, a deck. What is under a point is asked two ways. The quick way (every
+//    frame) is the same list of solids that turns a bird in flight, looked at from above: the highest top that is not over
+//    his head. The slow way (when he lands, and now and then while he stands there) is a line dropped through the stone
+//    itself (a temple's roof, the tower and the ships of Crete, a monastery and its bridge) for what has a shape but no
+//    entry in that list. Whichever is found is his ROOST: groundAt counts it as ground while he is on it, so the bird
+//    stands on it, the man it turns into stands on it, and either can walk to its edge and step off.
+const _top = { y: -1e9, kind: '', x: 0, z: 0, r: 0, c: 1, s: 0, hw: 0, hd: 0, R: 0 };
+function topAt(x, z, y) {   // (the highest top under (x, z) that is no more than a step above y; -1e9 if there is none)
+  const T = _top, lim = y + 2.5; T.y = -1e9; T.kind = '';
+  const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK), lx = x - cx * CHUNK, lz = z - cz * CHUNK;
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+    if (dx < 0 && lx > 40 || dx > 0 && lx < CHUNK - 40 || dz < 0 && lz > 40 || dz > 0 && lz < CHUNK - 40) continue;
+    const S = chunks.get((cx + dx) + ',' + (cz + dz))?.userData.solids; if (!S) continue;
+    for (let i = 0; i < S.length; i++) {
+      const s = S[i], top = s.y1 + 0.06; if (top > lim || top <= T.y || s.y1 < -1e8) continue;   // (a felled tree has no top)
+      const ex = x - s.x, ez = z - s.z; if (ex * ex + ez * ez >= s.r * s.r) continue;
+      T.y = top; T.kind = 'cyl'; T.x = s.x; T.z = s.z; T.r = s.r;
+    }
+  }
+  if (realm !== 'over') return T.y;
+  for (const c of ROCKS.cyls) { if (c.y1 > lim || c.y1 <= T.y) continue; const ex = x - c.x, ez = z - c.z; if (ex * ex + ez * ez >= c.r * c.r) continue; T.y = c.y1; T.kind = 'cyl'; T.x = c.x; T.z = c.z; T.r = c.r; }
+  const box = b => { if (b.y1 > lim || b.y1 <= T.y) return; const ex = x - b.x, ez = z - b.z; if (Math.abs(ex * b.c - ez * b.s) >= b.hw || Math.abs(ex * b.s + ez * b.c) >= b.hd) return; T.y = b.y1; T.kind = 'box'; T.x = b.x; T.z = b.z; T.c = b.c; T.s = b.s; T.hw = b.hw; T.hd = b.hd; };
+  for (const b of ROCKS.boxes) box(b);
+  if ((x - MOUNT.x) ** 2 + (z - MOUNT.z) ** 2 < 345 * 345) {
+    for (const b of CROWN.boxes) box(b);
+    for (const r of CROWN.rings) { if (r.y1 > lim || r.y1 <= T.y || Math.abs(Math.hypot(x - r.x, z - r.z) - r.R) >= r.hw) continue; T.y = r.y1; T.kind = 'ring'; T.x = r.x; T.z = r.z; T.R = r.R; T.hw = r.hw; }
+  }
+  return T.y;
+}
+const _rstC = new THREE.Raycaster(), _rstH = [], _rstO = new THREE.Vector3(), _rstD = new THREE.Vector3(0, -1, 0);
+function structHit(o, d, far) {   // (the nearest built stone a line meets, or null. Only what was built by hand and stands still is asked)
+  if (realm !== 'over' || !(far > 0)) return null;
+  _rstC.set(o, d); _rstC.far = far; _rstH.length = 0;
+  const X = o.x + d.x * far * 0.5, Z = o.z + d.z * far * 0.5, reach = far * 0.5 + 70;
+  const cast = g => { if (g && g.visible) try { g.traverseVisible(m => { if (m.isMesh && !m.isSkinnedMesh && m.material && !m.material.transparent && m.material.depthWrite !== false) m.raycast(_rstC, _rstH); }); } catch {} };
+  for (const T of temples) if (Math.abs(T.x - X) < reach && Math.abs(T.z - Z) < reach) cast(T.group);
+  for (const S of WORLD.shrines) if (S.group && Math.abs(S.group.position.x - X) < reach && Math.abs(S.group.position.z - Z) < reach) cast(S.group);
+  cast(SMITHY.group); for (const S of ROCKS.sites.values()) cast(S.mesh); cast(PANTHEON.group);
+  if (CRETE.group && Math.hypot(CRETE.x - X, CRETE.z - Z) < (CRETE.R || 4000) + reach) cast(CRETE.group);
+  let best = null; for (const h of _rstH) if (!best || h.distance < best.distance) best = h;
+  return best;
+}
+// what he would stand on at (x, z): the ground as groundAt has it (asked at yG), or a top no higher than yT, or (deep) built
+// stone a line dropped from yT finds first. It becomes the roost, and its height is given back.
+function roostFind(x, z, yG, yT, deep) {
+  const R = ROOST, was = R.on; R.on = false; const g = groundAt(x, z, yG); R.on = was;
+  let top = topAt(x, z, yT - 2.5), kind = _top.kind;
+  if (deep) { const base = Math.max(g, top), h = structHit(_rstO.set(x, yT, z), _rstD, yT - base - 0.2); if (h) { top = h.point.y + 0.03; kind = 'spot'; } }
+  if (top > g + 0.05 && !(realm === 'over' && top < WATER + 0.5)) {
+    R.on = true; R.kind = kind; R.top = top; R.realm = realm; R.px = x; R.pz = z; R.t = time;
+    if (kind === 'spot') { R.x = x; R.z = z; R.r = 1.4; } else { R.x = _top.x; R.z = _top.z; R.r = _top.r; R.c = _top.c; R.s = _top.s; R.hw = _top.hw; R.hd = _top.hd; R.R = _top.R; }
+    return top;
+  }
+  R.on = false; return g;
+}
+const _roostK = {};
+function surfAt(x, z, yG, yT, deep) { Object.assign(_roostK, ROOST); const h = roostFind(x, z, yG, yT, deep); Object.assign(ROOST, _roostK); return h; }   // (the same question, asked without taking it as his own)
+// each frame he is on his feet on it: where the list has an answer it is asked every frame; stone a line found is asked again
+// when he has moved, or every so often (it may have gone)
+function roostStep(x, z, yG, yT) {
+  const R = ROOST, spot = R.on && R.kind === 'spot';
+  if (spot && Math.hypot(x - R.px, z - R.pz) < 0.35 && time - R.t < 0.6 && time >= R.t) return R.top;
+  const was = R.on && !spot && roostHas(x, z), t0 = R.t, h = roostFind(x, z, yG, yT, spot);
+  if (!R.on && was && time - t0 < 1 && time >= t0) { R.on = true; return R.top; }   // (a top that is not in the list for a moment, as the country round it is put up again, is still under him)
+  return h;
+}
+// (too steep to stand on: bare ground at more than about sixty degrees. A top, a floor, an island is flat)
+const tooSteep = (x, z, y) => { if (y > terrainAt(x, z) + 0.3) return false; const e = 2; return Math.hypot(terrainAt(x + e, z) - terrainAt(x - e, z), terrainAt(x, z + e) - terrainAt(x, z - e)) / (2 * e) > 1.7; };
+function roostTick() {   // (it is his only while he is on it: a bird that has gone up, a man who has walked or fallen off, has none)
+  const p = player, R = ROOST; if (!R.on) return;
+  if (state === 'dead' || state === 'warp' || R.realm !== realm || p.sub || p.dive || p.mount) { R.on = false; return; }
+  if (p.form === 'phoenix') { if (!p.perch && !p.takeoff) R.on = false; return; }
+  if (p.grounded && !p.climb && !p.swim && Math.abs(p.pos.y - R.top) < 1.2) roostStep(p.pos.x, p.pos.z, p.pos.y + 0.5, p.pos.y + 0.6);
+  else if (p.climb || p.pos.y < R.top - 3 || p.pos.y > R.top + 30 || Math.hypot(p.pos.x - R.px, p.pos.z - R.pz) > 60) R.on = false;
+}
 function perchLand() {
-  const p = player;
-  p.perch = true; p.takeoff = null; p.perchT = 0; p.grounded = true; p.speed = 0; p.vy = 0; p.pitch = 0; p.bank = 0; p.turn = 0; p.perchRoom = 1; p.perchRoomT = 0;
-  p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * birdK(); perchClear(p.pos);
-  p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * birdK(); p.fallTop = p.pos.y; camShake = Math.max(camShake, 0.12 * birdK());
-  if (overHeight(p.pos.x, p.pos.z) < WATER + 1.5) ripple(p.pos.x, p.pos.z, 0.9);
+  const p = player, K = birdK();
+  p.perch = true; p.takeoff = null; p.perchT = 0; p.grounded = true; p.speed = 0; p.vy = 0; p.pitch = 0; p.bank = 0; p.turn = 0; p.perchRoom = 1; p.perchRoomT = 0; p.perchOpen = 0;
+  p.pos.y = roostFind(p.pos.x, p.pos.z, p.pos.y + 2, p.pos.y - 0.9 * K + 3, true) + 0.9 * K; perchClear(p.pos);
+  p.pos.y = roostFind(p.pos.x, p.pos.z, p.pos.y + 2, p.pos.y - 0.9 * K + 3, true) + 0.9 * K; p.fallTop = p.pos.y; camShake = Math.max(camShake, 0.12 * K);
+  if (!ROOST.on && overHeight(p.pos.x, p.pos.z) < WATER + 1.5) ripple(p.pos.x, p.pos.z, 0.9);
   for (let i = 0; i < 30; i++) emit(p.pos.x + rnd(2), p.pos.y - 0.6, p.pos.z + rnd(2), rnd(4), Math.random() * 3, rnd(4), 0.8, pick(EMBER));
-  audio.sfx.land?.(0.4); audio.sfx.perch?.(); toast('ON THE GROUND · AS THE BIRD');
-  if (!p.look) scorch(p.pos.x, p.pos.z, 2.4, p.pos.y);   // (where a bird of fire sets down, the grass knows it)
+  audio.sfx.land?.(0.4); audio.sfx.perch?.(); toast(ROOST.on ? 'PERCHED · AS THE BIRD' : 'ON THE GROUND · AS THE BIRD');
+  if (!p.look && !ROOST.on) scorch(p.pos.x, p.pos.z, 2.4, p.pos.y);   // (where a bird of fire sets down, the grass knows it)
+}
+// where a bird that only said "down" comes down: a little ahead of him, on whatever is there (or right under him, if that is the sea)
+function perchUnder() {
+  const p = player, P = p.pos, a = clamp(p.speed * 0.4, 2, 30), x = P.x - Math.sin(p.yaw) * a, z = P.z - Math.cos(p.yaw) * a, g = surfAt(x, z, P.y + 4, P.y + 1.5);
+  return g > WATER + 0.5 || realm !== 'over' ? { x, y: g, z, r: 4.5, name: '', under: true } : { x: P.x, y: surfAt(P.x, P.z, P.y + 4, P.y + 1.5), z: P.z, r: 4.5, name: '', under: true };
 }
 function perchUp() {
   const p = player; if (p.takeoff) return;
@@ -11850,6 +12059,18 @@ function perchUp() {
 // first beats are the biggest, nose high, until it has the air under it and levels into flight.
 function updateTakeoff(dt) {
   const p = player, T = p.takeoff, K = birdK(); T.t += dt; const t = T.t;
+  if (T.low) {   // (not up off a perch but on from a run or a jump: the first beats carry him forward and a little up, at the speed he had, and the stick is his from the start)
+    const u = clamp(t / 0.7, 0, 1), ax = state === 'play' ? axes()[0] : 0;
+    if (time > T.beatT && u < 0.9) { T.beatT = time + 0.3; WR.beat = 1; audio.sfx.flap?.(0.8 - u * 0.3); netFx('flap'); }
+    p.vy = lerp(p.vy, 6 * (1 - u * 0.7), damp(5, dt)); p.speed = lerp(p.speed, 40, damp(2.2, dt));
+    p.turn = lerp(p.turn, -ax, damp(4, dt)); p.yaw += p.turn * 1.1 * dt; p.bank = lerp(p.bank, p.turn * 0.6, damp(4, dt)); p.pitch = lerp(p.pitch, 0.2, damp(4, dt));
+    flyWings(dt, { boost: false, dive: 0, climb: 0.9 - u * 0.5 });
+    const lx = -Math.sin(p.yaw), lz = -Math.cos(p.yaw);
+    p.pos.x += lx * p.speed * dt; p.pos.z += lz * p.speed * dt; p.pos.y += p.vy * dt;
+    p.pos.y = Math.max(p.pos.y, groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * K);
+    if (u >= 1) { p.takeoff = null; p.speed = Math.max(p.speed, 30); p.vy = clamp(p.vy, 0, 8); }
+    dir3.set(lx * Math.cos(p.pitch), Math.sin(p.pitch), lz * Math.cos(p.pitch)); p.fallTop = p.pos.y; p.glideT = 0; return;
+  }
   const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), CR = 0.2;
   if (t < CR) {
     T.sq = Math.sin(clamp(t / CR, 0, 1) * Math.PI * 0.5); p.speed = 0; p.vy = 0;
@@ -11978,23 +12199,30 @@ function perchSeek() {
     if (sc < bs) { bs = sc; best = s; }
   }
   if (best) return { x: best.x, y: groundAt(best.x, best.z, best.top + 3), z: best.z, r: clamp(Math.sqrt(best.r2) * 0.8, 3, 14), name: best.name };
-  // low and slow over open ground: wherever he would come down
-  const g0 = groundAt(P.x, P.z, P.y), alt = P.y - Math.max(g0, WATER);
-  if (alt < 34 && g0 > WATER + 0.5 && p.speed < 112 && p.pitch > -0.3) {
-    const a = clamp(p.speed * 0.85, 18, 70), x = P.x + fx * a, z = P.z + fz * a, g = groundAt(x, z, P.y + 4);
-    if (g > WATER + 0.5 && Math.abs(g - g0) < 16) return { x, y: g, z, r: 4.5, name: '' };
+  // low and not too fast over anything solid: wherever he would come down. The ground, a slope he could stand on, or the top
+  // of whatever is under his line: a roof, a rock, a crown of leaves, a column (a small top is taken by its middle)
+  const g0 = Math.max(groundAt(P.x, P.z, P.y), topAt(P.x, P.z, P.y - 2.5)), alt = P.y - Math.max(g0, WATER);
+  if (alt < 34 && p.speed < 140 && p.pitch > -0.45) {
+    const a = clamp(p.speed * 0.85, 18, 70);
+    for (const k of [1, 0.55, 0.2]) {
+      let x = P.x + fx * a * k, z = P.z + fz * a * k, r = 4.5; const g = surfAt(x, z, P.y + 4, P.y + 1.5);
+      if (g < WATER + 0.5 && realm === 'over' || g > P.y + 1.5 || tooSteep(x, z, g)) continue;
+      if (_top.kind === 'cyl' && Math.abs(_top.y - g) < 0.01 && _top.r < 3.5) { x = _top.x; z = _top.z; r = Math.max(1.6, _top.r + 0.6); }
+      return { x, y: g, z, r, name: '', under: true };
+    }
   }
   return null;
 }
 function perchGo(S) {
-  const p = player, ty = groundAt(S.x, S.z, S.y + 3) + 0.9 * birdK(), L = Math.hypot(S.x - p.pos.x, ty - p.pos.y, S.z - p.pos.z), hx = S.x - p.pos.x, hz = S.z - p.pos.z, hl = Math.hypot(hx, hz) || 1, in_ = Math.min(L * 0.25, 18);
+  const p = player, ty = surfAt(S.x, S.z, S.y + 3, S.under ? Math.max(S.y + 3, p.pos.y + 1) : S.y + 3, true) + 0.9 * birdK(), L = Math.hypot(S.x - p.pos.x, ty - p.pos.y, S.z - p.pos.z), hx = S.x - p.pos.x, hz = S.z - p.pos.z, hl = Math.hypot(hx, hz) || 1, in_ = Math.min(L * 0.25, 18);
   p.perchGo = { x: S.x, y: S.y, z: S.z, r: S.r, ty, name: S.name, t: 0, T: clamp(L / Math.max(38, p.speed * 0.6), 1.1, 5), beatT: 0,
     a: p.pos.clone(), b: p.pos.clone().addScaledVector(dir3, L * 0.38), c: new THREE.Vector3(S.x - hx / hl * in_, ty + clamp(L * 0.12, 3, 16), S.z - hz / hl * in_), d: new THREE.Vector3(S.x, ty, S.z) };
   { const G = p.perchGo, m = 2.2 * birdK();   // if the curve would take him through rock, a wall or the ground, it is lifted until it does not: he comes in over the top
     const wasOpen = PART.fly; PART.fly = false;   // (the rocks that open for a bird in flight do not open for one coming in to land: they are looked at as stone)
     for (let lift = 0; lift < 6; lift++) { let hit = false;
       for (let q = 1; q < 9 && !hit; q++) { const e = q / 10, k = 1 - e; _pq.copy(G.a).multiplyScalar(k * k * k).addScaledVector(G.b, 3 * k * k * e).addScaledVector(G.c, 3 * k * e * e).addScaledVector(G.d, e * e * e);
-        hit = _pq.y < groundAt(_pq.x, _pq.z, _pq.y + 30) + m || realm === 'over' && (ROCKS.cyls.length || ROCKS.boxes.length) && !!stoneHit(_pq.x, _pq.y, _pq.z, m) || !!crownHit?.(_pq.x, _pq.y, _pq.z, m); }
+        hit = _pq.y < groundAt(_pq.x, _pq.z, _pq.y + 30) + m || realm === 'over' && (ROCKS.cyls.length || ROCKS.boxes.length) && !!stoneHit(_pq.x, _pq.y, _pq.z, m) || !!crownHit?.(_pq.x, _pq.y, _pq.z, m);
+        if (!hit) { const h = hitTest(_pq.x, _pq.y, _pq.z, m); hit = !!h && !h.soft; } }   // (a wall, a roof, a trunk: over it. Leaves he comes in through)
       if (!hit) break; G.b.y += 14; G.c.y += 14; G.T = Math.min(5.5, G.T + 0.25); }
     PART.fly = wasOpen; }
   audio.sfx.whoosh?.(false);
@@ -12038,11 +12266,12 @@ function updatePerch(dt) {
   p.vel.set(mx * sp, 0, mz * sp); pushOut(p.pos, p.vel, perchR());   // (the whole of him stops at a wall, not the middle of him)
   const hop = ml > 0.1 ? Math.abs(Math.sin(time * 9)) * 0.35 : 0;
   // he stands on the ground as it lies: on what is highest under the length of him, tipped the way it slopes
-  const K = birdK(), bx = -Math.sin(p.yaw), bz = -Math.cos(p.yaw), gc = groundAt(p.pos.x, p.pos.z, p.pos.y + 2);
-  const gf = clamp(groundAt(p.pos.x + bx * 1.5 * K, p.pos.z + bz * 1.5 * K, p.pos.y + 2), gc - 1.6 * K, gc + 1.6 * K), gb = clamp(groundAt(p.pos.x - bx * 1.7 * K, p.pos.z - bz * 1.7 * K, p.pos.y + 2), gc - 1.6 * K, gc + 1.6 * K);
+  const K = birdK(), bx = -Math.sin(p.yaw), bz = -Math.cos(p.yaw), gc = roostStep(p.pos.x, p.pos.z, p.pos.y + 2, p.pos.y + 0.1), flat = ROOST.on;   // (on a top he stands level, however near its edge)
+  const gAt = (ox, oz) => flat ? gc : clamp(groundAt(p.pos.x + ox * K, p.pos.z + oz * K, p.pos.y + 2), gc - 1.6 * K, gc + 1.6 * K);
+  const gf = gAt(bx * 1.5, bz * 1.5), gb = gAt(-bx * 1.7, -bz * 1.7), gl = gAt(bz * 1.2, -bx * 1.2), gr = gAt(-bz * 1.2, bx * 1.2);
   p.pos.y = lerp(p.pos.y, Math.max(gc, (gf + gb) / 2) + (0.9 + hop) * K, damp(14, dt));   // (a bigger bird stands taller: its feet on the ground, not its belly)
   if (ml > 0.1) p.yaw += wrapAngle(Math.atan2(-mx, -mz) - p.yaw) * damp(9, dt);
-  p.pitch = lerp(p.pitch, clamp(Math.atan2(gf - gb, 3.2 * K), -0.42, 0.42), damp(6, dt)); p.bank = lerp(p.bank, 0, damp(6, dt)); p.speed = 0; p.vy = 0;
+  p.pitch = lerp(p.pitch, clamp(Math.atan2(gf - gb, 3.2 * K), -0.42, 0.42), damp(6, dt)); p.bank = lerp(p.bank, clamp(Math.atan2(gr - gl, 2.4 * K), -0.3, 0.3), damp(6, dt)); p.speed = 0; p.vy = 0;
   if ((p.perchRoomT = (p.perchRoomT || 0) - dt) <= 0) { p.perchRoomT = 0.3;   // is there room to open his wings here? (a wall or a trunk within a wing's length on either side: no)
     let room = 1; for (const sd of [-1, 1]) { _pq.set(p.pos.x + bz * sd * 4.2 * K, p.pos.y, p.pos.z - bx * sd * 4.2 * K); _pz.set(0, 0, 0); if (pushOut(_pq, _pz, 1.2 * K)) room = 0; }
     p.perchRoom = room; }
@@ -12054,7 +12283,8 @@ function updatePerch(dt) {
     p.perchIdle = ml < 0.1 ? (p.perchIdle || 0) + dt : 0;
     if (L) p.flame = Math.min(1, p.flame + dt / 5); }
   p.perchT = (p.perchT || 0) + dt;
-  const open = Math.max(p.look ? smoothstep(0.5, 1.6, p.perchIdle) * (1 - BIRDI.lie) : 0, BIRDI.stretch, BIRDI.flex * 0.85, BIRDI.hop * 0.35, BIRDI.roll * 0.3) * (p.perchRoom === 0 ? 0.12 : 1);   // (no room: they stay folded)
+  if (p.perchOpen > 0 && (ml > 0.1 || BIRDI.lie > 0.3)) p.perchOpen = Math.max(0, p.perchOpen - dt / 0.3);   // (wings that were a man's arms held out: they stay out until it walks)
+  const open = Math.max(p.look ? smoothstep(0.5, 1.6, p.perchIdle) * (1 - BIRDI.lie) : 0, BIRDI.stretch, BIRDI.flex * 0.85, BIRDI.hop * 0.35, BIRDI.roll * 0.3, p.perchOpen || 0) * (p.perchRoom === 0 ? 0.12 : 1);   // (no room: they stay folded)
   flyWings(dt, { boost: false, dive: 0, climb: 0, fold: 1 - open });   // wings folded while he walks or stands; out to the wind on a perch with a name, or stretched now and then
   if (!dragging) camYaw += p.look && p.perchIdle > 1.8 ? dt * 0.09 : p.perchIdle > 7 ? dt * 0.035 * smoothstep(7, 11, p.perchIdle) : wrapAngle(p.yaw - camYaw) * damp(ml > 0.1 ? 1.2 : 0, dt);   // (left alone a while, the lens goes slowly round him)
 }
@@ -20778,7 +21008,7 @@ function apMark(w) {
   const d = Math.hypot(w.x - player.pos.x, w.z - player.pos.z); toast(`TO THE MARK · ${fmtDist(d).toUpperCase()}`);
 }
 // somewhere the bird can come down on: anything solid (ground, a roof, a peak, a pillar's top, an island), not open water
-const landable = w => player.form === 'phoenix' && realm === 'over' && !!w && !(w.y <= WATER + 0.6 && overHeight(w.x, w.z) < WATER);
+const landable = w => player.form === 'phoenix' && realm === 'over' && !!w && !(w.y <= WATER + 0.6 && overHeight(w.x, w.z) < WATER);   // (a spot he points at is always landed on, steep or not: perchGo brings him in over anything and he clings; refusing a cliff sent the bird flying into it)
 function apUnmark() { AP.wp = null; AP.beam.visible = false; AP.el.style.display = 'none'; guideWind(null); if (WP.sel >= 0) { WP.sel = -1; } }
 // ── Marks. A place he means to come back to can be kept: where he stands (J), what he last pointed at, or a place pressed
 //    and held on the map. Home — the summit — is always the first of them. Choosing one (N steps through them; a press on
@@ -20861,9 +21091,10 @@ function gazePoint() {
   } else if (!XR.on && performance.now() - MOUSE.t < 30000) {   // on a computer: where the pointer is
     _go.copy(camera.position); _gz.set(MOUSE.x / innerWidth * 2 - 1, -(MOUSE.y / innerHeight) * 2 + 1, 0.5).unproject(camera).sub(_go).normalize();
   } else { _go.copy(camera.position); _gz.set(0, 0, -1).applyQuaternion(camera.quaternion); if (!xrFP()) t0 = camera.position.distanceTo(player.pos) + 4; }   // (the middle of a follow camera's view is him: look past him)
-  for (let t = t0; t < 6000; t += 2 + t * 0.025) {
-    const x = _go.x + _gz.x * t, y = _go.y + _gz.y * t, z = _go.z + _gz.z * t, g = Math.max(groundAt(x, z, y + 1), WATER);
-    if (y <= g) return { x, y: g, z };
+  const bird = player.form === 'phoenix' && !XR.on;   // (the bird can come down on anything: what it points at is whatever is there, a top or a roof as much as the ground)
+  for (let t = t0; t < 6000; t += (bird && t < 700 ? 1 : 2) + t * 0.025) {
+    const x = _go.x + _gz.x * t, y = _go.y + _gz.y * t, z = _go.z + _gz.z * t, g = Math.max(groundAt(x, z, y + 1), bird && t < 1500 ? topAt(x, z, 1e9) : -1e9, WATER);
+    if (y <= g) { const h = bird ? structHit(_go, _gz, t) : null; return h ? { x: h.point.x, y: h.point.y, z: h.point.z } : { x, y: g, z }; }
   }
   const h = Math.hypot(_gz.x, _gz.z) || 1, x = _go.x + _gz.x / h * 1500, z = _go.z + _gz.z / h * 1500;   // (looking at the sky: the country under it, a long way off)
   return { x, y: Math.max(groundAt(x, z), WATER), z };
@@ -20922,8 +21153,8 @@ function voiceRun(a) {
   if (a.startsWith('follow:')) { const F = peerNamed(a.slice(7)); if (!F) { toast('NOBODY BY THAT NAME IS FLYING'); return; } if (state === 'map') closeMap(); apMark({ x: F.pos.x, y: F.pos.y, z: F.pos.z }); AP.kind = 'go'; AP.t0 = time; AP.follow = F.id; toast(`FOLLOWING ${F.name}`); return; }
   switch (a) {
     case 'fly': voiceFly(); toast('FLY'); break;
-    case 'bird': if (SH.def) shapeshift('phoenix'); else voiceFly(); toast('THE BIRD'); break;
-    case 'human': if (SH.def) shapeshift('myself'); else if (p.form === 'phoenix' && !p.cine) becomeHuman(); toast('A MAN AGAIN'); break;
+    case 'bird': if (SH.def) shapeshift('phoenix'); else if (!turnForm('bird')) voiceFly(); toast('THE BIRD'); break;   // (where he stands, or as he falls: the bird, going on as he was)
+    case 'human': if (SH.def) shapeshift('myself'); else if (p.form === 'phoenix' && !p.cine && !turnForm('human')) becomeHuman(); toast('A MAN AGAIN'); break;
     case 'land': AP.kind = 'land'; AP.t0 = time; AP.perch = false; toast('LANDING'); break;
     case 'nova': if (p.dive) boilWater(); else if (udNear(10)) nova(); else if (vultNear(70)) airNova(); else toast('NOTHING HERE TO BURN'); break;
     case 'blow': gustBlow(); break;
@@ -21177,7 +21408,7 @@ function updateAuto(dt) {
       if (p.form === 'phoenix' && p.perch) apClear();
       else if (p.form === 'phoenix' && AP.perch) {   // coming down as the bird: a gentle descent, and down onto its feet once it is low
         const alt = p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER), overLand = groundAt(p.pos.x, p.pos.z, p.pos.y) > WATER + 0.5;
-        if (alt < 28 && overLand) { perchLand(); apClear(); } else if (!p.cine) AP.ay = alt > 80 ? -0.45 : -0.12;
+        if (p.perchGo) {} else if (alt < 28 && overLand) perchGo(perchUnder()); else if (!p.cine) AP.ay = alt > 80 ? -0.45 : -0.12;
       }
       else if (p.form === 'phoenix') { if (spaceAction()?.kind === 'swoop' || spaceAction()?.kind === 'perch') { pressSpace(); if (!player.perch) AP.kind = 'spread'; else apClear(); } else if (!p.cine) AP.ay = -0.65; }
       else if (!p.grounded) AP.ay = 1;   // wings: flare; falling: spread out
@@ -21464,6 +21695,8 @@ function updatePhoto(dt) {
   dirPhoto(dt);   // (a shot he described: the lens flown for him, until he takes it)
 }
 $('diveBtn').textContent = TOUCH ? 'DIVE UNDER' : 'Q · DIVE UNDER';
+$('formBtn').addEventListener('click', e => { e.stopPropagation(); turnForm(); $('formBtn').blur(); });
+for (const ev of ['pointerdown', 'pointerup', 'touchstart']) $('formBtn').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 $('diveBtn').addEventListener('click', e => { e.stopPropagation(); humanDive(); $('diveBtn').blur(); });
 for (const ev of ['pointerdown', 'touchstart']) $('diveBtn').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 $('photoBar').addEventListener('click', e => {
@@ -28791,7 +29024,7 @@ addEventListener('keydown', e => {
     case 'KeyK': if (!e.repeat) { const P = TRACK.aim || NET.peers.get(TRACK.id); if (P) followPeer(P); else toast('LOOK AT ANOTHER FLIER, THEN K, TO FOLLOW THEM'); } break;
     case 'KeyP': setMuted(!muted); break;
     case 'KeyR': gustBlow(); break;
-    case 'KeyQ': humanDive(); break;
+    case 'KeyQ': if (!humanDive() && !e.repeat && (player.form === 'human' ? player.grounded : player.perch)) turnForm(); break;   // (on his feet, or on a perch: the other body, there. In the air it is Space, as it always was, and Q is the roll)
     case 'KeyO': if (!e.repeat) { REC.on ? recStop() : recStart(); } break;   // record what the lens sees (and again to stop)
     case 'KeyJ': if (!e.repeat) wpMarkHere(); break;   // keep this place
     case 'KeyN': if (!e.repeat) wpCycle(); break;      // the next of his marks (and, after the last, none)
@@ -28883,18 +29116,18 @@ function updateModels(dt) {
   human.group.visible = (isH || ghostH) && !p.gone; phoenix.group.visible = (!isH || ghostP) && !p.gone;
   if (human.group.visible) {
     human.group.position.copy(p.pos); humanLod(human, XR.on ? 0 : camera.position.distanceTo(p.pos)); if (p.swim) human.group.position.y += waterY(p.pos.x, p.pos.z) - WATER;   // he rides the swell
-    human.group.scale.setScalar(Math.max(0.001, ghostH ? gk * gk : pop) * MAN_SCALE);
-    if (ghostH) { human.group.position.y += (1 - gk) * 1.4; setBurn(1, 2.5); }
+    human.group.scale.setScalar(Math.max(0.001, ghostH ? gk * gk : pop * (gk > 0 && gh.quick ? 1 - 0.25 * gk * gk : 1)) * MAN_SCALE);
+    if (ghostH) { human.group.position.y += gh.quick ? (1 - gk) * 0.6 - (gh.dy || 0) : (1 - gk) * 1.4; setBurn(1, 2.5); }
     if (ear.level > 0.06 && state !== 'dead') human.head.rotation.x -= ear.level * 0.16 * (0.55 + 0.45 * Math.sin(time * 23));   // whatever the player is saying, he is saying
     animateCape(dt);
   }
   if (phoenix.group.visible) {
     phoenix.group.position.copy(p.pos);
-    if (ghostP) { phoenix.group.scale.setScalar((gh.ash ? 1 : Math.max(0.001, gk * gk)) * PHX_S * birdK() * (1 + 0.15 * perks.wings)); if (gh.ash) phoenix.group.rotation.set(0, p.yaw ?? phoenix.group.rotation.y, 0); }
+    if (ghostP) { phoenix.group.scale.setScalar((gh.ash ? 1 : Math.max(0.001, gk * gk)) * PHX_S * birdK() * (1 + 0.15 * perks.wings)); if (gh.ash) phoenix.group.rotation.set(0, p.yaw ?? phoenix.group.rotation.y, 0); phoenix.group.position.y += gh.dy || 0; }
     else {
       if (LIVE.on) phoenix.group.rotation.set(LIVE.pitch, LIVE.yaw, LIVE.roll, 'YXZ');   // (on its own in the menu: right over, in a loop or a roll)
       else { phoenix.group.rotation.set(flipShow(p.pitch) + 0.7 * FLIP.brake, p.yaw, p.bank + FLIP.a, 'YXZ'); phoenix.group.rotateX(-p.wingF * 0.06); }   // (nose up as he climbs, down as he dives, round as he loops; over on his back if he has rolled there; reared up, braking. Heading, then pitch, then roll: at any heading the nose lifts, it never turns into a roll)
-      phoenix.group.scale.setScalar(Math.max(0.001, pop * p.scale) * PHX_S * birdK() * (1 + 0.15 * perks.wings));
+      phoenix.group.scale.setScalar(Math.max(0.001, pop * p.scale * (gk > 0 && gh.quick ? 1 - (1 - (gh.s0 ?? 0.75)) * gk * gk : 1)) * PHX_S * birdK() * (1 + 0.15 * perks.wings));
       phoenix.group.position.y += p.wingF * -0.35;
       phxAlive(dt);
     }
@@ -29290,7 +29523,7 @@ function xrMove(ev) {
   if (ev === 'clap' || ev === 'pinch') return pressSpace();
   if (ev === 'leap') { if (p.grounded || p.climb) pressSpace(); return; }
   if (ev === 'spread') { if (p.form === 'human' && !p.grounded && !p.wings && !p.tumble) pressSpace(); return; }   // (just off the ground: catch fire. In a long fall, spreading out is how he slows down; a flap is how he burns)
-  if (ev === 'fold') { if (p.form === 'phoenix' && !p.cine) becomeHuman(); return; }
+  if (ev === 'fold') { if (p.form === 'phoenix' && !p.cine && !turnForm('human')) becomeHuman(); return; }
   if (ev === 'offer') { if (['talk', 'kindle', 'animal'].includes(kind)) pressSpace(); else if (time - (XR.offerSaid || -99) > 20) { XR.offerSaid = time; toast('NOBODY HERE TO OFFER YOUR HAND TO'); } return; }
   if (ev === 'push') { if (kind === 'swoop') pressSpace(); return; }
 }
@@ -29755,6 +29988,7 @@ function tick(dt) {
   else if (state === 'end') updateEnding(dt);
   else if (state === 'stats') statsStep(dt);
   else if (state === 'warp') updateWarp(dt);
+  turnTick(dt);
   carryOn();    // (and then to where it has stood off to, if a bird is passing through it)
   updateTail(dt); updateSmall(dt); updateCourier(dt); xfTick(dt); padTick(); flipTick(dt); agentsWatch(dt); woodTick(dt); waveTick(dt, false); keeperTick(dt); wreathTick(dt); keeperSizeTick(dt); eyeStep(dt);
   updateGodDirector(dt);
@@ -29806,6 +30040,7 @@ function tick(dt) {
     if (Number.isFinite(_v.x) && Number.isFinite(_v.y)) postMat.uniforms.uSunUV.value.set(_v.x * 0.5 + 0.5, _v.y * 0.5 + 0.5);
     postMat.uniforms.uRays.value = lerp(postMat.uniforms.uRays.value, want, damp(2, dt)); }
   if (CAMB.T) camBlend(dt);
+  if (TURNC.T) turnCam(dt);
   if (window.__icarus?.testCam) window.__icarus.testCam(camera);   // (tests only: look from wherever a test says)
   cosmosStep(dt);
   if (COSMOS.on || COSMOS.fadeT > 0) cosmosPresent(); else if (M3.on && mapV.open && state === 'map') m3Present(); else present(scene, camera);
@@ -35767,7 +36002,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { agBuild, agWeb, agReach, agSpans, agWool, agStill, agNear, FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { topAt, surfAt, structHit, roostFind, camera, dir3, MOUSE, turnForm, turnMan, turnBird, wingsOut, armsOut, TURNC, MOUNT, updatePerch, get camYaw() { return camYaw; }, get time() { return time; }, agBuild, agWeb, agReach, agSpans, agWool, agStill, agNear, FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, RR, rrJoin, rrMine, rrFetch, rrPlace, rrLayout, gotRjoin, get RING_DONE() { return RING_DONE; }, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { cpusCmd, MOD, die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AG, agTake, AGX, agxPoll, agxSend, agxDraw, agxTab, agxAt, agxHear, agxCommand, CH, chShow, sendChat, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { NEWB, newbHear, newbHeard, newbTyped, newbTalk, newbFallback, newbArrive });
