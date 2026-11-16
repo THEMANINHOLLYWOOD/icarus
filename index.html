@@ -12066,7 +12066,9 @@ function flipNet(p) {
 // a pad, if one is plugged in: the left stick flies, the right one looks round, the triggers are the fire and the brake,
 // the shoulders roll him, A is the one button (space), Y a trick
 const PAD = { x: 0, y: 0, roll: 0, brake: 0, boost: false, on: false, b: [], id: '', mid: [] };
+addEventListener('gamepadconnected', () => { PAD.lookT = 0; });
 function padTick() {
+  if (!PAD.on) { const now = performance.now(); if (now < (PAD.lookT || 0)) return; PAD.lookT = now + 250; }   // (with no pad, the browser is asked only a few times a second: asking costs a third of a millisecond a frame)
   const gp = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g && g.connected && g.axes.length >= 2) : null;
   if (!gp) { if (PAD.on) { PAD.on = false; PAD.x = PAD.y = PAD.roll = PAD.brake = PAD.thr = 0; PAD.boost = false; PAD.id = ''; } return; }
   if (PAD.id !== gp.id) { PAD.id = gp.id; PAD.mid = []; }
