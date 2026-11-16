@@ -11891,6 +11891,25 @@ function stoopPull(peak) {
   for (const w of phoenix.wings) { w.tip.getWorldPosition(_p); for (let i = 0; i < Math.round((14 + 20 * k) * Math.sqrt(K)); i++) emit(_p.x + rnd(K), _p.y + rnd(K), _p.z + rnd(K), rnd(14) - dir3.x * 20, rnd(10), rnd(14) - dir3.z * 20, 0.5 + Math.random() * 0.5, pick(EMBER), 1, (0.7 + Math.random()) * K); }
   netFx?.('flap');
 }
+// ── The dive bomb. Only S does it (the stick pulled down, the nose put down on a pad or a phone: his own hands, never the
+//    autopilot's, and never the fire on its own): held hard with the nose well down, he stops gliding down and drops like a
+//    thrown spear, faster the longer and the steeper he holds it — three hundred metres a second in a few breaths, past the
+//    sound barrier, toward a thousand — with the air rising to a roar, the lens trembling more and more and the streaks
+//    rushing past. Let go, and he pulls out hard: the nose comes up quickly but not all at once, and he keeps the speed.
+//    (t: how long, weighted by how steep; k: how far into it he is, eased; pull: the pull-out, 1 just let go)
+const DIVE = { t: 0, k: 0, pull: 0, was: false };
+const diveMul = t => 1 + 2.3 * (1 - Math.exp(-t / 3.5)) + 0.04 * t;   // (how many times a plain dive's speed: about 2.7 at four seconds, 3.4 at ten)
+// How much wider the lens opens for sheer speed, 0..1: one place for it, so the dive, the fire and hyper all agree. It is
+// eased slowly both ways (seconds, not frames), so it never pumps with the speed; and in a headset it is never the lens
+// that changes — the edges of sight darken instead (see xrVig). SPF_DEG: how many degrees wider at the most.
+const SPF = { k: 0 }, SPF_DEG = 20;
+const fovFromSpeed = sp => smoothstep(280, 950, sp);
+function speedFov(dt) {
+  const p = player, fly = (state === 'play' || state === 'talk') && p.form === 'phoenix' && !p.perch && !p.sub && !p.cine && !COSMOS.on;
+  const want = fly ? fovFromSpeed(p.speed || 0) : 0;
+  SPF.k += (want - SPF.k) * damp(want > SPF.k ? 0.6 : 0.45, dt);
+  return SPF.k;
+}
 // Where the bird could set down, shown in the world and nowhere else: a ring of light lying on the place — a named perch
 // he is flying toward, or the ground just ahead of him when he comes in low and slow — with a second ring drawing in to
 // its middle, and a thread of light standing on it so it can be found from the air. One press, and he goes down to it by
@@ -12029,7 +12048,7 @@ function updatePhoenix(dt) {
     // let go nearly straight up: he hangs there a moment, slowing — turn then, and he swings round on a wingtip before the nose falls
     if (pin < 0.2 && p.pitch > 1.15 && !FLIP.hung && brk < 0.2 && state === 'play') { FLIP.hung = true; FLIP.hangT = 1.1; }
     if (FLIP.hangT > 0) FLIP.hangT = pin > 0.2 || pin < -0.2 ? 0 : FLIP.hangT - dt; else if (p.pitch < 0.6) FLIP.hung = false;
-    p.pitch = lerp(p.pitch, lerp(pin > 0 || FLIP.vert > 0 ? lerp(Math.max(0, pin) * 0.6, 1.45, Math.min(1, up)) : pin * (PV ? 1.05 : 1.38), 0, brk), damp(FLIP.hangT > 0 ? 0.25 : p.pitch > 1.0 && pin < 0.2 && brk < 0.2 ? 0.6 : diving ? 4.5 : PV ? 3.2 : up > 0.2 ? 2.4 : 1.8, dt));   // (let go straight up and he carries on up a while, slowing)
+    p.pitch = lerp(p.pitch, lerp(pin > 0 || FLIP.vert > 0 ? lerp(Math.max(0, pin) * 0.6, 1.45, Math.min(1, up)) : pin * (PV ? 1.05 : 1.38), 0, brk), damp(FLIP.hangT > 0 ? 0.25 : p.pitch > 1.0 && pin < 0.2 && brk < 0.2 ? 0.6 : diving ? 4.5 : DIVE.pull > 0.05 ? lerp(PV ? 3.2 : 1.8, 3.6, DIVE.pull) : PV ? 3.2 : up > 0.2 ? 2.4 : 1.8, dt));   // (let go straight up and he carries on up a while, slowing)   // (out of a dive bomb: a hard pull-out, eased)
     if (p.speed < 30 && !diving && brk < 0.2 && !(FLIP.hangT > 0)) p.pitch = lerp(p.pitch, -0.45, damp(2.5, dt));  // stall: the nose drops
     if (GODM.spent) p.pitch = Math.min(p.pitch, -0.06);   // spent: the wings are heavy, and will not take him up
   }
@@ -12069,9 +12088,14 @@ function updatePhoenix(dt) {
   p.wasRiding = p.riding;
   const sp = Math.sin(p.pitch);
   const BK = 1 + (birdK() - 1) * 0.3, RK = 1 + (birdK() - 1) * 0.6;   // (the big bird: a stronger stroke, and the currents take it further and faster)
-  p.overT = boost && sp < -0.25 ? (p.overT || 0) + dt : Math.max(0, (p.overT || 0) - dt * 1.5);   // (no top speed: the longer a dive is held with the boost, the faster it goes, without end)
-  const target = lerp(((boost ? 125 : PV ? lerp(40, 112, Math.min(1, PILOT.thr / 0.86)) : 64) - (sp > 0 ? sp * (GODM.on ? 30 : boost ? 55 : PV ? 34 : 75) : sp * 240)) * (1 + 0.12 * perks.swift + IS.swift) * BK * (1 + p.overT * 0.14) * (GODM.spent ? 0.6 : 1), 3, brk);   // nose down: ~300 m/s, then on past it   // (braking: down to a hover)
-  p.speed = Math.max(lerp(18, 1.5, brk), lerp(p.speed, target * MOD.speed, damp(lerp(sp < -0.3 ? 1.7 : boost ? 1.1 : PV ? 0.95 : 0.55, 1.5, brk), dt)));
+  // the dive bomb (see DIVE): S held hard, his own, with the nose well down
+  { const own = state === 'play' ? pin - (AP.ay || 0) : 0, bomb = own < -0.6 && sp < -0.4 && !FLIP.over && !GODM.spent && brk < 0.2 && !p.riding;
+    DIVE.t = bomb ? DIVE.t + dt * smoothstep(0.4, 0.95, -sp) : Math.max(0, DIVE.t - dt * 3);
+    DIVE.k = lerp(DIVE.k, bomb ? 1 : 0, damp(bomb ? 1.6 : 2.6, dt));
+    if (!bomb && DIVE.was && p.speed > 180) DIVE.pull = 1;
+    DIVE.was = bomb; DIVE.pull = Math.max(0, DIVE.pull - dt / 1.4); p.overT = DIVE.t; }
+  const target = lerp(((boost ? 125 : PV ? lerp(40, 112, Math.min(1, PILOT.thr / 0.86)) : 64) - (sp > 0 ? sp * (GODM.on ? 30 : boost ? 55 : PV ? 34 : 75) : sp * 240)) * (1 + 0.12 * perks.swift + IS.swift) * BK * diveMul(DIVE.t) * (GODM.spent ? 0.6 : 1), 3, brk);   // nose down: ~300 m/s; held on S, far past it   // (braking: down to a hover)
+  p.speed = Math.max(lerp(18, 1.5, brk), lerp(p.speed, target * MOD.speed, damp(lerp(sp < -0.3 ? 1.7 + 1.6 * DIVE.k : boost ? 1.1 : PV ? 0.95 : 0.55 * (1 - 0.6 * DIVE.pull), 1.5, brk), dt)));   // (just out of a dive bomb he carries the speed a while)
   if (FLIP.over || sp > 0.8 && pin < 0.2) p.speed = Math.max(14, p.speed - sp * 24 * dt);   // going round (or hanging straight up, the wings still): the way up costs him speed and the way down gives it back
   if (p.riding) p.speed = lerp(p.speed, 310 * RK, damp(1.6 * RK, dt));
   const knife = FLIP.over ? 0 : smoothstep(0.8, 0.98, Math.abs(Math.sin(FLIP.a)));   // (on his side the wings hold nothing up: he sinks)
@@ -12098,7 +12122,8 @@ function updatePhoenix(dt) {
   }
   // the ground coming up too fast (and not the water he means to go into): the world says so instead of a word on the screen —
   // the colour drains, the edges close in red, the view narrows and shakes, and his heart is heard, faster the closer it is
-  const tHit = (diving || FLIP.over) && !plunge && state === 'play' && dir3.y < -0.2 ? (p.pos.y - ahead) / Math.max(1, -dir3.y * p.speed) : 99, dWant = clamp((1.8 - tHit) / 1.3, 0, 1);
+  // (the faster he goes, the sooner it warns: a dive bomb near a thousand metres a second needs three or four seconds to pull out of)
+  const tHit = (diving || FLIP.over) && !plunge && state === 'play' && dir3.y < -0.2 ? (p.pos.y - ahead) / Math.max(1, -dir3.y * p.speed) : 99, tWarn = 1.8 + clamp((p.speed - 300) / 350, 0, 1.6), dWant = clamp((tWarn - tHit) / (tWarn * 0.72), 0, 1);
   p.danger = lerp(p.danger || 0, dWant, damp(dWant > (p.danger || 0) ? 7 : 2.5, dt));
   if (p.danger > 0.3 && time > (p.beatT || 0)) { p.beatT = time + lerp(0.95, 0.42, p.danger); audio.sfx.heart?.(p.danger); }
   const p0x = p.pos.x, p0y = p.pos.y, p0z = p.pos.z, K0 = birdK(), sv = SMALL.k < 1 ? smallV() : K0 > 1.01 ? 1 + 0.18 * (K0 - 1) : 1;   // (and a big one covers more: the keeper's bird is a third as fast again for its size)   // (a small bird covers less ground: its own lengths a second are what they were)
@@ -26114,6 +26139,7 @@ const _pcO = new THREE.Vector3();
 function updateCamera(dt) {
   const p = player;
   { const on = pilotView(); PILOT.k = Math.abs(PILOT.k - (on ? 1 : 0)) < 0.002 ? (on ? 1 : 0) : lerp(PILOT.k, on ? 1 : 0, damp(on ? 3.4 : 5, dt)); }   // (how far the lens has gone over to the pilot's)
+  const sfk = speedFov(dt); if (XR.on || XR.vigM) xrVig(dt, sfk);   // (how much wider for sheer speed: see SPF)
   if (mdCamOn()) return mdCam(dt); if (MD.cam) mdCamOff();   // (a fight opening: the lens is the fight's, until it goes live — see MD)
   if (state === 'watch') return camWatch(dt);
   if (state === 'stats') return statsCam(dt);   // (his record in the sky: a wide shot of where he is)
@@ -26228,10 +26254,12 @@ function updateCamera(dt) {
     if (pk > 0) { const e = pk * pk * (3 - 2 * pk); camera.position.lerp(PILOT.pos, e); lookAt.lerp(PILOT.look, e); }
     camera.up.copy(FLIP.cu); camera.lookAt(lookAt); camera.up.set(0, 1, 0);   // (its up eased round with his over the top: the horizon turns with the loop, it never flips)
     camera.rotateZ(-p.bank * (0.12 + 0.3 * rush) * (1 - pk));   // (the pilot's horizon stays level)
-    camera.fov = lerp(camera.fov, Math.min(118, lerp(68 + rush * 32 + wide * 16 - (p.danger || 0) * 12, PILOT.fov - (p.danger || 0) * 8, pk) * fovK()), damp(2.4, dt));   // (the ground rushing up: tunnel vision)
+    camera.fov = lerp(camera.fov, Math.min(118, (lerp(68 + rush * 32 + wide * 16 - (p.danger || 0) * 12, PILOT.fov - (p.danger || 0) * 8, pk) + sfk * SPF_DEG) * fovK()), damp(2.4, dt));   // (the ground rushing up: tunnel vision)   // (very fast: wider, eased in slowly, see SPF)
     if (rush > 0.5 && pk < 1) { const k = (rush - 0.5) * 0.12 * (1 - pk); camera.position.x += rnd(k); camera.position.y += rnd(k); }
+    { const s = DIVE.k * smoothstep(220, 800, p.speed) * (1 - 0.6 * pk) * 0.32 * Math.sqrt(camK);   // (a dive bomb: a tremor that builds with the speed, smooth, not a rattle)
+      if (s > 0.005) { camera.position.x += (Math.sin(time * 27.1) + 0.5 * Math.sin(time * 41.3 + 1.7)) * s; camera.position.y += (Math.sin(time * 23.7 + 0.6) + 0.5 * Math.sin(time * 37.9 + 2.9)) * s; } }
     if ((p.danger || 0) > 0.15) { const k = p.danger * 0.2 * (1 - 0.6 * pk); camera.position.x += rnd(k); camera.position.y += rnd(k); }
-    postMat.uniforms.uSpeed.value = lerp(postMat.uniforms.uSpeed.value, rush, damp(3, dt));
+    postMat.uniforms.uSpeed.value = lerp(postMat.uniforms.uSpeed.value, rush + 0.55 * DIVE.k * smoothstep(300, 850, p.speed), damp(3, dt));   // (and a dive bomb's streaks, thicker)
   }
   if (camShake > 0) {
     camShake = Math.max(0, camShake - dt * 2.2);
@@ -29061,6 +29089,16 @@ function xrTurn(want, dt, k) {
   if (FLIP.over || player.form === 'phoenix' && Math.abs(Math.sin(player.pitch)) > 0.94) return;   // (straight up or down there is no heading to follow)
   if (Math.abs(d) > 1.75) { XR.yaw = want; xrBlink(); return; }
   XR.yaw += d * damp(k, dt);
+}
+// In a headset the lens is never widened for speed (it would be the room lurching): the edges of sight darken instead, a
+// soft ring that leaves the middle clear, as much as the lens would have widened (see SPF)
+function xrVig(dt, k) {
+  if (!XR.vigM) { if (!XR.on || k < 0.01) return;
+    XR.vigM = new THREE.Mesh(new THREE.SphereGeometry(0.22, 24, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, transparent: true, depthTest: false, depthWrite: false, fog: false, toneMapped: false, uniforms: { uK: { value: 0 } },
+      vertexShader: `varying vec3 vP; void main() { vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `uniform float uK; varying vec3 vP; void main() { float off = 1.0 + normalize(vP).z; gl_FragColor = vec4(0.0, 0.0, 0.0, uK * smoothstep(0.1, 0.5, off)); }` }));   // (off: 0 straight ahead, 1 square to the side)
+    XR.vigM.renderOrder = 10000; XR.vigM.frustumCulled = false; XR.cam.add(XR.vigM); }
+  const u = XR.vigM.material.uniforms.uK, want = XR.on ? 0.85 * k : 0; u.value = lerp(u.value, want, damp(2, dt)); XR.vigM.visible = u.value > 0.004;
 }
 function xrBlink() {
   if (!XR.blinkM) { XR.blinkM = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 8), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: 0, side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false, toneMapped: false })); XR.blinkM.renderOrder = 10001; XR.blinkM.frustumCulled = false; XR.cam.add(XR.blinkM); }
@@ -34247,6 +34285,7 @@ setTimeout(() => {
   if (window.__icarus) Object.assign(window.__icarus, { SONIC, SOUND, sonicBoom, sonicTaps, sonicCone, peerBoom, nearMissTick });   // (tests: the sound barrier)
   if (window.__icarus) Object.assign(window.__icarus, { FAR, TIERS, sightFar, farStep, xrLeave, tick, get dir3() { return dir3; } });   // (tests: the far country)
   if (window.__icarus) Object.assign(window.__icarus, { PILOT, PAD, pilotSet, pilotHold, pilotMouse, pilotFly, pilotView, pilotAxes, pilotThr, xrYoke, voiceRun, UIL, menuItems, get camYawOff() { return camYawOff; } });   // (tests: pilot view)
+  if (window.__icarus) Object.assign(window.__icarus, { DIVE, SPF, STOOP, BIG, fovFromSpeed, xrVig });   // (tests: the dive bomb, and the lens opened for speed)
   frame();
 }, 30);
 </script>
