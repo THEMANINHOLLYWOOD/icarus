@@ -231,6 +231,26 @@
   #who .r:first-of-type { border-top:none; }
   #who .r i { font-style:normal; text-align:right; color:var(--dim); } #who .r u { text-decoration:none; color:var(--dim); font-size:10px; } #who .r em { font-style:normal; text-align:center; }
   #who .none { text-align:center; color:var(--dim); padding:6px 0 2px; }
+  /* the corner (see MINI): the small map and what is under it are typed into the letters; these are only the places to press on it */
+  #mini button { position:fixed; left:0; top:0; width:0; height:0; margin:0; padding:0; border:0; background:none; color:transparent; z-index:6; cursor:pointer; display:none; -webkit-tap-highlight-color:transparent; }
+  #mini.on button { display:block; }
+  #miniWho, #ctlCard, #pgCard { display:none; box-sizing:border-box; color:#f4ead2; font-size:12px; letter-spacing:.08em; text-transform:uppercase; pointer-events:auto; background:rgba(6,7,12,.9); border-radius:6px; }
+  #miniWho.on, #ctlCard.on, #pgCard.on { display:block; }
+  #miniWho { position:fixed; left:8px; top:120px; z-index:9; min-width:calc(var(--cw, 9px) * 26); max-width:min(92vw, 420px); padding:6px 10px; }
+  #miniWho .r { display:flex; gap:var(--cw, 9px); align-items:center; white-space:nowrap; min-height:var(--ch, 14px); }
+  #miniWho .r b { font-weight:400; flex:1; overflow:hidden; text-overflow:ellipsis; } #miniWho .r i { font-style:normal; color:var(--dim); } #miniWho .r.h b { color:#ffd8a8; }
+  #ctlCard { position:fixed; left:50%; top:calc(var(--st, 0px) + 8vh); transform:translateX(-50%); z-index:26; width:min(94vw, calc(var(--cw, 9px) * 60)); padding:var(--ch, 14px) calc(var(--cw, 9px) * 2); }
+  #ctlCard h4 { margin:0 0 var(--ch, 14px); font-weight:400; color:#ffd8a8; letter-spacing:.2em; }
+  #ctlCard .tabs, #ctlCard .acts, #pgCard .acts { display:flex; flex-wrap:wrap; gap:0 var(--cw, 9px); margin:0 0 var(--ch, 14px); }
+  #ctlCard .acts { margin:var(--ch, 14px) 0 0; } #pgCard .acts { justify-content:center; margin:var(--ch, 14px) 0 0; }
+  #ctlCard .r { display:grid; grid-template-columns:minmax(0, 15fr) minmax(0, 23fr); gap:0 calc(var(--cw, 9px) * 2); }
+  #ctlCard .r b { font-weight:400; color:var(--dim); } #ctlCard .r span { color:#fff4e2; } #ctlCard .n { margin:var(--ch, 14px) 0 0; color:var(--dim); }
+  #pgCard { position:fixed; left:50%; bottom:max(calc(var(--sb, 0px) + 176px), calc(var(--sayH, 0px) + 56px)); transform:translateX(-50%); z-index:9; width:max-content; max-width:min(94vw, calc(var(--cw, 9px) * 56)); padding:calc(var(--ch, 14px) * .5) calc(var(--cw, 9px) * 2); text-align:center; }
+  #pgCard p { margin:0; } #pgCard .h { color:#ffd8a8; } #pgCard .t { color:#fff; } #pgCard .k { color:#fff4e2; } #pgCard .ok { color:#bfffd8; }
+  :is(#miniWho, #ctlCard, #pgCard) button { background:none; border:1px solid rgba(255,190,130,.4); color:#ffd8a8; font:inherit; letter-spacing:inherit; text-transform:inherit; padding:3px 9px; margin:2px 0; cursor:pointer; border-radius:3px; }
+  :is(#miniWho, #ctlCard, #pgCard) button.on { color:#fff; border-color:#fff; }
+  body.asciiui :is(#miniWho, #ctlCard, #pgCard) button { padding:0 var(--cw, 9px) !important; margin:0 !important; border:0 !important; }
+  .photo :is(#ctlCard, #pgCard, #miniWho), .pro :is(#ctlCard, #pgCard, #miniWho) { display:none !important; }
   #micBtn { position:fixed; left:calc(12px + env(safe-area-inset-left, 0px)); bottom:54px; z-index:6; width:34px; height:34px; border-radius:17px; padding:0;
     border:1px solid rgba(255,200,140,.35); background:rgba(0,0,0,.45); color:#ffd8a8; cursor:pointer; display:none; align-items:center; justify-content:center; opacity:.7; }
   #micBtn.on { display:flex; } #micBtn.muted { color:rgba(244,234,210,.45); border-color:rgba(255,255,255,.18); } #micBtn.talk { opacity:1; box-shadow:0 0 0 2px rgba(255,140,60,.55); }
@@ -953,7 +973,7 @@
 <div id="looks" role="dialog" aria-label="Visuals"></div><div id="guide" role="dialog" aria-label="Ask for help"><div class="gbox"><button class="gb" id="guideX" type="button" aria-label="Close">✕</button><div id="guideAsked"></div><div id="guideSay" aria-live="polite"></div><div id="guideChips"></div>
   <form id="guideForm" autocomplete="off"><button class="gb" id="guideMic" type="button" aria-label="Speak to her"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11.5a6 6 0 0 0 12 0M12 17.5V21M9 21h6"/></svg></button><input id="guideIn" maxlength="160" autocomplete="off" autocapitalize="sentences" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="Ask her" placeholder="ask how to do anything · or tell her to do it"><button class="gb" id="guideGo" type="submit" aria-label="Ask">↵</button></form></div></div>
 <div id="health"><button id="healthPill" type="button" aria-label="Site health" aria-expanded="false" aria-controls="healthBox"><i></i><span></span></button><div id="healthBox"></div></div>
-<button id="newcomer" type="button"></button><button id="friendAsk" type="button"></button><div id="xfCard" role="status" aria-live="polite"></div><div id="bag" role="dialog" aria-label="Your bag"></div><button id="waveBtn" type="button"></button><button id="flipBtn" type="button" aria-label="Turn over">⟲</button><div id="bldBar" role="toolbar" aria-label="The builder"></div><div id="xfList" role="dialog" aria-label="What has been brought to you"></div><input id="xfPick" type="file" tabindex="-1" aria-hidden="true"><div id="who"></div><button id="micBtn" type="button" aria-label="Microphone"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15"/><path class="x" d="M2 2l12 12" style="display:none"/></svg></button><button id="whoBtn" type="button"></button>
+<button id="newcomer" type="button"></button><button id="friendAsk" type="button"></button><div id="xfCard" role="status" aria-live="polite"></div><div id="bag" role="dialog" aria-label="Your bag"></div><button id="waveBtn" type="button"></button><button id="flipBtn" type="button" aria-label="Turn over">⟲</button><div id="bldBar" role="toolbar" aria-label="The builder"></div><div id="xfList" role="dialog" aria-label="What has been brought to you"></div><input id="xfPick" type="file" tabindex="-1" aria-hidden="true"><div id="who"></div><div id="mini"><button id="miniMapHit" type="button" aria-label="Open the map"></button><button id="miniWhoHit" type="button" aria-label="Who is flying"></button><button id="miniKeysHit" type="button" aria-label="Controls"></button></div><div id="miniWho" role="dialog" aria-label="Who is flying"></div><div id="ctlCard" role="dialog" aria-label="Controls"></div><div id="pgCard" role="status" aria-live="polite"></div><button id="micBtn" type="button" aria-label="Microphone"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15"/><path class="x" d="M2 2l12 12" style="display:none"/></svg></button><button id="whoBtn" type="button"></button>
 <div id="map"><canvas id="mapC"></canvas><div id="mapTitle"></div><div id="mapHint"></div><button id="mapMode" type="button" aria-label="Flat map or 3D model">FLAT</button><button id="mapNorth" type="button" aria-label="Turn the map north up"><span><svg viewBox="0 0 16 16" width="18" height="18"><path d="M8 1.5l3 6.5H5z" fill="currentColor"/><path d="M8 14.5L5 8h6z" fill="none" stroke="currentColor" stroke-width="1"/></svg></span></button></div>
 
 
@@ -8372,6 +8392,8 @@ const ICON = {
   name: ic('name', '<rect x="3.5" y="7" width="17" height="10" rx="1.4"/><path d="M7 14.5l1.8-5 1.8 5M7.7 13h2.2M13 14.5v-5M13 12.2c1.6-1.4 3.2-.6 3.2 1s-1.8 2.2-3.2 1"/><path class="d d3" d="M18 9.6v4.8"/>'),
   look: ic('look', '<rect x="3.5" y="4.5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 16l2.6-8h.8L14 16M9 13.5h4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M16 10v6M16 12.5h2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'),
   guide: ic('guide', '<path class="fl1" d="M12 2.8c.6 3.2 5.4 5.6 5.4 10.6a5.4 5.4 0 0 1-10.8 0c0-2.2 1.2-3.6 2.2-4.6.2 1.6.9 2.5 1.7 2.9C10.2 8.6 10.6 5.4 12 2.8z"/><path class="fl2" d="M12 13.2c1.5 1.2 2.2 2.3 2.2 3.5a2.2 2.2 0 0 1-4.4 0c0-1.2.7-2.3 2.2-3.5z"/>'),
+  keys: ic('keys', '<rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M6.5 10.5h1M10 10.5h1M13.5 10.5h1M17 10.5h1M8 14h8"/>'),
+  play: ic('play', '<path d="M3 11.5c3-4 6-5 9-2 3-3 6-2 9 2"/><circle class="f" cx="12" cy="13.4" r="1.7"/>'),
 };
 // ── The strip spells his name. Six letters, six drawers, and every word on it begins with its letter: I is who you are,
 //    C the camera, A the atlas (where things are, and who), R reaching the others, U understanding what to do, S how it
@@ -8391,6 +8413,7 @@ function menuItems() {
     { g: 'C', ic: 'rec', label: REC.on ? 'stop' : 'record', key: 'O', on: REC.on, f: () => { REC.on ? recStop() : recStart(); } },
     { g: 'C', ic: 'album', label: 'album', f: () => albumShow(true) },
     { g: 'A', ic: 'map', label: 'map', key: 'M', f: () => { if (state === 'play') openMap(); } },
+    { g: 'A', ic: 'map', label: MINI.mode === 'off' ? 'minimap off' : MINI.mode === 'north' ? 'minimap north' : 'minimap', on: MINI.mode !== 'off', keep: true, f: miniCycle },
     { g: 'A', ic: 'who', label: 'players', key: 'Tab', badge: String(flyers), on: who.pinned, f: () => { who.pinned = !who.pinned; who.open = who.pinned; } },
     { g: 'R', ic: mic.denied ? 'micx' : 'mic', label: mic.denied ? 'no mic' : 'voice', key: 'V', on: !!mic.stream && !VC.muted, keep: true, f: menuMic },
     { g: 'R', ic: 'chat', label: 'chat', key: 'T', f: () => openChat() },
@@ -8398,6 +8421,8 @@ function menuItems() {
     { g: 'R', ic: 'who', label: AG.mine && AG.ham.get(AG.mine)?.agents?.length ? 'your agents' : 'add your claude', f: agentsMenu },
     { g: 'R', ic: 'album', label: 'post', badge: XF.unseen ? String(XF.unseen) : '', on: XF.open, f: () => xfList(true) },
     { g: 'U', ic: 'guide', label: 'help', key: '?', on: GUIDE.open, f: () => guideShow(true) },
+    { g: 'U', ic: 'keys', label: 'controls', key: 'F1', on: CTL.open, f: () => ctlShow(true) },
+    { g: 'U', ic: 'play', label: 'playground', on: PG.on, f: () => { if (PG.on) pgEnd('stop'); else pgStart(); } },
     { g: 'U', ic: 'quest', label: 'quests', key: 'J', badge: String(qlActive().length || ''), on: QL.open, f: () => qlShow(!QL.open) },
     { g: 'S', ic: muted ? 'mute' : 'sound', label: muted ? 'muted' : 'sound', key: 'P', on: !muted, keep: true, f: () => setMuted(!muted) },
     { g: 'S', ic: 'look', label: 'visuals', on: LOOK.open, f: () => lookShow(true) },
@@ -8540,6 +8565,7 @@ const AIC = {
   guide: [["  )  ", " ( ) ", " (_) "], ["  (  ", " ( ) ", " (_) "], ["  ,  ", " ( ) ", " (_) "]],
   name: [["     ", "[Ab_]", "     "], ["     ", "[Ab ]", "     "]],
   rec: [[" .-. ", "( o )", " '-' "], [" .-. ", "( O )", " '-' "], [" .-. ", "( @ )", " '-' "]],
+  keys: [[" ___ ", "|?_?|", "'---'"], [" ___ ", "|_?_|", "'---'"]], play: [["\\ v /", " (o) ", "  ^  "], ["  v  ", "\\(o)/", "  ^  "]],
 };
 // (the six letters, three lines of five like the pictures; lit, each has a spark that moves)
 const ALET = {
@@ -8601,7 +8627,8 @@ function auiToast() {
   const now = performance.now(); if (now > TOAST.until || !TOAST.msg) return;
   const nx = UIL.nx, k = Math.min(1, (now - TOAST.t0) / 160, (TOAST.until - now) / 320), max = nx - 6, words = TOAST.msg.split(' '), lines = [''];
   for (const w of words) { const L = lines.length - 1, t = lines[L] ? lines[L] + ' ' + w : w; if (lines[L] && t.length > max) lines.push(w); else lines[L] = t; }
-  let mr = Math.max(MENU.open ? rectOf($('menu'), 250).bottom : 0, document.body.classList.contains('moding') ? rectOf($('modeBar'), 250).bottom + 4 : 0), top = Math.min(UIL.ny - 2 - (QL.rows && !MENU.open ? QL.rows + 1 : 0), uilRow(Math.max(mr + UIL.ch * 1.2, UIL.ch * 1.6)));   // (under the quest at the top left, not across it)
+  const wl = Math.max(...lines.slice(0, 3).map(l => l.length)), mini = MINI.drop && ((nx - wl) >> 1) - 3 <= MINI.c1 ? MINI.drop + 2 : 0;   // (and under the small map, if it would cross it)
+  let mr = Math.max(MENU.open ? rectOf($('menu'), 250).bottom : 0, document.body.classList.contains('moding') ? rectOf($('modeBar'), 250).bottom + 4 : 0), top = Math.min(UIL.ny - 2 - Math.max(QL.rows && !MENU.open ? QL.rows + 1 : 0, mini), uilRow(Math.max(mr + UIL.ch * 1.2, UIL.ch * 1.6)));   // (under the quest at the top left, not across it)
   if (AREA.barA > 0.05 && AREA.barRow) top = Math.min(top, AREA.barRow - (document.querySelector('#areaBar.acts') ? 5 : 3));   // (and under the name of the place, not across it)
   lines.slice(0, 3).forEach((ln, i) => { const shown = ln.slice(0, Math.ceil(ln.length * Math.min(1, (now - TOAST.t0) / 220 + 0.25))), c0 = (nx - ln.length) >> 1, tag = i === 0 && TOAST.tag ? TOAST.tag : ''; uilPlate(c0 - 2, top - i, c0 + ln.length + 1 + (tag ? tag.length + 2 : 0), top - i, 205 * k | 0); uilText(c0, top - i, shown, 0, 245 * k | 0); uilPut(c0 - 2, top - i, 42, 1, 220 * k | 0);
     if (tag) uilText(c0 + ln.length + 2, top - i, tag, 1, 150 * k | 0); });   // (which of how many: there is more coming, or this is the last of it)
@@ -8745,17 +8772,17 @@ function auiQuest() {
     if (QL.line2) for (const l of wrap(uiAsc(QL.line2), max).slice(0, 2)) lines.push({ t: l, ink: 0, b: 160, q: true }); }
   if (o) wrap(o, max).slice(0, 2).forEach((l, i) => lines.push({ t: l, ink: 2, b: 215, gap: !!QL.line && i === 0 }));
   if (!lines.length) { QL.rows = 0; return; }
-  const top = Math.floor(H / ch) - 2; let row = top, qEnd = top, W = 0;
+  const top = Math.floor(H / ch) - 2 - MINI.drop; let row = top, qEnd = top, W = 0;   // (under the small map, when it is up)
   for (const L of lines) { if (L.gap) row--;
     if (L.big) { const rb = Math.floor((row - 1) / 2); uibText(c0 >> 1, rb, L.t, L.ink, L.b); row = 2 * rb - 1; W = Math.max(W, L.t.length * 2); }
     else { uilText(c0, row, L.t, L.ink, L.b); row--; W = Math.max(W, L.t.length); }
     if (L.q) qEnd = row + 1; }
   const cEnd = (c0 + W + 1) | 1; uilPlate(0, row, cEnd, top + 1, 165);   // (a row of air above and below the words, inside the backing)
   const qt = $('qtrack'); if (qt && QL.line) { const cw = UIL.cw, t = H - (top + 1) * ch, g = `${t}|${qEnd}|${cEnd}|${cw}`; if (qt._g !== g) { qt._g = g; qt.style.left = '0px'; qt.style.top = t + 'px'; qt.style.width = (cEnd + 1) * cw + 'px'; qt.style.height = (top + 1 - qEnd) * ch + 'px'; } }
-  QL.rows = top + 2 - row;
+  QL.rows = top + MINI.drop + 2 - row;   // (counted from the top of the screen, small map and all)
 }
 function auiSay() {
-  if ((state === 'play' || state === 'map' && !M3.on) && !MENU.open && !who.open && !QL.open && !GUIDE.open) auiQuest(); else QL.rows = 0;   // (not over the standing map: it has its own heading; nor over the strip)
+  if ((state === 'play' || state === 'map' && !M3.on) && !MENU.open && !who.open && !QL.open && !GUIDE.open && !MINI.who && !CTL.open) auiQuest(); else QL.rows = 0;   // (not over the standing map: it has its own heading; nor over the strip)
   const D = $('dialog'), sayH = h => { if (UIB.h !== h) { UIB.h = h; document.body.style.setProperty('--sayH', h + 'px'); } };
   if (!D || D.classList.contains('hidden')) return sayH(0);
   const text = ($('dlgText').textContent || '').trim(), title = ($('dlgTitle').textContent || '').trim(); if (!text) return sayH(0);
@@ -8792,11 +8819,12 @@ function drawAsciiUi(dt) {
     if (state === 'map' && mapV.open) auiMapChrome();
     if (state === 'play' && !cl.contains('pro')) auiMarks();
     if (state !== 'title' && state !== 'stats' && !cl.contains('pro') && !cl.contains('photo')) { auiDom(); auiArea(dt); } else if (state === 'title' && AGC.open) auiDom('agentCard');
+    miniDraw(dt);   // (the small map at the top left, and what is under it: see MINI)
     if (shown && !REC.on && !STV.on) auiMark();
     if (state !== 'title' && !REC.on) { auiMenu(); auiToast(); }
     if (state !== 'title' && !cl.contains('pro') && !cl.contains('photo')) { if (state === 'talk') auiTalk(); else auiSay(); }   // (also while he is dying, or the film is running: what is said is always there to be read)
   }
-  if (!(on && state !== 'photo' && state !== 'loading')) inkDraw(false);
+  if (!(on && state !== 'photo' && state !== 'loading')) { inkDraw(false); if (MINI.a > 0 || MINI.on) { MINI.a = 0; MINI.on = false; MINI.drop = 0; MINI.c1 = -1; $('mini').classList.remove('on'); } }
   if (UIL.used || UIL.was) UIL.tex.needsUpdate = true;
   postMat.uniforms.uUiOn.value = UIL.used ? 1 : 0;
   if (UIB.tex && (UIB.used || UIB.was)) UIB.tex.needsUpdate = true; postMat.uniforms.uUi2On.value = UIB.used ? 1 : 0;
@@ -9043,8 +9071,8 @@ addEventListener('keydown', e => {
 // typed into the grid too. The page keeps every one of them, laid out as before but in letters the size of the grid's
 // (so where a word is on the page is where it is typed), unseen; a press still lands on the real thing. A panel is
 // looked at afresh when something in it changes, or every quarter of a second, and typed in again every frame from that.
-const AUID = { ids: ['agentCard', 'chat', 'who', 'prompt', 'warn', 'mic', 'modeBar', 'newcomer', 'friendAsk', 'xfCard', 'xfList', 'waveBtn', 'flipBtn', 'diveBtn', 'bag', 'bldBar', 'matchBig', 'fightCard', 'matchAsk', 'dpBar', 'dpExit', 'recChip', 'guide', 'qlog', 'healthPill', 'looks', 'patron', 'tut'],
-  panels: new Set(['agentCard', 'who', 'xfCard', 'xfList', 'bag', 'bldBar', 'guide', 'qlog', 'looks', 'patron', 'fightCard']), roots: [], mo: null };
+const AUID = { ids: ['agentCard', 'chat', 'who', 'prompt', 'warn', 'mic', 'modeBar', 'newcomer', 'friendAsk', 'xfCard', 'xfList', 'waveBtn', 'flipBtn', 'diveBtn', 'bag', 'bldBar', 'matchBig', 'fightCard', 'matchAsk', 'dpBar', 'dpExit', 'recChip', 'guide', 'qlog', 'healthPill', 'looks', 'patron', 'tut', 'miniWho', 'ctlCard', 'pgCard'],
+  panels: new Set(['agentCard', 'who', 'xfCard', 'xfList', 'bag', 'bldBar', 'guide', 'qlog', 'looks', 'patron', 'fightCard', 'miniWho', 'ctlCard', 'pgCard']), roots: [], mo: null };
 const UIASC = { '⟲': '@', '✕': 'X', '×': 'x', '◂': '<', '▸': '>', '‹': '<', '›': '>', '«': '<<', '»': '>>', '→': '->', '←': '<-', '↑': '^', '↓': 'v', '●': '*', '◉': '@', '◎': '@', '◆': '<>', '◇': '<>', '✦': '*', '✧': '+', '⌂': 'n', '♣': '&', '△': '^', '▲': '^', '▶': '>', '▦': '#', '▣': '#', '†': '+', '—': '-', '–': '-', '…': '...', '’': "'", '‘': "'", '“': '"', '”': '"', '·': '\x7f', '•': '\x7f', '\x7f': '\x7f', '²': '2', '³': '3', '°': 'o', '✓': 'v', '★': '*', '☆': '*', '♥': '<3', '✎': '>_', '⚑': 'P', '⏵': '>', '⏸': '||' };
 const uiAsc = s => String(s || '').replace(/[^\x20-\x7e]/g, ch => UIASC[ch] ?? (/[À-ÿ]/.test(ch) ? ch.normalize('NFD')[0] : ''));
 function auidInit() {
@@ -9272,6 +9300,440 @@ $('guideX').addEventListener('click', e => { e.stopPropagation(); guideShow(fals
 $('guideMic').addEventListener('click', e => { e.stopPropagation(); menuMic(); setTimeout(() => $('guideMic').classList.toggle('on', !!mic.stream && !VC.muted), 400); });
 for (const ev of ['pointerdown', 'touchstart', 'wheel', 'click', 'dblclick']) $('guide').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 addEventListener('keydown', e => { if (GUIDE.open && e.code === 'Escape') { e.stopPropagation(); e.preventDefault(); guideShow(false); } }, true);
+// ── The controls, in one place. Every way of doing each thing: on the keys (k, the keys to press, with kn saying when; or
+//    kd, what to do), with a finger (t), on a pad (p), in the headset (x), and the words to say (v). The controls card,
+//    /help, the first lessons and Hermes's playground all read it from here, so they never disagree.
+const BINDS = [
+  { id: 'steer', act: 'steer', k: ['A', 'D'], t: 'drag left or right', p: 'left stick', x: 'arms out, tip them like wings', v: ['left', 'right'] },
+  { id: 'climb', act: 'climb · dive', k: ['W', 'S'], t: 'drag up or down', p: 'left stick', x: 'raise or lower your arms', v: ['climb', 'dive'] },
+  { id: 'beat', act: 'beat your wings', k: ['Space'], t: 'tap', p: 'A', x: 'flap', v: ['fly'] },
+  { id: 'boost', act: 'go faster', k: ['Shift'], t: 'push the stick all the way', p: 'RT', x: 'keep flapping', v: ['faster'] },
+  { id: 'roll', act: 'roll', k: ['Q', 'E'], t: '', p: 'LB · RB', x: 'pinch and twist', v: ['barrel roll'] },
+  { id: 'loop', act: 'loop', kd: 'hold W, over the top', t: 'hold the drag up, over the top', p: 'hold the stick up', x: 'raise them high and hold', v: ['loop'] },
+  { id: 'brake', act: 'brake · hover', kd: '/brake', t: 'hold the turn-over key', p: 'LT', x: 'palms forward', v: ['brake'] },
+  { id: 'glide', act: 'glide on your wings', k: ['Space'], kn: 'high up', t: 'tap, high up', p: 'A, high up', x: '', v: ['glide'] },
+  { id: 'burn', act: 'back into the bird', k: ['Space'], t: 'tap', p: 'A', x: 'flap', v: ['bird'] },
+  { id: 'man', act: 'fall, as a man', kd: '/human', t: '', p: '', x: '', v: ['man'] },
+  { id: 'land', act: 'land', k: ['Space'], kn: 'low down', t: 'tap, low down', p: 'A, low down', x: 'hands together, held', v: ['land'] },
+  { id: 'perch', act: 'perch on a light', k: ['Space'], t: 'tap', p: 'A', x: 'hands together, held', v: ['perch'] },
+  { id: 'walk', act: 'walk', k: ['W', 'A', 'S', 'D'], t: 'left thumb', p: 'left stick', x: '', v: ['walk'] },
+  { id: 'jump', act: 'jump', k: ['Space'], t: 'tap', p: 'A', x: '', v: ['jump'] },
+  { id: 'map', act: 'the map', k: ['M'], t: 'pinch out', p: '', x: 'say map', v: ['map'] },
+  { id: 'travel', act: 'be carried there', kd: 'click a place on the map', t: 'tap a place on the map', p: '', x: 'look at it and pinch', v: ['take me to the volcano'] },
+  { id: 'goto', act: 'fly to a place', kd: 'double-click it', t: 'hold your finger on it', p: '', x: '', v: ['go there'] },
+  { id: 'players', act: 'who is flying', k: ['Tab'], t: 'ICARUS, then players', p: '', x: '', v: ['players'] },
+  { id: 'mini', act: 'small map', kd: 'Shift M: turn · north · off', t: 'ICARUS · A · minimap', p: '', x: '', v: [] },
+  { id: 'talk', act: 'talk to a god', kd: 'walk up, then speak or type', t: 'walk up, then tap a reply', p: 'A', x: 'walk up and talk', v: [] },
+  { id: 'chat', act: 'chat', k: ['T'], t: 'ICARUS · R · chat', p: '', x: '', v: [] },
+  { id: 'cmd', act: 'commands', k: ['/'], t: 'a slash in the chat', p: '', x: '', v: [] },
+  { id: 'mic', act: 'mic on · off', k: ['V'], t: 'ICARUS, then voice', p: '', x: '', v: [] },
+  { id: 'blow', act: 'leave a wind', k: ['R'], t: 'tap with two fingers', p: '', x: 'blow', v: ['blow'] },
+  { id: 'fire', act: 'fire, in a fight', k: ['F'], t: 'FIRE', p: 'X', x: '', v: ['fire'] },
+  { id: 'wind', act: 'wind, in a fight', k: ['R'], t: 'WIND', p: 'B', x: '', v: ['wind'] },
+  { id: 'shape', act: 'shapes, in a fight', k: ['C', '1', '2', '3'], t: 'SHAPE', p: 'Y', x: '', v: ['bird', 'fall', 'glide'] },
+  { id: 'trick', act: 'a trick', kd: '/loop · /barrel · /immelmann', t: '', p: 'Y', x: 'flick one hand', v: ['immelmann', 'split-s'] },
+  { id: 'photo', act: 'photo camera', k: ['F'], t: 'ICARUS · C · camera', p: '', x: '', v: ['photo'] },
+  { id: 'film', act: 'cinematic camera', k: ['C'], t: 'ICARUS — it films while its strip is down', p: '', x: '', v: ['cinematic'] },
+  { id: 'hands', act: 'your hands', k: ['H'], t: 'ICARUS · S · hands', p: '', x: '', v: ['see hands'] },
+  { id: 'stats', act: 'your stats', k: ['Z'], t: 'ICARUS · I · stats', p: '', x: '', v: ['stats'] },
+  { id: 'quests', act: 'quests', k: ['J'], t: 'ICARUS · U · quests', p: '', x: '', v: [] },
+  { id: 'help', act: 'ask for help', k: ['?'], t: 'ICARUS · U · help', p: '', x: '', v: ['help'] },
+  { id: 'menu', act: 'the menu', kd: 'click ICARUS', t: 'tap ICARUS', p: '', x: 'say menu', v: ['menu'] },
+  { id: 'keys', act: 'this card', k: ['F1'], t: 'the ? under the small map', p: '', x: '', v: [] },
+];
+const BIND = Object.fromEntries(BINDS.map(B => [B.id, B]));
+// (for the first lessons: one binding, the way TUT writes them)
+const bindTut = id => { const B = BIND[id]; return { keys: B.k || undefined, desk: B.kd || undefined, touch: B.t, voice: B.v && B.v.length ? B.v : undefined }; };
+// what he is holding: the headset, a phone, a pad, or the keys
+const devNow = () => XR.on || VISION ? 'xr' : TOUCH ? 'touch' : PAD.on ? 'pad' : 'keys';
+function bindTxt(B, d) {
+  if (!B) return '';
+  if (d === 'keys') return B.kd || (B.k ? B.k.join(' ') + (B.kn ? ', ' + B.kn : '') : '');
+  if (d === 'voice') return B.v && B.v.length ? B.v.map(w => `“${w}”`).join(' · ') : '';
+  return B[{ touch: 't', pad: 'p', xr: 'x' }[d]] || '';
+}
+const cEsc = t => String(t ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+
+// ── The corner. At the top left, small: the country round him in the letters (sea, low land, high ground, snow), him in the
+//    middle as an arrow, everyone else flying as a dot in their house's colour, the errand he follows, Hermes when he is
+//    up, and north on the rim; under it how fast and how high, the name of the place, which world, and how many are up. A
+//    press on the map opens the big one; on the count, who is up, each with a GO; on the ?, the controls. It turns with
+//    him, or keeps north up, or is not there (Shift M, /minimap). The errand's block moves down under it (see auiQuest).
+const MINI = { mode: (() => { try { const m = localStorage.getItem('icarus.minimap'); return m === 'off' || m === 'north' ? m : 'turn'; } catch { return 'turn'; } })(),
+  a: 0, on: false, drop: 0, bottom: 0, c1: -1, R: 900, buf: null, bk: '', bx: 0, bz: 0, ba: 0, bR: 1, geo: '', qw: null, qwT: 0, who: false, whoT: 0, f: new THREE.Vector3(), q: new THREE.Vector3() };
+function miniSet(m, say) {
+  MINI.mode = m; MINI.bk = ''; try { localStorage.setItem('icarus.minimap', m); } catch {}
+  if (say) toast(m === 'off' ? `SMALL MAP OFF · ${TOUCH ? 'ICARUS · A · MINIMAP' : 'SHIFT M'} BRINGS IT BACK` : m === 'north' ? 'SMALL MAP · NORTH UP' : 'SMALL MAP · TURNS WITH YOU');
+}
+const miniCycle = () => miniSet(MINI.mode === 'turn' ? 'north' : MINI.mode === 'north' ? 'off' : 'turn', true);
+function miniShown() {
+  const cl = document.body.classList;
+  return MINI.mode !== 'off' && UIL.on && state === 'play' && !cl.contains('photo') && !cl.contains('pro') && !cl.contains('cinema') && !MENU.open && !who.open && !QL.open && !GUIDE.open && !CTL.open && !STV.on
+    && !miniCrossed($('keyCard'), !!KEYC.s) && !miniCrossed($('tut'), $('tut').classList.contains('on'));   // (a key being taught, where it would cross the corner, has the place to itself)
+}
+function miniCrossed(el, on) { if (!on || !el) return false; const r = rectOf(el, 300), w = (MINI.c1 > 0 ? MINI.c1 + 2 : 26) * UIL.cw, h = MINI.c1 > 0 ? innerHeight - MINI.bottom * UIL.ch : innerHeight * 0.4; return r.width > 0 && r.left < w && r.top < h; }
+// the country, sampled once for every cell of the disc (again when he has moved, or turned, or the range has changed)
+function miniTerrain(rr, rc, fx, fz, R) {
+  const w = 2 * rc + 1, n = w * (2 * rr + 1) * 3, B = MINI.buf && MINI.buf.length === n ? MINI.buf : (MINI.buf = new Int16Array(n)), P = player.pos, rx = -fz, rz = fx;
+  for (let dr = -rr; dr <= rr; dr++) for (let dc = -rc; dc <= rc; dc++) {
+    const u = dc / (rc + 0.5), v = dr / (rr + 0.5), i = ((dr + rr) * w + dc + rc) * 3;
+    if (u * u + v * v > 1) { B[i] = -1; continue; }
+    const x = P.x + (u * rx + v * fx) * R, z = P.z + (u * rz + v * fz) * R, e = height(x, z) - WATER;
+    if (realm === 'over' && e < 0) { B[i] = 126; B[i + 1] = 13; B[i + 2] = e < -60 ? 56 : 80; }   // (the sea: darker where it is deep)
+    else { const k = e < 20 ? 0 : e < 110 ? 1 : e < 320 ? 2 : e < 900 ? 3 : 4; B[i] = [46, 58, 43, 94, 42][k]; B[i + 1] = 0; B[i + 2] = [84, 104, 122, 140, 175][k]; }
+  }
+  MINI.bx = P.x; MINI.bz = P.z; MINI.ba = Math.atan2(fx, fz); MINI.bR = R;
+}
+const MINI_ARROW = ['>', '/', '^', '\\', '<', '/', 'v', '\\'];
+function miniDraw(dt) {
+  const want = miniShown();
+  MINI.a = want ? Math.min(1, MINI.a + dt * 3.5) : Math.max(0, MINI.a - dt * 5);
+  const hit = $('mini'), up = MINI.a > 0.5 && want; if (up !== MINI.on) { MINI.on = up; hit.classList.toggle('on', up); }
+  if (!want && MINI.who) miniWhoShow(false);
+  if (MINI.a <= 0.01) { MINI.drop = 0; MINI.c1 = -1; return; }
+  const A = MINI.a, ease = A * A * (3 - 2 * A), nx = UIL.nx, ny = UIL.ny, cw = UIL.cw, ch = UIL.ch, H = innerHeight, ra = ch / cw, K = UISZ.K[UISZ.i];
+  // how big: about a twelfth of the height, in the letters as they are (so bigger text, a bigger map), and never more than a third across
+  let rr = clamp(Math.round(ny * K * 0.075), 3, 6), rc = Math.round(rr * ra * 0.95);
+  while (rr > 3 && 2 * rc + 1 > nx * 0.34) { rr--; rc = Math.round(rr * ra * 0.95); }
+  const w = 2 * rc + 1, base = Math.floor(H / ch) - 2, top = base - (nx < w * 2 + 34 ? 3 : 0), cc = 1 + rc, cr = top - rr;   // (on a narrow screen it starts lower: the name of the place has the very top)
+  // which way is up on it: where he is looking, or north
+  const p = player, P = p.pos, F = MINI.f; camera.getWorldDirection(F); { const l = Math.hypot(F.x, F.z); if (l > 0.05) { F.x /= l; F.z /= l; } else { F.x = -Math.sin(p.yaw); F.z = -Math.cos(p.yaw); } }
+  const north = MINI.mode === 'north', fx = north ? 0 : F.x, fz = north ? -1 : F.z, rx = -fz, rz = fx;
+  // how far it reaches: further the faster he goes
+  const sp = p.form === 'phoenix' ? p.speed : Math.hypot(p.vel.x, p.vel.z), Rw = p.form === 'phoenix' ? clamp(500 + sp * 8, 700, 2600) : 420;
+  MINI.R = lerp(MINI.R, Rw, damp(0.7, dt)); const R = MINI.R;
+  const key = `${rr}|${rc}|${realm}`;
+  if (MINI.bk !== key || Math.hypot(P.x - MINI.bx, P.z - MINI.bz) > R / rr * 0.3 || Math.abs(wrapAngle(Math.atan2(fx, fz) - MINI.ba)) > 0.05 || Math.abs(R / MINI.bR - 1) > 0.05) { MINI.bk = key; miniTerrain(rr, rc, fx, fz, R); }
+  const B = MINI.buf, hot = el => el.matches(':hover') || document.activeElement === el, mapHot = hot($('miniMapHit'));
+  for (let dr = -rr; dr <= rr; dr++) for (let dc = -rc; dc <= rc; dc++) { const i = ((dr + rr) * w + dc + rc) * 3; if (B[i] < 0) continue;
+    const c = cc + dc, r = cr + dr; uilPlate(c, r, c, r, (mapHot ? 200 : 170) * ease | 0); uilPut(c, r, B[i], B[i + 1], Math.min(255, B[i + 2] * (mapHot ? 1.25 : 1)) * ease | 0); }
+  // a thing in the world, put on the disc (on its rim, dimmer, if it is beyond it)
+  const put = (x, z, code, ink, b) => { let u = ((x - P.x) * rx + (z - P.z) * rz) / R, v = ((x - P.x) * fx + (z - P.z) * fz) / R; const l = Math.hypot(u, v), out = l > 0.92; if (out) { u *= 0.92 / l; v *= 0.92 / l; b *= 0.62; }
+    uilPut(cc + Math.round(u * (rc + 0.5)), cr + Math.round(v * (rr + 0.5)), code, ink, b * ease | 0); };
+  { const u = -fx, v = -fz; uilPut(cc + Math.round(u * (rc + 0.2)), cr + Math.round(v * (rr + 0.2)), 78, 1, 250 * ease | 0); }   // N, on the rim
+  // the errand he follows (looked up now and then: it hardly moves)
+  if ((MINI.qwT -= dt) <= 0) { MINI.qwT = 0.6; try { MINI.qw = qlWhere(qlTracked()); } catch { MINI.qw = null; } }
+  if (MINI.qw) put(MINI.qw.x, MINI.qw.z, (time * 3 % 1) < 0.55 ? 42 : 43, 2, 255);
+  // Hermes, or whichever god is up with him
+  if (GFLY.on && GFLY.B) put(GFLY.B.pos.x, GFLY.B.pos.z, GFLY.g.name.charCodeAt(0), inkCi('#' + GFLY.B.c.getHexString()), 240);
+  // everyone else flying, in their colours
+  const now = performance.now(), me = realm === 'under' ? 1 : 0; let n = 0;
+  for (const Q of NET.peers.values()) { if (!Q.s || now - Q.s.t > 15000) continue; n++; if (Q.realm !== me || SHUN.block.has(Q.name)) continue;
+    put(Q.pos.x, Q.pos.z, TRACK.id === Q.id ? 64 : FRIENDS.has(Q.name) ? 43 : 111, mkInk(Q.css || '#bfe6ff'), 245); }
+  // him, in the middle
+  { let ch0 = 94; if (north) { const a = Math.atan2(-F.z, F.x); ch0 = MINI_ARROW[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8].charCodeAt(0); }
+    uilPut(cc - 1, cr, 32, 0, 0); uilPut(cc + 1, cr, 32, 0, 0); uilPut(cc, cr, ch0, 2, 255 * ease | 0); }   // (a little room either side, so he is never lost in the hills)
+  // under it: how fast and how high · where · which world, how many up, and the controls
+  const kmh = Math.round((p.form === 'phoenix' ? p.speed : p.vel.length()) * 3.6), hi = Math.max(0, Math.round(P.y - Math.max(groundAt(P.x, P.z, P.y), WATER)));
+  const place = uiAsc(AREA.names.get(AREA.cur)?.name || '').toUpperCase().slice(0, Math.max(10, w + 6)), cnt = `${n + 1} ONLINE`, world = realm === 'under' ? 'UNDERWORLD' : 'OLYMPUS';
+  const rows = [`${kmh} KM/H  ${hi} M UP`]; if (place) rows.push(place);
+  let r = cr - rr - 1, c1 = cc + rc;
+  for (const t of rows) { uilClear(0, r, t.length + 1, r); uilPlate(0, r, t.length + 1, r, 150 * ease | 0); uilText(1, r, t, 0, (rows.indexOf(t) ? 165 : 200) * ease | 0); c1 = Math.max(c1, t.length + 1); r--; }
+  const key3 = (c, t, el) => { const h = hot(el); uilPut(c, r, 91, h ? 2 : 1, 255 * ease | 0); uilText(c + 1, r, t, h ? 2 : 0, (h ? 255 : 215) * ease | 0); uilPut(c + 1 + t.length, r, 93, h ? 2 : 1, 255 * ease | 0); return c + t.length + 2; };
+  const cW = world.length + 2, cK = cW + cnt.length + 3; uilClear(0, r, cK + 3, r); uilPlate(0, r, cK + 3, r, 150 * ease | 0);   // (nothing of the world's own lettering between the words)
+  uilText(1, r, world, 1, 190 * ease | 0);
+  key3(cW, cnt, $('miniWhoHit')); key3(cK, '?', $('miniKeysHit')); c1 = Math.max(c1, cK + 3);
+  const bottom = r; MINI.c1 = c1; MINI.bottom = bottom; MINI.drop = Math.round((base - (bottom - 2)) * ease);
+  // the places to press, laid where the letters are (and a little bigger under a finger)
+  const g = `${cc}|${cr}|${rr}|${rc}|${cW}|${cK}|${cnt.length}|${r}|${cw}|${ch}|${H}`;
+  if (g !== MINI.geo) { MINI.geo = g; const pad = TOUCH ? ch * 0.5 : 0, at = (el, c0, r1, cols, rws) => { const s = el.style; s.left = c0 * cw - pad + 'px'; s.top = H - (r1 + 1) * ch - pad + 'px'; s.width = cols * cw + pad * 2 + 'px'; s.height = rws * ch + pad * 2 + 'px'; };
+    at($('miniMapHit'), cc - rc, cr + rr, w, 2 * rr + 1); at($('miniWhoHit'), cW, r, cnt.length + 2, 1); at($('miniKeysHit'), cK, r, 3, 1);
+    const L = $('miniWho').style; L.left = cw + 'px'; L.top = H - (bottom - 1) * ch + 'px'; }
+}
+// who is up, at a press on the count: a short list under the corner, each with a GO that carries him to them
+function miniWhoShow(on) {
+  MINI.who = on; MINI.whoT = 0; $('miniWho').classList.toggle('on', on);
+  if (on) { if (CTL.open) ctlShow(false); miniWhoDraw(); }
+}
+function miniWhoDraw() {
+  const el = $('miniWho'), all = NET.peers.size ? whoList() : [], L = all.slice(0, 8);
+  let h = `<div class="r h"><b>${all.length + 1} ONLINE</b><button type="button" data-a="x" aria-label="Close">X</button></div>`;
+  for (const w of L) { const P = w.P, d = w.there ? fmtDist(w.d) : P.realm ? 'below' : 'above';
+    h += `<div class="r"><b style="color:${cEsc(P.css || '#bfe6ff')}">${FRIENDS.has(P.name) ? '+ ' : ''}${cEsc(P.name)}</b><i>${cEsc(d)}</i><button type="button" data-go="${cEsc(P.name)}">GO</button></div>`; }
+  if (!L.length) h += `<div class="r"><i>${NET.on || NET.ch ? 'nobody else right now' : 'not connected'}</i></div>`;
+  else if (all.length > L.length) h += `<div class="r"><i>and ${all.length - L.length} more · ${TOUCH ? 'ICARUS · A · players' : 'Tab'}</i></div>`;
+  if (el._h !== h) { el._h = h; el.innerHTML = h; }
+}
+$('miniWho').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation(); audio.sfx.ui?.();
+  if (b.dataset.a === 'x') return miniWhoShow(false);
+  const P = peerNamed(b.dataset.go); if (!P) { toast('THEY HAVE GONE'); return miniWhoDraw(); }
+  if (warpToPeer(P)) miniWhoShow(false); });
+$('miniMapHit').addEventListener('click', e => { e.stopPropagation(); $('miniMapHit').blur(); if (state === 'play') openMap(); });
+$('miniWhoHit').addEventListener('click', e => { e.stopPropagation(); $('miniWhoHit').blur(); audio.sfx.ui?.(); miniWhoShow(!MINI.who); });
+$('miniKeysHit').addEventListener('click', e => { e.stopPropagation(); $('miniKeysHit').blur(); audio.sfx.ui?.(); ctlShow(!CTL.open); });
+for (const id of ['mini', 'miniWho', 'ctlCard', 'pgCard']) for (const ev of ['pointerdown', 'touchstart', 'wheel', 'dblclick']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
+
+// ── The controls card: a quick look at what does what, for whatever he is holding (the keys, a phone, a pad, the headset,
+//    his voice), a page at a time; from it, Hermes's playground, or a question for Hermes. F1 (or `), the ? under the small
+//    map, the menu (U · controls), or /keys.
+const CTL = { open: false, dev: '', page: 0 };
+const CTL_DEV = [['keys', 'keys'], ['touch', 'touch'], ['pad', 'pad'], ['xr', 'headset'], ['voice', 'voice']];
+function ctlShow(on) {
+  if (on && !(state === 'play' || state === 'map')) return;
+  CTL.open = on; if (on) { CTL.dev = CTL.dev || devNow(); CTL.page = 0; if (MENU.open) menuShow(false); if (MINI.who) miniWhoShow(false); if (GUIDE.open) guideShow(false); }
+  $('ctlCard').classList.toggle('on', on); if (on) ctlDraw();
+}
+function ctlDraw() {
+  const d = CTL.dev || devNow(), rows = BINDS.filter(B => bindTxt(B, d)), n = clamp(Math.floor(innerHeight / (UIL.ch || 14)) - 14, 4, 12), pages = Math.max(1, Math.ceil(rows.length / n));
+  CTL.page = ((CTL.page % pages) + pages) % pages;
+  let h = `<h4>controls</h4><p class="tabs">${CTL_DEV.map(([k, t]) => `<button type="button" data-d="${k}" class="${k === d ? 'on' : ''}">${t}</button>`).join('')}</p>`;
+  for (const B of rows.slice(CTL.page * n, CTL.page * n + n)) h += `<div class="r"><b>${cEsc(B.act)}</b><span>${cEsc(bindTxt(B, d))}</span></div>`;
+  if (d === 'voice') h += `<p class="n">with your microphone on · ${TOUCH ? 'ICARUS, then voice' : 'V'}</p>`;
+  h += `<p class="acts"><button type="button" data-a="pg">playground</button><button type="button" data-a="ask">ask hermes</button>${pages > 1 ? `<button type="button" data-a="more">more ${CTL.page + 1}/${pages}</button>` : ''}<button type="button" data-a="x">close</button></p>`;
+  const el = $('ctlCard'); if (el._h !== h) { el._h = h; el.innerHTML = h; }
+}
+$('ctlCard').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation(); audio.sfx.ui?.();
+  if (b.dataset.d) { CTL.dev = b.dataset.d; CTL.page = 0; return ctlDraw(); }
+  const a = b.dataset.a;
+  if (a === 'more') { CTL.page++; return ctlDraw(); }
+  ctlShow(false);
+  if (a === 'pg') pgStart(); else if (a === 'ask') openChat('/hermes how do I '); });
+addEventListener('keydown', e => {
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.metaKey || e.ctrlKey || e.altKey) return;
+  if ((e.code === 'F1' || e.code === 'Backquote') && (state === 'play' || state === 'map')) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) ctlShow(!CTL.open); return; }
+  if (e.code === 'Escape' && (CTL.open || MINI.who || PG.pick)) { e.preventDefault(); e.stopImmediatePropagation(); if (CTL.open) ctlShow(false); else if (MINI.who) miniWhoShow(false); else { PG.pick = false; pgCardDraw(); } return; }
+  // (the playground's practice fire: F throws it at Hermes, outside a fight; R is the wind as ever, and counts)
+  if (PG.on && PG.list[PG.i] === 'fire' && PG.ph !== 'gap' && state === 'play' && !fbOn() && !e.repeat) {
+    if (e.code === 'KeyF') { e.preventDefault(); e.stopImmediatePropagation(); pgFire(); }
+    else if (e.code === 'KeyR') PG.blew = true; }
+}, true);
+
+// ── Hermes's playground. Asked for (the controls card, the menu, /playground), Hermes comes up beside him and goes through
+//    it one thing at a time while they fly: he says it in a line or two, does it himself (see pgDemo), and waits until he
+//    sees it done (or lets it go); then the next. Skip, pick a topic, or end it, from the card at the foot of the screen or
+//    by saying so. And he can be called for any one thing — /hermes how do I loop, or "Hermes, show me how to land" —
+//    when he comes, shows that one, and goes; anything else he is asked, he asks Gaia and says what she says.
+//    (Lessons: fly says it is done from the bird, in the air; until: done; words: what a question about it would say.)
+const PG_LESSONS = [
+  { id: 'steer', name: 'steering', fly: true, bind: ['steer'], show: 'weave', words: /\b(steer(ing)?|turn(ing)?|fly(ing)?|controls?|basics)\b/,
+    say: [['Okay, basics. Steer with me — left, then right. Nice and loose.'], ['First things first. Follow me — lean left, lean right.']], did: ['Smooth. You’re a natural.', 'See? Easy.'], until: T => T.turned > 1.8 },
+  { id: 'boost', name: 'boost', fly: true, bind: ['boost'], show: 'surge', words: /\b(boost(ing)?|fast(er)?|speed( up)?|sprint|quick(er)?|hurry)\b/,
+    say: () => [TOUCH ? 'Now floor it. Push your thumb all the way out and keep up with me.' : 'Now floor it. Hold Shift and keep up with me.'], did: ['Fast, right? Go easy on the turns at that speed.', 'There it is. Careful, the ground comes up quick.'], until: T => T.boostT > 1.2 },
+  { id: 'climb', name: 'climb and dive', fly: true, bind: ['climb'], show: 'updown', words: /\b(climb(ing)?|dive|diving|go (up|down)|higher|lower|altitude)\b/,
+    say: [['Nose up to climb, nose down to dive. Do both — watch me.']], did: ['Dive’s where the speed is. Climbing’s where you pay for it.'], until: T => T.upT > 0.4 && T.downT > 0.4 },
+  { id: 'loop', name: 'loop', fly: true, bind: ['loop'], show: 'loop', words: /\b(loop(s|ing)?|flip|tricks?|over the top|upside down|aerobatics?)\b/,
+    say: () => [[TOUCH ? 'Now the fun one. Drag up and keep holding it, all the way over. Like this.' : 'Now the fun one. Pull up and keep pulling, all the way over. Like this.']], did: ['A loop! Okay, show-off.', 'Ha! Nailed it.'], until: T => T.loop },
+  { id: 'perch', name: 'landing', fly: true, bind: ['land', 'perch'], show: 'swoop', words: /\b(land(ing)?|perch(ing)?|touch ?down|set down|get down|stop flying)\b/,
+    say: () => [[`Landing. Get low and ${TOUCH ? 'tap' : 'hit Space'} — or find a ring of light and perch on it.`]], did: ['Stuck it. Same button takes you up again.', 'Nice landing. I give it a nine.'], until: T => T.airT > 0.5 && !!(player.perch || player.perchGo || player.form === 'human' && player.grounded) },
+  { id: 'shapes', name: 'shapes', fly: true, bind: ['glide', 'burn'], show: 'morph', words: /\b(shapes?|morph(ing)?|glid(e|ing)|wings|man|human|change|transform|shift|fall(ing)?)\b/,
+    say: () => [[`You’ve got shapes. Up high, ${TOUCH ? 'tap' : 'Space'} drops you out of the bird onto your own wings.`, `Glide a bit, then ${TOUCH ? 'tap' : 'Space'} again — straight back into the bird.`]], did: ['Bird, man, bird. Told you.', 'Look at you, changing on the fly.'], until: T => T.glide && player.form === 'phoenix' },
+  { id: 'map', name: 'map and travel', bind: ['map', 'travel'], show: 'circle', words: /\b(map|travel|teleport|warp|carr(y|ied)|go to|get to|find (my )?friends?|someone|somebody)\b/,
+    say: () => [TOUCH ? ['Pinch out for the map.', 'Tap anywhere people have flown — or someone flying — and you get carried there.'] : ['M opens the map.', 'Click anywhere people have flown — or someone flying — and you get carried there.']], did: ['Fast travel. Saves the wings.', 'Door to door. That’s my whole job, by the way.'], until: T => T.mapped && T.went, wait: 60 },
+  { id: 'talk', name: 'talking to gods', bind: ['talk', 'chat'], show: 'close', words: /\b(talk(ing)?|speak(ing)?|chat|gods?|conversation|say something)\b/,
+    say: () => [[`Gods are just people. Say something to me — out loud, or ${TOUCH ? 'chat in the menu' : 'T to type it'}.`, 'On the ground, walk up to any of us and just talk.']], did: ['Ha. See? We talk back. And we remember.'], until: T => GFLY.heard > T.at + 0.05 || TOURDO.typed > T.at },
+  { id: 'fire', name: 'fire and wind', fly: true, bind: ['fire', 'wind'], show: 'fire', words: /\b(fire(ball)?|shoot(ing)?|throw|attack|wind|gust|fight(ing)?|combat|duel)\b/,
+    hint: d => d === 'touch' ? 'FIRE · THROW IT AT HERMES  /  WIND · YOUR GUST' : d === 'pad' || d === 'xr' ? 'THE FIRE AND WIND KEYS BELOW' : 'F · THROW FIRE AT HERMES  /  R · YOUR WIND',
+    say: () => [[`Fight practice. ${TOUCH ? 'FIRE' : 'F'} throws fire, ${TOUCH ? 'WIND' : 'R'} is your wind. Aim at me — I can take it.`]], did: ['Ow. Okay, that stung. In a real fight it chases whoever’s nearest.'], until: T => T.fired > 0 && (T.blew || GUST.cool > T.at + 2.2) },
+];
+const PG_BY = Object.fromEntries(PG_LESSONS.map(L => [L.id, L]));
+const PG_ASK = ['fire', 'map', 'talk', 'shapes', 'perch', 'loop', 'boost', 'climb', 'steer'];   // (which a question is about: the narrowest first)
+const PGL = {
+  hi: [['Welcome to the playground. I show you, you copy me. Easy.', 'Say skip if you’ve got one down.'], ['Playground’s open! I do it, you copy.', 'Skip anything you already know.']],
+  hi1: ['You rang? Okay — watch me.', 'Hey. Sure, I’ll show you.', 'On my way. Watch this.'],
+  up: () => [TOUCH ? 'Get in the air first — tap, then tap again. I’ll wait.' : 'Get in the air first — Space, then Space again. I’ll wait.'],
+  nudge: ['No rush. We’ll come back to it.', 'Fine, moving on.', 'Later, then.'],
+  skip: ['Sure.', 'Okay, next.', 'Got it already? Fine.'],
+  bye: ['That’s the playground. Want me again? Just say “Hermes, show me how to” — whatever.', 'Class dismissed. Say “Hermes, show me how to” anything and I’ll come back.'],
+  bye1: ['There you go. Holler if you need me.', 'That’s it. I’m around.'],
+  stop: ['Okay, okay. I’m around if you need me.', 'Fair. Call me any time.'],
+  think: ['Hang on.', 'Good question. One sec.'],
+  dunno: () => [TOUCH ? 'Honestly? No idea. Ask Gaia — ICARUS, then U, then help. She knows everything.' : 'Honestly? No idea. Ask Gaia — hit the question mark. She knows everything.'],
+};
+const PG = { on: false, list: [], i: 0, ph: 'gap', t: 0, one: false, ask: '', hello: '', pick: false, done: new Set(), shots: [], at: 0 };
+const pgSay = x => { const v = typeof x === 'function' ? x() : x; return Array.isArray(v) ? pick(v) : v; };
+function pgCan(say) {
+  const why = realm !== 'over' ? 'HERMES CAN’T COME DOWN HERE' : MATCH.phase ? 'NOT IN THE MIDDLE OF A FIGHT' : !flags.morphed ? 'FIND YOUR WINGS FIRST' : !(state === 'play' || state === 'map') ? 'NOT JUST NOW' : '';
+  if (why && say) toast(why); return !why;
+}
+function pgStart(ids = null, o = {}) {
+  if (!pgCan(true)) return false;
+  const g = godById.hermes; if (!g) return false;
+  if (state === 'map') closeMap();
+  if (GFLY.tour) { GFLY.tour = null; keyCard('', ''); flags.toured = true; }   // (his first-flight run gives way to this)
+  if (!(GFLY.on && GFLY.g === g) && !gflyStart(g, 'with', { pg: true })) return false;
+  GFLY.endAt = 0; GFLY.idleT = 0; GFLY.demo = null;
+  Object.assign(PG, { on: true, list: ids || PG_LESSONS.map(L => L.id), i: 0, ph: 'gap', t: o.one || o.ask ? 1.2 : 2, one: !!o.one, ask: o.ask || '', hello: o.ask ? '' : o.one ? 'hi1' : 'hi', pick: !!o.pick, answered: false });
+  if (CTL.open) ctlShow(false); pgCardDraw(); return true;
+}
+// over: said goodbye (or not, after an answer), and a few seconds later Hermes has other people to meet
+function pgEnd(how = '') {
+  if (!PG.on) return; const quiet = !!PG.ask, one = PG.one; PG.on = false; PG.ask = ''; PG.pick = false;
+  if (GFLY.demo?.hid && GFLY.B) GFLY.B.bird.group.visible = true; GFLY.demo = null; pgCardDraw();
+  const g = GFLY.g; if (!GFLY.on || g?.id !== 'hermes') return;
+  if (!quiet) hermesSays(pgSay(how === 'stop' ? PGL.stop : one ? PGL.bye1 : PGL.bye));
+  setTimeout(() => { if (GFLY.on && GFLY.g === g && !GFLY.tour && !PG.on) gflyEnd(); }, quiet ? 2500 : one ? 4500 : 6500);
+}
+function pgBegin() {
+  const T = PG, L = PG_BY[T.list[T.i]];
+  Object.assign(T, { ph: 'say', t: 1.2, at: time, turned: 0, yawL: player.yaw, airT: 0, boostT: 0, upT: 0, downT: 0, loop: false, tr0: STATS.d.tricks | 0, lp0: pgLoops(), glide: false, mapped: false, went: false, fired: 0, hits: 0, blew: false, saidUp: false });
+  GFLY.demo = L.show ? { k: L.show, t: 0 } : null;
+  hermesSays(pgSay(L.say)); pgCardDraw();
+}
+function pgNext(gap) {
+  if (GFLY.demo?.hid && GFLY.B) GFLY.B.bird.group.visible = true;
+  PG.i++; PG.ph = 'gap'; PG.t = gap; GFLY.demo = null; pgCardDraw();
+}
+function pgSkip() { if (!PG.on) return; if (PG.ask) return pgEnd(); if (PG.pick) return; if (PG.ph !== 'gap') hermesSays(pgSay(PGL.skip)); pgNext(0.8); }
+function pgTopic(id) { const i = PG_LESSONS.findIndex(L => L.id === id); if (i < 0) return; PG.list = PG_LESSONS.map(L => L.id); PG.i = i; PG.ph = 'gap'; PG.t = 0.4; PG.pick = false; PG.one = false; PG.hello = ''; GFLY.demo = null; pgCardDraw(); }
+// what he has done since the lesson began, counted as he flies
+const pgLoops = () => { const T = BIRD.bond.tricks || {}; return (T.loop | 0) + (T.immelmann | 0) + (T.splits | 0); };
+function pgTrack(dt) {
+  const T = PG, p = player, bird = state === 'play' && p.form === 'phoenix' && !p.perch && !p.perchGo;
+  if (bird) { T.turned += Math.abs(wrapAngle(p.yaw - (T.yawL ?? p.yaw))); T.airT += dt; if (boosting()) T.boostT += dt; if (p.pitch > 0.3) T.upT += dt; if (p.pitch < -0.35) T.downT += dt; }
+  T.yawL = p.yaw;
+  if (FLIP.loop || (STATS.d.tricks | 0) > T.tr0 || pgLoops() > T.lp0) T.loop = true;   // (by hand, over the top; or flown for him, /loop or said)
+  if (state === 'play' && p.form === 'human' && !p.grounded && !p.mount) { T.airT += dt; if (p.wings) T.glide = true; }
+  if (state === 'map') T.mapped = true; if (state === 'warp' || warp.dash) T.went = true;
+  if (GFLY.on && GFLY.B && state === 'play' && GFLY.B.pos.distanceTo(p.pos) > 1600) GFLY.far = 99;   // (carried off somewhere: he catches up at once)
+}
+// a lesson that wants him flying, while he is not: what to press first
+function pgNeed(L) {
+  const p = player; if (!L || !L.fly || p.form === 'phoenix' && !p.perch && !p.perchGo || L.id === 'shapes' && PG.glide) return '';
+  const d = devNow(), k = d === 'touch' ? 'TAP' : d === 'pad' ? 'A' : d === 'xr' ? 'FLAP' : 'SPACE';
+  return p.form === 'human' && p.grounded ? `${k} TO JUMP · ${k} AGAIN TO BURN · TAKE OFF FIRST` : p.perch ? `${k} · TAKE OFF FIRST` : `${k} · BURN BACK INTO THE BIRD`;
+}
+function pgHint(L, d) {
+  const dd = d === 'voice' ? 'keys' : d, speaks = !!mic.stream && !VC.muted;
+  return L.bind.map(id => { const B = BIND[id]; let t = bindTxt(B, dd) || (B.v?.length ? `say “${B.v[0]}”` : ''); if (t && speaks && B.v?.length && dd !== 'xr') t += ` or say “${B.v[0]}”`; return t ? `${t} · ${B.act}` : ''; }).filter(Boolean).join('  /  ');
+}
+// one step of it, every frame he is flying with Hermes (from updateGfly): never while either of them is talking
+function pgStep(dt) {
+  const T = PG, still = !GFLY.busy && !dlg.cur && !dlg.queue.length && !voiceSrc;
+  T.t -= dt; pgTrack(dt);
+  if (T.ask) return pgAskStep(still);
+  if (T.pick) return;
+  if (T.ph === 'gap') { if (!still || T.t > 0) return;
+    if (T.hello) { hermesSays(pgSay(PGL[T.hello])); T.hello = ''; T.t = 0.8; return; }
+    if (T.i >= T.list.length) return pgEnd();
+    return pgBegin(); }
+  const L = PG_BY[T.list[T.i]]; if (!L) return pgNext(0.5);
+  if (T.ph === 'say' || T.ph === 'try') {
+    if (L.until(T)) { T.ph = 'did'; T.t = 0.7; if (GFLY.demo?.hid && GFLY.B) GFLY.B.bird.group.visible = true; GFLY.demo = null; pgCardDraw(); return; }
+    const need = pgNeed(L);
+    if (T.ph === 'say') { if (still && T.t <= 0) { T.ph = 'try'; T.t = L.wait || 45; } return; }
+    if (need) { T.t += dt; if (!T.saidUp && still && time - T.at > 9) { T.saidUp = true; hermesSays(pgSay(PGL.up)); } return; }   // (the clock waits while he gets into the air)
+    if (T.t <= 0) { hermesSays(pgSay(PGL.nudge)); pgNext(1.6); }
+    return; }
+  if (T.ph === 'did' && T.t <= 0 && still) { T.done.add(L.id); hermesSays(pgSay(L.did)); pgNext(T.one ? 2.5 : 2.2); }
+}
+// asked something the playground does not cover: he asks Gaia, and says what she says (and does what she would)
+function pgAskStep(still) {
+  const T = PG;
+  if (T.ph === 'gap') { if (!still || T.t > 0) return; T.ph = 'wait'; hermesSays(pgSay(PGL.think)); pgCardDraw();
+    const q = T.ask;
+    fetch('/api/guide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: q, where: guideWhere(), before: GUIDE.log.slice(-4) }) })
+      .then(r => r.ok ? r.json() : null).catch(() => null).then(j => { if (!PG.on || PG.ask !== q) return;
+        if (j && j.say) { GUIDE.log.push({ who: 'you', text: q }, { who: 'her', text: j.say }); if (GUIDE.log.length > 8) GUIDE.log.splice(0, GUIDE.log.length - 8);
+          hermesSays(String(j.say).replace(/\bI am Gaia\b[.,]?\s*/i, '')); const acts = (j.actions || []).filter(a => a !== 'help' && a !== 'explain' && a !== 'close' && a !== 'menu'); if (acts.length) { AP.q.push(...acts); apPump(); } }
+        else hermesSays(pgSay(PGL.dunno));
+        PG.ph = 'bye'; PG.t = 5; pgCardDraw(); });
+    return; }
+  if (T.ph === 'bye' && still && T.t <= 0) pgEnd();
+}
+// summoned: for one thing he knows how to show, the playground's lesson for it; for nothing in particular, all of it; anything else, Gaia's answer
+function hmSummon(q) {
+  const raw = String(q || '').replace(/[<>]/g, '').trim().slice(0, 200), t = raw.toLowerCase().replace(/[?!.]+$/, '').replace(/^(?:can|could|would|will) you\s+/, '').replace(/^please\s+/, '')
+    .replace(/^(?:show me|teach me|help me(?: with)?|tell me|explain|walk me through|remind me)\s*/, '').replace(/^(?:how (?:do|can|should|would) (?:i|you|we)|how to|the way to)\s*/, '').trim();
+  if (/^(everything|it all|all( of it)?|the (basics|ropes|playground|controls|lot)|around|the game|stuff)?$/.test(t)) return pgStart();
+  const id = PG_ASK.find(k => PG_BY[k].words.test(t));
+  if (id) return pgStart([id], { one: true });
+  if (pgCan(false)) return pgStart([], { ask: raw });
+  guideAsk(raw); return false;   // (down here, or in a fight: she answers instead)
+}
+// "Hermes, show me how to …": what comes after his name, if it is asking him for something; null if it is not
+function hmParse(text) {
+  const m = String(text || '').trim().match(/^(?:(?:hey|hi|yo|oi|ok(?:ay)?)[, ]+)?hermes\b[,.!:]?\s*(.*)$/i); if (!m) return null;
+  const q = m[1].trim().replace(/^(?:can|could|would|will) you\s+/i, '').replace(/^please\s+/i, '');
+  return /^(show|teach|help|how|tell|explain|walk|remind|come)\b/i.test(q) ? q.replace(/^come (here|over|back)\b[,.!]?\s*/i, '') : null;
+}
+function hmHeard(text) { const q = hmParse(text); if (q === null) return false; hmSummon(q); return true; }
+// said out loud while the playground is on: next, enough, and the practice fire
+function pgHeard(low, words) {
+  if (!PG.on || words > 6) return false; const w = low.replace(/[.!?]+$/, '').trim();
+  if (/^(skip( (it|this|that|one))?|next( one)?|i know (this|that)( one)?|got it)$/.test(w)) { pgSkip(); return true; }
+  if (/^(that'?s (enough|all)|i'?m (done|good)|end (the )?(playground|lessons?)|stop the (playground|lessons?)|(bye|goodbye|thanks?|thank you),? hermes)$/.test(w)) { pgEnd('stop'); return true; }
+  if (PG.list[PG.i] === 'fire' && PG.ph !== 'gap' && !fbOn()) { if (/^(fire|throw( fire)?|shoot)$/.test(w)) { pgFire(); return true; } if (/^(wind|gust)$/.test(w)) { gustBlow(); PG.blew = true; return true; } }
+  return false;
+}
+// the card at the foot of the screen: whose it is and how far along, the lesson, how to do it on what he is holding, and its keys
+function pgCardDraw() {
+  const el = $('pgCard'), show = PG.on && (state === 'play' || state === 'map' || state === 'warp');
+  el.classList.toggle('on', show); if (!show) { if (el._h) { el._h = ''; el.innerHTML = ''; } return; }
+  const d = devNow(), n = PG.list.length, L = PG_BY[PG.list[PG.i]], btn = (a, t) => `<button type="button" data-a="${a}">${t}</button>`;
+  let h;
+  if (PG.ask) h = `<p class="h">hermes</p><p class="k">“${cEsc(PG.ask)}”</p><p class="acts">${btn('end', 'done')}</p>`;
+  else if (PG.pick) h = `<p class="h">hermes · pick one</p><p class="acts">${PG_LESSONS.map(L => `<button type="button" data-t="${L.id}">${PG.done.has(L.id) ? '✓ ' : ''}${cEsc(L.name)}</button>`).join('')}</p><p class="acts">${btn('back', 'back')}${btn('end', 'end')}</p>`;
+  else {
+    let body = `<p class="k">${PG.i >= n ? 'that’s everything' : 'watch hermes'}</p>`;
+    if (L && PG.ph !== 'gap') { const need = pgNeed(L); body = `<p class="t">${cEsc(L.name)}</p>` + (PG.ph === 'did' ? '<p class="ok">✓ done</p>' : `<p class="k">${cEsc(need || (L.hint ? L.hint(d) : pgHint(L, d)))}</p>`); }
+    h = `<p class="h">hermes · ${PG.one ? 'how to' : 'playground'}${!PG.one && n > 1 ? ` · ${Math.min(PG.i + 1, n)}/${n}` : ''}</p>${body}<p class="acts">${L?.id === 'fire' && PG.ph !== 'gap' && PG.ph !== 'did' ? btn('fire', 'fire') + btn('wind', 'wind') : ''}${PG.one ? '' : btn('skip', 'skip') + btn('topics', 'topics')}${btn('end', 'end')}</p>`; }
+  if (el._h !== h) { el._h = h; el.innerHTML = h; }
+}
+$('pgCard').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation(); audio.sfx.ui?.();
+  if (b.dataset.t) return pgTopic(b.dataset.t);
+  const a = b.dataset.a;
+  if (a === 'skip') pgSkip(); else if (a === 'topics') { PG.pick = true; pgCardDraw(); } else if (a === 'back') { PG.pick = false; pgCardDraw(); } else if (a === 'end') pgEnd(PG.ask ? '' : 'stop');
+  else if (a === 'fire') pgFire(); else if (a === 'wind') { gustBlow(); PG.blew = true; } });
+// what Hermes does to show it, in place of where he would have flown (see updateGfly): a weave, a surge, up and down, a
+// loop (flown exactly, nose and all), down low and up again, a burst of fire into the man and back, a wide ring, close
+// in to talk, and a ball of fire of his own and a gust. null: nothing to show just now, he flies as he would.
+const _pgV = new THREE.Vector3(), _pgW = new THREE.Vector3();
+function pgDemo(D, dt, tx, ty, tz, fx, fz, sv, sp, flying) {
+  const B = GFLY.B, P = player.pos, top = Math.max(110, sp * 1.6 + 60); D.rot = null;
+  if (!flying && D.k !== 'morph' && D.k !== 'fire') return null;
+  if (!D.go) { D.wait = (D.wait || 0) + dt; if (B.pos.distanceTo(_pgW.set(tx, ty, tz)) > 160 && D.wait < 8) return null; D.go = true; }   // (not until he is where he can be seen)
+  const t = D.t += dt;
+  switch (D.k) {
+    case 'weave': if (t > 9) break; { const s = Math.sin(t * 1.25) * 130; return { x: tx - fz * s, y: ty, z: tz + fx * s, top }; }
+    case 'surge': if (t > 6.5) break; { const k = smoothstep(0, 1.5, t) * (1 - smoothstep(4, 6.5, t)); return { x: tx + fx * 560 * k, y: ty, z: tz + fz * 560 * k, top: top + 380 * k }; }
+    case 'updown': if (t > 8) break; return { x: tx, y: ty + 170 * Math.sin(t * 1.1), z: tz, top: top + 60 };
+    case 'loop': {
+      if (!D.S) { D.S = B.pos.clone(); const g = Math.max(groundAt(D.S.x, D.S.z, D.S.y + 200), WATER); if (D.S.y - g < 90) D.S.y = g + 90; D.fx = fx; D.fz = fz; D.yaw = Math.atan2(-fx, -fz); D.v = sv.clone(); D.v.y = 0; D.prev = B.pos.clone(); }
+      const Tl = 4.2, u = clamp(t / Tl, 0, 1); if (u >= 1) break;
+      const a = Math.PI * 2 * (u * u * (3 - 2 * u)), Rl = 75;
+      B.pos.set(D.S.x + D.v.x * t + D.fx * Rl * Math.sin(a), D.S.y + Rl * (1 - Math.cos(a)), D.S.z + D.v.z * t + D.fz * Rl * Math.sin(a));
+      B.vel.copy(B.pos).sub(D.prev).divideScalar(Math.max(dt, 1e-3)); D.prev.copy(B.pos); B.yaw = D.yaw; B.bank = 0; B.pitch = 0; B.sp = B.vel.length(); D.rot = a;
+      return { kin: true }; }
+    case 'swoop': if (t > 7) break; { const gx = P.x + fx * 230, gz = P.z + fz * 230, y = Math.max(groundAt(gx, gz, P.y + 200), WATER) + 28 + Math.max(0, t - 4) * 70; return { x: gx - fz * 70 * GFLY.side, y, z: gz + fx * 70 * GFLY.side, top }; }
+    case 'morph': {
+      if (t > 0.6 && !D.a) { D.a = 1; burst(B.pos.x, B.pos.y, B.pos.z, 170, 16, 1.4); shock(B.pos.x, B.pos.y, B.pos.z, B.c.getHex(), 70, 0.8, true); B.bird.group.visible = false; D.hid = true; }
+      if (D.hid && t < 2.4) for (let i = 0; i < 3; i++) emit(B.pos.x + rnd(3), B.pos.y + rnd(3), B.pos.z + rnd(3), rnd(3), -4 - Math.random() * 4, rnd(3), 0.6, [B.c.r * 2.4 + 0.4, B.c.g * 2.4 + 0.3, B.c.b * 2.4 + 0.2], 0, 1.6);   // (a man falling, in a trail of his own sparks)
+      if (t > 2.4 && !D.b) { D.b = 1; burst(B.pos.x, B.pos.y, B.pos.z, 200, 18, 1.5); shock(B.pos.x, B.pos.y, B.pos.z, B.c.getHex(), 80, 0.9, true); B.bird.group.visible = true; D.hid = false; }
+      if (t > 3) break; return null; }
+    case 'circle': if (t > 12) break; { const a = t * 0.5; return { x: P.x + Math.cos(a) * 300, y: ty, z: P.z + Math.sin(a) * 300, top }; }
+    case 'close': if (t > 14) break; return { x: P.x + fx * 80 - fz * 70 * GFLY.side, y: P.y + 22, z: P.z + fz * 80 + fx * 70 * GFLY.side, top };
+    case 'fire': {
+      if (t > 1 && !D.a) { D.a = 1; _pgV.set(-Math.sin(B.yaw), -0.12, -Math.cos(B.yaw)).normalize(); pgShot(B.pos, _pgV, '', B.c); }
+      if (t > 3 && !D.b) { D.b = 1; fbGust(B.pos, GOD_PHX * 0.8); }
+      if (t > 3.6) break; return null; }
+  }
+  D.done = true; return null;
+}
+// the practice fire: from him (homing on Hermes) or from Hermes (straight out), in particles; it bursts on what it meets
+function pgShot(from, dir, at, col) { PG.shots.push({ pos: from.clone().addScaledVector(dir, 9), vel: dir.clone().multiplyScalar(175), t: 0, at, col: col instanceof THREE.Color ? col : new THREE.Color(col || '#ff8a3a') }); if (PG.shots.length > 12) PG.shots.shift(); }
+function pgFire() {
+  if (state !== 'play' || fbOn()) return false;
+  const dir = camera.getWorldDirection(_pgW), p = player; pgShot(p.pos, dir, 'hermes', PATRONS[PATRON.id]?.[0] || '#ff8a3a'); PG.fired = (PG.fired | 0) + 1;
+  inkSay('FIRE · PRACTICE', { sx: 0.5, sy: 0.8 }, PATRONS[PATRON.id]?.[0] || '#ffb070', 1, 900, { key: 'pgfire' }); audio.sfx.whoosh?.(true); return true;
+}
+function pgBoom(S, k = 1) { burst(S.pos.x, S.pos.y, S.pos.z, Math.round(70 * k), 10 * k, 1); shock(S.pos.x, S.pos.y, S.pos.z, S.col.getHex(), 30 * k + 8, 0.6, true); }
+function pgShots(dt) {
+  for (let i = PG.shots.length - 1; i >= 0; i--) { const S = PG.shots[i]; S.t += dt;
+    const B = S.at === 'hermes' && GFLY.on && GFLY.B ? GFLY.B : null;
+    if (B) { const d = _pgV.copy(B.pos).sub(S.pos), L = d.length(); if (L < 24) { pgBoom(S); PG.hits = (PG.hits | 0) + 1; B.vel.y += 25; PG.shots.splice(i, 1); continue; }
+      const sp = S.vel.length(); d.divideScalar(L).multiplyScalar(sp); S.vel.lerp(d, Math.min(1, dt * 2.4)).setLength(sp); }
+    S.pos.addScaledVector(S.vel, dt);
+    if (S.pos.distanceToSquared(camera.position) < 1400 * 1400) for (let k = 0; k < 3; k++) emit(S.pos.x + rnd(1.2), S.pos.y + rnd(1.2), S.pos.z + rnd(1.2), -S.vel.x * 0.05 + rnd(2), rnd(2), -S.vel.z * 0.05 + rnd(2), 0.3 + Math.random() * 0.3, [S.col.r * 3 + 0.5, S.col.g * 3 + 0.25, S.col.b * 3 + 0.05], 0, 2.4);
+    if (S.t > 3.2 || S.pos.y < Math.max(groundAt(S.pos.x, S.pos.z, S.pos.y), WATER)) { pgBoom(S, 0.5); PG.shots.splice(i, 1); } }
+}
+// every frame: the lists kept fresh while they are open, and the fire in the air
+function updateCorner(dt) {
+  if (MINI.who && (MINI.whoT -= dt) <= 0) { MINI.whoT = 0.5; miniWhoDraw(); }
+  if (CTL.open && !(state === 'play' || state === 'map')) ctlShow(false);
+  if (PG.on && !(GFLY.on && GFLY.g?.id === 'hermes')) { PG.on = false; PG.ask = ''; PG.pick = false; GFLY.demo = null; }   // (Hermes went, whatever took him)
+  if ((PG.cardT = (PG.cardT || 0) - dt) <= 0) { PG.cardT = 0.2; pgCardDraw(); }
+  if (PG.shots.length) pgShots(dt);
+}
 // ── the keeper's readout. Whoever flies under the name ANDRES sees how the site itself is doing: a dot and the frame
 //    rate in the corner (green, amber, red, with the reason beside it when something is wrong), and a tap, or saying
 //    "health", opens the rest: frames, the shared world's messages against its allowance, every call to the server and
@@ -9487,7 +9949,8 @@ function closeChat() {
 //    lists them. And in something that is said, @NAME calls that flier: it rings for them, and stands out in their log.
 const CMD_HELP = [
   ['MOVE', '/takeoff  /land  /perch  /glide  /dive  /bird  /human  /stop'],
-  ['FLY', 'hold W (the stick up) past straight up and over: a loop · let go on your back: he rolls the right way up (an Immelmann) · Q / E roll (let go half way: knife-edge) · on your back, hold S: a split-S · straight up, let go and turn: a stall turn · Z (held flip button) brakes and hovers · /level off stays on your back after a loop · or say it: loop, go over the top, immelmann, split-s, barrel roll, knife edge, stall turn, upside down, brake · /loop /immelmann /splits /barrel /knife /stall /brake'],
+  ['KEYS', BINDS.filter(B => B.k || B.kd).map(B => `${bindTxt(B, 'keys')} ${B.act}`).join(' · ')],
+  ['FLY', 'hold W (the stick up) past straight up and over: a loop · let go on your back: he rolls the right way up (an Immelmann) · Q / E roll (let go half way: knife-edge) · on your back, hold S: a split-S · straight up, let go and turn: a stall turn · /brake, the held turn-over key on a touch screen, or LT on a pad brakes and hovers (Z is your stats) · /level off stays on your back after a loop · or say it: loop, go over the top, immelmann, split-s, barrel roll, knife edge, stall turn, upside down, brake · /loop /immelmann /splits /barrel /knife /stall /brake'],
   ['GO', '/tp NAME or PLACE · /tp X Z · /tp X Y Z · /goto PLACE (flown, not carried) · /where'],
   ['MISSION', '/mission (carried straight to what you are doing) · J the list, a GO button on each · shift+J goes to the one you follow'],
   ['PLACES', 'summit · crete · volcano · temple · parthenon · monasteries · cave · my island · objective · any god · any flier'],
@@ -9507,6 +9970,7 @@ const CMD_HELP = [
   ['SET', '/sound on|off · /mic on|off · /hands on|off · /quality up|down · /letters up|down · /text bigger|smaller (the size of the words) · /clear'],
   ['RECORD', '/stats (your numbers, written in the sky · Z)'],
   ['ASK', '/ask ANYTHING: she answers, and does it if she can'],
+  ['LEARN', '/keys (the controls, for whatever you hold · F1, ` or the ? under the small map) · /playground (Hermes flies with you and shows you, one thing at a time · /playground loop for one) · /hermes how do I … (or say “Hermes, show me how to …”: he comes, shows it, and goes) · /minimap north|turn|off (Shift M; a press on it opens the map)'],
 ];
 // ── The keeper. A traveller called ANDRES whose travel code the server lists may give orders: send someone home (/kick),
 //    ban them (/ban), ban their address too (/ipban), lift it (/unban). The server signs the order; it goes over the live
@@ -9560,7 +10024,10 @@ function chatCommand(text) {
   if (['kick', 'ban', 'ipban', 'unban', 'noclip', 'speed', 'spawn', 'summon', 'agent'].includes(c) && !MOD.admin) { sys(AUTH.s ? 'THAT IS NOT YOURS TO DO' : 'THAT IS NOT YOURS TO DO · THE KEEPER SIGNS IN FIRST'); return true; }
   if (c === 'watch' && (MATCH.phase || MATCH.seen && Date.now() < MATCH.seen.until)) { matchGhost(); return true; }   // (while a fight is on, /watch is the fight; otherwise Crete)
   switch (c) {
-    case 'stats': if (state === 'stats') statsClose(); else statsOpen(); return true;   // (/record is the camera's: see below)
+    case 'stats': if (state === 'stats') statsClose(); else statsOpen(); return true;
+    case 'keys': case 'controls': case 'keybinds': if (CHAT.open) closeChat(); ctlShow(true); return true;   // (the controls card)
+    case 'playground': case 'pg': case 'lessons': if (CHAT.open) closeChat(); if (/^(end|stop|off|quit|leave)$/.test(low)) pgEnd('stop'); else if (!arg) pgStart(); else hmSummon(arg); return true;
+    case 'minimap': case 'mini': miniSet(/^north/.test(low) ? 'north' : /^(turn|rotate|heading|on)$/.test(low) ? 'turn' : off ? 'off' : MINI.mode === 'off' ? 'turn' : 'off', true); return true;   // (/record is the camera's: see below)
     case 'text': case 'textsize': case 'size': { const i = /^(big|bigger|larger|up|\+)$/.test(low) ? UISZ.i + 1 : /^(small|smaller|down|-)$/.test(low) ? UISZ.i - 1 : /^(normal|reset|default)$/.test(low) ? 0 : /^[1-4]$/.test(low) ? +low - 1 : UISZ.i + 1; uiSizeSet(clamp(i, 0, 3), true); return true; }
     case 'help': case 'h': case 'commands': case '?': for (const [k, v] of CMD_HELP) sys(`${k} · ${v}`); if (MOD.admin) sys('KEEPER · /studio (every mission, the clock, scenes) · /agent ANYTHING · /noclip · /speed N · /spawn GOD · /kick NAME · /ban NAME · /ipban NAME · /unban NAME'); return true;
     case 'agent': agentAsk(arg); return true;
@@ -9577,7 +10044,8 @@ function chatCommand(text) {
     case 'brake': if (p.form === 'phoenix') { FLIP.brakeT = 4; sys('HOVERING · HOLD Z TO STAY'); } else sys('BE THE BIRD FIRST'); return true;
     case 'level': case 'autolevel': FLIP.auto = arg ? !off : !FLIP.auto; try { localStorage.setItem('icarus.autolevel', FLIP.auto ? '1' : '0'); } catch {} sys(FLIP.auto ? 'AFTER A LOOP HE ROLLS THE RIGHT WAY UP' : 'AFTER A LOOP HE STAYS ON HIS BACK UNTIL YOU ROLL HIM'); return true;
     case 'dp': case 'shot': case 'director': if (state === 'play' || state === 'photo') dpHear(arg || 'wide shot', true); return true;
-    case 'tour': case 'hermes': if (GFLY.tour) tourSkip(); else if (GFLY.on) gflyEnd(); else if (!tourStart()) chatLine('', player.form === 'phoenix' ? 'NOT NOW' : 'TAKE OFF FIRST · HERMES MEETS YOU IN THE AIR', 'sys'); return true;
+    case 'hermes': if (arg) { if (CHAT.open) closeChat(); hmSummon(arg); return true; }   // (/hermes how do I loop: he comes and shows it; alone, it falls through to the tour, as ever)
+    case 'tour': if (GFLY.tour) tourSkip(); else if (GFLY.on) gflyEnd(); else if (!tourStart()) chatLine('', player.form === 'phoenix' ? 'NOT NOW' : 'TAKE OFF FIRST · HERMES MEETS YOU IN THE AIR', 'sys'); return true;
     case 'crete': case 'prologue': case 'opening': if (CHAT.open) closeChat(); creteCmd(); return true;   // (the opening once more, and back here after)
     case 'godword': if (!arg) sys(GODM.word ? `YOUR GOD WORD IS “${GODM.word.toUpperCase()}” · /godword off TO DROP IT` : '/godword WORD · YOUR OWN WORD FOR GOD MODE'); else godWordSet('/godword ' + arg); return true;
     case 'accept': if (MATCH.inv && !MATCH.inv.mine) matchAnswer(true); else if (!xfAnswer(true, true)) sys('NOTHING IS WAITING FOR AN ANSWER'); return true;
@@ -11539,6 +12007,8 @@ function sendChat(raw) {
   if (text[0] === '/') TOURDO.cmd = time; else TOURDO.typed = time;
   if (/^\/(name|rename|call me|i am)\s+\S/i.test(text)) { renameSelf(text.replace(/^\/(name|rename|call me|i am)\s+/i, '')); return; }   // (/name ARIADNE: a new name)
   if (text[0] === '/' && chatCommand(text)) return;
+  if (text[0] !== '/' && hmHeard(text)) { chatLine(heroName, text, 'me'); return; }   // (“Hermes, show me how to land”: see hmSummon)
+  if (PG.on && /^(skip|next)$/i.test(text)) { pgSkip(); return; }
   if (text[0] !== '/' && mdHeard(text)) return;   // (a fight opening: what he writes is for Ares — see mdHeard)
   if (text[0] !== '/' && dpOn()) { const R = dirParse(text.toLowerCase()); if (R && (R.rich || R.any || R.adj.length && (DIR.s || DIR.next))) { chatLine('', `→ CAMERA · ${text.toUpperCase()}`, 'sys'); dpHear(text, true); return; } }   // (with the camera his, a shot written down is for the camera)
   if (text[0] !== '/' && GFLY.on && state === 'play') { statsWords(text, true); chatLine(heroName, text); airSay(text); return; }   // (with a god beside him, what he writes is for the god: nobody else reads it)
@@ -23005,6 +23475,8 @@ function heard(text, recorded = false) {
     return;
   }
   if (state === 'play' && GFLY.tour && words <= 5 && /\b(skip( (it|this|the tour|the run))?|no tour|i know (all )?(this|that))\b/.test(low)) { tourSkip(); return; }   // (Hermes's run, cut short)
+  if ((state === 'play' || state === 'map') && hmHeard(text)) return;   // (“Hermes, show me how to …”: he comes)
+  if (state === 'play' && pgHeard(low, words)) return;   // (the playground: next, enough, the practice fire)
   if (state === 'play' && godWordSet(text)) return;   // ("set my god word to …")
   if (state === 'play' && !GODM.on && godWordSaid(low, words)) { godMode(true); return; }   // (his own word for the god in him)
   if (state === 'play' && GODM.on && globalThis.DAIMON?.hear(text)) return;   // (with the god in him he speaks to his own agents, by name: "atlas, run the tests" · "yes")
@@ -28263,25 +28735,25 @@ const K = (desk, touch) => TOUCH ? touch : desk;
 const voiced = a => (TUT.voiced?.[a] ?? -1e9) > (TUT.cur?.t0 ?? 1e9);   // (said since this lesson came up)
 const LESSONS = {
   ground: () => [
-    { act: 'Walk', keys: ['W', 'A', 'S', 'D'], touch: 'left thumb', voice: ['walk'], until: () => TUT.moved > 4, max: 14 },
+    { act: 'Walk', ...bindTut('walk'), until: () => TUT.moved > 4, max: 14 },
   ],
   leap: () => [
-    { act: 'Let go', keys: ['Space'], touch: 'tap', voice: ['jump'], until: () => story.phase !== 'leap', max: 45 },
+    { act: 'Let go', ...bindTut('jump'), until: () => story.phase !== 'leap', max: 45 },
   ],
   flight: () => [
-    { line: 'Everything here listens to you. Say what you want, and it happens — try “faster”.', act: 'Go faster', keys: ['Shift'], touch: 'push the stick all the way', voice: ['faster'], until: () => voiced('faster') || boosting(), max: 16 },
-    { act: 'Climb and dive', keys: ['W', 'S'], touch: 'drag up or down', voice: ['climb', 'dive'], until: () => voiced('climb') || voiced('dive') || Math.abs(axes()[1]) > 0.4, max: 12 },
-    { act: 'Turn', keys: ['A', 'D'], touch: 'drag left or right', voice: ['left', 'right'], until: () => voiced('left') || voiced('right') || voiced('around') || Math.abs(axes()[0]) > 0.4, max: 12 },
+    { line: 'Everything here listens to you. Say what you want, and it happens — try “faster”.', act: 'Go faster', ...bindTut('boost'), until: () => voiced('faster') || boosting(), max: 16 },
+    { act: 'Climb and dive', ...bindTut('climb'), until: () => voiced('climb') || voiced('dive') || Math.abs(axes()[1]) > 0.4, max: 12 },
+    { act: 'Turn', ...bindTut('steer'), until: () => voiced('left') || voiced('right') || voiced('around') || Math.abs(axes()[0]) > 0.4, max: 12 },
     { line: TOUCH ? 'Hold your finger on somewhere you want to be, and you go there. Or say it — “take me to the volcano”.' : 'Double-click somewhere you want to be, and you go there. Or point at it and say “go there” — or name it: “take me to the volcano”.',
-      act: 'Fly to a place', desk: 'double-click it', touch: 'hold your finger on it', voice: ['go there'], until: () => voiced('go_there') || voiced('goto') || TUT.heldGo, max: 16 },
-    { line: 'Blow — into the microphone, or just say it. The wind you leave behind you stays, for everyone.', act: 'Leave a wind behind you', keys: ['R'], touch: 'tap with two fingers', voice: ['blow'], until: () => voiced('blow') || !!GUST.drawing, max: 16 },
-    { act: 'Open your map', keys: ['M'], touch: 'pinch out', voice: ['map'], until: () => mapV.open, max: 9 },
-    { line: 'You are not the only one up here, and they can hear you when you speak. Say “players” to see who is flying.', act: 'See who else is flying', keys: ['Tab'], touch: 'ICARUS, then players', voice: ['players'], until: () => who.open || who.pinned || voiced('players'), max: 10 },
-    { act: 'Your microphone, on or off', keys: ['V'], touch: 'ICARUS, then voice', max: 5 },
-    { act: 'The cinematic camera', keys: ['C'], touch: 'ICARUS — it films while its strip is down', voice: ['cinematic'], open: true, until: () => cinema.manual || voiced('cinematic'), max: 8 },
-    { line: 'Let go of everything and you glide: it is how you rest up here. Where you see a ring of light, you can set down as the bird.', act: 'Glide, then perch on a ring of light', keys: ['Space'], touch: 'tap', voice: ['perch'], until: () => voiced('perch') || player.perch || !!player.perchGo, max: 18 },
-    { line: 'When you have had enough sky, say “land”.', act: 'Come down', keys: ['Space'], touch: 'tap', voice: ['land'], until: () => voiced('land') || voiced('perch') || player.form === 'human' && player.grounded, max: 20 },
-    { line: 'The gods are people. Walk up to one and just talk to them — they answer, and they remember what you said.', act: 'Talk to a god', desk: 'walk up, then speak or type', touch: 'walk up, then tap a reply', until: () => state === 'talk', max: 16 },
+      act: 'Fly to a place', ...bindTut('goto'), until: () => voiced('go_there') || voiced('goto') || TUT.heldGo, max: 16 },
+    { line: 'Blow — into the microphone, or just say it. The wind you leave behind you stays, for everyone.', act: 'Leave a wind behind you', ...bindTut('blow'), until: () => voiced('blow') || !!GUST.drawing, max: 16 },
+    { act: 'Open your map', ...bindTut('map'), until: () => mapV.open, max: 9 },
+    { line: 'You are not the only one up here, and they can hear you when you speak. Say “players” to see who is flying.', act: 'See who else is flying', ...bindTut('players'), until: () => who.open || who.pinned || voiced('players'), max: 10 },
+    { act: 'Your microphone, on or off', ...bindTut('mic'), max: 5 },
+    { act: 'The cinematic camera', ...bindTut('film'), open: true, until: () => cinema.manual || voiced('cinematic'), max: 8 },
+    { line: 'Let go of everything and you glide: it is how you rest up here. Where you see a ring of light, you can set down as the bird.', act: 'Glide, then perch on a ring of light', ...bindTut('perch'), until: () => voiced('perch') || player.perch || !!player.perchGo, max: 18 },
+    { line: 'When you have had enough sky, say “land”.', act: 'Come down', ...bindTut('land'), until: () => voiced('land') || voiced('perch') || player.form === 'human' && player.grounded, max: 20 },
+    { line: 'The gods are people. Walk up to one and just talk to them — they answer, and they remember what you said.', act: 'Talk to a god', ...bindTut('talk'), until: () => state === 'talk', max: 16 },
   ],
 };
 // a lesson, drawn: what to do as a plain sentence, then how — the keys on a computer, the gesture on a phone, and the
@@ -28545,7 +29017,7 @@ addEventListener('keydown', e => {
     case 'KeyV': if (!e.repeat && mic.stream) setMicMuted(!VC.muted); break;   // (the Mac's "delete" key is Backspace)
     case 'BracketLeft': lettersSet(cellIdx - 1); break;
     case 'BracketRight': lettersSet(cellIdx + 1); break;
-    case 'KeyM': openMap(); break;
+    case 'KeyM': if (e.shiftKey) miniCycle(); else openMap(); break;   // (Shift M: the small map turns, keeps north up, or goes)
     case 'KeyZ': if (state === 'play') statsOpen(); break;   // his record, written in the sky
     case 'KeyJ': if (e.shiftKey) qlGo(); else qlShow(!QL.open); break;
     case 'KeyF': openPhoto(); break;
@@ -29545,7 +30017,7 @@ function tick(dt) {
   updateParticles(dt);
   updateDialog(dt);
   updateTalk(dt);
-  updateHUD(dt); updateHealth(); updateWho(dt); updateMarks(dt); updateMemo(dt); updateRec(dt); updateMenuFx(); updateGuide(dt); drawAsciiUi(dt);
+  updateHUD(dt); updateHealth(); updateWho(dt); updateMarks(dt); updateMemo(dt); updateRec(dt); updateMenuFx(); updateGuide(dt); updateCorner(dt); drawAsciiUi(dt);
   { const pl = player, can = state === 'play' && pl.form === 'human' && !!pl.swim && realm === 'over' && !pl.cine; if (can !== HUDQ.dive) { HUDQ.dive = can; $('diveBtn').classList.toggle('on', can); } }   // (the way under shows while he swims)
   updateLessons(dt); updateExplainer(dt); updatePrayPrompt(dt); updateTitleSync(); updateGodWorld(dt);
   chart(dt); try { updateWorld(dt); } catch (e) { if (!WORLD.err) { WORLD.err = String(e); console.warn('world', e); } } updateQuests(dt); updateGreat(dt); updateMap(dt); updateRemoteBeams(dt); updateNewcomer();
@@ -29927,9 +30399,9 @@ function gflyStart(g, mode, o = {}) {
   Object.assign(GFLY, { on: true, g, mode: 'with', B, busy: false, pend: '', last: time, heard: time, tour: o.tour ? { i: 0, t: 2.6, ph: 'gap' } : null, land: null, dest: null, t: 0, idleT: 0, nudges: 0, far: 0, route: null, endAt: 0, want: '' });
   audio.sfx.rebirth?.(); audio.sfx.halo?.(); flash = Math.max(flash, 0.25);
   if (mode === 'ride') gflyMount(true);
-  else toast(`${g.name.toUpperCase()} IS FLYING WITH YOU${o.tour ? '' : ' · JUST TALK'}`);
+  else toast(`${g.name.toUpperCase()} IS FLYING WITH YOU${o.tour || o.pg ? '' : ' · JUST TALK'}`);
   witness(mode === 'ride' ? `rode on ${g.name}’s back, in the shape of a great phoenix` : `flew wing to wing with ${g.name}, in the shape of a great phoenix`, false);
-  if (!o.tour) setTimeout(() => { if (GFLY.on && GFLY.g === g) airSay('', { aside: mode === 'ride' ? 'He is on your back and you are climbing away from the ground. Say something to him as you go up.' : 'You are in the air together now, off his wing. Say something to him.' }); }, 1600);
+  if (!o.tour && !o.pg) setTimeout(() => { if (GFLY.on && GFLY.g === g) airSay('', { aside: mode === 'ride' ? 'He is on your back and you are climbing away from the ground. Say something to him as you go up.' : 'You are in the air together now, off his wing. Say something to him.' }); }, 1600);
   return true;
 }
 // onto its back: he stops being a bird, and is carried
@@ -29963,6 +30435,7 @@ function gflyEnd(quiet) {
   const p = player, B = GFLY.B, g = GFLY.g;
   if (p.mount) { const [x, z] = dryNear(p.pos.x, p.pos.z); if (Math.hypot(x - p.pos.x, z - p.pos.z) < 60 && p.pos.y - groundAt(x, z) < 40) { p.pos.set(x, groundAt(x, z), z); p.grounded = true; } else { p.grounded = false; p.vel.copy(B.vel); } p.mount = null; human.group.scale.setScalar(MAN_SCALE); human.group.rotation.set(0, B.yaw, 0); p.fallTop = p.pos.y; }
   if (GFLY.tour) { keyCard('', ''); if (MENU.open && TOUR_BEATS[GFLY.tour.i]?.menu) menuShow(false); }   // (the run cut short: nothing of it left on the screen)
+  if (PG.on) { PG.on = false; PG.ask = ''; PG.pick = false; pgCardDraw(); } if (GFLY.demo?.hid) B.bird.group.visible = true; GFLY.demo = null;   // (and the playground with him)
   GFLY.on = false; GFLY.tour = null; GFLY.land = null; GFLY.dest = null; GFLY.busy = false; GFLY.pend = '';
   GFLY.gone = { B, t: 0 };   // (it climbs away, and is gone)
   if (g.flying) { g.flying = false; if (g.active) { g.group.visible = true; burst(g.x, g.gy + 3, g.z, 90, 8, 1.1); } }
@@ -30165,12 +30638,15 @@ function updateGfly(dt) {
     const sv = BIRDS.sv, sp = sv.length(); let tx, ty, tz;
     if (!flying) { const a = time * 0.22; tx = P.x + Math.cos(a) * 190; tz = P.z + Math.sin(a) * 190; ty = P.y + 120; }
     else if (GFLY.dest) { const D = GFLY.dest, d = Math.hypot(D.x - P.x, D.z - P.z) || 1; tx = P.x + (D.x - P.x) / d * 240 + fz * 60 * GFLY.side; tz = P.z + (D.z - P.z) / d * 240 - fx * 60 * GFLY.side; ty = P.y + 30; if (d < 420) GFLY.dest = null; }
-    else { const near = GFLY.tour ? 0.7 : 1, lead = (150 + sp * 0.7) * near, side = 175 * near * GFLY.side; tx = P.x + fx * lead - fz * side; tz = P.z + fz * lead + fx * side; ty = P.y + 64 + Math.sin(time * 0.31) * 10; }   // (up and to one side: where his own wings do not hide it)
-    godBirdFly(B, tx, ty, tz, sv, Math.max(110, sp * 1.6 + 60), dt);
+    else { const near = GFLY.tour ? 0.7 : 1, lead = (150 + sp * 0.7) * near * (PG.on ? 1.6 : 1), side = 175 * near * GFLY.side * (PG.on ? 0.5 : 1); tx = P.x + fx * lead - fz * side; tz = P.z + fz * lead + fx * side; ty = P.y + 64 + Math.sin(time * 0.31) * 10; }   // (up and to one side: where his own wings do not hide it)
+    const dm = GFLY.demo ? pgDemo(GFLY.demo, dt, tx, ty, tz, fx, fz, sv, sp, flying) : null; if (GFLY.demo?.done) GFLY.demo = null;   // (in the playground he shows it: see pgDemo)
+    if (dm) { if (!dm.kin) godBirdFly(B, dm.x, dm.y, dm.z, sv, dm.top, dt); }
+    else godBirdFly(B, tx, ty, tz, sv, Math.max(110, sp * 1.6 + 60), dt);
     const d = B.pos.distanceTo(P); GFLY.far = d > 1500 ? GFLY.far + dt : 0;
     if (GFLY.far > 12) { B.pos.set(P.x - fx * 500, P.y + 200, P.z - fz * 500); B.vel.copy(sv); GFLY.far = 0; }   // (lost each other: it comes down out of the sky behind him again)
   }
   godBirdPose(B, dt);
+  if (GFLY.demo && GFLY.demo.rot != null) B.bird.group.rotation.set(GFLY.demo.rot, B.yaw, 0, 'YXZ');   // (round the loop, nose and all)
   if (p.mount) {   // him, on its back: between the wings, just behind the neck, leaning as it leans (and drawn larger than life, or nobody could see there was anyone up there)
     const G = B.bird.group; G.updateMatrixWorld(); P.copy(_p.set(0, 0.58, -0.42).applyMatrix4(G.matrixWorld)); p.fallTop = P.y;
     human.group.scale.setScalar(MAN_SCALE * 2.6); human.group.rotation.set(-B.pitch * 0.5, B.yaw, B.bank * 0.8, 'YXZ'); }
@@ -30178,6 +30654,7 @@ function updateGfly(dt) {
   const quiet = !GFLY.busy && !dlg.cur && !dlg.queue.length && !voiceSrc && time - GFLY.heard > 4;
   const T = GFLY.tour;
   if (T) tourStep(T, dt);   // (see tourStep)
+  else if (PG.on) pgStep(dt);   // (the playground: see pgStep)
   else if (GFLY.endAt && quiet && time - GFLY.heard > 14 && (time > GFLY.endAt || !GFLY.dest && time > GFLY.endAt - 26)) { GFLY.endAt = 0; gflyEnd(); return; }   // (the run is over, and he has nothing more to ask: Hermes has other people to meet)
   else if (quiet && !GFLY.land) {   // a long silence: they ask the next thing; after a few with no answer, they leave him to it
     if ((GFLY.idleT += dt) > (GFLY.nudges ? 55 : 34)) { GFLY.idleT = 0; if (++GFLY.nudges > 3) gflyLand(); else airSay('', {}); } }
@@ -35018,6 +35495,7 @@ setTimeout(() => {
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, RR, rrJoin, rrMine, rrFetch, rrPlace, rrLayout, gotRjoin, get RING_DONE() { return RING_DONE; }, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { cpusCmd, MOD, die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
+  if (window.__icarus) Object.assign(window.__icarus, { MINI, miniSet, miniCycle, miniWhoShow, miniShown, BINDS, BIND, bindTxt, devNow, CTL, ctlShow, ctlDraw, PG, PG_LESSONS, pgStart, pgEnd, pgSkip, pgTopic, pgFire, pgCardDraw, hmSummon, hmParse, hmHeard, pgHeard, CMD_HELP, sendChat });
   if (window.__icarus) Object.assign(window.__icarus, { NEWB, newbHear, newbHeard, newbTyped, newbTalk, newbFallback, newbArrive });
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
   if (window.__icarus) Object.assign(window.__icarus, { boomHouse, HB, hbHouse, matchHouse, gotBoom, crash, setTimeK: v => { timeK = v; }, gameTime: () => time, pAlive: () => { let n = 0; for (let i = 0; i < PMAX; i++) if (pLife[i] > 0) n++; return n; } });
