@@ -30316,12 +30316,13 @@ function updateTron(dt) {
 
 // ── The agents' hamlets. A traveller's own AI agents can come and live in the world (they come in by /mcp: see
 //    api/_mcp.js). Each traveller who has any has a hamlet: a flat place by the water, found from who they are, the same
-//    on every screen. Every agent has a small red house there, with a lit window and smoke from the stove; and they
-//    build. What stands is worked out from how much timber they have laid between them (each time one says what it is
-//    doing, and for as long as it is heard from, and for a while by itself afterwards): the woodpile and the fire, log
-//    homes going up a course at a time, a shrine to their traveller's god, a post for each of the twelve, a watchtower,
-//    a hall. Their figures haul the timber and hammer at whatever is going up. Anyone flying by can read who they are
-//    and what they are at; and when it is their own traveller who comes, they drop everything and run to meet him.
+//    on every screen. Every agent has a small house there, woven of its own wool, with a lit window and smoke from the
+//    stove; and they weave. What stands is worked out from how much timber they have laid between them (each time one
+//    says what it is doing, and for as long as it is heard from, and for a while by itself afterwards): the loom and the
+//    fire, woven homes going up a row at a time, a shrine to their traveller's god, a post for each of the twelve, a
+//    watchtower, a hall; and bridges woven out across the water (see agReach). Their figures fetch wool and weave it into
+//    whatever is going up, the threads running from their hands. Anyone flying by can read who they are and what they
+//    are at; and when it is their own traveller who comes, they drop everything and run to meet him.
 const AG = { list: [], srv: [], dmn: [], dsig: '', dT: 0, keep: null, ham: new Map(), mine: '', who: false, godT: -999, S: 1.45, R: 2400, mat: null, glow: null, fig: null, prism: null, box: null, cyl: null, orb: null };
 const AG_WORKS = [['woodpile', 4], ['home', 24], ['shrine', 36], ['home', 24], ...Object.keys(PATRONS).map(g => ['post:' + g, 8]), ['home', 24], ['tower', 40], ['home', 24], ['home', 24], ['hall', 80], ['home', 24], ['home', 24], ['home', 24]];
 const AG_HOMES = [[-28, -4], [28, -4], [-44, -24], [44, -24], [-30, -48], [30, -48], [-58, -44], [58, -44], [62, 4]];
@@ -30337,7 +30338,7 @@ async function agWho() { if (AG.mine || AG.who || !WORLD.code || !globalThis.cry
 function agTake(list) {
   const ok = [], str = (v, n) => String(v || '').replace(/[^A-Za-z0-9 .,'!?:;()\/+\-_#&]/g, '').slice(0, n);
   for (const a of Array.isArray(list) ? list.slice(0, 120) : []) { if (!a || typeof a.o !== 'string' || !/^[0-9a-f]{16}$/.test(a.o) || typeof a.id !== 'string') continue;
-    ok.push({ id: a.id.slice(0, 12), n: str(a.n, 12).toUpperCase() || 'AGENT', o: a.o, b: str(a.b, 12).toUpperCase() || 'SOMEONE', g: PATRONS[a.g] ? a.g : '', k: str(a.k, 80), u: clamp(+a.u || 0, 0, 1e6), t: +a.t || 0, hb: +a.hb || 0, s: +a.s || 0, d: a.d | 0, gone: !!a.gone }); }
+    ok.push({ id: a.id.slice(0, 12), n: str(a.n, 12).toUpperCase() || 'AGENT', o: a.o, b: str(a.b, 12).toUpperCase() || 'SOMEONE', g: PATRONS[a.g] ? a.g : '', k: str(a.k, 80), u: clamp(+a.u || 0, 0, 1e6), t: +a.t || 0, hb: +a.hb || 0, s: +a.s || 0, d: a.d | 0, gone: !!a.gone, sz: clamp(+a.sz || 0, 0, 1e9) }); }
   AG.srv = ok; agWho(); agMerge();
   // his god, told to his own agents (the shrine they build is that god's)
   const mine = AG.mine && AG.ham.get(AG.mine); if (mine && mine.agents.some(a => !a.loc) && PATRON.id && mine.god !== PATRON.id && time - AG.godT > 600 && WORLD.code) { AG.godT = time; fetch('/api/hub?fn=mcp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'key', code: WORLD.code, god: PATRON.id }) }).catch(() => {}); }
@@ -30383,75 +30384,166 @@ function agSite(o) {
 // a place in the hamlet: u along the shore, v toward the water
 function agAt(H, u, v, out = {}) { const S = H.site, c = Math.cos(S.yaw), s = Math.sin(S.yaw); out.x = S.x - s * u * AG.S + c * v * AG.S; out.z = S.z + c * u * AG.S + s * v * AG.S; out.y = Math.max(overHeight(out.x, out.z), WATER + 0.3); out.ry = Math.PI / 2 - S.yaw; return out; }
 
-// ───────── carpentry: everything in a hamlet is two meshes (what is lit by the day, and what glows by itself)
+// ───────── weaving: everything in a hamlet is woven. Each agent is a weaver with a wool of its own colour (from its name,
+//    turned until it is clear of the others' in the same hamlet); the houses are basket-woven, wall and roof, in the wools
+//    of those who wove them; garlands run from house to house; and out from the shore go bridges, woven across the water to
+//    the next island, a rock, or the far side of a bay. The more agents and the more they have done (and the bigger the code
+//    they work in, when they say), the more bridges, the longer, and the more there is in each: a rope bridge first, then a
+//    web of hangers, arches under it, braided ropes and a spiral round it, and at the last woven towers with fans of cable.
+//    The flowers of the hamlet's god grow round every house and along every bridge, a few in the weavers' own colours.
+//    The houses are three meshes (woven, plain, glowing); the bridges, garlands and flowers a few more; the threads each
+//    weaver throws one more, moved only while someone is near enough to see it. All of it rebuilt only when the work moves on.
 function agTools() {
   if (AG.mat) return;
   AG.mat = new THREE.MeshLambertMaterial({ vertexColors: true }); AG.glow = new THREE.MeshBasicMaterial({ vertexColors: true, fog: true });
   AG.box = new THREE.BoxGeometry(1, 1, 1).toNonIndexed(); AG.cyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 7).toNonIndexed(); AG.orb = new THREE.IcosahedronGeometry(0.5, 1);
   const P = [[-.5, 0, .5], [.5, 0, .5], [.5, 1, 0], [-.5, 0, .5], [.5, 1, 0], [-.5, 1, 0], [.5, 0, -.5], [-.5, 0, -.5], [-.5, 1, 0], [.5, 0, -.5], [-.5, 1, 0], [.5, 1, 0], [-.5, 0, -.5], [-.5, 0, .5], [-.5, 1, 0], [.5, 0, .5], [.5, 0, -.5], [.5, 1, 0]];
   AG.prism = new THREE.BufferGeometry(); AG.prism.setAttribute('position', new THREE.Float32BufferAttribute(P.flat(), 3)); AG.prism.computeVertexNormals();   // (a roof: ridge along x, a unit wide, deep and high)
+  // the weave, drawn in the shader: square by square one wool goes over and the other under, each thread rounded, a little
+  // darker where it dips under the next (and, far off, only the two wools mixed, so it never shimmers)
+  AG.weave = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  AG.weave.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 colB; attribute vec2 wuv; varying vec3 vColB; varying vec2 vWuv;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvColB = colB; vWuv = wuv;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vColB; varying vec2 vWuv;').replace('#include <color_fragment>', `{
+      vec2 cl = floor(vWuv), l = fract(vWuv), fw = fwidth(vWuv); float over = mod(cl.x + cl.y, 2.0);
+      float across = mix(l.x, l.y, over), along = mix(l.y, l.x, over);
+      float th = pow(sin(across * 3.14159), 0.55), dip = 0.72 + 0.28 * sin(along * 3.14159);
+      vec3 woven = mix(vColB, vColor, over) * (0.3 + 0.8 * th) * dip;
+      diffuseColor.rgb *= mix(woven, (vColor + vColB) * 0.48, smoothstep(0.3, 0.75, max(fw.x, fw.y)));
+    }`);
+  };
+  AG.thread = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, fog: true });   // (the threads in the air: wool in the light of the work)
+  // the flowers: big ones, to be seen from the air (a stem, a leaf, six petals round a gold heart); only the petals take
+  // the colour each flower is given; all of them nodding a little
+  { const P = [], C = [], N = [], stem = [0.26, 0.5, 0.2], pet = [1.3, 1.3, 1.3], tri = (a, b, c, col, n) => { for (const v of [a, b, c]) { P.push(...v); C.push(...col); N.push(...n); } };
+    tri([-0.03, 0, 0], [0.03, 0, 0], [0, 0.88, 0], stem, [0, 0.3, 0.95]); tri([0, 0, -0.03], [0, 0, 0.03], [0, 0.88, 0], stem, [0.95, 0.3, 0]); tri([0, 0.3, 0], [0.2, 0.5, 0.05], [0.03, 0.44, 0], stem, [0, 1, 0]); tri([0, 0.45, 0], [-0.18, 0.62, -0.04], [-0.03, 0.57, 0], stem, [0, 1, 0]);
+    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.2832, o = [0, 0.86, 0], tip = [Math.cos(a) * 0.44, 0.99, Math.sin(a) * 0.44], l = [Math.cos(a - 0.42) * 0.27, 0.93, Math.sin(a - 0.42) * 0.27], r = [Math.cos(a + 0.42) * 0.27, 0.93, Math.sin(a + 0.42) * 0.27], n = [-Math.cos(a) * 0.3, 0.95, -Math.sin(a) * 0.3]; tri(o, tip, l, pet, n); tri(o, r, tip, pet, n); }
+    for (let i = 0; i < 3; i++) { const a = i / 3 * 6.2832, b = (i + 1) / 3 * 6.2832; tri([0, 0.97, 0], [Math.cos(b) * 0.1, 0.88, Math.sin(b) * 0.1], [Math.cos(a) * 0.1, 0.88, Math.sin(a) * 0.1], [1.2, 0.95, 0.35], [0, 1, 0]); }
+    AG.flower = new THREE.BufferGeometry(); AG.flower.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); AG.flower.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); AG.flower.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); }
+  AG.fmat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  AG.fmat.onBeforeCompile = sh => { sh.uniforms.uTime = worldFx.uTime;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime;').replace('#include <color_vertex>', `vColor = color;
+      #ifdef USE_INSTANCING_COLOR
+        vColor.xyz *= mix(vec3(1.0), instanceColor.xyz, step(1.25, color.r));
+      #endif`).replace('#include <begin_vertex>', '#include <begin_vertex>\n{ vec3 r = instanceMatrix[3].xyz; float k = position.y * position.y; transformed.x += sin(uTime * 1.7 + r.x * 0.31 + r.z * 0.2) * 0.09 * k; transformed.z += cos(uTime * 1.3 + r.z * 0.27) * 0.09 * k; }');
+  };
 }
 const _agM = new THREE.Matrix4(), _agQ = new THREE.Quaternion(), _agE = new THREE.Euler(), _agS = new THREE.Vector3(), _agP = new THREE.Vector3(), _agN = new THREE.Vector3(), _agC = new THREE.Color();
 // one piece, in a frame F (where the thing stands, and which way it faces), into a builder B
 function agPut(B, F, g, lx, ly, lz, sx, sy, sz, col, o = {}) {
   const S = AG.S, c = Math.cos(F.ry), s = Math.sin(F.ry);
   _agP.set(F.x + (lx * c + lz * s) * S, F.y + ly * S, F.z + (-lx * s + lz * c) * S); _agQ.setFromEuler(_agE.set(o.rx || 0, F.ry + (o.ry || 0), o.rz || 0, 'YXZ')); _agM.compose(_agP, _agQ, _agS.set(sx * S, sy * S, sz * S));
-  const P = g.attributes.position, N = g.attributes.normal, k = o.k || 1; if (Array.isArray(col)) _agC.setRGB(col[0], col[1], col[2]); else _agC.setHex(col);
+  const P = g.attributes.position, N = g.attributes.normal, k = o.k || 1; if (col && col.isColor) _agC.copy(col); else if (Array.isArray(col)) _agC.setRGB(col[0], col[1], col[2]); else _agC.setHex(col);
   for (let i = 0; i < P.count; i++) { _agP.fromBufferAttribute(P, i).applyMatrix4(_agM); B.pos.push(_agP.x, _agP.y, _agP.z); _agN.fromBufferAttribute(N, i).applyQuaternion(_agQ); B.nor.push(_agN.x, _agN.y, _agN.z); B.col.push(_agC.r * k, _agC.g * k, _agC.b * k); }
 }
-const AG_WOOD = [0x7a5230, 0x6b4728, 0x8a6038], AG_STONE = 0x8f8b82, AG_WARM = [2.6, 1.75, 0.7];
-function agCabin(B, G, F, a) {   // the red house: every agent's own
-  const box = AG.box, lit = !a.gone;
-  agPut(B, F, box, 0, -2.3, 0, 7.2, 5.2, 5.6, AG_STONE); agPut(B, F, box, 0, 1.7, 0, 6.6, 3.0, 5.0, 0xc2412a);
-  for (const [x, z] of [[-3.3, -2.5], [3.3, -2.5], [-3.3, 2.5], [3.3, 2.5]]) agPut(B, F, box, x, 1.7, z, 0.26, 3.0, 0.26, 0xece5d2);
-  agPut(B, F, AG.prism, 0, 3.2, 0, 7.6, 2.1, 6.2, 0x24242b); agPut(B, F, box, 0, 3.75, 2.52, 2.4, 0.9, 0.1, 0xc2412a); agPut(B, F, box, 0, 3.75, -2.52, 2.4, 0.9, 0.1, 0xc2412a);
-  agPut(B, F, box, 1.9, 4.7, -0.9, 0.75, 2.0, 0.75, 0x77736b);
-  agPut(B, F, box, -1.5, 1.2, 2.53, 1.05, 2.0, 0.1, 0x3a2416); agPut(B, F, box, 1.3, 2.0, 2.53, 1.7, 1.5, 0.1, 0xece5d2); agPut(B, F, box, -3.33, 2.0, 0.3, 0.1, 1.3, 1.4, 0xece5d2);
-  if (lit) { agPut(G, F, box, 1.3, 2.0, 2.6, 1.34, 1.14, 0.06, AG_WARM); agPut(G, F, box, -3.4, 2.0, 0.3, 0.06, 0.95, 1.05, AG_WARM, { k: 0.8 }); } else { agPut(B, F, box, 1.3, 2.0, 2.6, 1.34, 1.14, 0.06, 0x1c2230); agPut(B, F, box, -3.4, 2.0, 0.3, 0.06, 0.95, 1.05, 0x1c2230); }
-  agPut(B, F, box, 1.3, 2.0, 2.63, 0.1, 1.14, 0.04, 0xece5d2); agPut(B, F, box, 1.3, 2.0, 2.63, 1.34, 0.1, 0.04, 0xece5d2);
-  agPut(B, F, box, 3.0, 0.55, 3.2, 1.6, 0.14, 0.5, 0x6b4728);   // (a bench by the door)
+// a point in a thing's own frame F, in the world (as agPut places things)
+function agW(F, lx, ly, lz) { const S = AG.S, c = Math.cos(F.ry), s = Math.sin(F.ry); return [F.x + (lx * c + lz * s) * S, F.y + ly * S, F.z + (-lx * s + lz * c) * S]; }
+const AG_WOOD = [0x7a5230, 0x6b4728, 0x8a6038], AG_STONE = 0x8f8b82, AG_WARM = [2.6, 1.75, 0.7], AG_UNDYED = new THREE.Color(0xe8dcc4), AG_STAKE = new THREE.Color(0x8a6038);
+
+// ───────── the wools
+// a weaver's wool: a hue from its name, turned on by the golden angle until it is clear of every wool before it in the hamlet
+function agWools(H) {
+  const used = [], out = new Map();
+  for (const a of H.agents) { let h = 0; for (const ch of a.n) h = (h * 131 + ch.charCodeAt(0)) % 1009; h /= 1009;
+    for (let k = 0; k < 16 && used.some(u => Math.min(Math.abs(u - h), 1 - Math.abs(u - h)) < 0.07); k++) h = (h + 0.381966) % 1;
+    used.push(h); out.set(a.id, new THREE.Color().setHSL(h, 0.74, 0.6 - 0.1 * Math.max(0, 1 - Math.abs(h - 0.16) * 7))); }   // (yellows a little deeper, or in letters they read as white)
+  return out;
 }
-function agLogs(B, F, W, D, n, of, h0 = 0.25) {   // walls of logs, n courses of them out of `of`, the corners crossed
-  for (let i = 0; i < n; i++) { const y = h0 + 0.21 + i * 0.42, c = AG_WOOD[i % 3], e = i % 2 ? 0.9 : 0.3;
-    agPut(B, F, AG.box, 0, y, D / 2, W + e, 0.4, 0.4, c); agPut(B, F, AG.box, 0, y, -D / 2, W + e, 0.4, 0.4, c); agPut(B, F, AG.box, W / 2, y, 0, 0.4, 0.4, D + 1.2 - e, AG_WOOD[(i + 1) % 3]); agPut(B, F, AG.box, -W / 2, y, 0, 0.4, 0.4, D + 1.2 - e, AG_WOOD[(i + 1) % 3]); }
-  return h0 + of * 0.42;
+function agWoolsNow(H) { const sig = H.agents.map(a => a.id + a.n).join(); if (H.woolSig !== sig) { H.woolSig = sig; H.wool = agWools(H); } }
+const agWool = (H, a) => { if (!H.wool) agWoolsNow(H); return H.wool.get(a.id) || AG_UNDYED; };
+
+// ───────── a strand: everything woven is made of these. A tube along a path of points ([x, y, z, how thick here]), r thick
+// (or [across, up]: flattened, which is a deck or a wall), of two wools: ca runs along it, cb round it (one colour each, or
+// one for every point of the path, which is how a bridge goes from one weaver's stretch to the next); tl how long a square
+// of the weave is, tw how many threads go round. side: which way is across (else it is worked out from the path); up: which
+// way is up, for cloth that hangs straight however its edge runs
+const agAcc = () => ({ p: [], n: [], c: [], b: [], w: [], i: [] });
+const _wT = new THREE.Vector3(), _wN = new THREE.Vector3(), _wB = new THREE.Vector3(), _wU = new THREE.Vector3();
+function agTube(W, pts, r, sides, ca, cb, tl = 1, tw = sides, side = null, up = null) {
+  const n = pts.length; if (n < 2) return; const rx = Array.isArray(r) ? r[0] : r, ry = Array.isArray(r) ? r[1] : r, v0 = W.p.length / 3; let s = 0;
+  for (let j = 0; j < n; j++) { const P = pts[j], A = pts[Math.max(0, j - 1)], Z = pts[Math.min(n - 1, j + 1)], k = P[3] ?? 1, c1 = Array.isArray(ca) ? ca[j] : ca, c2 = Array.isArray(cb) ? cb[j] : cb;
+    if (j) s += Math.hypot(P[0] - A[0], P[1] - A[1], P[2] - A[2]);
+    _wT.set(Z[0] - A[0], Z[1] - A[1], Z[2] - A[2]).normalize();
+    if (side) _wN.set(side[0], side[1], side[2]); else { _wN.crossVectors(_wT, _wU.set(0, 1, 0)); if (_wN.lengthSq() < 1e-4) _wN.set(1, 0, 0); }
+    _wN.addScaledVector(_wT, -_wN.dot(_wT)).normalize(); if (up) _wB.set(up[0], up[1], up[2]); else _wB.crossVectors(_wN, _wT).normalize();
+    for (let q = 0; q <= sides; q++) { const a = q / sides * 6.2832, cs = Math.cos(a), sn = Math.sin(a);
+      W.p.push(P[0] + (_wN.x * cs * rx + _wB.x * sn * ry) * k, P[1] + (_wN.y * cs * rx + _wB.y * sn * ry) * k, P[2] + (_wN.z * cs * rx + _wB.z * sn * ry) * k);
+      _wU.set(_wN.x * cs * ry + _wB.x * sn * rx, _wN.y * cs * ry + _wB.y * sn * rx, _wN.z * cs * ry + _wB.z * sn * rx).normalize(); W.n.push(_wU.x, _wU.y, _wU.z);
+      W.c.push(c1.r, c1.g, c1.b); W.b.push(c2.r, c2.g, c2.b); W.w.push(s / tl, q / sides * tw); } }
+  for (let j = 0; j < n - 1; j++) for (let q = 0; q < sides; q++) { const a = v0 + j * (sides + 1) + q, b = a + sides + 1; W.i.push(a, b, a + 1, a + 1, b, b + 1); }
 }
-function agHome(B, G, F, f) {   // a log home, as far up as it has got
-  const W = 6.4, D = 4.8; agPut(B, F, AG.box, 0, -2.35, 0, W + 0.8, 5.2, D + 0.8, AG_STONE);
-  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) agPut(B, F, AG.box, x * (W / 2 + 0.9), 0.5, z * (D / 2 + 0.9), 0.14, 1.0, 0.14, 0xb9a57c);   // (the pegs it was laid out with)
-  const top = agLogs(B, F, W, D, Math.round(clamp(f / 0.6, 0, 1) * 8), 8);
-  if (f >= 0.6 && f < 0.82) { agPut(B, F, AG.box, 0, top + 1.9, 0, W + 1.0, 0.22, 0.22, 0x5a3c22); for (let i = -2; i <= 2; i++) for (const s of [-1, 1]) agPut(B, F, AG.box, i * 1.5, top + 0.95, s * (D / 4 + 0.15), 0.16, 0.16, D / 2 + 1.7, 0x5a3c22, { rx: s * 0.66 }); }
-  if (f >= 0.82) agPut(B, F, AG.prism, 0, top, 0, W + 1.1, 2.0, D + 1.5, 0x3b2b1e);
-  if (f >= 1) { agPut(B, F, AG.box, -1.6, 1.25, D / 2 + 0.22, 1.0, 1.9, 0.1, 0x2f1d12); agPut(G, F, AG.box, 1.3, 1.9, D / 2 + 0.23, 1.1, 0.9, 0.06, AG_WARM, { k: 0.7 }); agPut(B, F, AG.box, 2.1, top + 1.5, -0.9, 0.6, 1.6, 0.6, 0x77736b); }
+function agWoven(W) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(W.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(W.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(W.c, 3)); g.setAttribute('colB', new THREE.Float32BufferAttribute(W.b, 3)); g.setAttribute('wuv', new THREE.Float32BufferAttribute(W.w, 2)); g.setIndex(W.i); g.computeBoundingSphere(); return new THREE.Mesh(g, AG.weave); }
+function agMesh(D, mat) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(D.pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(D.nor, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(D.col, 3)); g.computeBoundingSphere(); return new THREE.Mesh(g, mat); }
+// a round woven thing standing in a frame F: a wall, a dome, a cone (prof: rings of [height, width]); r across, sq how much deeper than wide
+function agRound(W, F, prof, r, ca, cb, sq = 1, sides = 18, tl = 0.75) {
+  const c = Math.cos(F.ry), s = Math.sin(F.ry), th = 2 * Math.max(1, Math.round(Math.PI * r * AG.S * (1 + sq) / 2 / 0.8 / 2));
+  agTube(W, prof.map(([y, k]) => [...agW(F, 0, y, 0), k]), [r * AG.S, r * AG.S * sq], sides, ca, cb, tl, th, [c, 0, -s]);
 }
-function agPile(B, G, F) {   // the woodpile, the block, and the fire they sit round
-  for (let r = 0; r < 3; r++) for (let i = 0; i < 4 - r; i++) agPut(B, F, AG.cyl, -3.2, 0.3 + r * 0.5, (i - (3 - r) / 2) * 0.56, 0.5, 2.6, 0.5, AG_WOOD[(i + r) % 3], { rz: Math.PI / 2 });
+const agDome = (y0, h, k0 = 1, m = 7) => Array.from({ length: m + 1 }, (_, j) => { const t = j / m; return [y0 + h * Math.sin(t * 1.5708), k0 * Math.pow(Math.max(0, Math.cos(t * 1.5708)), 0.75) + 0.015]; });
+// a ring of strand round a thing, at a height (the rim of a wall, braided)
+function agRim(W, F, y, r, sq, rr, ca, cb) { const p = []; for (let j = 0; j <= 24; j++) { const a = j / 24 * 6.2832; p.push(agW(F, Math.cos(a) * r, y, Math.sin(a) * r * sq)); } agTube(W, p, rr * AG.S, 5, ca, cb, 0.5, 4); }
+// stakes standing in a ring: the warp everything is woven onto, up first
+function agStakes(W, F, n, r, sq, y0, y1, col) { for (let i = 0; i < n; i++) { const a = (i + 0.5) / n * 6.2832; agTube(W, [agW(F, Math.cos(a) * r, y0, Math.sin(a) * r * sq), agW(F, Math.cos(a) * r, y1, Math.sin(a) * r * sq)], 0.1 * AG.S, 4, col, col, 0.6, 2); } }
+// the ribs of a roof, bent over from the top of the wall
+function agRibs(W, F, n, y0, h, r, sq, col) { for (let i = 0; i < n; i++) { const a = i / n * 6.2832, p = agDome(y0, h, 1.04).map(([y, k]) => agW(F, Math.cos(a) * r * k, y, Math.sin(a) * r * k * sq)); agTube(W, p, 0.09 * AG.S, 4, col, col, 0.6, 2); } }
+
+// ───────── the houses
+function agCabin(B, G, W, F, a, wool) {   // its own house, woven of its own wool alone; the window lit while it is in
+  const lt = wool.clone().offsetHSL(0, -0.08, 0.14), dk = wool.clone().offsetHSL(0.02, 0, -0.16), lit = !a.gone;
+  agPut(B, F, AG.cyl, 0, -2.3, 0, 6.9, 5.2, 6.9, AG_STONE);
+  agRound(W, F, [[0.3, 1], [3.25, 1]], 3.0, wool, lt); agRim(W, F, 3.25, 3.05, 1, 0.24, dk, wool);
+  agRound(W, F, agDome(3.25, 2.6, 1.1), 3.0, dk, wool); agPut(B, F, AG.orb, 0, 5.95, 0, 0.7, 0.7, 0.7, lt);
+  agPut(B, F, AG.box, 1.9, 4.7, -0.9, 0.6, 2.0, 0.6, 0x77736b);   // (the stove's pipe: the smoke comes out of it)
+  agPut(B, F, AG.box, 0, 1.15, 2.9, 1.15, 2.1, 0.5, 0x3a2416); agPut(B, F, AG.box, 0, 2.28, 2.95, 1.45, 0.22, 0.56, dk);
+  agPut(lit ? G : B, F, AG.box, 2.0, 1.95, 2.2, 1.1, 0.9, 0.5, lit ? AG_WARM : 0x1c2230, { ry: 0.74 }); agPut(lit ? G : B, F, AG.box, -2.6, 1.95, -1.45, 0.95, 0.85, 0.5, lit ? AG_WARM : 0x1c2230, { ry: 1.06, k: 0.8 });
+  agPut(B, F, AG.box, 2.4, 0.55, 3.4, 1.6, 0.14, 0.5, 0x6b4728);   // (a bench by the door)
+}
+function agHome(B, G, W, F, f, ca, cb, cc) {   // a woven house, as far up as it has got: stakes, the walls round them, the ribs of the roof, the roof
+  const R = 3.3, Hw = 3.4, top = 0.3 + Hw, hw = Hw * clamp(f / 0.6, 0, 1);
+  agPut(B, F, AG.cyl, 0, -2.25, 0, R * 2 + 0.8, 5.1, R * 2 + 0.8, AG_STONE);
+  agStakes(W, F, 12, R + 0.05, 1, 0.2, f < 0.6 ? top + 0.5 : top, AG_STAKE);
+  if (hw > 0.05) { agRound(W, F, [[0.3, 1], [0.3 + hw * 0.5, 1]], R, ca, cb); agRound(W, F, [[0.3 + hw * 0.5, 1], [0.3 + hw, 1]], R, cb, cc); }
+  if (f >= 0.6) { agRim(W, F, top, R + 0.05, 1, 0.26, cc, ca); agRibs(W, F, 8, top, 2.9, R, 1, AG_STAKE); }
+  if (f >= 0.82) { const m = Math.max(2, Math.round(7 * clamp((f - 0.82) / 0.18, 0.3, 1))), d = agDome(top, 2.9, 1.04).slice(0, m + 1); agRound(W, F, d, R, ca, cc); }
+  if (f >= 1) { agPut(B, F, AG.orb, 0, top + 3.0, 0, 0.8, 0.8, 0.8, cb); agPut(B, F, AG.box, 0, 1.25, R - 0.15, 1.15, 2.1, 0.5, 0x2f1d12); agPut(G, F, AG.box, 2.15, 2.1, 2.45, 1.0, 0.85, 0.5, AG_WARM, { ry: 0.72, k: 0.7 }); }
+}
+function agPile(B, G, W, F, wl) {   // where the wool is kept: the loom, the baskets, the block, and the fire they sit round
+  const S = AG.S, c = Math.cos(F.ry), s = Math.sin(F.ry), n = wl.length;
+  for (const z of [-1.4, 1.4]) agPut(B, F, AG.box, -3.2, 1.75, z, 0.26, 3.5, 0.26, AG_WOOD[1]);
+  agPut(B, F, AG.box, -3.2, 3.4, 0, 0.3, 0.3, 3.2, AG_WOOD[0]); agPut(B, F, AG.box, -3.2, 0.45, 0, 0.3, 0.3, 3.2, AG_WOOD[0]);
+  for (let i = 0; i < 9; i++) { const z = (i - 4) * 0.3; agTube(W, [agW(F, -3.2, 0.5, z), agW(F, -3.2, 3.35, z)], 0.035 * S, 3, wl[i % n], wl[i % n], 0.5, 2); }   // (the warp on the loom)
+  agTube(W, [agW(F, -3.2, 0.6, 0), agW(F, -3.2, 2.1, 0)], [1.3 * S, 0.06 * S], 4, wl[0], wl[1 % n], 0.42, 8, [s, 0, c]);   // (and the cloth coming off it)
+  [[-1.2, 1.9], [-1.0, -2.0], [-5.0, 1.9], [-5.2, -1.7]].forEach(([x, z], i) => { const Fb = { x: 0, y: 0, z: 0, ry: F.ry }; [Fb.x, Fb.y, Fb.z] = agW(F, x, 0, z); agRound(W, Fb, [[0, 1], [0.75, 1.18]], 0.6, AG_STAKE, AG_UNDYED, 1, 10, 0.4);
+    for (let q = 0; q < 3; q++) agPut(B, F, AG.orb, x + Math.cos(q * 2.1) * 0.28, 0.85 + q * 0.12, z + Math.sin(q * 2.1) * 0.28, 0.5, 0.5, 0.5, wl[(i + q) % n]); });   // (baskets of wool balls)
   agPut(B, F, AG.cyl, -0.6, 0.3, 1.9, 0.9, 0.6, 0.9, 0x6b4728); for (let i = 0; i < 7; i++) agPut(B, F, AG.box, 1.6 + Math.cos(i * 0.9) * 0.85, 0.12, Math.sin(i * 0.9) * 0.85, 0.36, 0.3, 0.36, AG_STONE);
   agPut(G, F, AG.orb, 1.6, 0.5, 0, 0.8, 1.1, 0.8, [3.0, 1.3, 0.35]);
 }
-function agShrine(B, G, F, f, god) {   // the shrine to their traveller's god
-  const col = god ? new THREE.Color(PATRONS[god][0]) : new THREE.Color(0xfff0c8), c3 = [col.r, col.g, col.b];
+function agShrine(B, G, W, F, f, god, wl) {   // the shrine to their traveller's god: steps of stone, braided pillars, a woven canopy in the god's colour
+  const col = god ? new THREE.Color(PATRONS[god][0]) : new THREE.Color(0xfff0c8), c3 = [col.r, col.g, col.b], n = wl.length;
   agPut(B, F, AG.box, 0, -2.4, 0, 6.4, 5.2, 6.4, AG_STONE); if (f > 0.12) agPut(B, F, AG.box, 0, 0.4, 0, 5.4, 0.4, 5.4, 0xa39f95); if (f > 0.25) agPut(B, F, AG.box, 0, 0.8, 0, 4.4, 0.4, 4.4, 0xb0aca1);
-  if (f > 0.4) for (const [x, z] of [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]]) agPut(B, F, AG.cyl, x, 1.0 + 1.7 * clamp((f - 0.4) / 0.2, 0, 1), z, 0.38, 3.4 * clamp((f - 0.4) / 0.2, 0, 1), 0.38, 0x7a5230);
+  if (f > 0.4) { const h = 3.4 * clamp((f - 0.4) / 0.2, 0, 1); [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]].forEach(([x, z], i) => { const p = []; for (let j = 0; j <= 4; j++) p.push(agW(F, x, 1.0 + h * j / 4, z)); agTube(W, p, 0.2 * AG.S, 6, col, wl[i % n], 0.4, 4);
+      for (let q = 0; q < 2; q++) { const hp = []; for (let j = 0; j <= 16; j++) { const a = j / 16 * h * 2.4 + q * Math.PI; hp.push(agW(F, x + Math.cos(a) * 0.24, 1.0 + h * j / 16, z + Math.sin(a) * 0.24)); } agTube(W, hp, 0.07 * AG.S, 4, wl[(i + q + 1) % n], wl[(i + q + 1) % n], 0.4, 2); } }); }
   if (f > 0.55) { agPut(B, F, AG.box, 0, 1.5, -0.3, 1.3, 1.0, 0.9, 0xc9c5ba); agPut(B, F, AG.cyl, 0, 2.1, -0.3, 0.9, 0.22, 0.9, 0x8a6a3a); }
-  if (f > 0.7) { agPut(B, F, AG.prism, 0, 4.4, 0, 5.2, 1.7, 5.2, 0x3b2b1e); agPut(B, F, AG.box, 0, 6.12, 0, 5.3, 0.14, 0.2, c3, { k: 0.9 }); }
+  if (f > 0.7) { agRim(W, F, 4.45, 2.75, 1, 0.24, col, wl[0]); agRound(W, F, agDome(4.45, 2.1, 1.08), 2.75, col, wl[1 % n], 1, 16); }
   if (f > 0.85) agPut(B, F, AG.box, 0, 3.2, -1.86, 1.3, 2.0, 0.06, c3, { k: 0.85 });
-  if (f >= 1) agPut(G, F, AG.orb, 0, 2.75, -0.3, 0.8, 1.2, 0.8, c3, { k: 2.6 });
+  if (f >= 1) { agPut(G, F, AG.orb, 0, 2.75, -0.3, 0.8, 1.2, 0.8, c3, { k: 2.6 }); agPut(G, F, AG.orb, 0, 6.75, 0, 0.6, 0.6, 0.6, c3, { k: 2.0 }); }
 }
-function agPost(B, G, F, god) { const c = new THREE.Color(PATRONS[god][0]); agPut(B, F, AG.cyl, 0, 1.7, 0, 0.44, 3.6, 0.44, 0x6b4728); agPut(B, F, AG.box, 0, 3.6, 0, 0.7, 0.3, 0.7, 0x8a6038); agPut(G, F, AG.orb, 0, 4.2, 0, 0.8, 0.8, 0.8, [c.r, c.g, c.b], { k: 2.3 }); }
-function agTower(B, G, F, f) {
-  const h = 9 * clamp(f / 0.5, 0.08, 1); for (const [x, z] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) agPut(B, F, AG.box, x, h / 2, z, 0.32, h, 0.32, 0x6b4728);
-  if (f > 0.3) for (const z of [-1.5, 1.5]) agPut(B, F, AG.box, 0, 3.2, z, 3.6, 0.2, 0.2, 0x7a5230, { rz: 0.6 });
-  if (f > 0.5) { agPut(B, F, AG.box, 0, 8.3, 0, 4.2, 0.26, 4.2, 0x7a5230); for (const [x, z, w, d] of [[0, 2.0, 4.2, 0.14], [0, -2.0, 4.2, 0.14], [2.0, 0, 0.14, 4.2], [-2.0, 0, 0.14, 4.2]]) agPut(B, F, AG.box, x, 9.2, z, w, 0.14, d, 0x8a6038); }
-  if (f > 0.8) { for (const [x, z] of [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]]) agPut(B, F, AG.box, x, 9.6, z, 0.2, 2.4, 0.2, 0x6b4728); agPut(B, F, AG.prism, 0, 10.8, 0, 5.0, 1.6, 5.0, 0x3b2b1e); }
-  if (f >= 1) agPut(G, F, AG.orb, 0, 9.3, 0, 0.6, 0.6, 0.6, AG_WARM, { k: 1.2 });
+function agPost(B, G, W, F, god) { const c = new THREE.Color(PATRONS[god][0]); agRound(W, F, [[0, 1], [3.6, 1]], 0.26, c, AG_UNDYED, 1, 6, 0.45); agPut(B, F, AG.box, 0, 3.6, 0, 0.7, 0.3, 0.7, 0x8a6038); agPut(G, F, AG.orb, 0, 4.2, 0, 0.8, 0.8, 0.8, [c.r, c.g, c.b], { k: 2.3 }); }
+function agTower(B, G, W, F, f, wl) {   // a tall woven tower, narrowing as it goes, a lookout, a woven cone on posts
+  const n = wl.length, hf = clamp(f / 0.5, 0.08, 1), h = 8.3 * hf;
+  agPut(B, F, AG.cyl, 0, -2.3, 0, 5.4, 5.0, 5.4, AG_STONE); agStakes(W, F, 10, 2.32, 1, 0.2, h + 0.4, AG_STAKE);
+  for (let q = 0, bands = 3; q < bands; q++) { const y0 = 0.2 + h * q / bands, y1 = 0.2 + h * (q + 1) / bands; agRound(W, F, [[y0, 1 - 0.3 * (y0 / 8.5)], [y1, 1 - 0.3 * (y1 / 8.5)]], 2.3, wl[q % n], wl[(q + 1) % n], 1, 16); }
+  if (f > 0.5) { agPut(B, F, AG.box, 0, 8.6, 0, 4.4, 0.26, 4.4, 0x7a5230); agRound(W, F, [[8.75, 1], [9.6, 1]], 2.15, wl[2 % n], wl[0], 1, 4, 0.5); }
+  if (f > 0.8) { for (const [x, z] of [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]]) agPut(B, F, AG.box, x, 9.9, z, 0.2, 2.4, 0.2, 0x6b4728); agRound(W, F, [[11.0, 1.35], [11.6, 0.9], [12.9, 0.06]], 2.3, wl[1 % n], wl[0], 1, 16); }
+  if (f >= 1) agPut(G, F, AG.orb, 0, 9.7, 0, 0.6, 0.6, 0.6, AG_WARM, { k: 1.2 });
 }
-function agHall(B, G, F, f) {   // the hall of the twelve
-  const W = 15, D = 7; agPut(B, F, AG.box, 0, -3.2, 0.8, W + 1.6, 7.0, D + 3.4, AG_STONE);
-  const top = agLogs(B, F, W, D, Math.round(clamp(f / 0.5, 0, 1) * 10), 10, 0.3);
-  if (f > 0.5) for (let i = 0; i < 6; i++) agPut(B, F, AG.cyl, (i - 2.5) * 2.7, 0.3 + 2.1 * clamp((f - 0.5) / 0.2, 0, 1), D / 2 + 1.7, 0.5, 4.2 * clamp((f - 0.5) / 0.2, 0, 1), 0.5, 0xb9b3a4);
-  if (f > 0.75) agPut(B, F, AG.prism, 0, top, 0.8, W + 1.4, 3.0, D + 4.2, 0x33251a);
-  if (f >= 1) { Object.keys(PATRONS).forEach((g, i) => { const c = new THREE.Color(PATRONS[g][0]); agPut(G, F, AG.orb, (i - 5.5) * 1.22, top - 0.1, D / 2 + 2.05, 0.5, 0.5, 0.2, [c.r, c.g, c.b], { k: 2.0 }); }); agPut(B, F, AG.box, 0, 1.6, D / 2 + 0.22, 2.2, 2.6, 0.1, 0x2f1d12); agPut(G, F, AG.box, -4.6, 2.3, D / 2 + 0.23, 1.3, 1.0, 0.06, AG_WARM, { k: 0.7 }); agPut(G, F, AG.box, 4.6, 2.3, D / 2 + 0.23, 1.3, 1.0, 0.06, AG_WARM, { k: 0.7 }); }
+function agHall(B, G, W, F, f, wl) {   // the hall of the twelve: a long woven house, banded in every weaver's wool, a porch of braided pillars
+  const n = wl.length, R = 7.8, sq = 0.5, Hw = 4.4, hw = Hw * clamp(f / 0.5, 0, 1), top = 0.3 + Hw;
+  agPut(B, F, AG.box, 0, -3.2, 0.8, 17.6, 7.0, 10.4, AG_STONE); agStakes(W, F, 22, R + 0.05, sq, 0.2, f < 0.5 ? top + 0.6 : top, AG_STAKE);
+  const bands = Math.min(4, Math.max(2, n)); for (let q = 0; q < bands && hw > 0.05; q++) agRound(W, F, [[0.3 + hw * q / bands, 1], [0.3 + hw * (q + 1) / bands, 1]], R, wl[q % n], wl[(q + 1) % n], sq, 26);
+  if (f > 0.5) { const ph = 4.3 * clamp((f - 0.5) / 0.2, 0, 1); for (let i = 0; i < 6; i++) { const x = (i - 2.5) * 2.7, p = []; for (let j = 0; j <= 4; j++) p.push(agW(F, x, 0.3 + ph * j / 4, 5.4)); agTube(W, p, 0.28 * AG.S, 6, wl[i % n], AG_UNDYED, 0.45, 4); } }
+  if (f > 0.75) { agRim(W, F, top, R + 0.05, sq, 0.3, wl[0], wl[1 % n]); agRound(W, F, agDome(top, 3.6, 1.06), R, wl[(n - 1) % n], wl[0], sq, 26); const p = []; for (let j = 0; j <= 8; j++) p.push(agW(F, -7.4 + j * 14.8 / 8, 4.75, 5.4)); agTube(W, p, 0.3 * AG.S, 6, wl[0], wl[2 % n], 0.5, 4); }
+  if (f >= 1) { Object.keys(PATRONS).forEach((g, i) => { const c = new THREE.Color(PATRONS[g][0]); agPut(G, F, AG.orb, (i - 5.5) * 1.22, 5.35, 5.4, 0.55, 0.55, 0.55, [c.r, c.g, c.b], { k: 2.0 }); }); agPut(B, F, AG.box, 0, 1.6, 3.75, 2.2, 2.6, 0.6, 0x2f1d12); agPut(G, F, AG.box, -4.6, 2.3, 3.1, 1.3, 1.0, 0.5, AG_WARM, { ry: -0.35, k: 0.7 }); agPut(G, F, AG.box, 4.6, 2.3, 3.1, 1.3, 1.0, 0.5, AG_WARM, { ry: 0.35, k: 0.7 }); }
 }
 // where each thing in the list stands (u, v), by its place in the list
 function agPlan(H) {
@@ -30461,39 +30553,200 @@ function agPlan(H) {
   return (H.plan = P);
 }
 const agCabinAt = (H, i) => [(i - (H.agents.length - 1) / 2) * 15, 16 + (i % 2) * 6];
+const AG_RAD = { home: 3.3, shrine: 2.8, tower: 2.3, hall: 7.8, woodpile: 3.5 };   // (how far round each thing its flowers go)
+const agStand = w => (AG_RAD[w] ?? 0.4) + (w === 'hall' ? 1 : 4.2);   // (how far off a weaver stands to throw its threads: far enough for them to be seen)
 function agBuild(H) {
-  agTools(); agDrop(H, false);
-  const B = { pos: [], nor: [], col: [] }, G = { pos: [], nor: [], col: [] }, st = H.st, P = agPlan(H), F = {};
-  H.agents.forEach((a, i) => { const [u, v] = agCabinAt(H, i); agAt(H, u, v, F); agCabin(B, G, F, a); });
+  agTools(); agClear(H, 'group');
+  const B = { pos: [], nor: [], col: [] }, G = { pos: [], nor: [], col: [] }, W = agAcc(), st = H.st, P = agPlan(H), F = {}, wl = H.agents.map(a => agWool(H, a)), n = wl.length, wq = q => wl[q % n];
+  H.agents.forEach((a, i) => { const [u, v] = agCabinAt(H, i); agAt(H, u, v, F); agCabin(B, G, W, F, a, wl[i]); });
+  let hn = 0;
   for (let k = 0; k < AG_WORKS.length && k <= st.k; k++) { const w = AG_WORKS[k][0], f = k < st.k ? 1 : st.f; agAt(H, P[k][0], P[k][1], F);
-    if (w === 'woodpile') { if (f > 0.3 || k < st.k) agPile(B, G, F); } else if (w === 'home') agHome(B, G, F, f); else if (w === 'shrine') agShrine(B, G, F, f, H.god); else if (w === 'tower') agTower(B, G, F, f); else if (w === 'hall') agHall(B, G, F, f); else if (k < st.k) agPost(B, G, F, w.slice(5)); }
-  const mesh = (D, mat) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(D.pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(D.nor, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(D.col, 3)); g.computeBoundingSphere(); return new THREE.Mesh(g, mat); };
-  H.group = new THREE.Group(); H.group.add(mesh(B, AG.mat)); if (G.pos.length) H.group.add(mesh(G, AG.glow)); scene.add(H.group);
+    if (w === 'woodpile') { if (f > 0.3 || k < st.k) agPile(B, G, W, F, wl); } else if (w === 'home') { agHome(B, G, W, F, f, wq(hn), wq(hn + 1), wq(hn + 2)); hn++; } else if (w === 'shrine') agShrine(B, G, W, F, f, H.god, wl); else if (w === 'tower') agTower(B, G, W, F, f, wl); else if (w === 'hall') agHall(B, G, W, F, f, wl); else if (k < st.k) agPost(B, G, W, F, w.slice(5)); }
+  H.group = new THREE.Group(); H.group.add(agMesh(B, AG.mat)); if (W.p.length) H.group.add(agWoven(W)); if (G.pos.length) H.group.add(agMesh(G, AG.glow)); scene.add(H.group);
 }
+function agClear(H, k) { const g = H[k]; if (!g) return; scene.remove(g); g.traverse(o => { if (o.isInstancedMesh) o.dispose(); else o.geometry?.dispose(); }); H[k] = null; }
 function agDrop(H, all) {
-  if (H.group) { scene.remove(H.group); H.group.traverse(o => o.geometry?.dispose()); H.group = null; }
-  if (!all) return; for (const f of H.figs.values()) { scene.remove(f.g); f.el.remove(); } H.figs.clear(); if (H.label) { H.label.remove(); H.label = null; } H.key = '';
+  agClear(H, 'group'); agClear(H, 'web'); agClear(H, 'still'); H.wks = '';
+  if (H.thr) H.thr.visible = false;
+  if (!all) return; for (const f of H.figs.values()) { scene.remove(f.g); f.el.remove(); } H.figs.clear(); if (H.label) { H.label.remove(); H.label = null; } agClear(H, 'thr'); H.key = H.wkey = '';
 }
-// ───────── the builders themselves
-function agFigure(a) {
-  agTools(); let hh = 0; for (const ch of a.id) hh = (hh * 31 + ch.charCodeAt(0)) % 360; const hue = hh / 360, tunic = new THREE.Color().setHSL(hue, 0.6, 0.5), L = c => new THREE.MeshLambertMaterial({ color: c });
+
+// ───────── the bridges
+// where bridges can go from a hamlet: out from its shore, over water, to land again (another island, a rock, the far side of
+// a bay), looked for once; where there is only open sea, rocks are set in it for them to reach. Shortest first.
+function agSpans(H) {
+  const S = H.site, out = [], open = [], far = (a, b) => Math.abs(wrapAngle(a - b));
+  for (let i = 0; i < 56; i++) { const b = S.yaw + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.1122, cx = Math.cos(b), cz = Math.sin(b); let r1 = 0, end = 0;
+    for (let r = 20; r < 760; r += 5) { const h = overHeight(S.x + cx * r, S.z + cz * r); if (!r1) { if (h < WATER - 0.4) r1 = r; else if (r > 250) break; } else if (h > WATER + 1.5) { end = r; break; } }
+    if (!r1) continue;
+    const at = (r, y) => [S.x + cx * r, y ?? Math.max(overHeight(S.x + cx * r, S.z + cz * r), WATER) + 0.35, S.z + cz * r];
+    if (!end) { open.push({ b, r1, at }); continue; }
+    const A = at(r1 - 5), B = at(end + 4); if (B[1] > WATER + 34 || A[1] > WATER + 34 || end + 9 - r1 < 22) continue;
+    out.push({ b, A, B, len: Math.hypot(B[0] - A[0], B[2] - A[2]) }); }
+  out.sort((a, b) => a.len - b.len); const pick = [];
+  for (const s of out) if (pick.length < 10 && pick.every(p => far(p.b, s.b) > 0.3)) pick.push(s);
+  open.sort((a, b) => far(a.b, S.yaw) - far(b.b, S.yaw));
+  for (const o of open) { if (pick.length >= 8) break; if (!pick.every(p => far(p.b, o.b) > 0.36)) continue; const D = 34 + 22 * (pick.length % 4), B = o.at(o.r1 + D, WATER + 6 + (pick.length % 3) * 2);
+    if (overHeight(B[0], B[2]) > WATER - 2) continue; const A = o.at(o.r1 - 5); pick.push({ b: o.b, A, B, len: Math.hypot(B[0] - A[0], B[2] - A[2]), stack: true }); }
+  pick.sort((a, b) => a.len - b.len);
+  for (const s of pick) { const dx = (s.B[0] - s.A[0]) / s.len, dz = (s.B[2] - s.A[2]) / s.len; s.d = [dx, dz]; s.sv = [-dz, 0, dx]; }
+  return pick;
+}
+// how far the bridges have got, by now: which are begun, how far across each is woven, how big and how fine they all are
+function agReach(H, u) {
+  if (!H.spans) H.spans = agSpans(H);
+  const n = H.agents.length, sz = H.agents.reduce((t, a) => t + (a.sz || 0), 0);
+  const g = sz > 0 ? clamp((Math.log10(1 + sz) - 1.3) / 4.2, 0, 1) : clamp(Math.sqrt(u / 900), 0, 1);   // (how big: the code they work in, if they say; else what they have done)
+  const lv = clamp(Math.floor(0.5 * (n - 1) + 2.4 * g + u / 260), 0, 4), most = Math.min(H.spans.length, 1 + Math.ceil(n * 1.25)), br = [];   // (how fine: more of them, more done, bigger code)
+  let T = 6;
+  for (let i = 0; i < most; i++) { const sp = H.spans[i], C = 12 + sp.len * 0.22 * (1 + lv * 0.15), f = clamp((u - T) / C, 0, 1); if (f <= 0) break;
+    br.push({ sp, f, i, wd: 2.4 + 2.4 * g + 0.3 * lv, rh: 1.7 + 0.8 * g, rise: Math.min(26, 2 + sp.len * (0.05 + 0.06 * g) + lv * 0.5) }); T += C * 0.6 / (1 + 0.12 * (n - 1)); }
+  H.br = br; H.lv = lv; H.g = g;
+  return `${lv}|${Math.round(g * 8)}|${br.map(b => Math.floor(b.f * 16)).join(',')}`;
+}
+// a point on a bridge: t of the way across, o to the side, h above the deck
+function agDeck(b, t, o = 0, h = 0) { const A = b.sp.A, Z = b.sp.B, sv = b.sp.sv; return [A[0] + (Z[0] - A[0]) * t + sv[0] * o, A[1] + (Z[1] - A[1]) * t + b.rise * Math.sin(Math.PI * t) + h, A[2] + (Z[2] - A[2]) * t + sv[2] * o]; }
+// one bridge, woven out from the shore as far as it has got: the finer the hamlet's weaving (lv), the more goes into it.
+// What is to be seen from the air and from far off is cloth (the deck, the woven sides, the cloth under the arches); the
+// strands (ropes, webs, spirals, fans) are for whoever comes close
+function agBridge(W, B, G, FL, b, lv, g, wl, wl2, god, rng) {
+  const sp = b.sp, L = sp.len, f = b.f, n = wl.length, c = q => wl[(b.i + q) % n], cl = q => wl2[(b.i + q) % n], wd = b.wd, rh = b.rh, sv = sp.sv, along = [sp.d[0], 0, sp.d[1]], K = clamp(L / 130, 1, 1.7), r0 = (0.16 + 0.1 * g) * K, tl = 0.75 * K;   // (K: a long bridge is seen from further off, so all of it is a little heavier)
+  const ns = Math.max(8, Math.ceil(L * f / 1.6)), path = (o, h) => { const p = []; for (let j = 0; j <= ns; j++) p.push(agDeck(b, f * j / ns, o, h)); return p; }, top = lv >= 1 ? rh + 1.2 + 0.6 * g : rh;
+  // (each weaver wove a stretch of it in its own wool, light on dark: from far off it is a sash of their colours, one after another)
+  const band = 12 * K, cols = (C, off, sh) => Array.from({ length: ns + 1 }, (_, j) => C(Math.floor((f * j / ns * L + sh * band) / band) + off));
+  agTube(W, path(0, 0), [wd / 2, 0.34], 8, cols(c, 0, 0), cols(cl, 0, 0), tl, 2 * Math.max(2, Math.round(wd / tl)), sv);   // (the deck: a flat woven band)
+  for (const o of [-wd / 2, wd / 2]) {
+    agTube(W, path(o, rh / 2), [0.08, rh / 2], 4, cols(c, o > 0 ? 2 : 1, 0.5), cols(cl, o > 0 ? 2 : 1, 0.5), tl, 2 * Math.max(2, Math.round(rh / tl)), sv);   // (its sides, woven up to the hand rope)
+    if (lv < 3) agTube(W, path(o, rh), r0, 5, c(2), c(0), 0.6, 4);   // (the hand rope; braided of three, in the finer ones)
+    else for (let q = 0; q < 3; q++) { const p = []; for (let j = 0; j <= ns * 2; j++) { const t = f * j / (ns * 2), ph = t * L / (1.7 * K) * 6.2832 + q * 2.0944; p.push(agDeck(b, t, o + Math.cos(ph) * r0 * 1.2, rh + Math.sin(ph) * r0 * 1.2)); } agTube(W, p, r0 * 0.7, 4, c(q), c(q), 0.6, 2); }
+    if (lv >= 1) {   // (from the second fineness: a rope above that one, and a web of crossed threads between the two)
+      agTube(W, path(o, top), r0 * 0.8, 5, c(4), c(1), 0.6, 4); const hs = 2.6 * K, nh = Math.floor(L * f / hs);
+      for (let k = 0; k <= nh; k++) { const t = k * hs / L, t2 = (k + 1) * hs / L; agTube(W, [agDeck(b, t, o, rh), agDeck(b, t, o, top)], 0.085 * K, 3, c(1), c(1), 0.5, 2);
+        if (k < nh) { agTube(W, [agDeck(b, t, o, rh), agDeck(b, t2, o, top)], 0.065 * K, 3, c(3), c(3), 0.5, 2); agTube(W, [agDeck(b, t, o, top), agDeck(b, t2, o, rh)], 0.065 * K, 3, c(5), c(5), 0.5, 2); } } } }
+  if (lv >= 2) {   // (arches under it, from foot to foot across the water, and cloth woven between each arch and the deck)
+    const na = clamp(Math.round(L / 46), 1, 9), gy = t => { const d = agDeck(b, t); return Math.min(Math.max(overHeight(d[0], d[2]), WATER) + 0.2, d[1] - 0.3); };
+    for (const o of [-wd * 0.42, wd * 0.42]) for (let a = 0; a < na; a++) { const t0 = 0.02 + 0.96 * a / na, t1 = 0.02 + 0.96 * (a + 1) / na, y0 = gy(t0), y1 = gy(t1), ym = agDeck(b, (t0 + t1) / 2)[1] - 0.7, arch = [], cloth = [];
+      for (let j = 0; j <= 24; j++) { const uu = j / 24, t = t0 + (t1 - t0) * uu; if (t > f) break; const d = agDeck(b, t, o, -0.3), base = y0 + (y1 - y0) * uu, y = Math.min(base + Math.max(0, ym - base) * Math.pow(Math.sin(Math.PI * uu), 0.6), d[1] - 0.1), h = (d[1] - y) / 2; arch.push([d[0], y, d[2]]); cloth.push([d[0], y + h, d[2], Math.max(0.02, h)]); }
+      agTube(W, arch, (0.26 + 0.14 * g) * K, 5, c(a + 1), c(a + 2), 0.6, 4); agTube(W, cloth, [0.07, 1], 4, c(a), cl(a), tl, 2 * Math.max(2, Math.round((ym - Math.min(y0, y1)) * 0.5 / tl)), sv, [0, 1, 0]); } }
+  if (lv >= 3) {   // (a spiral weave round the whole of it, two ways at once: a woven tunnel)
+    const nh2 = lv >= 4 ? 4 : 2, pitch = (8 + 5 * g) * K, rx = wd * 0.64, ry = top * 0.5 + 0.9, m = Math.max(12, Math.ceil(L * f / (0.9 * K)));
+    for (let q = 0; q < nh2; q++) { const p = [], dir = q % 2 ? 1 : -1; for (let j = 0; j <= m; j++) { const t = f * j / m, ph = dir * t * L / pitch * 6.2832 + Math.floor(q / 2) * Math.PI; p.push(agDeck(b, t, Math.cos(ph) * rx, top * 0.5 + Math.sin(ph) * ry)); } agTube(W, p, (0.1 + 0.05 * g) * K, 4, c(q + 1), c(q + 1), 0.6, 2); } }
+  if (lv >= 4) {   // (woven towers at the ends, an arch between each pair, fans of cable down to the ropes, and a cable slung from end to end)
+    const hp = 8 + 8 * g + Math.min(12, L * 0.03), po = wd / 2 + 0.7;
+    for (const te of f >= 1 ? [0.015, 0.985] : [0.015]) { const tops = [];
+      for (const o of [-po, po]) { const base = agDeck(b, te, o, -1.5), p = []; for (let j = 0; j <= 6; j++) p.push([base[0], base[1] + (hp + 1.5) * j / 6, base[2], 1 - 0.4 * j / 6]); agTube(W, p, 0.6 * K, 8, c(0), cl(0), tl, 6, along); tops.push(agDeck(b, te, o, hp)); }
+      const p = []; for (let j = 0; j <= 10; j++) { const a = j / 10 * Math.PI; p.push(agDeck(b, te, -Math.cos(a) * po, hp + Math.sin(a) * po * 0.6)); } agTube(W, p, 0.3 * K, 5, c(2), c(1), 0.6, 4);
+      for (let q = 0; q < 2; q++) for (let k = 1; k <= 7; k++) { const t = te < 0.5 ? te + k * 0.055 : te - k * 0.055; if (t > f) continue; agTube(W, [tops[q], agDeck(b, t, q ? wd / 2 : -wd / 2, top)], 0.06 * K, 3, c(k), c(k), 0.5, 2); } }
+    for (const o of [-po, po]) { const p = [], m = Math.max(8, Math.ceil(ns / 2)); for (let j = 0; j <= m; j++) { const t = Math.max(0.015, f * j / m), w = (t - 0.015) / 0.97; p.push(agDeck(b, t, o, top + 0.8 + (hp - top - 0.8) * (2 * w - 1) ** 2)); } agTube(W, p, 0.22 * K, 5, c(1), c(2), 0.5, 4); } }
+  if (f < 1) for (let q = 0; q < 5; q++) { const o = (q / 4 - 0.5) * wd, d = agDeck(b, f, o, 0), p = []; for (let j = 0; j <= 6; j++) p.push([d[0] + along[0] * j * 0.3 + Math.sin(j * 1.3 + q) * 0.25, d[1] - j * 0.42, d[2] + along[2] * j * 0.3 + Math.cos(j * 1.1 + q) * 0.25]); agTube(W, p, 0.05, 3, c(q), c(q), 0.5, 2); }   // (loose ends where the weaving has got to)
+  for (const te of f >= 1 ? [0, 1] : [0]) for (const o of [-wd / 2 - 0.25, wd / 2 + 0.25]) {   // (a woven post each side at each end, a lantern on it, flowers round it)
+    const d = agDeck(b, te, o, 0), y0 = Math.max(overHeight(d[0], d[2]), WATER) - 0.6, F = { x: d[0], y: d[1] + rh + 1.25, z: d[2], ry: 0 };
+    agTube(W, [[d[0], y0, d[2]], [d[0], d[1] + rh + 0.9, d[2]]], 0.3 + 0.1 * g, 6, c(0), c(1), 0.5, 4, along); agPut(G, F, AG.orb, 0, 0, 0, 0.5, 0.5, 0.5, AG_WARM, { k: 0.9 });
+    for (let q = 0; q < 4; q++) { const a = rng() * 6.2832, rr = 0.8 + rng() * 2.2, x = d[0] + Math.cos(a) * rr, z = d[2] + Math.sin(a) * rr, y = overHeight(x, z); if (y > WATER + 0.3) FL.push([x, y, z, rng() < 0.25 ? c(q) : god, 1.4 + rng() * 0.5]); } }
+  if (sp.stack && f > 0) { const Fs = { x: sp.B[0], y: WATER, z: sp.B[2], ry: sp.b }, tp = (sp.B[1] - WATER) / AG.S;   // (the rock set in the sea for it to reach)
+    agPut(B, Fs, AG.orb, 0, tp - 2.0, 0, 6.5, 4.2, 6.5, 0x8a867c); agPut(B, Fs, AG.orb, 1.1, tp - 4.6, 0.7, 8.5, 6.5, 8.5, AG_STONE); agPut(B, Fs, AG.orb, -1.3, -2, -0.9, 11, 8, 11, 0x7d796f); agPut(B, Fs, AG.orb, 4.6, -1.2, 2.4, 3.6, 3.0, 3.6, AG_STONE);
+    if (f >= 1) for (let q = 0; q < 7; q++) { const a = rng() * 6.2832, rr = 1 + rng() * 2.6; FL.push([sp.B[0] + Math.cos(a) * rr, sp.B[1] - 0.3, sp.B[2] + Math.sin(a) * rr, god, 1.3 + rng() * 0.4]); } }
+  for (let s = 2; s < L * f - 1; s += 4.2) { const k = Math.round(s / 4.2), d = agDeck(b, s / L, (k % 2 ? 1 : -1) * (wd / 2 - 0.45), 0.3); FL.push([d[0], d[1], d[2], rng() < 0.22 ? c(k) : god, 1.15 + rng() * 0.35]); }   // (flowers along the deck)
+}
+// garlands, house to house: each thing that stands is tied to the nearest one already tied, by two strands twisted, slung
+function agGarlands(W, H, wl) {
+  const st = H.st, P = agPlan(H), F = {}, pts = [], n = wl.length;
+  H.agents.forEach((a, i) => { const [u, v] = agCabinAt(H, i); agAt(H, u, v, F); pts.push(agW(F, 0, 5.3, 0)); });
+  for (let k = 0; k < st.k; k++) { const w = AG_WORKS[k][0], y = { home: 6.1, shrine: 6.2, tower: 9.6, hall: 7.4 }[w]; if (!y) continue; agAt(H, P[k][0], P[k][1], F); pts.push(agW(F, 0, y, 0)); }
+  if (pts.length < 2) return; const inn = [0], rest = pts.map((_, i) => i).slice(1); let e = 0;
+  while (rest.length) { let best = 1e9, bi = 0, bj = 0; for (const i of inn) for (let j = 0; j < rest.length; j++) { const p = pts[i], q = pts[rest[j]], d = (p[0] - q[0]) ** 2 + (p[2] - q[2]) ** 2; if (d < best) { best = d; bi = i; bj = j; } }
+    const j = rest.splice(bj, 1)[0]; inn.push(j); const p = pts[bi], q = pts[j], D = Math.sqrt(best); if (D > 75) continue;
+    const sv = [-(q[2] - p[2]) / D, 0, (q[0] - p[0]) / D], sag = 0.5 + D * 0.09, m = Math.max(10, Math.ceil(D / 1.2));
+    for (let s = 0; s < 2; s++) { const L = []; for (let i = 0; i <= m; i++) { const t = i / m, ph = t * D / 1.1 * 6.2832 + s * Math.PI, ox = Math.cos(ph) * 0.13, oy = Math.sin(ph) * 0.13; L.push([p[0] + (q[0] - p[0]) * t + sv[0] * ox, p[1] + (q[1] - p[1]) * t - sag * 4 * t * (1 - t) + oy, p[2] + (q[2] - p[2]) * t + sv[2] * ox]); } agTube(W, L, 0.075, 3, wl[(e + s) % n], wl[(e + s) % n], 0.5, 2); }
+    e++; }
+}
+// the flowers of the house: round every finished thing, scattered through the hamlet, more as it grows (the same places every time)
+function agFlowers(H, FL, wl, god, u) {
+  const st = H.st, P = agPlan(H), F = {}, n = wl.length, seed = parseInt(H.o.slice(8, 16), 16) || 7, spots = [];
+  const ring = (k, r, m) => { const R = mulberry32(seed + k * 7919); for (let j = 0; j < m; j++) { const a = R() * 6.2832, rr = r + 1.0 + R() * 2.2; if (Math.sin(a) > 0.82) continue; const [x, , z] = agW(F, Math.cos(a) * rr, 0, Math.sin(a) * rr), y = overHeight(x, z); if (y > WATER + 0.4) FL.push([x, y, z, R() < 0.2 ? wl[Math.floor(R() * n)] : god, 1.5 + R() * 0.6]); } };
+  H.agents.forEach((a, i) => { const [cu, cv] = agCabinAt(H, i); spots.push([cu, cv]); agAt(H, cu, cv, F); ring(100 + i, 3.1, 14); });
+  for (let k = 0; k < AG_WORKS.length && k <= st.k; k++) { spots.push(P[k]); if (k >= st.k) continue; const w = AG_WORKS[k][0]; agAt(H, P[k][0], P[k][1], F); ring(k, AG_RAD[w] ?? 0.6, w === 'hall' ? 34 : w === 'shrine' ? 20 : w.startsWith('post') ? 3 : 14); }
+  const R = mulberry32(seed ^ 0x9e3779b9), m = Math.min(90, 12 + Math.floor(u / 5));
+  for (let j = 0; j < m; j++) { const cu = -78 + R() * 156, cv = -88 + R() * 118, many = 3 + Math.floor(R() * 4), col = R() < 0.18 ? wl[Math.floor(R() * n)] : god;
+    if (spots.some(([a, b]) => (a - cu) ** 2 + (b - cv) ** 2 < 64)) continue;
+    for (let q = 0; q < many; q++) { agAt(H, cu + (R() - 0.5) * 5, cv + (R() - 0.5) * 5, F); if (overHeight(F.x, F.z) > WATER + 0.5) FL.push([F.x, F.y, F.z, col, 1.4 + R() * 0.7]); } }
+}
+function agBloom(FL) {
+  const n = Math.min(FL.length, 2000); if (!n) return null; const m = new THREE.InstancedMesh(AG.flower, AG.fmat, n);
+  for (let i = 0; i < n; i++) { const [x, y, z, c, s] = FL[i]; _agM.compose(_agP.set(x, y, z), _agQ.setFromAxisAngle(UP, (i * 2.39996) % 6.2832), _agS.set(s, s, s)); m.setMatrixAt(i, _agM); m.setColorAt(i, _agC.copy(c).offsetHSL(0, 0, ((i * 0.618) % 1 - 0.5) * 0.12)); }
+  m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; m.computeBoundingSphere(); return m;
+}
+// all that is woven outside the houses: the finished bridges (kept until something about them changes), the ones still
+// going across, the garlands, and the flowers
+function agWeb(H, u) {
+  agTools(); agClear(H, 'web');
+  const wl = H.agents.map(a => agWool(H, a)), wl2 = wl.map(c => c.clone().offsetHSL(0, -0.06, 0.15)), god = new THREE.Color(H.god ? PATRONS[H.god][0] : 0xfff0c8), seed = parseInt(H.o.slice(0, 8), 16) || 3, FL = [], lv = H.lv, g = H.g;
+  const done = H.br.filter(b => b.f >= 1), ks = `${lv}|${Math.round(g * 8)}|${done.length}|${H.woolSig}|${H.god}`;
+  const part = (list, fl) => { const W = agAcc(), B = { pos: [], nor: [], col: [] }, G = { pos: [], nor: [], col: [] }, grp = new THREE.Group();
+    for (const b of list) agBridge(W, B, G, fl, b, lv, g, wl, wl2, god, mulberry32(seed + b.i * 104729));
+    return [W, B, G, grp]; };
+  const put = ([W, B, G, grp]) => { if (W.p.length) grp.add(agWoven(W)); if (B.pos.length) grp.add(agMesh(B, AG.mat)); if (G.pos.length) grp.add(agMesh(G, AG.glow)); return grp; };
+  if (ks !== H.wks) { agClear(H, 'still'); H.wks = ks; H.stillFl = []; H.still = put(part(done, H.stillFl)); scene.add(H.still); }
+  const now = part(H.br.filter(b => b.f < 1), FL); agGarlands(now[0], H, wl); H.web = put(now);
+  agFlowers(H, FL, wl, god, u); const fl = agBloom(H.stillFl.concat(FL)); if (fl) H.web.add(fl);
+  scene.add(H.web);
+}
+
+// ───────── the weavers themselves
+function agFigure(a, wool) {
+  agTools(); const wc = wool || AG_UNDYED, L = c => new THREE.MeshLambertMaterial({ color: c });
   const g = new THREE.Group(), part = (geo, mat, x, y, z, sx, sy, sz, parent = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); parent.add(m); return m; };
-  const skin = L(0xd9a57a), cloth = L(tunic), dark = L(0x3a2a1c), piv = (x, y) => { const p = new THREE.Group(); p.position.set(x, y, 0); g.add(p); return p; };
+  const skin = L(0xd9a57a), cloth = L(wc.clone().multiplyScalar(0.8)), yarn = L(wc), dark = L(0x3a2a1c), piv = (x, y) => { const p = new THREE.Group(); p.position.set(x, y, 0); g.add(p); return p; };
   part(AG.box, cloth, 0, 1.15, 0, 0.52, 0.72, 0.3); part(AG.box, skin, 0, 1.72, 0, 0.32, 0.32, 0.32); part(AG.prism, cloth, 0, 1.86, 0, 0.44, 0.34, 0.44);
   const aL = piv(-0.34, 1.46), aR = piv(0.34, 1.46), lL = piv(-0.14, 0.8), lR = piv(0.14, 0.8);
   part(AG.box, skin, 0, -0.34, 0, 0.15, 0.7, 0.16, aL); part(AG.box, skin, 0, -0.34, 0, 0.15, 0.7, 0.16, aR); part(AG.box, dark, 0, -0.4, 0, 0.19, 0.8, 0.21, lL); part(AG.box, dark, 0, -0.4, 0, 0.19, 0.8, 0.21, lR);
-  const log = part(AG.cyl, L(0x7a5230), 0.3, 1.62, 0, 0.24, 1.7, 0.24); log.rotation.x = Math.PI / 2; log.visible = false;
+  const log = part(AG.orb, yarn, 0, 1.22, 0.42, 0.95, 0.78, 0.8); log.visible = false;   // (an armful of wool, fetched from the baskets)
+  const ball = part(AG.orb, yarn, 0, -0.74, 0.1, 0.38, 0.38, 0.38, aL); ball.visible = false;   // (the ball it weaves from, turning in its hand as it unwinds)
+  const tip = new THREE.Object3D(); tip.position.set(0, -0.74, 0.08); aR.add(tip);
   part(AG.orb, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.6, 0.6) }), 0.22, 0.95, 0.2, 0.16, 0.2, 0.16);   // (a lantern at the belt: found by it at night)
   g.scale.setScalar(1.7); scene.add(g);   // (a little larger than life: they have to be seen from the air)
   const el = document.createElement('div'); el.className = 'mk'; el.innerHTML = '<b></b><span></span>'; el.style.display = 'none'; el.style.pointerEvents = 'none'; $('markers').appendChild(el);
-  return { g, aL, aR, lL, lR, log, el, x: 0, z: 0, y: 0, yaw: 0, st: 'idle', t: Math.random() * 3, ph: Math.random() * 6, tx: 0, tz: 0, has: false, hop: 0, say: '', sayT: -99, set: false };
+  return { g, aL, aR, lL, lR, log, ball, tip, cloth, yarn, wool: wc.getHex(), el, x: 0, z: 0, y: 0, yaw: 0, st: 'idle', t: Math.random() * 3, ph: Math.random() * 6, tx: 0, tz: 0, has: false, hop: 0, say: '', sayT: -99, set: false, job: null, wt: null };
+}
+function agDye(f, c) { f.cloth.color.copy(c).multiplyScalar(0.8); f.yarn.color.copy(c); f.wool = c.getHex(); }
+// where on what is going up a weaver's threads go: the side of it nearest the weaver, at the height it has reached, the
+// shuttle running to and fro
+function agAim(H, F, f, i) {
+  const st = H.st, w = st.now, ff = st.f, S = AG.S, c = Math.cos(F.ry), s = Math.sin(F.ry), wx = f.x - F.x, wz = f.z - F.z, lx = (wx * c - wz * s) / S, lz = (wx * s + wz * c) / S;
+  if (w === 'woodpile') return agW(F, -3.2, 1.3 + Math.sin(time * 2 + i) * 0.5, Math.sin(time * 1.6 + i) * 1.1);   // (at the loom)
+  const R = AG_RAD[w] ?? 0.4, sq = w === 'hall' ? 0.5 : 1, a = Math.atan2(lz, lx / sq) + Math.sin(time * 1.3 + i * 2.1) * 0.7;
+  const y = w === 'home' ? 0.4 + Math.min(ff / 0.6, 1) * 3.4 + Math.max(0, ff - 0.6) * 6 : w === 'hall' ? 0.4 + Math.min(ff / 0.5, 1) * 4.4 + Math.max(0, ff - 0.5) * 6 : w === 'tower' ? 0.5 + Math.min(ff / 0.5, 1) * 8 + Math.max(0, ff - 0.5) * 6 : w === 'shrine' ? 1 + ff * 4.5 : 2 + ff * 2;
+  return agW(F, Math.cos(a) * R, y, Math.sin(a) * R * sq);
+}
+// the threads in the air between each weaver and its work: three apiece, from the ball and the other hand, lifting, rippling,
+// a brighter pulse running along each; only for those near enough to be seen, and only while they weave
+const AG_TS = 12, AG_TMAX = 36;
+const _tA = new THREE.Vector3(), _tB = new THREE.Vector3(), _tP = new THREE.Vector3(), _tQ = new THREE.Vector3(), _tD = new THREE.Vector3(), _tS = new THREE.Vector3();
+function agThreads(H, list) {
+  if (!list.length) { if (H.thr) H.thr.visible = false; return; }
+  if (!H.thr) { const nV = AG_TMAX * (AG_TS + 1) * 2, idx = []; for (let q = 0; q < AG_TMAX; q++) for (let j = 0; j < AG_TS; j++) { const a = (q * (AG_TS + 1) + j) * 2; idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nV * 3), 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(nV * 3), 3).setUsage(THREE.DynamicDrawUsage)); g.setIndex(idx);
+    H.thr = new THREE.Mesh(g, AG.thread); H.thr.frustumCulled = false; scene.add(H.thr); }
+  const g = H.thr.geometry, Pa = g.attributes.position.array, Ca = g.attributes.color.array, cam = camera.position; let q = 0;
+  for (const f of list) { const col = _agC.setHex(f.wool), T = f.wt;
+    for (let j = 0; j < 3 && q < AG_TMAX; j++, q++) {
+      (j ? f.tip : f.ball).getWorldPosition(_tA); _tB.set(T[0] + Math.sin(time * 2.3 + j * 2.1) * 0.6, T[1] + (j - 1) * 0.45, T[2] + Math.cos(time * 1.9 + j * 1.7) * 0.6);
+      _tD.subVectors(_tB, _tA); const len = Math.max(0.1, _tD.length()), lh = 0.5 + len * 0.16, wv = 0.1 + len * 0.018;
+      for (let s = 0; s <= AG_TS; s++) { const t = s / AG_TS, sn = Math.sin(Math.PI * t);
+        _tP.copy(_tA).addScaledVector(_tD, t); _tP.y += sn * lh + sn * Math.sin(time * 7 - t * 10 + j * 2) * wv;
+        _tQ.copy(_tD).divideScalar(len); _tQ.y += Math.cos(Math.PI * t) * Math.PI * lh / len;
+        _tS.subVectors(_tP, cam).cross(_tQ).normalize().multiplyScalar(0.12 * (1 - t * 0.4));
+        const o = (q * (AG_TS + 1) + s) * 6, k = 1.3 + 1.7 * Math.max(0, 1 - Math.abs(((time * 0.8 + j * 0.37) % 1) - t) * 7);
+        Pa[o] = _tP.x - _tS.x; Pa[o + 1] = _tP.y - _tS.y; Pa[o + 2] = _tP.z - _tS.z; Pa[o + 3] = _tP.x + _tS.x; Pa[o + 4] = _tP.y + _tS.y; Pa[o + 5] = _tP.z + _tS.z;
+        Ca[o] = Ca[o + 3] = col.r * k; Ca[o + 1] = Ca[o + 4] = col.g * k; Ca[o + 2] = Ca[o + 5] = col.b * k; } } }
+  g.setDrawRange(0, q * AG_TS * 6); g.attributes.position.needsUpdate = true; g.attributes.color.needsUpdate = true; H.thr.visible = true;
 }
 // the whole of it, every frame
 function updateAgents(dt) {
   if ((AG.dT -= dt) <= 0) { AG.dT = 2; agDaimons(); }
   if (!AG.ham.size) return;
-  if (realm !== 'over') { if (!AG.hid) { AG.hid = true; for (const H of AG.ham.values()) { if (H.group) H.group.visible = false; if (H.label) H.label.style.display = 'none'; for (const f of H.figs.values()) { f.g.visible = false; f.el.style.display = 'none'; } } } return; }
-  if (AG.hid) { AG.hid = false; for (const H of AG.ham.values()) if (H.group) H.group.visible = true; }
+  if (realm !== 'over') { if (!AG.hid) { AG.hid = true; for (const H of AG.ham.values()) { for (const k of ['group', 'web', 'still', 'thr']) if (H[k]) H[k].visible = false; if (H.label) H.label.style.display = 'none'; for (const f of H.figs.values()) { f.g.visible = false; f.el.style.display = 'none'; } } } return; }
+  if (AG.hid) { AG.hid = false; for (const H of AG.ham.values()) for (const k of ['group', 'web', 'still']) if (H[k]) H[k].visible = true; }
   const now = Date.now(), cam = camera.position, p = player, R = 'over';
   for (const H of AG.ham.values()) {
     if (H.site === undefined) H.site = agSite(H.o) || null;
@@ -30502,12 +30755,14 @@ function updateAgents(dt) {
     // its name, from a way off
     if (!H.label) { H.label = document.createElement('div'); H.label.className = 'mk'; H.label.innerHTML = '<b></b><span></span>'; H.label.style.display = 'none'; H.label.style.pointerEvents = 'none'; $('markers').appendChild(H.label); }
     placeMarker(H.label, S.x, S.y + 30, S.z, state === 'play' && (mine ? d > 150 && d < 9000 : d > 150 && d < 900), '⌂', mine ? `YOUR AGENTS · ${fmtDist(d).toUpperCase()}` : `${H.boss}’S AGENTS`, mine);
-    if (d > AG.R + 600) { if (H.group) agDrop(H, false), H.key = ''; for (const f of H.figs.values()) { f.g.visible = false; f.el.style.display = 'none'; } continue; }
-    if (d > AG.R) continue;
-    // what stands, by now
+    if (d > AG.R + 600) { if (H.group || H.web || H.still) { agDrop(H, false); H.key = H.wkey = ''; } for (const f of H.figs.values()) { f.g.visible = false; f.el.style.display = 'none'; } continue; }
+    if (d > AG.R) { if (H.thr) H.thr.visible = false; continue; }
+    // what stands, by now; and how far the bridges have got
+    agWoolsNow(H);
     let u = 0; for (const a of H.agents) u += agTimber(a, now); const st = H.st = agStanding(u), steps = st.now === 'home' ? 14 : st.now === 'hall' ? 16 : st.now === 'shrine' || st.now === 'tower' ? 10 : 2;
-    const key = `${H.agents.map(a => a.id + (a.gone ? 0 : 1)).join()}|${st.k}|${Math.floor(st.f * steps)}|${H.god}`;
+    const key = `${H.agents.map(a => a.id + (a.gone ? 0 : 1)).join()}|${st.k}|${Math.floor(st.f * steps)}|${H.god}|${H.woolSig}`;
     if (key !== H.key) { H.key = key; H.plan = null; agBuild(H); }
+    const wk = key + '|' + agReach(H, u); if (wk !== H.wkey) { H.wkey = wk; agWeb(H, u); }
     // the fires: smoke from the stoves of those who are in, sparks from the fire, the god's light at the shrine
     if (d < 700 && (H.smT = (H.smT || 0) - dt) <= 0) { H.smT = 0.22; const F = {};
       H.agents.forEach((a, i) => { if (a.gone || now - a.hb > AG_IDLE) return; const [cu, cv] = agCabinAt(H, i); agAt(H, cu, cv, F); const c = Math.cos(F.ry), s = Math.sin(F.ry), lx = 1.9 * AG.S, lz = -0.9 * AG.S;
@@ -30519,50 +30774,55 @@ function updateAgents(dt) {
     const boss = mine && state === 'play' && realm === R && pd < 100 && low && !p.sub;
     if (boss && !H.greet && time - H.greetT > 60) agGreet(H);
     if (H.greet) { if (!boss) { if ((H.awayT += dt) > 5) { H.greet = 0; H.greetT = time; } } else H.awayT = 0; }
-    // the figures
-    const P = agPlan(H), F = {}, work = st.now ? P[st.k] : null;
+    // the weavers
+    const P = agPlan(H), F = {}, work = st.now ? P[st.k] : null, grow = H.br.find(b => b.f < 1), weaving = [];
     H.agents.forEach((a, i) => {
-      let f = H.figs.get(a.id); if (!f) H.figs.set(a.id, f = agFigure(a));
+      const wc = agWool(H, a); let f = H.figs.get(a.id); if (!f) H.figs.set(a.id, f = agFigure(a, wc)); else if (f.wool !== wc.getHex()) agDye(f, wc);
       const active = !a.gone && now - a.hb < AG_ACTIVE, alone = !a.gone && !active && now - a.hb < AG_IDLE, [cu, cv] = agCabinAt(H, i);
       if (!f.set) { agAt(H, cu + 3.4, cv + 4.2, F); f.x = F.x; f.z = F.z; f.yaw = S.yaw; f.set = true; }
       const near = d < 520; f.g.visible = near && (active || alone || !!H.greet || pal.stars < 0.5);   // (those who have gone in are in, after dark)
       if (!near) { f.el.style.display = 'none'; return; }
-      // what it is doing: greeting; or hauling timber from the pile to whatever is going up and hammering at it; or sitting by its door
-      const sp = active ? 3.4 : 1.7; let tx = f.x, tz = f.z, run = 0, face = null;
+      // what it is doing: greeting; or fetching wool from the baskets, taking it to what is going up (a house, or a bridge
+      // still going across) and weaving it in; or sitting by its door
+      const sp = active ? 3.4 : 1.7; let tx = f.x, tz = f.z, run = 0, face = null; const job = f.job !== null ? H.br.find(b => b.i === f.job) : null;
       if (H.greet) { const a2 = (i / Math.max(1, H.agents.length)) * 6.2832 + H.greet, rr = 5.5 + (i % 3) * 1.6; tx = p.pos.x + Math.cos(a2) * rr; tz = p.pos.z + Math.sin(a2) * rr; run = 8.5; face = p.pos; f.st = 'greet'; f.log.visible = false; f.has = false; }
-      else if ((active || alone) && work) {
-        if (f.st === 'greet' || f.st === 'idle') { f.st = 'fetch'; f.t = 0; }
-        if (f.st === 'fetch') { agAt(H, -3.2 + (i % 3 - 1) * 1.5, 5.2, F); tx = F.x; tz = F.z; run = sp; if (Math.hypot(tx - f.x, tz - f.z) < 1.2) { f.st = 'haul'; f.has = true; } }
-        else if (f.st === 'haul') { const off = (i * 2.4) % 6.2832; agAt(H, work[0] + Math.cos(off) * 5.5, work[1] + Math.sin(off) * 4.6, F); tx = F.x; tz = F.z; run = sp * 0.85; if (Math.hypot(tx - f.x, tz - f.z) < 1.2) { f.st = 'hammer'; f.t = active ? 2.2 + Math.random() * 1.5 : 4 + Math.random() * 5; f.has = false; } }
-        else if (f.st === 'hammer') { agAt(H, work[0], work[1], F); face = F; if ((f.t -= dt) <= 0) f.st = 'fetch'; else if (Math.random() < dt * 5) emit(f.x + rnd(0.6), f.y + 1.6, f.z + rnd(0.6), rnd(1.5), 1.5 + Math.random() * 2, rnd(1.5), 0.4, [1.6, 1.1, 0.5], 4, 0.3); }
+      else if ((active || alone) && (work || grow)) {
+        if (f.st === 'greet' || f.st === 'idle' || (f.st === 'haul' || f.st === 'weave') && !job && !work) { f.st = 'fetch'; f.t = 0; }
+        if (f.st === 'fetch') { agAt(H, -3.2 + (i % 3 - 1) * 1.5, 5.2, F); tx = F.x; tz = F.z; run = sp; if (Math.hypot(tx - f.x, tz - f.z) < 1.2) { f.st = 'haul'; f.has = true; f.job = grow && (!work || i % 2 === 1 || H.agents.length === 1 && Math.random() < 0.4) ? grow.i : null; } }
+        else if (f.st === 'haul') { if (job) { const s = job.sp, k = (i % 3 - 1) * 1.8; tx = s.A[0] - s.d[0] * 3.5 + s.sv[0] * k; tz = s.A[2] - s.d[1] * 3.5 + s.sv[2] * k; } else { const off = (i * 2.4) % 6.2832; agAt(H, work[0] + Math.cos(off) * agStand(st.now), work[1] + Math.sin(off) * agStand(st.now) * 0.85, F); tx = F.x; tz = F.z; }
+          run = sp * 0.85; if (Math.hypot(tx - f.x, tz - f.z) < 1.2) { f.st = 'weave'; f.t = active ? 4 + Math.random() * 3 : 6 + Math.random() * 6; f.has = false; } }
+        else if (f.st === 'weave') { if (job) { f.wt = agDeck(job, job.f, Math.sin(time * 1.7 + i) * job.wd * 0.42, 0.25); face = { x: f.wt[0], z: f.wt[2] }; } else { agAt(H, work[0], work[1], F); face = F; f.wt = agAim(H, F, f, i); }
+          if ((f.t -= dt) <= 0) f.st = 'fetch'; else if (Math.random() < dt * 3) { const c = _agC.setHex(f.wool); emit(f.x + rnd(0.6), f.y + 2.2, f.z + rnd(0.6), rnd(0.8), 0.6 + Math.random(), rnd(0.8), 0.9, [c.r * 1.7, c.g * 1.7, c.b * 1.7], 1.2, 0.3); } }   // (a little fluff off the wool)
         f.log.visible = f.has;
       } else { f.st = 'idle'; f.log.visible = false; agAt(H, cu + 3.0, cv + 4.4, F); tx = F.x; tz = F.z; run = Math.hypot(tx - f.x, tz - f.z) > 1 ? 1.6 : 0; if (!run) face = { x: S.x + Math.cos(S.yaw) * 400, z: S.z + Math.sin(S.yaw) * 400 }; }
       const dx = tx - f.x, dz = tz - f.z, dl = Math.hypot(dx, dz), moving = run > 0 && dl > 0.4;
       if (moving) { const v = Math.min(run * dt, dl); f.x += dx / dl * v; f.z += dz / dl * v; f.yaw = Math.atan2(dx, dz); f.ph += dt * run * 2.4; }
       else if (face) f.yaw += wrapAngle(Math.atan2(face.x - f.x, face.z - f.z) - f.yaw) * damp(8, dt);
       f.y = Math.max(groundAt(f.x, f.z, S.y + 80), WATER + 0.2);
-      // how it holds itself
-      const sw = moving ? Math.sin(f.ph) * 0.7 : 0, joy = f.st === 'greet' && !moving;
+      // how it holds itself: weaving, both hands at the work, the shuttle passing from one to the other
+      const sw = moving ? Math.sin(f.ph) * 0.7 : 0, joy = f.st === 'greet' && !moving, wv = f.st === 'weave' && !moving;
       f.hop = joy ? Math.abs(Math.sin(time * 9 + i * 1.7)) * 0.55 : 0;
-      f.lL.rotation.x = sw; f.lR.rotation.x = -sw;
+      f.lL.rotation.x = sw; f.lR.rotation.x = -sw; f.ball.visible = wv;
       if (joy) { f.aL.rotation.set(Math.PI + Math.sin(time * 14 + i) * 0.5, 0, 0.35); f.aR.rotation.set(Math.PI + Math.cos(time * 14 + i) * 0.5, 0, -0.35); }
-      else if (f.st === 'hammer') { f.aL.rotation.set(-0.3, 0, 0); f.aR.rotation.set(-1.2 - Math.abs(Math.sin(time * 7 + i)) * 1.3, 0, 0); }
-      else if (f.has) { f.aL.rotation.set(-sw * 0.6, 0, 0); f.aR.rotation.set(-2.5, 0, 0); }
+      else if (wv) { const w = time * 5.5 + i; f.aL.rotation.set(-1.15 + Math.sin(w) * 0.35, 0, 0.3 + Math.cos(w) * 0.22); f.aR.rotation.set(-1.15 - Math.sin(w) * 0.35, 0, -0.3 - Math.cos(w) * 0.22); f.ball.rotation.x += dt * 9; }
+      else if (f.has) { f.aL.rotation.set(-1.0 - sw * 0.1, 0, 0.3); f.aR.rotation.set(-1.0 + sw * 0.1, 0, -0.3); }
       else if (f.st === 'idle' && !moving) { f.aL.rotation.set(-0.2, 0, 0.1); f.aR.rotation.set(-0.2, 0, -0.1); }
       else { f.aL.rotation.set(-sw, 0, 0); f.aR.rotation.set(sw, 0, 0); }
-      f.g.position.set(f.x, f.y + f.hop, f.z); f.g.rotation.y = f.yaw + (joy ? Math.sin(time * 4 + i) * 0.25 : 0);
+      f.g.position.set(f.x, f.y + f.hop, f.z); f.g.rotation.y = f.yaw + (joy ? Math.sin(time * 4 + i) * 0.25 : wv ? Math.sin(time * 2.2 + i) * 0.12 : 0);
       // its name, and what it is at (or what it has to say to him)
       const fd = Math.hypot(f.x - cam.x, f.z - cam.z), saying = time - f.sayT < 5;
-      placeMarker(f.el, f.x, f.y + 4.1 + f.hop, f.z, f.g.visible && state === 'play' && fd < (saying ? 260 : 150), saying ? '!' : '·', saying ? `${a.n} · ${f.say}` : `${a.n} · ${a.k ? a.k.toUpperCase().slice(0, 44) : active ? 'BUILDING' : alone ? 'BUILDING ON' : 'RESTING'}`, saying || mine);
+      if (wv && f.wt && f.g.visible && fd < 300) weaving.push(f);
+      placeMarker(f.el, f.x, f.y + 4.1 + f.hop, f.z, f.g.visible && state === 'play' && fd < (saying ? 260 : 150), saying ? '!' : '·', saying ? `${a.n} · ${f.say}` : `${a.n} · ${a.k ? a.k.toUpperCase().slice(0, 44) : active ? 'WEAVING' : alone ? 'WEAVING ON' : 'RESTING'}`, saying || mine);
     });
+    agThreads(H, weaving);
   }
 }
 // their own traveller has come: they drop what they are carrying and run to him
 function agGreet(H) {
-  H.greet = 0.5 + Math.random() * 6; H.awayT = 0; const st = H.st || agStanding(0), homes = st.done.filter(w => w === 'home').length, col = new THREE.Color(PATRONS[PATRON.id]?.[0] || '#ffb060');
-  const more = [homes ? `WE’VE RAISED ${homes} ${homes === 1 ? 'HOME' : 'HOMES'}, BOSS!` : 'THE FIRST HOME IS GOING UP, BOSS!', st.done.includes('shrine') ? `THE SHRINE${H.god ? ' TO ' + H.god.toUpperCase() : ''} IS UP, BOSS! COME AND SEE!` : `WE’RE BUILDING ${H.god ? H.god.toUpperCase() : 'YOUR GOD'} A SHRINE, BOSS!`, 'LOOK WHAT WE BUILT, BOSS!', 'WE KEPT THE FIRE GOING FOR YOU, BOSS!'];
+  H.greet = 0.5 + Math.random() * 6; H.awayT = 0; const st = H.st || agStanding(0), homes = st.done.filter(w => w === 'home').length, bridges = (H.br || []).filter(b => b.f >= 1).length, col = new THREE.Color(PATRONS[PATRON.id]?.[0] || '#ffb060');
+  const more = [homes ? `WE’VE WOVEN ${homes} ${homes === 1 ? 'HOME' : 'HOMES'}, BOSS!` : 'WE’RE WEAVING THE FIRST HOME, BOSS!', st.done.includes('shrine') ? `THE SHRINE${H.god ? ' TO ' + H.god.toUpperCase() : ''} IS UP, BOSS! COME AND SEE!` : `WE’RE WEAVING ${H.god ? H.god.toUpperCase() : 'YOUR GOD'} A SHRINE, BOSS!`, bridges ? `WE WOVE ${bridges === 1 ? 'A BRIDGE' : bridges + ' BRIDGES'} ACROSS THE WATER, BOSS!` : 'LOOK WHAT WE WOVE, BOSS!', 'WE KEPT THE FIRE GOING FOR YOU, BOSS!'];
   const pool = AG_HEY.slice().sort(() => Math.random() - 0.5);
-  H.agents.forEach((a, i) => { let f = H.figs.get(a.id); if (!f) H.figs.set(a.id, f = agFigure(a));
+  H.agents.forEach((a, i) => { let f = H.figs.get(a.id); if (!f) H.figs.set(a.id, f = agFigure(a, agWool(H, a)));
     setTimeout(() => { if (!H.greet) return; f.say = i === 0 ? pool.pop() : a.k && i % 2 ? `HEY BOSS! STILL ON: ${a.k.toUpperCase().slice(0, 40)}` : more.length ? more.shift() : pool.pop() || 'HEY BOSS!'; f.sayT = time;   // (no two of them the same thing)
       if (i < 4) chatLine('', `${a.n} · ${f.say}`, 'sys'); burst(f.x, f.y + 2.2, f.z, TOUCH ? 14 : 30, 7, 0.9);
       for (let k = 0; k < (TOUCH ? 8 : 18); k++) emit(f.x + rnd(0.8), f.y + 2 + Math.random() * 1.5, f.z + rnd(0.8), rnd(3), 3 + Math.random() * 4, rnd(3), 0.8 + Math.random() * 0.7, [col.r * 2.4 + 0.2, col.g * 2.4 + 0.2, col.b * 2.4 + 0.2], 2, 0.5); }, 250 + i * 650); });
@@ -33990,7 +34250,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, agBuild, agWeb, agReach, agSpans, agWool, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, perchBird, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, RR, rrJoin, rrMine, rrFetch, rrPlace, rrLayout, gotRjoin, get RING_DONE() { return RING_DONE; }, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { cpusCmd, MOD, die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { NEWB, newbHear, newbHeard, newbTyped, newbTalk, newbFallback, newbArrive });
