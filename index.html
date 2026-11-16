@@ -9727,7 +9727,7 @@ const CMD_HELP = [
   ['COLOUR', '/vivid (the world in full colour, which is how it comes, or in its plainer colours)'],
   ['HAMLET', '/hamlet (your own AI agents: who lives there, what they are building, the way to it) · /hamlet connect (bring your Claude, Codex and other agents in) · /hamlet key (the key, by hand)'],
   ['AGENTS', '@NAME and what you want to say (one of your own agents: it reads it at its next step, and what it answers comes back here, under the agents tab) · /agent NAME (stay with it: then just type, and /goal /todo /plan /mode /effort /model /compact /review /test /commit /stop /status /skills are requests to it; /help there lists them all) · /agent all · /agent off · /agent go NAME · with the god in you they are marked wherever they are, and a panel says what each is at (/agent panel keeps it up)'],
-  ['GAMES', '/fly modes (every game, a line each) · /fly hunger · /fly snd · /fly ctf · /fly zombies · /fly possess · /fly speed · /fly king · /fly tag (/fly tag once: one round) · /fly jugg · /fly survive · /race long · any of them with a number for that many of the house’s birds (they fill the empty places anyway)'],
+  ['GAMES', '/fly modes (every game, a line each) · /fly hunger · /fly snd · /fly ctf · /fly zombies · /fly possess · /fly speed · /fly king · /fly tag (/fly tag once: one round) · /fly jugg · /fly laser (or /fly beams) · /fly survive · /race long · any of them with a number for that many of the house’s birds (they fill the empty places anyway)'],
   ['FIGHT', '/fly · /fly party · /fly NAME (or cpu) · /fly teams · /fly 2v2 · /fly A B vs C D · F fire · R wind · C changes your shape: bird, falling, gliding (1 BIRD · 2 FALL · 3 GLIDE · SPACE as a man is the bird again · Y on a pad · the SHAPE key on a touch screen · or say fall, glide, bird) · /accept · /decline · /cpu N (birds that fly themselves) · /cpus off (none) · /cpus on (the usual ones back) · /warsim N (watch N of them) · /fly watch · /leave · /forfeit · /fly end · /fly restart · /fly skip (if you called it)'],
   ['SET', '/sound on|off · /mic on|off · /hands on|off · /quality up|down · /letters up|down · /text bigger|smaller (the size of the words) · /clear'],
   ['RECORD', '/stats (your numbers, written in the sky · Z)'],
@@ -32097,7 +32097,7 @@ function gotMatch(m) {
     return matchSetOut(who, String(m.by || '').slice(0, 24), false, { soft: !!m.left, v: Number.isFinite(+m.v) ? clamp(+m.v, 0, 3000) : undefined, kid: typeof m.kid === 'string' && MATCH.roster.has(m.kid) ? m.kid : '' }); }
   if (m.k === 're' && MATCH.phase === 'live') { const who = typeof m.who === 'string' && MATCH.roster.get(m.who)?.cpu && m.i === MATCH.hostId ? m.who : m.i, r = MATCH.roster.get(who); if (!r || !r.alive) return;   // (a practice hit, in the warm-up: the fire, and the wall it had drawn goes out)
     if (Number.isFinite(+m.l)) r.lives = clamp(m.l | 0, 0, 9);   // (an extra life spent: the fire, and back on their line)
-    const Q = NET.peers.get(who); if (Q?.s) matchBoom(Q.pos.x, Q.pos.y, Q.pos.z, matchCol(who), bigName(r.name) * 0.8, Number.isFinite(+m.v) ? clamp(+m.v, 0, 3000) : 70, true, matchHouse(who));
+    const Q = NET.peers.get(who); if (Q?.s && !m.q) matchBoom(Q.pos.x, Q.pos.y, Q.pos.z, matchCol(who), bigName(r.name) * 0.8, Number.isFinite(+m.v) ? clamp(+m.v, 0, 3000) : 70, true, matchHouse(who));
     const T = TRON.trails.get(who); if (T) tronClear(T); return; }
   if (m.k === 'stop' && m.i === MATCH.hostId) return matchStopped(nm);
   if (m.k === 'ring' && MATCH.game === 'rings' && MATCH.phase === 'live') { const who = typeof m.who === 'string' && MATCH.roster.get(m.who)?.cpu && m.i === MATCH.hostId ? m.who : m.i; if (!MATCH.roster.has(who)) return;
@@ -32777,6 +32777,7 @@ function fbLaunch(by, from, dir) {
 function fbFire() {
   const M = MATCH, p = player;
   if (!fbOn() || !M.me.alive || state !== 'play' || p.form !== 'phoenix' || M.glide || M.reAt) return false;
+  if (MO.d && MO.d.shoot) return MO.d.shoot(NET.id) === true;   // (a game with its own weapon in place of the fire: see MODES.laser)
   if (MO.d && (MO.d.fire === false || moH('fire', NET.id) === false)) { inkSay(moH('nofire', NET.id) || 'NO FIRE IN THIS GAME', { sx: 0.5, sy: 0.8 }, '#c8a080', 1, 900, { key: 'fbmsg' }); return false; }   // (a game says who may throw)
   if (FB.coolT > 0) { inkSay(`FIRE IN ${FB.coolT.toFixed(1)}`, { sx: 0.5, sy: 0.8 }, '#ffb070', 1, 700, { key: 'fbmsg' }); return false; }
   FB.coolT = moH('cool', NET.id) || FB.cool; const dir = camera.getWorldDirection(_cd), to = fbLaunch(NET.id, p.pos, dir); moH('fired', NET.id);
@@ -33007,7 +33008,7 @@ function matchOut(by = '', kid = '') {   // (kid: whose fire it was, if it was s
 function matchPractice(by, life = false, o = null) {   // (o: a game's knock-out, see moKO: how long, and what is said)
   const M = MATCH, p = player; if (M.reAt) return; const v = Math.round(p.speed || 60);
   if (life) { M.lives--; const r = M.roster.get(NET.id); if (r) r.lives = M.lives; fbLife(); }   // (a new life, a new wind)
-  matchBoom(p.pos.x, p.pos.y, p.pos.z, matchCol(NET.id), birdK() * 0.8, v, true, PATRON.id || ''); matchSend({ k: 're', id: M.id, v, l: life ? M.lives : undefined });
+  if (!o?.nb) matchBoom(p.pos.x, p.pos.y, p.pos.z, matchCol(NET.id), birdK() * 0.8, v, true, PATRON.id || ''); matchSend({ k: 're', id: M.id, v, l: life ? M.lives : undefined, q: o?.nb ? 1 : undefined });   // (nb: a game shows it its own way, see lzCut)
   const T = TRON.trails.get(NET.id); if (T) tronClear(T);
   M.reAt = performance.now() + (o ? o.ms : life ? 800 : 1500); M.deadAt = performance.now(); M.deadPos = (M.deadPos || new THREE.Vector3()).copy(p.pos); M.deadYaw = p.yaw; M.outT = 0; M.glide = null;
   state = 'watch'; p.gone = true; p.cine = null; p.vel.set(0, 0, 0); for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
@@ -33185,13 +33186,13 @@ function cpuFly(C, dt) {
   if ((C.sendT -= dt) <= 0 && NET.on && NET.ch && NET.count > 0) { C.sendT = 0.5 * clamp(M.cpus.length * NET.count / 12, 1, 4); const r1 = q => Math.round(q * 10) / 10, P = NET.peers.get(C.id).s, T2 = TRON.trails.get(C.id), end = T2.base + T2.n, g0 = Math.max(C.sent || 0, T2.base + T2.start, end - 40), tp = []; for (let gi = g0; gi < end; gi++) { const i = (gi - T2.base) * 3; tp.push(r1(T2.pts[i]), r1(T2.pts[i + 1]) + (T2.gap[gi - T2.base] ? 2e6 : 0), r1(T2.pts[i + 2])); } C.sent = end;
     NET.ch.send({ type: 'broadcast', event: 's', payload: { i: C.id, n: C.name, p: [r1(P.x), r1(P.y), r1(P.z)], v: [r1(P.vx), r1(P.vy), r1(P.vz)], y: Math.round(C.yaw * 100) / 100, pi: Math.round(C.pitch * 100) / 100, b: Math.round(C.bank * 100) / 100, f: 'p', r: 0, g: 0, w: 0, gm: 1, ma: M.id, pt: C.pat, ts: g0, tp } }); }
 }
-function cpuPractice(C) {
-  const M = MATCH; matchBoom(C.pos.x, C.pos.y, C.pos.z, matchCol(C.id), 0.8, C.speed, true, C.pat || ''); matchSend({ k: 're', id: M.id, who: C.id, v: Math.round(C.speed), l: M.warm ? undefined : C.lives || 0 });
+function cpuPractice(C, nb = false) {
+  const M = MATCH; if (!nb) matchBoom(C.pos.x, C.pos.y, C.pos.z, matchCol(C.id), 0.8, C.speed, true, C.pat || ''); matchSend({ k: 're', id: M.id, who: C.id, v: Math.round(C.speed), l: M.warm ? undefined : C.lives || 0, q: nb ? 1 : undefined });
   const T = TRON.trails.get(C.id); if (T) tronClear(T); C.reAt = time + 1.4; cpuShow(C, false);
 }
 function cpuBack(C) { const S = moH('spawn', C.id) || matchSlotIn(C.slot || matchSlot(C.id)); C.reAt = 0; C.pos.set(S.x, S.y, S.z); C.prev.copy(C.pos); C.yaw = S.yaw; C.pitch = 0; C.bank = 0; C.tgtT = 0; C.immune = time + 2.5; }
 function updateMatch(dt) {
-  const M = MATCH, p = player, now = Date.now(); updateBooms(dt); updateBlasts(dt); updatePylonBlaze(dt); updateAim(dt); teamPaintMe();
+  const M = MATCH, p = player, now = Date.now(); lzStep(dt); updateBooms(dt); updateBlasts(dt); updatePylonBlaze(dt); updateAim(dt); teamPaintMe();
   if (M.againUntil && performance.now() > M.againUntil) { M.againUntil = 0; if (!M.inv) $('matchAsk').classList.remove('on'); }
   if (M.inv && performance.now() > M.inv.until) { if (!M.inv.mine) matchAnswer(false); else { toast(`${M.inv.name} DID NOT ANSWER`); M.inv = null; } }
   matchQueueStep(dt);
@@ -33390,7 +33391,7 @@ function moSideAt(t, f = 0.62, da = 0) {
   return { x, z, y: Math.max(M.base + 120, Math.max(groundAt(x, z, 9000), WATER) + 90), a };
 }
 const MODES = {};
-const MO_ORDER = ['hunger', 'snd', 'ctf', 'zombies', 'possess', 'speed', 'king', 'tag', 'jugg', 'long', 'survive', 'territory', 'land'];   // (the order /fly modes says them in)
+const MO_ORDER = ['hunger', 'snd', 'ctf', 'zombies', 'possess', 'speed', 'king', 'tag', 'jugg', 'laser', 'long', 'survive', 'territory', 'land'];   // (the order /fly modes says them in)
 // ── The hunger games: nothing in his hands — no fire, no wind — and caches falling out of the sky all over a ring half
 //    as wide again as a fight's, which closes as a fight's does. Fly through one: orange is two fireballs, blue a wind,
 //    white an extra life. Where they come down, and what is in them, is from the fight's own name, the same on every
@@ -34191,6 +34192,339 @@ function ldCpu(C) {   // (a house's bird: out from home a little way, across, an
     const p1 = { x: C.pos.x + Math.cos(a) * d1, z: C.pos.z + Math.sin(a) * d1 }, p2 = { x: p1.x + Math.cos(a + s * 1.5708) * d2, z: p1.z + Math.sin(a + s * 1.5708) * d2 }; C.ld = { p: [p1, p2, H], i: 0 }; return fly(p1.x, p1.z); }
   const H = home(); return fly(H.x, H.z);
 }
+// ── Lasers (/fly laser, /fly beams): no walls, no fireballs. F — FIRE on a touch screen, X on a pad, or "fire" — fires a
+//    thin beam of light in his side's colour, straight where he is looking, after a breath of charge (a faint line shows
+//    where it will go). Light does not fly: it is there at once, and it goes through every bird along it, out to a long way
+//    off, until the ground, the sea or anything standing on it stops it. Anyone it touches who is not of his side is cut in
+//    half: the two halves fly apart with the way it was going, tumble down burning along the cut, and break on the ground;
+//    he is back on his line two seconds later. A shot every second and a bit. Whoever fires says so (lz: where from, which
+//    way, how far, and whom he saw it go through) and every screen draws the beam. Whether it cut someone is for that one's
+//    own screen, against where it truly was over the last moment, and only if the one who fired saw it too; for the house's
+//    birds, whoever fired decides, and whoever flies them only checks that it could have been so. The screen that decides
+//    says so (cut: where the bird was, how it was turned and going), and every screen splits it the same way from that.
+//    Most cuts when the minute is up wins; in sides (/fly laser teams), the side's.
+//    (LZ: the beams in the air, the halves falling, his own shot charging, who was cut lately and who fired when)
+const LZ = { cool: 1.2, charge: 0.16, range: 2400, life: 0.26, R: 6.5, ms: 2000, NB: 12, NH: 8, beams: [], cb: null, halves: [], mesh: null, geo: null, bird: null, man: null, sb: null, sm: null,
+  n: 0, myT: -1, last: new Map(), down: new Map(), seen: new Map(), cn: -1, cc: 0, cpuOff: false, shots: 0, cuts: 0, rx: 0, em: 0 };   // (cpuOff, and the counts: for the tests)
+const LZ_FIRE = [3, 1.3, 0.35], LZ_EMB = [3, 2.2, 1.1], LZ_STEAM = [0.6, 0.62, 0.64];
+const _lzS = new THREE.Vector3(), _lzD = new THREE.Vector3(), _lzS2 = new THREE.Vector3(), _lzD2 = new THREE.Vector3(), _lzS3 = new THREE.Vector3(), _lzD3 = new THREE.Vector3();
+const _lzW = new THREE.Vector3(), _lzA = new THREE.Vector3(), _lzB = new THREE.Vector3(), _lzC = new THREE.Vector3(), _lzP = new THREE.Vector3(), _lzN = new THREE.Vector3(), _lzN2 = new THREE.Vector3();
+const _lzF2 = new THREE.Vector3(), _lzQ = new THREE.Quaternion(), _lzQ2 = new THREE.Quaternion(), _lzQ3 = new THREE.Quaternion(), _lzE = new THREE.Euler(), _lzCol = new THREE.Color();
+MODES.laser = { name: 'LASER', words: ['laser', 'beams', 'beam', 'lasers'], teamsOk: true, min: 4, warm: 0, dur: 60, walls: false, glass: false, close: false, respawn: LZ.ms, winds: 0,
+  line: 'F fires a thin beam of light straight where you look: it goes through everyone in its way and cuts them in half · back in two seconds · no walls, no fireballs · most cuts in a minute wins (/fly laser teams: in sides)',
+  ares: () => ['Lasers this time. F fires one, straight where you look.', 'Light goes through everything in its way. Line two of them up.', 'Get hit and you are cut in half. Back in a moment. Most cuts wins.'],
+  vet: 'Lasers. Line them up. Most cuts wins.',
+  ask: 'F (FIRE, X on a pad, or say "fire") shoots a beam of light straight where you look. It goes through everyone along it, stops at the ground, and passes through your own side. Anyone it touches is cut in half and back on their line two seconds later. A shot every second or so. A minute; the most cuts wins.',
+  fire: () => false, wind: () => false,   // (no fireballs, no wind: the laser is all there is)
+  shoot: () => lzFire(),
+  ink: () => LZ.myT >= 0 ? 'LASER * CHARGING' : FB.coolT > 0 ? `LASER ${FB.coolT.toFixed(1)}` : TOUCH ? 'LASER READY' : 'F: LASER',
+  setup() { lzClear(); },
+  clear() { lzClear(); },
+  out: (id, by) => moKO(id, by),   // (the ground, the ring: back on his line, the usual way)
+  score: v => `${Math.round(v)} CUT`,
+  tick(dt) { if (MATCH.host && !LZ.cpuOff) for (const C of MATCH.cpus) lzCpu(C, dt); },
+  got(who, m) { lzGot(who, m); },
+  time() { const M = MATCH; if (M.tm) { const ts = lzTeams(), top = Math.max(...ts), t = ts.indexOf(top), tie = ts.filter(v => v === top).length > 1; return moWin(tie ? [] : [...M.roster.keys()].filter(id => teamOf(id) === t), tie ? '' : teamName(t), tie ? -1 : t); }
+    const b = moBest(); moWin(b ? [b] : [], ''); },
+  win() { const L = moAlive(); if (MO.went && L.length < 2) moWin(L, ''); },
+  bar(el) { const M = MATCH, me = Math.round(MO.sc.get(NET.id) || 0);
+    if (M.tm) return [`LASER · ${moClock(moLeft(el))}`, `${lzTeams().map((v, t) => `${teamName(t).replace('THE HOUSE OF ', '')} ${v}`).join(' · ')} · you ${me}`];
+    const b = moBoard(3); return [`LASER · ${moClock(moLeft(el))}`, !b ? 'line them up: the beam goes through them all' : /^you /.test(b) || / · you /.test(b) ? b : `${b} · you ${me}`]; },
+  cpu(C) { let b = null, bd = 1e12; for (const id of MATCH.roster.keys()) { if (id === C.id || sameSide(C.id, id)) continue; const T = lzUp(id); if (!T) continue; const d = T.distanceToSquared(C.pos); if (d < bd) { bd = d; b = T; } }
+    if (!b || Math.random() > 0.45 + 0.5 * C.skill) return false; C.tgt.set(b.x + rnd(40), b.y + rnd(20), b.z + rnd(40)); C.tgtT = 1.2 + Math.random(); return true; },   // (after whoever is nearest, to bring them in front of its nose)
+};
+function lzTeams() { const M = MATCH, ts = new Array(M.tm ? M.tm.n : 0).fill(0); for (const [id, v] of MO.sc) { const t = teamOf(id); if (t >= 0 && t < ts.length) ts[t] += Math.round(v); } return ts; }
+function lzClear() {
+  for (const b of LZ.beams) b.on = false; if (LZ.cb) LZ.cb.on = false; for (const H of LZ.halves) lzFree(H); if (LZ.mesh) LZ.mesh.visible = false;
+  LZ.myT = -1; LZ.last.clear(); LZ.down.clear(); LZ.seen.clear(); LZ.cn = -1; LZ.cc = 0;
+}
+// who can be hit, as this screen sees them: flying, and not cut a moment ago (one whose bird has gone from here, until he says where he is again)
+function lzUp(id) {
+  if ((LZ.down.get(id) || 0) > performance.now()) return null;
+  if (id !== NET.id && !moCpu(id)) { const P = NET.peers.get(id); if (P && P.s && P.ghostAt > P.s.t) return null; }
+  return moPos(id);
+}
+// how thick a target a bird is to light: its body and the roots of its wings, at its size; a man is small
+function lzR(id) {
+  if (id === NET.id) return LZ.R * (player.form === 'phoenix' ? birdK() : 0.3);
+  const C = moCpu(id); if (C) return LZ.R * (C.fsh ? 0.3 : moK(id) || 1);
+  const P = NET.peers.get(id); return LZ.R * (P && P.form !== 'p' ? 0.3 : mdK(id));
+}
+// how one is going: his own, a house's bird, anyone else as last told
+function lzVel(id, out) {
+  const p = player, C = moCpu(id);
+  if (id === NET.id) return p.form === 'phoenix' ? out.copy(dir3).multiplyScalar(p.speed) : out.copy(p.vel);
+  if (C) { const cp = Math.cos(C.pitch); return C.fsh ? out.set(-Math.sin(C.yaw) * C.speed * 0.45, -C.fsh.v, -Math.cos(C.yaw) * C.speed * 0.45) : out.set(-Math.sin(C.yaw) * cp * C.speed, Math.sin(C.pitch) * C.speed, -Math.cos(C.yaw) * cp * C.speed); }
+  const P = NET.peers.get(id); return P && P.s ? out.set(P.s.vx, P.s.vy, P.s.vz) : out.set(0, 0, 0);
+}
+// how far light goes from S along d before the ground, the sea or something standing stops it (stepped, then narrowed down)
+function lzRay(S, d, max = LZ.range) {
+  const st = 10, under = (t) => { const y = S.y + d.y * t; return y < Math.max(groundAt(S.x + d.x * t, S.z + d.z * t, y + 1), WATER); };
+  let prev = 0;
+  for (let t = Math.min(st, max); ; t = Math.min(t + st, max)) {
+    if (under(t)) { let lo = prev, hi = t; for (let k = 0; k < 7; k++) { const m = (lo + hi) / 2; if (under(m)) hi = m; else lo = m; } return hi; }
+    prev = t; if (t >= max || S.y + d.y * t > SKY_LIMIT + 400 && d.y > 0) return max; }
+}
+// the nearest two segments come to each other (a + u·s and b + v·t, s and t from 0 to 1), squared
+function lzSegD2(ax, ay, az, ux, uy, uz, bx, by, bz, vx, vy, vz) {
+  const wx = ax - bx, wy = ay - by, wz = az - bz, A = ux * ux + uy * uy + uz * uz, B = ux * vx + uy * vy + uz * vz, C = vx * vx + vy * vy + vz * vz, D = ux * wx + uy * wy + uz * wz, E = vx * wx + vy * wy + vz * wz, den = A * C - B * B;
+  let s = den > 1e-9 ? clamp((B * E - C * D) / den, 0, 1) : 0, t = C > 1e-9 ? (B * s + E) / C : 0;
+  if (t < 0) { t = 0; s = A > 1e-9 ? clamp(-D / A, 0, 1) : 0; } else if (t > 1) { t = 1; s = A > 1e-9 ? clamp((B - D) / A, 0, 1) : 0; }
+  const dx = wx + ux * s - vx * t, dy = wy + uy * s - vy * t, dz = wz + uz * s - vz * t; return dx * dx + dy * dy + dz * dz;
+}
+// did the beam (S along d, L long) pass within r of where X was over the last `back` seconds, going V (and a little ahead)?
+function lzNear(S, d, L, X, V, back, fwd, r) {
+  return lzSegD2(S.x, S.y, S.z, d.x * L, d.y * L, d.z * L, X.x - V.x * back, X.y - V.y * back, X.z - V.z * back, V.x * (back + fwd), V.y * (back + fwd), V.z * (back + fwd)) < r * r;
+}
+// F, in a game of lasers: a breath of charge (see lzStep), then the beam
+function lzFire() {
+  if (LZ.myT >= 0) return true;
+  if (FB.coolT > 0) { inkSay(`LASER IN ${FB.coolT.toFixed(1)}`, { sx: 0.5, sy: 0.8 }, '#ffb070', 1, 700, { key: 'fbmsg' }); return false; }
+  FB.coolT = LZ.cool; LZ.myT = 0; audio.sfx.ui?.(); return true;
+}
+// where his shot goes: from his bird toward where he is looking (within a hair of someone, at them)
+function lzAim(S, D) {
+  const p = player, M = MATCH; S.copy(p.pos).addScaledVector(dir3, 3 * birdK());
+  const cd = camera.getWorldDirection(_lzF2), C = camera.position; let best = null, ba = 0.035;
+  for (const id of M.roster.keys()) { if (id === NET.id || sameSide(NET.id, id)) continue; const T = lzUp(id); if (!T) continue;
+    _lzA.subVectors(T, C); const dl = _lzA.length(); if (dl < 5 || dl > LZ.range) continue; const a = Math.acos(clamp(_lzA.dot(cd) / dl, -1, 1)); if (a < ba) { ba = a; best = T; } }
+  if (best) D.subVectors(best, S); else D.copy(C).addScaledVector(cd, 1500).sub(S);
+  if (D.lengthSq() < 1e-6) D.copy(cd); return D.normalize();
+}
+// fired, by him or by one of the house's birds he flies: drawn, said, and what it went through (as this screen sees it)
+function lzShoot(by, S, d) {
+  const M = MATCH, L = lzRay(S, d), hits = [];
+  for (const id of M.roster.keys()) { if (id === by || sameSide(by, id) || !M.roster.get(id).alive) continue; const T = lzUp(id); if (!T) continue;
+    const t = (T.x - S.x) * d.x + (T.y - S.y) * d.y + (T.z - S.z) * d.z, r = lzR(id); if (t < 0 || t > L + r) continue;
+    const ex = T.x - S.x - d.x * t, ey = T.y - S.y - d.y * t, ez = T.z - S.z - d.z * t; if (ex * ex + ey * ey + ez * ez < r * r) hits.push(id); if (hits.length >= 8) break; }
+  const n = ++LZ.n; LZ.last.set(by, performance.now());
+  lzBeam(S, d, L, matchCol(by), L < LZ.range - 1);
+  moSay('lz', { n, who: by === NET.id ? undefined : by, p: [S.x, S.y, S.z].map(v => Math.round(v * 10) / 10), d: [d.x, d.y, d.z].map(v => Math.round(v * 1000) / 1000), L: Math.round(L), h: hits.length ? hits : undefined });
+  for (const id of hits) lzJudge(by, id, n, S, d, L, true);
+  return hits;
+}
+// this screen's to decide, if the one it went through is his own bird or a house's bird he flies: was it really there?
+function lzJudge(by, id, n, S, d, L, local) {
+  const M = MATCH, C = moCpu(id); if (M.phase !== 'live' || M.warm) return false;
+  if (id === NET.id) { if (!M.me.alive || state !== 'play' || M.reAt || M.glide || moImm()) return false;   // (his own: where he truly was over the last half second)
+    lzVel(id, _lzW); if (!lzNear(S, d, L + lzR(id), player.pos, _lzW, 0.6, 0.15, lzR(id) + 3)) return false; }
+  else if (C && M.host) { if (!C.alive || C.reAt || C.immune > time || C.imm > time) return false;   // (a house's bird: whoever fired decides; this only checks it could have been so)
+    lzVel(id, _lzW); if (!lzNear(S, d, L + lzR(id), C.pos, _lzW, local ? 0.1 : 1, local ? 0.1 : 0.3, lzR(id) + (local ? 1 : 22))) return false; }
+  else return false;
+  if (!local) { const X = id === NET.id ? player.pos : C.pos, t = (X.x - S.x) * d.x + (X.y - S.y) * d.y + (X.z - S.z) * d.z - lzR(id); if (t > 2 && lzRay(S, d, t) < t - 2) return false; }   // (and nothing standing between)
+  lzCut(by, id, n, S, d); return true;
+}
+// cut, decided here: said to everyone with where it was and how it was turned and going; shown; and out for a moment
+function lzCut(by, id, n, S, d) {
+  const M = MATCH, C = moCpu(id), me = id === NET.id, p = player, man = me ? p.form !== 'phoenix' : !!C?.fsh, X = me ? p.pos : C.pos;
+  const yaw = me ? (man ? human.group.rotation.y : p.yaw) : C.yaw, pitch = man ? 0 : me ? p.pitch : C.pitch, bank = man ? 0 : me ? p.bank : C.bank, K = me ? (man ? 1 : birdK()) : moK(id) || 1;
+  lzVel(id, _lzW); const r2 = v => Math.round(v * 100) / 100, r1 = v => Math.round(v * 10) / 10;
+  moSay('cut', { n, by, who: me ? undefined : id, x: r1(X.x), y: r1(X.y), z: r1(X.z), v: [r1(_lzW.x), r1(_lzW.y), r1(_lzW.z)], q: [r2(yaw), r2(pitch), r2(bank)], f: man ? 1 : undefined, s: K, p: [r1(S.x), r1(S.y), r1(S.z)], d: [d.x, d.y, d.z].map(v => Math.round(v * 1000) / 1000) });
+  lzSeen(id, by, n, X.x, X.y, X.z, _lzW, yaw, pitch, bank, man, K, S, d);
+  if (me) matchPractice(`${matchName(by)}’s laser`, false, { ms: LZ.ms, big: 'CUT IN HALF', line: `BACK IN ${Math.round(LZ.ms / 1000)} S`, nb: true });   // (no fire of the usual kind: the halves are the show)
+  else if (C) { cpuPractice(C, true); C.reAt = time + LZ.ms / 1000; }
+}
+// a cut, shown on this screen (decided here, or told by the screen that decided it): the halves, the line in the chat, the score
+function lzSeen(id, by, n, x, y, z, V, yaw, pitch, bank, man, K, S, d) {
+  const M = MATCH, now = performance.now(), key = by + ':' + n + ':' + id; if (LZ.seen.has(key) || (LZ.down.get(id) || 0) > now) return;
+  if (LZ.seen.size > 200) LZ.seen.clear(); LZ.seen.set(key, now); LZ.down.set(id, now + LZ.ms + 400); LZ.cuts++;
+  if (id !== NET.id) { const P = NET.peers.get(id); if (P) P.ghostAt = now; }   // (its bird goes from here until it is back and says where it is)
+  const col = matchCol(id), rng = mulberry32(miHash(key)); _lzA.set(x, y, z);
+  lzSplit(_lzA, V, yaw, pitch, bank, man, K, S, d, col, rng);
+  if (camera.position.distanceToSquared(_lzA) < 2200 * 2200) { boomHouse(x, y, z, matchHouse(id), 0.4 * K, null, col); shock(x, y, z, _lzCol.set(col).getHex(), 30 * K, 0.5, true); burst(x, y, z, TOUCH ? 16 : 40, 26, 0.6);
+    flash = Math.max(flash, 0.12 * smoothstep(600, 40, camera.position.distanceTo(_lzA))); }   // (the house's fire, but small: the halves are what is seen)
+  if (M.host) moAdd(by);
+  if (matchSees()) { chatLine('', `${matchName(id)} was cut in half by ${by === NET.id ? 'your' : matchName(by) + '’s'} laser`, 'sys death'); if (id !== NET.id) inkSay(`${matchName(id)} · CUT`, { x, y, z }, col, 1, 1400, { dy: 2 }); }
+  if (by === NET.id) { if (LZ.cn === n) LZ.cc++; else { LZ.cn = n; LZ.cc = 1; } matchBig(LZ.cc >= 2 ? `${LZ.cc} WITH ONE BEAM` : 'CUT', 900, matchCol(NET.id)); if (LZ.cc >= 2) chatLine('', `${LZ.cc} WITH ONE BEAM`, 'sys'); }
+  modeBarSet();
+}
+// heard: a beam fired (by one in it, still up; a house's bird only from whoever flies them), and a cut, from whoever decided it
+function lzGot(who, m) {
+  const M = MATCH, now = performance.now(), num = (a, k) => Array.isArray(a) && a.length === k && a.every(v => typeof v === 'number' && Number.isFinite(v));
+  if (!num(m.p, 3) || !num(m.d, 3)) return; const dl = Math.hypot(m.d[0], m.d[1], m.d[2]); if (dl < 0.9 || dl > 1.1) return;
+  if (Math.hypot(m.p[0] - M.cx, m.p[2] - M.cz) > M.R0 * 2.5 || m.p[1] < -500 || m.p[1] > SKY_LIMIT + 2000) return;
+  const S = _lzS.set(m.p[0], m.p[1], m.p[2]), d = _lzD.set(m.d[0], m.d[1], m.d[2]).normalize();
+  if (m.op === 'lz') { const r = M.roster.get(who); if (!r || !r.alive || who === NET.id || (LZ.down.get(who) || 0) > now) return;
+    if (now - (LZ.last.get(who) || -1e9) < LZ.cool * 700) return;   // (no quicker than the laser fires, from anyone)
+    const at = moPos(who); if (at && Math.hypot(at.x - S.x, at.y - S.y, at.z - S.z) > 160) return;   // (from about where he is)
+    LZ.last.set(who, now); LZ.rx++; const L = clamp(Number.isFinite(+m.L) ? +m.L : 0, 0, LZ.range);
+    lzBeam(S, d, L, matchCol(who), L < LZ.range - 1);
+    if (Array.isArray(m.h)) for (const id of m.h.slice(0, 8)) if (typeof id === 'string' && id !== who && M.roster.get(id)?.alive && !sameSide(who, id)) lzJudge(who, id, m.n | 0, S, d, L, false);
+    return; }
+  if (m.op === 'cut') { const by = typeof m.by === 'string' && m.by !== who && M.roster.has(m.by) && !sameSide(m.by, who) ? m.by : ''; if (!by || who === NET.id || !M.roster.get(who)?.alive) return;
+    if (![m.x, m.y, m.z].every(v => typeof v === 'number' && Number.isFinite(v)) || !num(m.v, 3) || !num(m.q, 3) || Math.hypot(m.x - M.cx, m.z - M.cz) > M.R0 * 2.5) return;
+    lzSeen(who, by, m.n | 0, m.x, m.y, m.z, _lzW.set(clamp(m.v[0], -400, 400), clamp(m.v[1], -400, 400), clamp(m.v[2], -400, 400)), m.q[0], m.q[1], m.q[2], m.f === 1, clamp(+m.s || 1, 0.2, 4), S, d); }
+}
+// one of the house's birds: when someone not of its side is near the line of its nose, it fires, as well as it aims
+function lzCpu(C, dt) {
+  if (!C.alive || C.reAt || C.fsh) return;
+  if ((C.lzT = (C.lzT ?? 1.5 + Math.random() * 2) - dt) > 0) return;
+  const M = MATCH, cp = Math.cos(C.pitch), fx = -Math.sin(C.yaw) * cp, fy = Math.sin(C.pitch), fz = -Math.cos(C.yaw) * cp; let best = '', bs = 1e9;
+  for (const id of M.roster.keys()) { if (id === C.id || sameSide(C.id, id) || !M.roster.get(id).alive) continue; const T = lzUp(id); if (!T) continue;
+    const dx = T.x - C.pos.x, dy = T.y - C.pos.y, dz = T.z - C.pos.z, dd = Math.hypot(dx, dy, dz); if (dd < 20 || dd > 1100) continue;
+    const a = Math.acos(clamp((dx * fx + dy * fy + dz * fz) / dd, -1, 1)); if (a > 0.45) continue; const s = a * 900 + dd; if (s < bs) { bs = s; best = id; } }
+  if (!best) { C.lzT = 0.25; return; }
+  lzCpuShoot(C, best);
+}
+function lzCpuShoot(C, id, err) {   // (at him, a little off: how far off is how good it is)
+  const T = lzUp(id); if (!T) return []; const cp = Math.cos(C.pitch), S = _lzS3.set(C.pos.x - Math.sin(C.yaw) * cp * 4, C.pos.y + Math.sin(C.pitch) * 4, C.pos.z - Math.cos(C.yaw) * cp * 4);
+  const dd = S.distanceTo(T), e = (err ?? 0.004 + (1 - C.skill) * 0.045) * dd, g = () => (Math.random() + Math.random() + Math.random() - 1.5) * 1.4;
+  const D = _lzD3.set(T.x + g() * e, T.y + g() * e, T.z + g() * e).sub(S).normalize();
+  C.lzT = LZ.cool + 0.3 + Math.random() * 1.5 * (1.3 - C.skill);
+  return lzShoot(C.id, S, D);
+}
+// ── What it looks like. A beam is a strip turned to the lens (in the shader, so it is right from any eye: a test's, the
+//    headset's two), as wide on the screen at any distance, so the letters always catch it: a soft glow in the colour, a hot
+//    core near white, a spark where the ground stops it; it is gone in a quarter of a second. (Thirteen of them: twelve shots
+//    in the air at once, and his own charge. Each vertex knows its own end of the strip and the other end, and which side.)
+function lzMesh() {
+  if (LZ.mesh) return LZ.mesh;
+  const N = (LZ.NB + 1) * 12, idx = [], geo = LZ.geo = new THREE.BufferGeometry(), A = (n, k) => new THREE.BufferAttribute(new Float32Array(N * k), k).setUsage(THREE.DynamicDrawUsage);
+  for (let q = 0; q < (LZ.NB + 1) * 3; q++) { const a = q * 4; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  geo.setAttribute('position', A(N, 3)); geo.setAttribute('aO', A(N, 3)); geo.setAttribute('aCol', A(N, 3)); geo.setAttribute('uv', A(N, 2)); geo.setAttribute('aW', A(N, 1)); geo.setAttribute('aD', A(N, 1)); geo.setIndex(idx);
+  const m = LZ.mesh = new THREE.Mesh(geo, new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, premultipliedAlpha: true, side: THREE.DoubleSide,
+    uniforms: { uH: { value: 720 }, uNear: { value: 0.6 } },
+    vertexShader: `attribute vec3 aO, aCol; attribute float aW, aD; uniform float uH, uNear; varying vec3 vCol; varying vec2 vUv;
+      void main(){ vCol = aCol; vUv = uv;
+        vec4 a = viewMatrix * vec4(position, 1.0), b = viewMatrix * vec4(aO, 1.0); float za = -a.z, zb = -b.z;
+        if (za < uNear) { if (zb < uNear || aD > 0.5 && aD < 1.5) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; } a.xyz = mix(a.xyz, b.xyz, (uNear - za) / (zb - za)); za = uNear; }
+        float k = aW * 2.0 * za / (projectionMatrix[1][1] * uH);
+        if (aD > 0.5 && aD < 1.5) a.xy += uv * k;
+        else { vec3 s = cross(b.xyz - a.xyz, a.xyz) * (aD > 1.5 ? -1.0 : 1.0); float L = length(s); if (L > 1e-6) a.xyz += s / L * uv.x * k; }
+        gl_Position = projectionMatrix * a; }`,
+    fragmentShader: 'varying vec3 vCol; varying vec2 vUv; void main(){ float k = exp(-dot(vUv, vUv) * 3.2); gl_FragColor = vec4(vCol * k, 0.0); }' }));   // (no alpha: whose letters are where is left as it was)
+  m.frustumCulled = false; m.renderOrder = 4; m.visible = false; scene.add(m);
+  for (let i = 0; i < LZ.NB; i++) LZ.beams.push({ on: false, a: new THREE.Vector3(), b: new THREE.Vector3(), t: 0, T: 1, g: [0, 0, 0], c: [0, 0, 0], k: 1, end: false });
+  LZ.cb = { on: false, a: new THREE.Vector3(), b: new THREE.Vector3(), t: 0, T: 1, g: [0, 0, 0], c: [0, 0, 0], k: 1, end: false };
+  return m;
+}
+function lzPaint(B, col, k) { _lzCol.set(col); B.g[0] = _lzCol.r * 2.4 + 0.12; B.g[1] = _lzCol.g * 2.4 + 0.12; B.g[2] = _lzCol.b * 2.4 + 0.12; B.c[0] = _lzCol.r * 0.9 + 1.5; B.c[1] = _lzCol.g * 0.9 + 1.5; B.c[2] = _lzCol.b * 0.9 + 1.5; B.k = k; }
+function lzBeam(S, d, L, col, end) {
+  lzMesh(); let B = LZ.beams.find(b => !b.on); if (!B) { B = LZ.beams[0]; for (const b of LZ.beams) if (b.t / b.T > B.t / B.T) B = b; }
+  B.on = true; B.t = 0; B.T = LZ.life; B.end = end; B.a.copy(S); B.b.copy(S).addScaledVector(d, L); lzPaint(B, col, 1);
+  if (end && camera.position.distanceToSquared(B.b) < 2400 * 2400) for (let i = 0; i < (TOUCH ? 5 : 10); i++) emit(B.b.x, B.b.y + 0.5, B.b.z, rnd(14), 4 + Math.random() * 14, rnd(14), 0.35 + Math.random() * 0.4, B.c, -3, 1.2 + Math.random());   // (a spark where it stops)
+}
+function lzCharge(S, D) { const B = lzMesh() && LZ.cb, u = clamp(LZ.myT / LZ.charge, 0, 1); B.on = true; B.t = 0; B.T = 1; B.end = false; B.a.copy(S); B.b.copy(S).addScaledVector(D, 220 + 160 * u); lzPaint(B, matchCol(NET.id), 0.12 + 0.3 * u); }
+function lzQuad(q, A, B, w, g, f, dot) {   // (strip q: from A to B, w pixels either side; or a spark at A, w pixels round)
+  const G = LZ.geo.attributes, P = G.position.array, O = G.aO.array, K = G.aCol.array, U = G.uv.array, W = G.aW.array, D = G.aD.array;
+  for (let v = 0; v < 4; v++) { const i = q * 4 + v, e = dot ? 0 : v >> 1, Q = e ? B : A, R = dot ? A : e ? A : B;
+    P[i * 3] = Q.x; P[i * 3 + 1] = Q.y; P[i * 3 + 2] = Q.z; O[i * 3] = R.x; O[i * 3 + 1] = R.y; O[i * 3 + 2] = R.z;
+    K[i * 3] = g[0] * f; K[i * 3 + 1] = g[1] * f; K[i * 3 + 2] = g[2] * f; U[i * 2] = v & 1 ? 1 : -1; U[i * 2 + 1] = dot ? (v & 2 ? 1 : -1) : 0; W[i] = w; D[i] = dot ? 1 : e ? 2 : 0; }
+}
+function lzDraw(dt) {
+  const m = LZ.mesh; if (!m) return; let any = LZ.cb.on; for (const b of LZ.beams) if (b.on) { any = true; break; }
+  if (!any || realm !== 'over') { m.visible = false; for (const b of LZ.beams) if (b.on && (b.t += dt) >= b.T) b.on = false; LZ.cb.on = false; return; }
+  const cell = UIL.ch || 14; m.material.uniforms.uH.value = Math.max(200, innerHeight); m.material.uniforms.uNear.value = camera.near + 0.5;
+  LZ.beams.forEach((B, i) => { if (B.on && (B.t += dt) >= B.T) B.on = false; const u = B.t / B.T, f = B.on ? B.k * (1 - u) ** 1.6 : 0;
+    lzQuad(i * 3, B.a, B.b, cell * 0.62, B.g, f * 0.6); lzQuad(i * 3 + 1, B.a, B.b, cell * 0.2, B.c, f * 1.5);   // (the glow, the core)
+    lzQuad(i * 3 + 2, B.b, B.b, cell * 1.1 * (1 + u), B.c, B.on && B.end ? 2.2 * (1 - u) * (1 - u) : 0, true); });
+  const Cb = LZ.cb, q = LZ.NB * 3; lzQuad(q, Cb.a, Cb.b, cell * 0.12, Cb.g, Cb.on ? Cb.k : 0); lzQuad(q + 1, Cb.a, Cb.b, 0, Cb.g, 0); lzQuad(q + 2, Cb.b, Cb.b, 0, Cb.g, 0, true); Cb.on = false;   // (his charge: drawn again each frame while it lasts)
+  for (const k of ['position', 'aO', 'aCol', 'uv', 'aW', 'aD']) LZ.geo.attributes[k].needsUpdate = true; m.visible = true;
+}
+// ── The halves. The bird as one still shape (body, head, both wings spread), and a man as a few blocks; each half is that
+//    shape with everything on one side of the cut thrown away (in the shader), the cut itself burning, the wing it still has
+//    beating as it falls. Each tumbles about its own middle (gravity, the air, a spin that dies away), sheds fire and black
+//    smoke along the cut, chars as it goes, breaks on the ground and goes out. Eight of them at most (four birds); the
+//    oldest gives way. Nothing is made while they fall.
+function lzBuild() {
+  if (LZ.bird) return;
+  const v = new THREE.Vector3(), take = (parts, sample) => { let N = 0; for (const [g] of parts) N += g.attributes.position.count;
+    const pos = new Float32Array(N * 3), cl = new Float32Array(N * 3), uv = new Float32Array(N * 2); let o = 0;
+    for (const [g, M] of parts) { const p = g.attributes.position, c = g.attributes.color, t = g.attributes.uv;
+      for (let i = 0; i < p.count; i++, o++) { v.fromBufferAttribute(p, i).applyMatrix4(M); pos[o * 3] = v.x; pos[o * 3 + 1] = v.y; pos[o * 3 + 2] = v.z;
+        if (c) { cl[o * 3] = c.getX(i); cl[o * 3 + 1] = c.getY(i); cl[o * 3 + 2] = c.getZ(i); } if (t) { uv[o * 2] = t.getX(i); uv[o * 2 + 1] = t.getY(i); } } }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aCol', new THREE.BufferAttribute(cl, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.computeBoundingSphere();
+    const st = Math.max(1, Math.ceil(N / sample)), S = new Float32Array(Math.ceil(N / st) * 3); let k = 0; for (let i = 0; i < N; i += st, k++) { S[k * 3] = pos[i * 3]; S[k * 3 + 1] = pos[i * 3 + 1]; S[k * 3 + 2] = pos[i * 3 + 2]; }
+    return [geo, S]; };
+  { const P = makePhoenix(); P.group.updateMatrixWorld(true); const parts = [P.body, P.head.children[0], ...P.wings.flatMap(w => w.meshes)].map(m => [m.geometry, m.matrixWorld]);
+    [LZ.bird, LZ.sb] = take(parts, 700); for (const [g] of parts) g.dispose(); for (const t of P.tails) t.geo.dispose(); P.light.dispose(); }
+  { const box = (w, h, d, x, y, z, c) => { const g = new THREE.BoxGeometry(w, h, d).toNonIndexed().translate(x, y, z), n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set(c, i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv'); return [g, new THREE.Matrix4()]; };
+    const skin = [1.5, 1.05, 0.8], cloth = [1.4, 1.3, 1.0], parts = [box(0.5, 0.7, 0.3, 0, 0.25, 0, cloth), box(0.26, 0.28, 0.26, 0, 0.82, 0, skin), box(0.16, 0.85, 0.16, -0.13, -0.55, 0, skin), box(0.16, 0.85, 0.16, 0.13, -0.55, 0, skin), box(0.12, 0.7, 0.12, -0.36, 0.25, 0, skin), box(0.12, 0.7, 0.12, 0.36, 0.25, 0, skin)];
+    [LZ.man, LZ.sm] = take(parts, 400); for (const [g] of parts) g.dispose(); }
+  for (let i = 0; i < LZ.NH; i++) {
+    const mat = new THREE.ShaderMaterial({ side: THREE.DoubleSide, fog: true,
+      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uPlane: { value: new THREE.Vector4() }, uTint: { value: new THREE.Color() }, uK: { value: 1 }, uBurn: { value: 0 }, uFlap: { value: 0 }, uPh: { value: 0 }, uTime: { value: 0 } }]),
+      vertexShader: `attribute vec3 aCol; uniform float uFlap, uPh, uTime; varying vec3 vCol, vL;
+        #include <fog_pars_vertex>
+        void main(){ vec3 p = position; vL = p; vCol = aCol;
+          float ax = abs(p.x) - 0.6; if (ax > 0.0) p.y += ax * sin(uTime * 7.0 + uPh) * uFlap * 0.5;   // (the wing it still has, beating as it falls)
+          p.y += sin(uTime * 13.0 - uv.x * 5.5 + uv.y * 40.0) * 0.09 * uv.x * uv.x * (0.3 + uFlap);
+          vec4 mvPosition = modelViewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mvPosition;
+          #include <fog_vertex>
+        }`,
+      fragmentShader: `uniform vec4 uPlane; uniform vec3 uTint; uniform float uK, uBurn, uTime; varying vec3 vCol, vL;
+        #include <fog_pars_fragment>
+        void main(){ float s = dot(uPlane.xyz, vL) - uPlane.w; if (s < 0.0) discard;
+          float L = dot(vCol, vec3(0.35, 0.5, 0.15));
+          vec3 c = mix(uTint * L * 1.75, mix(uTint, vec3(1.0, 0.76, 0.36), 0.7) * L * 1.45, smoothstep(0.9, 1.75, L));
+          c = c * 1.6 + uTint * 0.3 + vec3(0.25, 0.08, 0.0);   // (a bird of fire: brighter than its plumage, cut)
+          c = mix(c, c * vec3(0.35, 0.12, 0.05) + vec3(0.25, 0.05, 0.0) * L, uBurn * 0.55);   // (charred as it burns, the fire still in it)
+          float e = 1.0 - smoothstep(0.0, 0.55, s), fl = 0.75 + 0.25 * sin(uTime * 23.0 + vL.z * 9.0 + vL.x * 7.0);
+          c += vec3(3.0, 1.35, 0.35) * e * fl * (1.0 - 0.45 * uBurn);   // (the cut, burning)
+          gl_FragColor = vec4(c * uK, 1.0);
+          #include <fog_fragment>
+        }` });
+    mat.uniforms.uTime = worldFx.uTime;
+    const mesh = new THREE.Mesh(LZ.bird, mat); mesh.visible = false; mesh.renderOrder = 1; scene.add(mesh);
+    LZ.halves.push({ on: false, mesh, u: mat.uniforms, X: new THREE.Vector3(), V: new THREE.Vector3(), W: new THREE.Vector3(), Q: new THREE.Quaternion(), com: new THREE.Vector3(), s: 1, t: 0, land: 0, sm: 0, man: false, wet: false, edge: new Float32Array(36), ne: 0, hot: [0, 0, 0] }); }
+}
+function lzFree(H) { H.on = false; H.mesh.visible = false; }
+// split: the plane through the line of the beam that comes nearest to parting the bird wing from wing (the man, head from feet)
+function lzSplit(X, V, yaw, pitch, bank, man, K, S, d, col, rng) {
+  lzBuild();
+  const R = _lzQ.setFromEuler(_lzE.set(pitch, yaw, bank, 'YXZ')), s = man ? 1 : PHX_S * K, Ri = _lzQ2.copy(R).invert();
+  _lzP.copy(S).addScaledVector(d, _lzC.subVectors(X, S).dot(d));   // (the beam's nearest point to it)
+  const nw = _lzN.set(man ? 0 : 1, man ? 1 : 0, 0).applyQuaternion(R); nw.addScaledVector(d, -nw.dot(d));
+  if (nw.lengthSq() < 0.12) { nw.set(man ? 1 : 0, 0, man ? 0 : 1).applyQuaternion(R); nw.addScaledVector(d, -nw.dot(d)); } if (nw.lengthSq() < 1e-6) nw.set(1, 0, 0); nw.normalize();
+  const nl = _lzN2.copy(nw).applyQuaternion(Ri), pl = _lzC.subVectors(_lzP, X).applyQuaternion(Ri).divideScalar(s), w = clamp(nl.dot(pl), man ? -0.2 : -0.45, man ? 0.2 : 0.45);
+  const SP = man ? LZ.sm : LZ.sb; _lzCol.set(col);
+  for (const side of [1, -1]) {
+    let H = LZ.halves.find(h => !h.on); if (!H) { H = LZ.halves[0]; for (const h of LZ.halves) if (h.t > H.t) H = h; }
+    H.on = true; H.man = man; H.mesh.geometry = man ? LZ.man : LZ.bird; H.t = 0; H.land = 0; H.sm = rng(); H.wet = false; H.s = s; H.Q.copy(R);
+    H.u.uPlane.value.set(nl.x * side, nl.y * side, nl.z * side, w * side); H.u.uTint.value.copy(_lzCol); H.u.uK.value = 1; H.u.uBurn.value = 0; H.u.uFlap.value = man ? 0 : 1; H.u.uPh.value = rng() * 6.28;
+    H.hot[0] = _lzCol.r * 1.6 + 1.2; H.hot[1] = _lzCol.g * 1.2 + 0.5; H.hot[2] = _lzCol.b * 0.8 + 0.15;
+    // its middle (what it turns about), and the points along its cut that burn
+    let cx = 0, cy = 0, cz = 0, cn = 0; H.ne = 0;
+    for (let i = 0; i < SP.length; i += 3) { const q = (nl.x * SP[i] + nl.y * SP[i + 1] + nl.z * SP[i + 2] - w) * side; if (q < 0) continue; cx += SP[i]; cy += SP[i + 1]; cz += SP[i + 2]; cn++;
+      if (q < (man ? 0.12 : 0.4) && H.ne < 12 && rng() < 0.6) { H.edge[H.ne * 3] = SP[i]; H.edge[H.ne * 3 + 1] = SP[i + 1]; H.edge[H.ne * 3 + 2] = SP[i + 2]; H.ne++; } }
+    if (cn) H.com.set(cx / cn, cy / cn, cz / cn); else H.com.copy(pl).addScaledVector(nl, side * 0.8);
+    if (!H.ne) { H.edge[0] = pl.x; H.edge[1] = pl.y; H.edge[2] = pl.z; H.ne = 1; }
+    H.X.copy(H.com).multiplyScalar(s).applyQuaternion(R).add(X);
+    H.V.copy(V).multiplyScalar(0.8).addScaledVector(nw, side * (9 + rng() * 7) * Math.sqrt(K)); H.V.y += 4 + rng() * 4;   // (with the way it was going, and thrown off the cut)
+    H.W.crossVectors(d, nw).multiplyScalar(side * (1.5 + rng() * 2.5)); H.W.x += (rng() - 0.5) * 2.4; H.W.y += (rng() - 0.5) * 2.4; H.W.z += (rng() - 0.5) * 2.4;
+    lzPose(H); H.mesh.visible = realm === 'over'; }
+}
+function lzPose(H) { const m = H.mesh; m.quaternion.copy(H.Q); m.scale.setScalar(H.s); m.position.copy(H.com).multiplyScalar(-H.s).applyQuaternion(H.Q).add(H.X); m.updateMatrixWorld(); }
+function lzHalves(dt) {
+  for (const H of LZ.halves) { if (!H.on) continue; H.t += dt; const u = H.u;
+    if (!H.land) { H.V.y -= 24 * dt; H.V.multiplyScalar(Math.exp(-0.3 * dt)); H.X.addScaledVector(H.V, dt);
+      const wl = H.W.length(); if (wl > 1e-4) { _lzQ3.setFromAxisAngle(_lzA.copy(H.W).divideScalar(wl), wl * dt); H.Q.premultiply(_lzQ3).normalize(); } H.W.multiplyScalar(Math.exp(-0.2 * dt));
+      const g0 = groundAt(H.X.x, H.X.z, H.X.y + 5), g = Math.max(g0, WATER), r = (H.man ? 0.35 : 1.1) * H.s;
+      if (H.X.y < g + r) { H.land = H.t; H.X.y = g + r * 0.5; H.wet = g0 < WATER; const near = camera.position.distanceToSquared(H.X) < 2000 * 2000;   // (down: it breaks on the ground, or hisses out in the sea)
+        if (near) { if (H.wet) for (let i = 0; i < (TOUCH ? 14 : 30); i++) emit(H.X.x + rnd(3 * H.s), g + 0.5, H.X.z + rnd(3 * H.s), rnd(4), 6 + Math.random() * 10, rnd(4), 1.6 + Math.random(), LZ_STEAM, 2, 2.5);
+          else { burst(H.X.x, g + 1, H.X.z, TOUCH ? 14 : 34, 16, 0.9); shock(H.X.x, g + 0.6, H.X.z, 0xff8a3a, 14 * H.s, 0.6, false); smokePuff(H.X.x, g + 1, H.X.z, 1.4 * H.s, 0, 1); } } }
+      u.uFlap.value = H.man ? 0 : Math.max(0, 1 - H.t / 2.4); }
+    u.uBurn.value = Math.min(1, H.t / 5);
+    const gone = H.land ? H.t - H.land : 0; u.uK.value = H.land ? clamp(1 - (gone - 1.2) / 1.3, 0, 1) : 1;
+    if (gone > 2.5 || H.t > 11) { lzFree(H); continue; }
+    lzPose(H); H.mesh.visible = realm === 'over';
+    // fire off the cut, embers, and black smoke behind it as it falls
+    const dc = camera.position.distanceToSquared(H.X); if (dc > 2200 * 2200 || realm !== 'over' || H.wet) continue;
+    const mw = H.mesh.matrixWorld, f = H.land ? (1 - smoothstep(0, 2, gone)) : 1, n = f > 0.5 ? (TOUCH ? 1 : 2) : f > 0.05 && Math.random() < f ? 1 : 0;
+    for (let i = 0; i < n; i++) { const k = Math.floor(Math.random() * H.ne) * 3; _lzB.set(H.edge[k], H.edge[k + 1], H.edge[k + 2]).applyMatrix4(mw);
+      emit(_lzB.x + rnd(0.6), _lzB.y + rnd(0.6), _lzB.z + rnd(0.6), H.V.x * 0.25 + rnd(2), H.V.y * 0.25 + 2 + Math.random() * 3, H.V.z * 0.25 + rnd(2), 0.45 + Math.random() * 0.5, i ? H.hot : LZ_FIRE, 3, (1.6 + Math.random() * 1.8) * Math.sqrt(H.s)); LZ.em++; }
+    if (f > 0.3 && Math.random() < 0.3) { const k = Math.floor(Math.random() * H.ne) * 3; _lzB.set(H.edge[k], H.edge[k + 1], H.edge[k + 2]).applyMatrix4(mw); emit(_lzB.x, _lzB.y, _lzB.z, rnd(9), rnd(9), rnd(9), 1 + Math.random() * 0.8, LZ_EMB, -3, 0.8); }
+    if ((H.sm += dt * (H.land ? 0.8 : 1.4) * f) > 1) { H.sm -= 1; const k = Math.floor(Math.random() * H.ne) * 3; _lzB.set(H.edge[k], H.edge[k + 1], H.edge[k + 2]).applyMatrix4(mw); smokePuff(_lzB.x, _lzB.y, _lzB.z, 0.5 * H.s, Math.sqrt(dc), 0); } }
+}
+// each frame (in a fight or not, so what is falling finishes falling): his own charge, the beams, the halves
+function lzStep(dt) {
+  if (LZ.myT >= 0) { const M = MATCH;
+    if (MO.key !== 'laser' || M.phase !== 'live' || !M.me.alive || state !== 'play' || M.reAt || M.glide || player.form !== 'phoenix') LZ.myT = -1;
+    else { LZ.myT += dt; lzAim(_lzS2, _lzD2); if (LZ.myT >= LZ.charge) { LZ.myT = -1; LZ.shots++; lzShoot(NET.id, _lzS2, _lzD2); audio.sfx.whoosh?.(true); } else lzCharge(_lzS2, _lzD2); } }
+  if (LZ.mesh) lzDraw(dt);
+  if (LZ.bird) lzHalves(dt);
+}
+
 // ── Shapes, in a fight. In any fight, and any game of it, he can go from the bird to a man falling, to the man gliding on
 //    his wings, and back into the bird, as often as he likes and with no wait: C goes round them (bird, falling,
 //    gliding, bird; in a fight C is the shape, not the lens), 1, 2 and 3 go straight to the bird, the fall and the glide,
@@ -35775,6 +36109,7 @@ setTimeout(() => {
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
   if (window.__icarus) Object.assign(window.__icarus, { boomHouse, HB, hbHouse, matchHouse, gotBoom, crash, setTimeK: v => { timeK = v; }, gameTime: () => time, pAlive: () => { let n = 0; for (let i = 0; i < PMAX; i++) if (pLife[i] > 0) n++; return n; } });
   if (window.__icarus) Object.assign(window.__icarus, { crash, cpuShow, matchGhost, matchQuit, matchView, matchWhere, matchParty, matchRegulars, matchGlide, matchPractice, matchGoLive, matchSlot, BLAST, matchBlast, GHOST_U, NPCS, OLY_R, PARTY_R, chatCommand, cpuFly });
+  if (window.__icarus) Object.assign(window.__icarus, { LZ, lzShoot, lzRay, lzR, lzUp, lzAim, lzFire, lzCpuShoot, lzClear, lzSplit });   // (tests: the lasers)
   if (window.__icarus) Object.assign(window.__icarus, { STU, stuOpen, stuClose, stuTab, stuMissions, stuProSeek, stuPlay, stuWatch, stuFetch, stuTest, stuBack, stuGo, stuStep, stuPP, stuRate, sceneClean, stuDone });
   if (window.__icarus) Object.assign(window.__icarus, { MD, PW, INKW, inkSay, inkNow, mdReady, mdHeard, mdShotAt, mdCamOn, mdSkip, matchBusy, matchWait, matchFire, matchUnqueue, matchFirst, matchRAt, matchWhere, matchParty, pwTake, pwShatter, matchBar, aresScript, miPose, MODEBAR, queueOf: () => MATCH.queue });   // (tests: the fight's opening, its words, one at a time)
   if (window.__icarus) Object.assign(window.__icarus, { SONIC, SOUND, sonicBoom, sonicTaps, sonicCone, peerBoom, nearMissTick });   // (tests: the sound barrier)
