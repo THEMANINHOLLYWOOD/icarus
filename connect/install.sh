@@ -9,8 +9,12 @@
 #      given in ~/.icarus/key. That key opens nothing but your hamlet.
 #   3. If you have Claude Code or Codex, adds hooks to ~/.claude/settings.json and ~/.codex/hooks.json that
 #      run hook.sh in the background. A copy of each file as it was is kept beside it (…before-icarus).
-# Nothing your agents read or write is sent anywhere. See hook.sh for exactly what is.
+# Nothing your agents read or write is sent anywhere. See hook.sh for exactly what is: a word for the kind of work, a
+# name, and (for you alone) the session's model, mode and effort, and counts of its todos and the project's files.
+# With Claude Code it works the other way too: what you type to an agent inside the game is handed to it, marked as a
+# chat message from you (only you can send one), and it can answer you there.
 #
+#   No notes from the game:       touch ~/.icarus/quiet
 #   Remove everything this did:   sh ~/.icarus/install.sh remove
 set -u
 URL="${ICARUS_URL:-https://justkeepflying.com}"; URL="${URL%/}"
@@ -73,6 +77,9 @@ g() {   # matcher  word  program  → one group of hooks, as JSON
   if [ -n "$1" ]; then m="\"matcher\":\"$1\","; else m=; fi
   printf '{%s"hooks":[{"type":"command","command":"sh \\"%s\\" %s %s","async":true,"timeout":20}]}' "$m" "$HOOK" "$2" "$3"
 }
+w() {   # → the one that listens for you while an agent of yours sits waiting (it may wake the agent: see hook.sh)
+  printf '{"hooks":[{"type":"command","command":"sh \\"%s\\" listen claude","async":true,"asyncRewake":true,"timeout":330}]}' "$HOOK"
+}
 wire() {   # name  folder  file  hooks-as-json
   [ -d "$2" ] || return 1
   if [ "$MODE" = remove ]; then [ -f "$3" ] && edit "$3" remove '{}' && say "  $1: hooks taken out of $3"; return 0; fi
@@ -86,7 +93,7 @@ wire() {   # name  folder  file  hooks-as-json
   esac
   return 2
 }
-CLAUDE_HOOKS="{\"SessionStart\":[$(g '' start claude)],\"UserPromptSubmit\":[$(g '' think claude)],\"PostToolUse\":[$(g 'Edit|Write|MultiEdit|NotebookEdit' write claude),$(g Bash run claude),$(g 'Read|Grep|Glob' read claude),$(g 'WebSearch|WebFetch' web claude),$(g 'Task|Agent' helpers claude),$(g 'mcp__.*' tool claude)],\"Notification\":[$(g '' wait claude)],\"Stop\":[$(g '' done claude)]}"
+CLAUDE_HOOKS="{\"SessionStart\":[$(g '' start claude)],\"UserPromptSubmit\":[$(g '' think claude)],\"PostToolUse\":[$(g 'Edit|Write|MultiEdit|NotebookEdit' write claude),$(g Bash run claude),$(g 'Read|Grep|Glob' read claude),$(g 'WebSearch|WebFetch' web claude),$(g 'Task|Agent' helpers claude),$(g 'mcp__.*' tool claude),$(g TodoWrite plan claude)],\"TaskCreated\":[$(g '' task+ claude)],\"TaskCompleted\":[$(g '' task- claude)],\"Notification\":[$(g '' wait claude)],\"Stop\":[$(g '' done claude),$(w)]}"
 CODEX_HOOKS="{\"SessionStart\":[$(g '' start codex)],\"UserPromptSubmit\":[$(g '' think codex)],\"PostToolUse\":[$(g 'apply_patch|Edit|Write' write codex),$(g Bash run codex),$(g 'mcp__.*' tool codex)],\"Stop\":[$(g '' done codex)]}"
 
 if [ "$MODE" = remove ]; then
@@ -121,6 +128,7 @@ claim() {
   k=$(printf %s "$r" | sed -n 's/.*"key":"\(icarus-[0-9a-f]*-[0-9a-f]*\)".*/\1/p'); [ -n "$k" ] || return 1
   printf '%s\n' "$k" > "$D/key"; chmod 600 "$D/key"; rm -f "$D/pair" "$D/pair.at" "$D/key.refused"
   case "$r" in *'"names":"plain"'*) echo names=plain > "$D/config" ;; *) echo names=folder > "$D/config" ;; esac
+  case "$r" in *'"talk":"off"'*) : > "$D/quiet" ;; esac
   BOSS=$(printf %s "$r" | sed -n 's/.*"boss":"\([A-Z0-9 -]*\)".*/\1/p'); return 0
 }
 if [ -s "$D/key" ]; then
@@ -147,4 +155,8 @@ say ""
 [ -n "${HAVE_CLAUDE:-}" ] && say "  Claude Code: every session on this computer shows up as it works, the ones already open too."
 [ -n "${HAVE_CODEX:-}" ] && say "  Codex: open /hooks in Codex once and trust the Icarus hooks. It will not run them until you do."
 say "  See them: in the game, type /hamlet"
+if [ -n "${HAVE_CLAUDE:-}" ]; then
+  if [ -f "$D/quiet" ]; then say "  Notes from the game are off here (rm $D/quiet to let your agents hear you)."
+  else say "  Talk to them: in the game's chat, @NAME and what you want to say. It reaches the agent as a message from you."; say "  No notes from the game: touch $D/quiet"; fi
+fi
 say "  Pause: touch $D/off     Remove: sh $D/install.sh remove"
