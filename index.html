@@ -32677,10 +32677,10 @@ MODES.hunger = { name: 'HUNGER GAMES', words: ['hunger', 'hungergames', 'hg'], m
 };
 function hgSpawn(at) {   // one cache, at so many seconds after GO: inside where the ring will be a little later
   const M = MATCH, r = MO.rnd, R = matchRAt(at + 8) * 0.8, a = r() * 6.2832, d = Math.sqrt(r()) * R, x = M.cx + Math.cos(a) * d, z = M.cz + Math.sin(a) * d, g = Math.max(groundAt(x, z, 9000), WATER);
-  const y = clamp(Math.max(g + 80, M.base + 50) + r() * 260, g + 60, Math.max(g + 60, M.base + 600)), q = r();
+  const y = clamp(Math.max(g + 80, M.base + 50) + r() * 260, g + 60, Math.max(g + 60, Math.min(M.base + 600, SKY_LIMIT - 120))), q = r();
   MO.s.list.push({ i: MO.s.n++, x, y, z, kind: q < 0.5 ? 0 : q < 0.78 ? 1 : 2, t0: at, by: '', k: 1 }); MO.s.next += 4.5 + r() * 3.5;
 }
-const hgY = (Q, el) => Q.y + 420 * (1 - miEase(clamp((el - Q.t0) / 4.2, 0, 1)));   // (it falls out of the sky, and slows as it comes to its height)
+const hgY = (Q, el) => Math.min(Q.y + 420 * (1 - miEase(clamp((el - Q.t0) / 4.2, 0, 1))), Math.max(Q.y, SKY_LIMIT - 60));   // (it falls out of the sky, and slows as it comes to its height; never from above where the sun burns)
 function hgTake(Q, id, mine) {
   if (!Q || Q.by) return; Q.by = id; Q.k = 1;
   const M = MATCH, me = id === NET.id, C = moCpu(id), r = M.roster.get(id), K = HG_K[Q.kind], y = hgY(Q, (performance.now() - M.liveAt) / 1000);
@@ -33376,9 +33376,9 @@ function ldStart() {   // (whoever called it: who is who, and each one's patch o
     for (let j = j0 - LD.start; j <= j0 + LD.start; j++) for (let i = i0 - LD.start; i <= i0 + LD.start; i++) { if (i < 0 || j < 0 || i >= G || j >= G || (i - i0) ** 2 + (j - j0) ** 2 > LD.start * LD.start + 1) continue; const c = j * G + i; if (GP.inn[c] && !L.own[c]) L.own[c] = k + 1; } });
   ldCount(); L.dirty = true; moSay('lg', ldAll());
 }
-function ldLine(a, b) {   // (the cells from one to the next, every one between, not counting the first)
+function ldLine(a, b) {   // (the cells from one to the next, every one between, not counting the first; edge to edge, never corner to corner, so no two lines can cross without sharing a cell)
   const G = GP.G, out = []; let x0 = a % G, y0 = Math.floor(a / G); const x1 = b % G, y1 = Math.floor(b / G), dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
-  while (x0 !== x1 || y0 !== y1) { const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } const c = y0 * G + x0; if (GP.inn[c]) out.push(c); }
+  while (x0 !== x1 || y0 !== y1) { const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; if (e2 <= dx) { const c = y0 * G + x0; if (GP.inn[c]) out.push(c); } } if (e2 <= dx) { e += dx; y0 += sy; } const c = y0 * G + x0; if (GP.inn[c]) out.push(c); }
   return out;
 }
 function ldStep(k, q) {   // (whoever called it: bird k comes into cell q)
