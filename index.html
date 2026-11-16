@@ -6694,18 +6694,16 @@ function updateHumanDive(dt) {
   const bed = overHeight(p.pos.x, p.pos.z);
   if (D.reef && bed < WATER - 18) { D.reef = false; D.deep = Math.max(Math.min(30, WATER - bed - 3), WATER - p.pos.y + 4); }   // (out over the drop-off from a reef: the deep is the deep again, and S takes him on through)
   if (p.pos.y < bed + 1.2) { p.pos.y = bed + 1.2; if (D.mom && !D.through) { D.mom = null; for (let i = 0; i < 24; i++) emit(p.pos.x + rnd(1.5), bed + 0.4, p.pos.z + rnd(1.5), rnd(2), 0.5 + Math.random() * 1.5, rnd(2), 1.2 + Math.random(), [0.5, 0.46, 0.38], 0.4, 1.4); } }   // (the bed: a cloud of it goes up)
-  // the stroke: arms sweep from stretched ahead out and back to his sides, and glide; the legs beat
+  // the stroke (see swimUnderPose): a streamline and a dolphin kick going down, the long stroke and a glide going along, sculling left alone
   const glide = clamp(ms / 18, 0, 1);   // (still carried by the plunge: one line, arms ahead, no stroke yet)
-  const st = D.t * 4, pull = Math.max(0, Math.sin(st)) * (1 - glide), kick = Math.sin(D.t * 9) * (1 - glide * 0.7), tilt = D.rise ? -1.25 : glide > 0.05 && M ? clamp(-M.y / (ms || 1), -0.35, 1.25) : vy < -0.5 ? 1 : vy > 0.5 ? -0.35 : 0.12;
-  R.position.y = 1.0; R.rotation.x = lerp(R.rotation.x, -1.5 - 0.9 * tilt - 0.4 * glide * Math.max(0, tilt), damp(3.5 + glide * 5, dt)); R.rotation.z = Math.sin(st * 0.5) * 0.08 * (1 - glide);
-  H.armL.rotation.set(lerp(-2.95, -0.5, pull), 0, -0.12 - Math.sin(pull * Math.PI) * 0.95); H.armR.rotation.set(lerp(-2.95, -0.5, pull), 0, 0.12 + Math.sin(pull * Math.PI) * 0.95);
-  if (H.foreL) H.foreL.rotation.x = H.foreR.rotation.x = -pull * 0.5;
-  H.legL.rotation.x = kick * 0.36; H.legR.rotation.x = -kick * 0.36; if (H.head) H.head.rotation.x = -0.45;
-  if (p.tailK > 0) R.rotation.x += Math.sin(TAILS.ph) * 0.07 * p.tailK;   // (the whole of him goes with the tail)
+  const tilt = D.rise ? -1.25 : glide > 0.05 && M ? clamp(-M.y / (ms || 1), -0.35, 1.25) : vy < -0.5 ? 1 : vy > 0.5 ? -0.35 : 0.12;
+  Object.assign(PT, POSE0); swimUnderPose(PT, SWIM, dt, tilt, sink, idle && !D.rise, glide, !!D.rise, Math.hypot(p.vel.x, p.vel.y, p.vel.z) + ms);
+  if (p.tailK > 0) PT.rx += Math.sin(TAILS.ph) * 0.07 * p.tailK;   // (the whole of him goes with the tail)
+  applyBody(dt, 6); setCurl(H.handL, OPEN, damp(6, dt)); setCurl(H.handR, OPEN, damp(6, dt));
   if (Math.random() < 0.5) emit(p.pos.x + rnd(0.5), p.pos.y + 1 + rnd(0.5), p.pos.z + rnd(0.5), rnd(0.6), 1.5 + Math.random() * 2.5, rnd(0.6), 0.9 + Math.random() * 0.8, [0.7, 0.85, 0.95], 5);   // his breath, going up
   if ((D.bT = (D.bT || 0) - dt) < 0) { D.bT = 0.45 + Math.random() * 0.5; audio.sfx.bubble?.(); }
   if (!(p.tailK > 0.5)) p.flame = Math.max(0.12, p.flame - dt * 0.03);   // (water is no friend of his fire, until his legs have taken it: see updateTail)
-  if ((vy > 0 || D.rise) && p.pos.y > WATER - 0.9) { const out = D.rise; p.pos.y = WATER; p.dive = null; p.grounded = true; p.swim = true; resetPose(); ripple(p.pos.x, p.pos.z, 0.8); audio.sfx.splash?.(false);   // back up into the air
+  if ((vy > 0 || D.rise) && p.pos.y > WATER - 0.9) { const out = D.rise; p.pos.y = WATER; p.dive = null; p.grounded = true; p.swim = true; ripple(p.pos.x, p.pos.z, 0.8); audio.sfx.splash?.(false);   // back up into the air
     if (out) { if (realm === 'over' && !p.burnout && p.flame >= COST.rebirth && story.phase !== 'summit' && story.phase !== 'leap') leapFromWater(); else toast('ON TOP · NOT ENOUGH FIRE YET TO BURN: THE SEA IS GIVING IT BACK'); }
     return; }
   if (p.pos.y < WATER - D.deep) {   // through: out of the roof of the Underworld, falling
@@ -7118,6 +7116,10 @@ function applyBody(dt, rate) {
     if (!Number.isFinite(c)) { c = PT[k]; v = 0; }
     C[k] = c; PV[k] = v;
   }
+  poseOn(H, C);
+}
+// (a pose put on a man as it is: his own through the springs above, another's straight from what was worked out for him)
+function poseOn(H, C) {
   H.rig.position.y = C.py; H.rig.position.x = C.px; H.rig.rotation.set(C.rx, C.ry, C.rz);
   H.chest.rotation.set(C.cx, C.cy, C.cz); H.chest.scale.set(1, C.csy, C.csz);
   H.head.rotation.set(C.nx, C.ny, C.nz);
@@ -7212,6 +7214,78 @@ function updateFace(dt, shut = 0) {
   faceApply(human, FACE.on ? FACE.cur : null, damp(18, dt), body.mouth, true);
 }
 
+// ── Swimming, as a man swims. Every stroke goes round as fast as the speed it is making asks, so the hands are never seen
+//    pulling at water he is not moving through.
+//    STILL, he treads water: the legs beat an eggbeater under him (each knee wide, each foot going round, the two half a turn
+//    apart), the hands scull flat at his sides, palms turning at each end of their sweep, and he bobs a little.
+//    GOING GENTLY, a breaststroke: pull (the hands sweep out, then in under the chin, and his head comes up to breathe), the
+//    hands shoot forward as the heels come up, the legs whip round and together, and he glides, long and flat, before the next.
+//    PUSHING, the crawl. Each arm goes in ahead, catches with the elbow high, pulls under him and pushes past the hip, then
+//    comes out and goes back over the water out to the side, elbow up; the two arms are half a stroke apart. He rolls to the
+//    arm that is pulling, his head stays down, and every third stroke it turns out with the roll to breathe, a side at a time.
+//    The legs flutter from the hip, six beats to a stroke. Each hand going in throws a little water.
+//    UNDER (swimUnderPose): carried by a plunge or driving down, he is a streamline, arms locked ahead, and a dolphin kick runs
+//    down him; swimming along, the long underwater stroke: one pull right down to the thighs, a glide, the hands brought up
+//    the chest as the knees come up, a frog kick, a glide; left alone, he sculls and drifts up.
+const SWIM = { c: 0, b: 0, u: 0, d: 0, tr: 0, qL: 0.75, qR: 0.25, wd: 0, wp: 0, wf: 1 };
+const SWW = { t: 1, b: 0, c: 0 }, SPRAY = [0.78, 0.9, 1.0], _SPT = { ...POSE0 };   // (_SPT: another swimmer's pose, worked out and put straight on)
+const swMix = (t, b, c) => SWW.t * t + SWW.b * b + SWW.c * c;
+const fr1 = x => x - Math.floor(x);
+function swimArm(q, o) {   // one arm of the crawl, at q of its stroke (0 going in ahead): o gets its lift forward, its swing out from his side, the elbow's bend
+  if (q < 0.62) { const v = q / 0.62; o[0] = 2.95 - 2.85 * smoothstep(0.04, 1, v); o[1] = 0.12 + 0.12 * Math.sin(Math.PI * v); o[2] = 0.15 + 1.25 * Math.sin(Math.PI * clamp((v - 0.1) / 0.7, 0, 1)); }
+  else { const v = (q - 0.62) / 0.38; o[0] = 0.1 + 2.85 * smoothstep(0, 1, v); o[1] = 0.12 + 1.05 * Math.sin(Math.PI * v); o[2] = 0.15 + 1.55 * Math.sin(Math.PI * v); }
+}
+const _aL = new Float32Array(3), _aR = new Float32Array(3);
+function swimPose(T, S, hs, dt, H) {
+  const go = smoothstep(0.3, 1.4, hs), cr = smoothstep(2.4, 4.0, hs), W = SWW; W.t = 1 - go; W.b = go * (1 - cr); W.c = go * cr;
+  S.c = (S.c + dt * clamp(hs / 2.7, 0.55, 1.7)) % 300; S.b = (S.b + dt * clamp(0.32 + hs * 0.17, 0.4, 0.95)) % 300; S.tr = (S.tr + dt * 1.1) % 300;
+  // treading
+  const tp = S.tr * W_TAU, ts = Math.sin(tp), tc = Math.cos(tp);
+  // breaststroke
+  const u = fr1(S.b), out = Math.sin(Math.PI * smoothstep(0.02, 0.24, u)) * (1 - smoothstep(0.24, 0.3, u)), inn = smoothstep(0.14, 0.3, u) * (1 - smoothstep(0.3, 0.44, u));
+  const ah = 1 - smoothstep(0.02, 0.24, u) * (1 - smoothstep(0.3, 0.46, u)), draw = smoothstep(0.3, 0.44, u) * (1 - smoothstep(0.46, 0.56, u)), kick = smoothstep(0.44, 0.5, u) * (1 - smoothstep(0.5, 0.62, u));
+  const lift = smoothstep(0.04, 0.22, u) * (1 - smoothstep(0.3, 0.5, u));
+  // crawl
+  const qL = fr1(S.c), qR = fr1(S.c + 0.5); swimArm(qL, _aL); swimArm(qR, _aR);
+  const roll = -0.6 * Math.sin(W_TAU * qL), bw = S.c - 0.62, bk = Math.floor(bw / 1.5), bu = bw - bk * 1.5, br = bu < 0.38 ? Math.sin(Math.PI * bu / 0.38) : 0, side = bk % 2 === 0 ? 1 : -1;   // (rolling to the arm that pulls; a breath every third stroke, the sides taking turns)
+  const fl = Math.sin(S.c * 3 * W_TAU);
+  T.py = 1 + swMix(-0.06 + 0.035 * Math.sin(tp * 2), -0.3 + 0.1 * lift, -0.34); T.px = 0;
+  T.rx = swMix(-0.1, -1.28 + 0.38 * lift, -1.38); T.ry = W.c * (roll + side * 0.14 * br); T.rz = 0;
+  T.cx = swMix(-0.05, 0.12 * lift, 0.05); T.cy = W.c * roll * 0.25; T.cz = 0;
+  T.nx = swMix(0.08, 0.32 + 0.6 * lift, 0.3 + 0.1 * br); T.ny = W.c * side * 1.05 * br; T.nz = 0;
+  T.alx = swMix(0.62, lerp(1.7, 2.95, ah), _aL[0]); T.arx = swMix(0.62, lerp(1.7, 2.95, ah), _aR[0]); T.aly = T.ary = 0;
+  T.alz = -swMix(0.72 + 0.26 * ts, 0.12 + 0.85 * out + 0.06 * inn, _aL[1]); T.arz = swMix(0.72 + 0.26 * ts, 0.12 + 0.85 * out + 0.06 * inn, _aR[1]);
+  T.flx = swMix(0.32, 0.05 + 1.5 * inn, _aL[2]); T.frx = swMix(0.32, 0.05 + 1.5 * inn, _aR[2]); T.flz = T.frz = 0;
+  T.wlx = T.wrx = W.t * 0.4 * tc; T.wlz = T.wrz = 0;   // (sculling: the palms turned to the way they are sweeping)
+  T.llx = swMix(0.95 + 0.25 * ts, 0.05 + 0.6 * draw, 0.1 + 0.26 * fl); T.lrx = swMix(0.95 - 0.25 * ts, 0.05 + 0.6 * draw, 0.1 - 0.26 * fl);
+  T.llz = -swMix(0.45 + 0.2 * tc, 0.05 + 0.35 * draw + 0.3 * kick, 0.04); T.lrz = swMix(0.45 - 0.2 * tc, 0.05 + 0.35 * draw + 0.3 * kick, 0.04);
+  T.slx = swMix(-1.45 + 0.35 * tc, -0.05 - 2.0 * draw, -0.1 - 0.35 * Math.max(0, -Math.sin(S.c * 3 * W_TAU - 0.6))); T.srx = swMix(-1.45 - 0.35 * tc, -0.05 - 2.0 * draw, -0.1 - 0.35 * Math.max(0, Math.sin(S.c * 3 * W_TAU - 0.6)));
+  T.tlx = T.trx = swMix(0.4, 0.5 * draw, -0.3);
+  if (H) {   // (his own: each hand going in throws water)
+    if (W.c > 0.4 && qL < S.qL) { H.handL.getWorldPosition(_v); ripple(_v.x, _v.z, 0.3); for (let i = 0; i < 3; i++) emit(_v.x + rnd(0.2), WATER + 0.1, _v.z + rnd(0.2), rnd(1.2), 1.6 + Math.random() * 1.8, rnd(1.2), 0.4 + Math.random() * 0.3, SPRAY, -9); }
+    if (W.c > 0.4 && qR < S.qR) { H.handR.getWorldPosition(_v); ripple(_v.x, _v.z, 0.3); for (let i = 0; i < 3; i++) emit(_v.x + rnd(0.2), WATER + 0.1, _v.z + rnd(0.2), rnd(1.2), 1.6 + Math.random() * 1.8, rnd(1.2), 0.4 + Math.random() * 0.3, SPRAY, -9); }
+    if (W.b > 0.4 && kick > 0.5 && S.bk !== Math.floor(S.b)) { S.bk = Math.floor(S.b); ripple(H.group.position.x + Math.sin(H.group.rotation.y) * 1.2, H.group.position.z + Math.cos(H.group.rotation.y) * 1.2, 0.4); }
+  }
+  S.qL = qL; S.qR = qR;
+}
+// (under the water: tilt is how far head-down he is going; sink, driving down; idle, left alone; glide, still carried by his plunge)
+function swimUnderPose(T, S, dt, tilt, sink, idle, glide, rise, sp) {
+  const k = damp(3, dt), wd = rise || sink ? 1 : glide;
+  S.wd = lerp(S.wd, wd, k); S.wp = lerp(S.wp, (1 - wd) * (idle ? 0 : 1), k); S.wf = lerp(S.wf, (1 - wd) * (idle ? 1 : 0), k);
+  const n = 1 / (S.wd + S.wp + S.wf || 1), D = S.wd * n, P = S.wp * n, F = S.wf * n;
+  S.u = (S.u + dt * 0.5 * P) % 300; S.d = (S.d + dt * (1.2 + 0.07 * sp)) % 300; S.tr = (S.tr + dt * 0.9) % 300;
+  const u = fr1(S.u), pull = smoothstep(0.02, 0.25, u), out = Math.sin(Math.PI * pull), ah = 1 - pull + smoothstep(0.58, 0.76, u), up = Math.sin(Math.PI * smoothstep(0.52, 0.76, u));
+  const load = smoothstep(0.56, 0.7, u) * (1 - smoothstep(0.72, 0.8, u)), kick = smoothstep(0.7, 0.76, u) * (1 - smoothstep(0.76, 0.86, u));
+  const ph = S.d * W_TAU, A = sink || rise ? 1 : 0.35 + 0.65 * (1 - glide), tp = S.tr * W_TAU, ts = Math.sin(tp);
+  T.py = 1; T.px = 0; T.ry = T.rz = 0; T.cy = T.cz = 0; T.ny = T.nz = 0; T.aly = T.ary = T.flz = T.frz = T.wlz = T.wrz = 0;
+  T.rx = -1.5 - 0.9 * tilt - 0.4 * glide * Math.max(0, tilt) + D * 0.08 * A * Math.sin(ph - 0.6) + F * 1.1;   // (left alone he comes upright, drifting up)
+  T.cx = D * 0.1 * A * Math.sin(ph) - F * 0.05; T.nx = D * -0.15 + P * 0.05 * up + F * 0.1;
+  const ax = D * 2.95 + P * lerp(0.05, 2.95, Math.min(1, ah)) + F * (0.5 + 0.15 * ts), az = D * 0.06 + P * (0.1 + 0.95 * out) + F * (0.9 + 0.3 * ts);
+  T.alx = T.arx = ax; T.alz = -az; T.arz = az; T.flx = T.frx = D * 0.02 + P * 2.1 * up + F * 0.5; T.wlx = T.wrx = F * 0.4 * Math.cos(tp);
+  const lx = D * 0.3 * A * Math.sin(ph - 1.3) + P * 0.75 * load + F * (0.35 + 0.18 * ts), sx = -0.08 - D * 0.6 * A * Math.max(0, Math.sin(ph - 2.1)) - P * (1.9 * load) - F * (0.6 + 0.25 * Math.cos(tp));
+  T.llx = lx; T.lrx = F ? lx - F * 0.36 * ts : lx; T.slx = T.srx = sx; T.llz = -(0.04 + P * (0.4 * load + 0.25 * kick) + F * 0.25); T.lrz = -T.llz;
+  T.tlx = T.trx = -0.4 * D + P * 0.4 * load;
+}
 function bodyLanguage(dt, hs, swimming) {
   const p = player, T = PT, H = human;
   if (time - body.last > 0.12) readBody();
@@ -7347,32 +7421,12 @@ function bodyLanguage(dt, hs, swimming) {
       T.alx += 1.02 * tr; T.arx += 1.02 * tr; T.alz -= 0.1 * tr; T.arz += 0.1 * tr; T.flx -= 0.08 * tr; T.frx -= 0.08 * tr; T.nx += 0.66 * tr;
       T.cx += -br * 0.05 * tr; T.nx += br * 0.04 * tr;
     }
-    // In the water there are three ways of being: treading it when he is still (arms sculling out at his sides, legs
-    // cycling under him, bobbing); a breaststroke, head held up, when he goes gently; and when he pushes, a crawl — down
-    // on his chest, one arm over after the other, legs beating, his head turning out to breathe.
+    // In the water: see swimPose (treading it when still, a breaststroke going gently, a crawl when he pushes)
     if (swimming) {
-      const go = smoothstep(0.35, 1.6, hs), crawl = smoothstep(2.6, 4.2, hs);
-      if (go < 0.02) {
-        const tt = time * 3.1, cy = Math.sin(tt * 1.3);
-        T.alx = 0.55 + Math.sin(tt) * 0.25; T.arx = 0.55 - Math.sin(tt) * 0.25; T.alz = -1.05 - Math.cos(tt) * 0.28; T.arz = 1.05 - Math.cos(tt) * 0.28; T.flx = T.frx = 0.55;
-        T.llx = 0.5 + cy * 0.5; T.lrx = 0.5 - cy * 0.5; T.slx = -0.8 - cy * 0.4; T.srx = -0.8 + cy * 0.4; T.cx = -0.06; T.nx = 0.12; T.py += Math.sin(tt * 0.5) * 0.05;
-      } else {
-        const st = time * lerp(2.6, 7.2, crawl), bs = Math.sin(st), bc = Math.max(0, Math.cos(st));
-        // the breaststroke
-        T.alx = 1.6 + bs * 0.5; T.arx = 1.6 + bs * 0.5; T.alz = -0.3 - bc * 0.8; T.arz = 0.3 + bc * 0.8;
-        T.flx = T.frx = 0.5; T.llx = T.lrx = 0.3 + Math.sin(st + 1) * 0.3; T.slx = T.srx = -0.6 - Math.max(0, Math.sin(st + 1)) * 0.6; T.cx = -0.35; T.nx = 0.45;
-        if (crawl > 0) {   // and over into the crawl
-          const k = crawl, fl = Math.sin(st * 2);
-          T.rx = lerp(T.rx || 0, -1.15, k); T.rz = Math.sin(st) * 0.22 * k; T.py -= 0.32 * k;
-          T.alx = lerp(T.alx, 1.55 + Math.sin(st) * 1.55, k); T.arx = lerp(T.arx, 1.55 - Math.sin(st) * 1.55, k);
-          T.alz = lerp(T.alz, -0.18 - Math.max(0, Math.cos(st)) * 0.35, k); T.arz = lerp(T.arz, 0.18 + Math.max(0, -Math.cos(st)) * 0.35, k);
-          T.flx = lerp(T.flx, 0.25 + Math.max(0, -Math.sin(st)) * 0.7, k); T.frx = lerp(T.frx, 0.25 + Math.max(0, Math.sin(st)) * 0.7, k);
-          T.llx = lerp(T.llx, 0.1 + fl * 0.32, k); T.lrx = lerp(T.lrx, 0.1 - fl * 0.32, k); T.slx = lerp(T.slx, -0.25 - Math.max(0, fl) * 0.3, k); T.srx = lerp(T.srx, -0.25 - Math.max(0, -fl) * 0.3, k);
-          T.cx = lerp(T.cx, 0.1, k); T.nx = lerp(T.nx, 0.75, k); T.ny = (T.ny || 0) + Math.max(0, Math.sin(st - 0.6)) * 0.6 * k;
-        }
-      }
+      swimPose(T, SWIM, hs, dt, human);
+      T.ny += body.lookY * SWW.t; T.nx += body.lookX * SWW.t * 0.5;   // (treading water, he looks about him)
       { const tk = p.tailK || 0; if (tk > 0.02) {   // with the tail: he lies along the water; a long reach, one sweep, a glide
-          const pull = smoothstep(0.35, 1, Math.sin(TAILS.ph * 0.5)), mk = tk * go, idle = tk * (1 - go);
+          const pull = smoothstep(0.35, 1, Math.sin(TAILS.ph * 0.5)), mk = tk * (1 - SWW.t), idle = tk * SWW.t;
           T.rx = lerp(T.rx || 0, -1.3 + Math.sin(TAILS.ph) * 0.09, mk); T.rz = lerp(T.rz || 0, 0, mk); T.py -= (0.3 - Math.sin(TAILS.ph - 0.8) * 0.045) * mk;
           T.alx = lerp(T.alx, lerp(3.0, 0.5, pull), mk); T.arx = lerp(T.arx, lerp(3.0, 0.5, pull), mk); T.alz = lerp(T.alz, -0.1 - Math.sin(pull * Math.PI) * 0.9, mk); T.arz = lerp(T.arz, 0.1 + Math.sin(pull * Math.PI) * 0.9, mk);
           T.flx = lerp(T.flx, 0.1, mk); T.frx = lerp(T.frx, 0.1, mk); T.cx = lerp(T.cx, 0.12, mk); T.nx = lerp(T.nx, 0.7, mk); T.ny = lerp(T.ny || 0, 0, mk);
@@ -8258,6 +8312,14 @@ function animPeer(P, H, dt, sp) {
     if (P.tk > 0 || H.tail.root.visible) { P.tph = (P.tph || 0) + dt * (2.2 + sp * 0.75); tailPose(H, P.tk, P.tph, 0.35 + Math.min(1, sp / 9) * 0.75); }
     if (P.tk > 0.5) { const pull = smoothstep(0.35, 1, Math.sin(P.tph * 0.5)), mk = smoothstep(0.35, 1.6, sp), ax = lerp(0.6, lerp(3.0, 0.5, pull), mk), az = 0.2 + Math.sin(pull * Math.PI) * 0.8 * mk;
       R.rotation.set(lerp(-0.2, -1.3 + Math.sin(P.tph) * 0.09, mk), 0, 0); H.armL.rotation.set(ax, 0, -az); H.armR.rotation.set(ax, 0, az); return; } }
+  if (t === 'h' && realm === 'over' && P.pos.y < WATER + 0.5 && overHeight(P.pos.x, P.pos.z) < WATER - 1.1) {   // in the sea: swimming as he does (see swimPose), from how fast they are going
+    const S = P.swS || (P.swS = { c: Math.random(), b: Math.random(), u: 0, d: 0, tr: Math.random(), qL: 0.75, qR: 0.25, wd: 0, wp: 0, wf: 1, on: false }), vy = P.s.vy || 0;
+    Object.assign(_SPT, POSE0); S.on = true;
+    if (P.pos.y > WATER - 1.5) swimPose(_SPT, S, sp, dt, null);
+    else swimUnderPose(_SPT, S, dt, vy < -2 ? 1 : vy > 1 ? -0.35 : 0.12, vy < -6, sp < 0.8 && vy > -1, 0, false, Math.hypot(sp, vy));
+    poseOn(H, _SPT); return;
+  }
+  if (P.swS && P.swS.on) { P.swS.on = false; poseOn(H, POSE0); }   // (out of it: nothing of the stroke left on him)
   P.ph += sp / lerp(4.6, 8.4, run) * 6.2832 * dt;
   const s1 = Math.sin(P.ph), air = !P.gr && t === 'h';
   if (t === 't') {   // falling: belly to the earth, arms out
@@ -34142,6 +34204,7 @@ setTimeout(() => {
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, RR, rrJoin, rrMine, rrFetch, rrPlace, rrLayout, gotRjoin, get RING_DONE() { return RING_DONE; }, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { cpusCmd, MOD, die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { NEWB, newbHear, newbHeard, newbTyped, newbTalk, newbFallback, newbArrive });
+  if (window.__icarus) Object.assign(window.__icarus, { WS, wingSolve, wingState, wingSet, wingRead, birdWings, airRough, WPOSE: { M: POSE_M, CUP: POSE_CUP, TEAR: POSE_TEAR, LOAD: POSE_LOAD, WIDE: POSE_WIDE, BRAKE: POSE_BRAKE, FOLD: FOLDW }, fireMat, featherFx, updateTails, updatePeers, body, PC, PT, SWIM, SWW, swimPose, swimUnderPose, poseOn });   // (tests: the wings, and the swimmer)
   if (window.__icarus) Object.assign(window.__icarus, { AREA_V, placeCmd, areaRename, areaPropose, areaVoteCmd, areaFc, areaOwn, areaMe, areaGp, areaBar, facMates });
   if (window.__icarus) Object.assign(window.__icarus, { boomHouse, HB, hbHouse, matchHouse, gotBoom, crash, setTimeK: v => { timeK = v; }, gameTime: () => time, pAlive: () => { let n = 0; for (let i = 0; i < PMAX; i++) if (pLife[i] > 0) n++; return n; } });
   if (window.__icarus) Object.assign(window.__icarus, { crash, cpuShow, matchGhost, matchQuit, matchView, matchWhere, matchParty, matchRegulars, matchGlide, matchPractice, matchGoLive, matchSlot, BLAST, matchBlast, GHOST_U, NPCS, OLY_R, PARTY_R, chatCommand, cpuFly });
@@ -34153,4 +34216,3 @@ setTimeout(() => {
 </script>
 </body>
 </html>
-  if (window.__icarus) Object.assign(window.__icarus, { WS, wingSolve, wingState, wingSet, wingRead, birdWings, airRough, WPOSE: { M: POSE_M, CUP: POSE_CUP, TEAR: POSE_TEAR, LOAD: POSE_LOAD, WIDE: POSE_WIDE, BRAKE: POSE_BRAKE, FOLD: FOLDW }, fireMat, featherFx, updateTails, updatePeers, body, PC, PT });   // (tests: the wings, and the swimmer)
