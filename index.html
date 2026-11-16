@@ -5930,7 +5930,7 @@ function deathFly() {
   toast('INTO THE FIRE AGAIN');
 }
 function pressSpace() {
-  if (fshOn()) return void fshTo('next');   // (in a fight: the next shape, see FSH)
+  if (fshOn() && player.form !== 'phoenix') return void fshTo('bird');   // (in a fight, as a man: back into the bird at once; as the bird Space never takes him out of it, see spaceAction and FSH)
   if (COSMOS.on) return cosmosBeat();
   if (deathCanFly()) return deathFly();
   if (player.mount && state === 'play') return gflyLeap();
@@ -9503,7 +9503,7 @@ const CMD_HELP = [
   ['COLOUR', '/vivid (the world in full colour, which is how it comes, or in its plainer colours)'],
   ['HAMLET', '/hamlet (your own AI agents: who lives there, what they are building, the way to it) · /hamlet connect (bring your Claude, Codex and other agents in) · /hamlet key (the key, by hand)'],
   ['GAMES', '/fly modes (every game, a line each) · /fly hunger · /fly snd · /fly ctf · /fly zombies · /fly possess · /fly speed · /fly king · /fly tag (/fly tag once: one round) · /fly jugg · /fly survive · /race long · any of them with a number for that many of the house’s birds (they fill the empty places anyway)'],
-  ['FIGHT', '/fly · /fly party · /fly NAME (or cpu) · /fly teams · /fly 2v2 · /fly A B vs C D · F fire · R wind · SPACE changes your shape: bird, falling, gliding (1 BIRD · 2 FALL · 3 GLIDE · Y on a pad · the SHAPE key on a touch screen · or say fall, glide, bird) · /accept · /decline · /cpu N (birds that fly themselves) · /cpus off (none) · /cpus on (the usual ones back) · /warsim N (watch N of them) · /fly watch · /leave · /forfeit · /fly end · /fly restart · /fly skip (if you called it)'],
+  ['FIGHT', '/fly · /fly party · /fly NAME (or cpu) · /fly teams · /fly 2v2 · /fly A B vs C D · F fire · R wind · C changes your shape: bird, falling, gliding (1 BIRD · 2 FALL · 3 GLIDE · SPACE as a man is the bird again · Y on a pad · the SHAPE key on a touch screen · or say fall, glide, bird) · /accept · /decline · /cpu N (birds that fly themselves) · /cpus off (none) · /cpus on (the usual ones back) · /warsim N (watch N of them) · /fly watch · /leave · /forfeit · /fly end · /fly restart · /fly skip (if you called it)'],
   ['SET', '/sound on|off · /mic on|off · /hands on|off · /quality up|down · /letters up|down · /text bigger|smaller (the size of the words) · /clear'],
   ['RECORD', '/stats (your numbers, written in the sky · Z)'],
   ['ASK', '/ask ANYTHING: she answers, and does it if she can'],
@@ -33440,10 +33440,11 @@ function ldCpu(C) {   // (a house's bird: out from home a little way, across, an
   const H = home(); return fly(H.x, H.z);
 }
 // ── Shapes, in a fight. In any fight, and any game of it, he can go from the bird to a man falling, to the man gliding on
-//    his wings, and back into the bird, as often as he likes and with no wait: Space goes round them (bird, falling,
-//    gliding, bird), 1, 2 and 3 go straight to the bird, the fall and the glide; a pad's A is Space, and Y goes round
-//    them too; on a touch screen there is a key for it; and said aloud, "fall", "glide", "bird". Each change is a short
-//    burst of fire and ash and nothing more: the stick is never taken from him. A man is a small target — walls and fire
+//    his wings, and back into the bird, as often as he likes and with no wait: C goes round them (bird, falling,
+//    gliding, bird; in a fight C is the shape, not the lens), 1, 2 and 3 go straight to the bird, the fall and the glide,
+//    and Space only ever brings a man back into the bird (it never takes him out of it); a pad's Y goes round them;
+//    on a touch screen there is a key for it; and said aloud, "fall", "glide", "bird". Each change is a short burst of
+//    fire and ash and nothing more: the stick is never taken from him. A man is a small target — walls and fire
 //    are judged at his size, so he can drop under a wall — he leaves no wall of his own (and the bird's picks up again
 //    after the gap), and the ground puts him out as it would the bird. What he is goes out to everyone at once, and
 //    every screen shows the change with a burst of its own. The house's birds do it too, now and then, to drop under a
@@ -33486,15 +33487,15 @@ function fshSeen(P, was) { if (!P.ma || !MATCH.phase || was === P.form || !/[ptw
 function fshHeard(low) { if (!fshOn()) return false; const w = vNorm(low);
   const want = /^(fall|drop|let go|fold|man|human|become (a )?man)$/.test(w) ? 'fall' : /^(glide|wings|open( your)? wings|spread( your)? wings)$/.test(w) ? 'glide' : /^(bird|phoenix|burn|fly|become (a |the )?bird|catch fire)$/.test(w) ? 'bird' : /^(shift|change|shape|next shape)$/.test(w) ? 'next' : '';
   return want ? (fshTo(want), true) : false; }
-// 1, 2, 3: straight to a shape (Space goes round them: see pressSpace)
+// C: the next shape · 1, 2, 3: straight to one (and Space, as a man, back into the bird: see pressSpace)
 addEventListener('keydown', e => {
-  if (e.repeat || !/^Digit[123]$/.test(e.code) || e.metaKey || e.ctrlKey || !fshOn()) return; const tg = e.target; if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.isContentEditable)) return;
-  e.preventDefault(); e.stopImmediatePropagation(); fshTo(['bird', 'fall', 'glide'][+e.code[5] - 1]);
+  if (e.repeat || !/^(Digit[123]|KeyC)$/.test(e.code) || e.metaKey || e.ctrlKey || e.altKey || !fshOn()) return; const tg = e.target; if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.isContentEditable)) return;
+  e.preventDefault(); e.stopImmediatePropagation(); fshTo(e.code === 'KeyC' ? 'next' : ['bird', 'fall', 'glide'][+e.code[5] - 1]);
 }, true);
 // what shape he is and what comes next, in the letters; and on a touch screen the key for it
 function fshInk() {
   const on = fshOn() && !XR.on, nx = FSH_NEXT[fshNow()];
-  if (on && asciiOn) inkLine(`${TOUCH ? 'SHAPE' : 'SPACE'}: ${FSH_SAY[nx]}${TOUCH ? '' : ' * 1 BIRD * 2 FALL * 3 GLIDE'}`, UIL.nx / 2, Math.round(UIL.ny * 0.1) + 2, inkCi('#e8c8a0'), 0.8, 130);
+  if (on && asciiOn) inkLine(`${TOUCH ? 'SHAPE' : 'C'}: ${FSH_SAY[nx]}${TOUCH ? '' : ' * 1 BIRD * 2 FALL * 3 GLIDE'}`, UIL.nx / 2, Math.round(UIL.ny * 0.1) + 2, inkCi('#e8c8a0'), 0.8, 130);
   if (!TOUCH) return;
   if (!FSH.el) { if (!on) return; const el = FSH.el = document.createElement('div'); el.id = 'fshKey'; const b = document.createElement('button'); b.type = 'button'; b.textContent = 'FALL'; el.appendChild(b);
     b.addEventListener('click', e => { e.stopPropagation(); b.blur(); fshTo('next'); });
