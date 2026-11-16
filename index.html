@@ -4477,14 +4477,14 @@ function animateCape(dt) {
     for (let t = 0; t < idx.length; t += 3) {
       const ia = idx[t] * 3, ib = idx[t + 1] * 3, ic = idx[t + 2] * 3;
       const ux = x[ib] - x[ia], uy = x[ib + 1] - x[ia + 1], uz = x[ib + 2] - x[ia + 2], vx = x[ic] - x[ia], vy = x[ic + 1] - x[ia + 1], vz = x[ic + 2] - x[ia + 2];
-      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const nl = Math.hypot(nx, ny, nz); if (nl < 1e-9) continue;
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const nl = Math.sqrt(nx * nx + ny * ny + nz * nz); if (nl < 1e-9) continue;
       nx /= nl; ny /= nl; nz /= nl;
       const cx = (x[ia] + x[ib] + x[ic]) / 3, cz = (x[ia + 2] + x[ib + 2] + x[ic + 2]) / 3;
       const ed = Math.sin(time * 2.3 + cx * 1.9 + cz * 0.7) * 0.9 + Math.sin(time * 5.1 - cz * 2.6) * 0.45;   // eddies
       const rx = wx * (1 + ed * 0.35) + ed * 0.5 - ((x[ia] - px[ia]) + (x[ib] - px[ib]) + (x[ic] - px[ic])) / (3 * h) - bx;
       const ry = wy + ed * 0.35 - ((x[ia + 1] - px[ia + 1]) + (x[ib + 1] - px[ib + 1]) + (x[ic + 1] - px[ic + 1])) / (3 * h) - by;
       const rz = wz * (1 + ed * 0.35) - ((x[ia + 2] - px[ia + 2]) + (x[ib + 2] - px[ib + 2]) + (x[ic + 2] - px[ic + 2])) / (3 * h) - bz;
-      const sp = Math.hypot(rx, ry, rz), dn = rx * nx + ry * ny + rz * nz;
+      const sp = Math.sqrt(rx * rx + ry * ry + rz * rz), dn = rx * nx + ry * ny + rz * nz;
       // fast air makes cloth flutter: ripples that run from the collar to the hem, bigger toward the free end
       const q = (t / 6) | 0, row = (q / (W - 1)) | 0, fl = Math.sin(time * (6 + sp * 0.45) - row * 0.8 + (q % (W - 1)) * 0.45) * row / C.H;
       let f = 0.55 * C.aero * sp * (dn + fl * Math.min(sp, 30) * 0.09); f = clamp(f, -220, 220);
@@ -4508,7 +4508,7 @@ function animateCape(dt) {
     for (let it = 0, its = TOUCH || XR.on ? 5 : 8; it < its; it++) {
       for (let q = 0; q < nc; q += 4) {
         const i = cons[q], j = cons[q + 1], L = cons[q + 2] * sc, k = cons[q + 3], a3 = i * 3, b3 = j * 3;
-        const dx = x[b3] - x[a3], dy = x[b3 + 1] - x[a3 + 1], dz = x[b3 + 2] - x[a3 + 2], d = Math.hypot(dx, dy, dz);
+        const dx = x[b3] - x[a3], dy = x[b3 + 1] - x[a3 + 1], dz = x[b3 + 2] - x[a3 + 2], d = Math.sqrt(dx * dx + dy * dy + dz * dz);   // (sqrt, not hypot: this runs tens of thousands of times a frame, and hypot is many times slower)
         if (d < 1e-9) continue;
         const wi = i < W ? 0 : 1, wj = j < W ? 0 : 1, ws = wi + wj; if (!ws) continue;
         const g = (d - L) / d * k / ws;
@@ -4519,7 +4519,7 @@ function animateCape(dt) {
     // cloth barely stretches: one pass down from the collar holds each point within a tenth of its length of the one above
     for (let i = W; i < n; i++) {
       const j = i * 3, k = (i - W) * 3, L = C.vl[i] * sc;
-      const dx = x[j] - x[k], dy = x[j + 1] - x[k + 1], dz = x[j + 2] - x[k + 2], d = Math.hypot(dx, dy, dz);
+      const dx = x[j] - x[k], dy = x[j + 1] - x[k + 1], dz = x[j + 2] - x[k + 2], d = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (d > L) { const g = L / d; x[j] = x[k] + dx * g; x[j + 1] = x[k + 1] + dy * g; x[j + 2] = x[k + 2] + dz * g; }
     }
     // his body, and the ground
@@ -5819,8 +5819,22 @@ const flags = { morphed: false, faint: 0, deaths: 0, beganAt: 0, flapHintT: 0 };
 const story = { phase: 'summit', met: new Set(), known: new Set(), gossip: [], events: [], chain: null };
 const beaconsAwake = () => realm === 'over' && (story.phase === 'gods' || story.phase === 'free');
 
-const keys = {};
-const down = (...codes) => codes.some(c => keys[c]);
+const keys = {};   // (the keys as they are held: written only here, ahead of every other listener, so nothing that eats a key for itself can lose one or leave one held)
+// (what is held counts only while nothing else has the keys: a chat or the guide open, a conversation, the map, his record, a warp, a fight watched. Nothing is wiped when one of those comes: when it goes, whatever is still held counts again)
+const keysOff = () => state !== 'play' && state !== 'photo' && state !== 'dead' || CHAT.open || GUIDE.open || COSMOS.map.on;
+const down = (...codes) => !keysOff() && codes.some(c => keys[c]);
+const typingIn = t => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || !!t?.isContentEditable;
+const keysLetGo = () => { for (const k in keys) keys[k] = false; };
+addEventListener('keydown', e => {
+  const t = e.target;
+  if (t instanceof Element && t !== document.body && !(t.checkVisibility ? t.checkVisibility({ visibilityProperty: true }) : t.getClientRects().length)) {   // (the focus left on something since hidden, a closed panel's button or box: it lets go, and the key is the game's)
+    t.blur(); e.preventDefault(); e.stopImmediatePropagation(); document.body.dispatchEvent(new KeyboardEvent('keydown', e)); return; }
+  if (e.code === 'MetaLeft' || e.code === 'MetaRight') return keysLetGo();   // (with Cmd down a Mac sends no keyup for anything: what was held is let go, and a key pressed with it is a shortcut, not held)
+  if (!e.code || e.metaKey || typingIn(t)) return;   // (what is typed into a box is not flying)
+  keys[e.code] = true;
+}, true);
+addEventListener('keyup', e => { if (e.code === 'MetaLeft' || e.code === 'MetaRight') keysLetGo(); else if (e.code) keys[e.code] = false; }, true);
+document.addEventListener('visibilitychange', () => { if (document.hidden) keysLetGo(); });   // (the tab put away: its keyups go elsewhere)
 const stick = { x: 0, y: 0 };  // virtual thumbstick, -1..1, y up
 const boosting = () => down('ShiftLeft', 'ShiftRight', 'TouchBoost') || AP.boost || PAD.boost;
 // ── Pilot view. The bird flown the way a racing car is driven, seen from high behind it: the lens up over its back looking
@@ -7933,7 +7947,7 @@ function wingLeap() {
 // noclip on foot: he floats wherever the lens looks, through anything; E up, Q down (or the stick, the way the lens points)
 function updateNoclip(dt) {
   const p = player, [ix, iz] = axes(), f = camera.getWorldDirection(_n), rX = Math.cos(camYaw), rZ = -Math.sin(camYaw), sp = (boosting() ? 60 : 18) * MOD.speed;
-  const up = (keys.KeyE ? 1 : 0) - (keys.KeyQ ? 1 : 0);
+  const up = (down('KeyE') ? 1 : 0) - (down('KeyQ') ? 1 : 0);
   p.vel.set((f.x * iz + rX * ix) * sp, (f.y * iz + up) * sp, (f.z * iz + rZ * ix) * sp);
   p.pos.addScaledVector(p.vel, dt); p.grounded = false; p.tumble = false; p.climb = null; p.fallTop = p.pos.y; p.wings = false;
   if (Math.hypot(ix, iz) > 0.05) human.group.rotation.y += wrapAngle(Math.atan2(-(f.x * iz + rX * ix), -(f.z * iz + rZ * ix)) - human.group.rotation.y) * damp(8, dt);
@@ -9426,7 +9440,7 @@ function statsOpen() {
   if (MATCH.phase === 'live' && MATCH.me?.alive) { toast('NOT IN THE MIDDLE OF A FIGHT'); return; }
   if (MENU.open) menuShow(false); if (CHAT.open) closeChat(); if (QL.open) qlShow(false); if (GUIDE.open) guideShow(false);
   statsSend(false); state = 'stats'; Object.assign(STV, { on: true, t: 0, page: 0, pan: 0, panV: 0, sc: [], drag: null, map: false, said: -1, layKey: '' });
-  for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+  keys.TouchBoost = false; stick.x = stick.y = 0;
   STV.p0.copy(camera.position); STV.q0.copy(camera.quaternion); STV.fov0 = camera.fov;
   STV.yaw0 = player.form === 'human' ? human.group.rotation.y : player.yaw;
   STV.pages = statsPages(); statsWorld();
@@ -9438,7 +9452,7 @@ function statsClose() {
   if (STV.map) statsMapOut(false);
   STV.on = false; STV.drag = null; if (state === 'stats') state = 'play';
   STV.el.classList.remove('on', 'thru'); document.body.classList.remove('statsv', 'stvmap'); STV.plain.innerHTML = STV.nav.innerHTML = '';
-  for (const k in keys) keys[k] = false; audio.sfx.mapClose?.();
+  audio.sfx.mapClose?.();
 }
 const stvLast = () => STV.pages.length - 1;
 function statsGo(i) { const n = clamp(Math.round(i), 0, stvLast()); if (n !== STV.page) { STV.page = n; audio.sfx.mapTurn?.(0.5); } }
@@ -9802,7 +9816,7 @@ function guideShow(on, focus = true) {
   if (GUIDE.open === on) { if (on && focus && !TOUCH) $('guideIn').focus({ preventScroll: true }); return; }
   if (on && !(state === 'play' || state === 'map')) return;
   GUIDE.open = on; GUIDE.auto = false; $('guide').classList.toggle('open', on);
-  for (const k in keys) keys[k] = false;
+  keys.TouchBoost = false;
   if (on) { if (MENU.open) menuShow(false); if (EXPLAIN.i >= 0) { EXPLAIN.i = 1e9; explainPanel(); } $('guideAsked').textContent = ''; guideChips(); guideLine(GUIDE_HELLO, false); audio.sfx.guideOpen?.();
     if (focus && !TOUCH) $('guideIn').focus({ preventScroll: true }); try { localStorage.setItem('icarus.explained', '1'); } catch {} }
   else { $('guideIn').blur(); $('guide').classList.remove('think'); }
@@ -10015,7 +10029,7 @@ $('miniKeysHit').addEventListener('click', e => { e.stopPropagation(); $('miniKe
 for (const id of ['mini', 'miniWho', 'ctlCard', 'pgCard']) for (const ev of ['pointerdown', 'touchstart', 'wheel', 'dblclick']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
 
 // ── The controls card: a quick look at what does what, for whatever he is holding (the keys, a phone, a pad, the headset,
-//    his voice), a page at a time; from it, Hermes's playground, or a question for Hermes. F1 (or `), the ? under the small
+//    his voice), a page at a time; from it, Hermes's playground, or a question for Hermes. F1, the ? under the small
 //    map, the menu (U · controls), or /keys.
 const CTL = { open: false, dev: '', page: 0 };
 const CTL_DEV = [['keys', 'keys'], ['touch', 'touch'], ['pad', 'pad'], ['xr', 'headset'], ['voice', 'voice']];
@@ -10041,7 +10055,7 @@ $('ctlCard').addEventListener('click', e => { const b = e.target.closest('button
   if (a === 'pg') pgStart(); else if (a === 'ask') openChat('/hermes how do I '); });
 addEventListener('keydown', e => {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.metaKey || e.ctrlKey || e.altKey) return;
-  if ((e.code === 'F1' || e.code === 'Backquote') && (state === 'play' || state === 'map')) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) ctlShow(!CTL.open); return; }
+  if (e.code === 'F1' && (state === 'play' || state === 'map')) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) ctlShow(!CTL.open); return; }
   if (e.code === 'Escape' && (CTL.open || MINI.who || PG.pick)) { e.preventDefault(); e.stopImmediatePropagation(); if (CTL.open) ctlShow(false); else if (MINI.who) miniWhoShow(false); else { PG.pick = false; pgCardDraw(); } return; }
   // (the playground's practice fire: F throws it at Hermes, outside a fight; R is the wind as ever, and counts)
   if (PG.on && PG.list[PG.i] === 'fire' && PG.ph !== 'gap' && state === 'play' && !fbOn() && !e.repeat) {
@@ -10486,14 +10500,13 @@ function chatFilter(f) {   // which kind of line the open log shows
 $('chatTabs').addEventListener('pointerdown', e => { const b = e.target.closest('button[data-f]'); if (!b) return; e.preventDefault(); e.stopPropagation(); chatFilter(b.dataset.f); audio.sfx.ui?.(); });
 function openChat(pre = '') {
   if (CHAT.open) return;
-  CHAT.open = true; for (const k in keys) keys[k] = false;
+  CHAT.open = true; keys.TouchBoost = false;
   const c = $('chat'), i = $('chatInput'); c.classList.remove('hidden'); c.classList.add('open');
   i.value = pre; i.focus({ preventScroll: true }); $('chatLog').scrollTop = 1e6; chShow();
 }
 function closeChat() {
   if (!CHAT.open) return;
   CHAT.open = false; $('chat').classList.remove('open'); $('chatInput').blur();
-  for (const k in keys) keys[k] = false;
 }
 // ── Everything can be typed. A line that begins with / is an order, not something said: /tp and /goto, /sethome and
 //    /home, the camera, the map, who to follow, what to become — the same things a voice can ask for, by name. /help
@@ -10523,7 +10536,7 @@ const CMD_HELP = [
   ['SET', '/sound on|off · /mic on|off · /hands on|off · /quality up|down · /letters up|down · /text bigger|smaller (the size of the words) · /clear'],
   ['RECORD', '/stats (your numbers, written in the sky · Z)'],
   ['ASK', '/ask ANYTHING: she answers, and does it if she can'],
-  ['LEARN', '/keys (the controls, for whatever you hold · F1, ` or the ? under the small map) · /playground (Hermes flies with you and shows you, one thing at a time · /playground loop for one) · /hermes how do I … (or say “Hermes, show me how to …”: he comes, shows it, and goes) · /minimap north|turn|off (Shift M; a press on it opens the map)'],
+  ['LEARN', '/keys (the controls, for whatever you hold · F1 or the ? under the small map) · /playground (Hermes flies with you and shows you, one thing at a time · /playground loop for one) · /hermes how do I … (or say “Hermes, show me how to …”: he comes, shows it, and goes) · /minimap north|turn|off (Shift M; a press on it opens the map)'],
 ];
 // ── The keeper. A traveller called ANDRES whose travel code the server lists may give orders: send someone home (/kick),
 //    ban them (/ban), ban their address too (/ipban), lift it (/unban). The server signs the order; it goes over the live
@@ -12543,14 +12556,18 @@ function flipNet(p) {
 }
 // a pad, if one is plugged in: the left stick flies, the right one looks round, the triggers are the fire and the brake,
 // the shoulders roll him, A is the one button (space), Y a trick
-const PAD = { x: 0, y: 0, roll: 0, brake: 0, boost: false, on: false, b: [] };
+const PAD = { x: 0, y: 0, roll: 0, brake: 0, boost: false, on: false, b: [], id: '', mid: [] };
+addEventListener('gamepadconnected', () => { PAD.lookT = 0; });
 function padTick() {
+  if (!PAD.on) { const now = performance.now(); if (now < (PAD.lookT || 0)) return; PAD.lookT = now + 250; }   // (with no pad, the browser is asked only a few times a second: asking costs a third of a millisecond a frame)
   const gp = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g && g.connected && g.axes.length >= 2) : null;
-  if (!gp) { if (PAD.on) { PAD.on = false; PAD.x = PAD.y = PAD.roll = PAD.brake = PAD.thr = 0; PAD.boost = false; } return; }
+  if (!gp) { if (PAD.on) { PAD.on = false; PAD.x = PAD.y = PAD.roll = PAD.brake = PAD.thr = 0; PAD.boost = false; PAD.id = ''; } return; }
+  if (PAD.id !== gp.id) { PAD.id = gp.id; PAD.mid = []; }
   if (!PAD.on) { PAD.on = true; toast('A PAD · LEFT STICK FLIES · BUMPERS ROLL · TRIGGERS: FIRE AND BRAKE · IN A FIGHT X THROWS FIRE, B IS YOUR WIND, Y CHANGES YOUR SHAPE'); }
   const dz = v => Math.abs(v) < 0.15 ? 0 : (v - Math.sign(v) * 0.15) / 0.85, btn = i => !!(gp.buttons[i] && gp.buttons[i].pressed), val = i => gp.buttons[i] ? gp.buttons[i].value : 0;
-  PAD.x = dz(gp.axes[0]); PAD.y = -dz(gp.axes[1]); PAD.roll = (btn(4) ? 1 : 0) - (btn(5) ? 1 : 0); PAD.brake = val(6); PAD.boost = val(7) > 0.3;
-  if (gp.axes.length >= 4 && player.form === 'phoenix' && !dragging) camYawOff = clamp(camYawOff - dz(gp.axes[2]) * 0.04, -Math.PI, Math.PI);
+  const ax = i => { const v = gp.axes[i] || 0; if (Math.abs(v) < 0.15) PAD.mid[i] = true; return PAD.mid[i] ? dz(v) : 0; };   // (an axis counts once it has been seen at rest in the middle: one that rests at an end, a throttle or a trigger, would hold the nose down for good)
+  PAD.x = ax(0); PAD.y = -ax(1); PAD.roll = (btn(4) ? 1 : 0) - (btn(5) ? 1 : 0); PAD.brake = val(6); PAD.boost = val(7) > 0.3;
+  if (gp.axes.length >= 4 && player.form === 'phoenix' && !dragging) camYawOff = clamp(camYawOff - ax(2) * 0.04, -Math.PI, Math.PI);
   const was = PAD.b; PAD.b = gp.buttons.map(b => b.pressed);
   if (state === 'play' && PAD.b[0] && !was[0]) { const M = MATCH; if (M.phase === 'count' && M.placed && MD.id === M.id && Date.now() < M.t0) { if (MD.ask === 'ready') mdReady(); if (mdCamOn()) mdSkip(); } else pressSpace(); }   // (in a fight's opening, A is Space there: a yes when asked, and his own lens)
   if (state === 'play' && PAD.b[3] && !was[3]) { if (fshOn()) fshTo('next'); else if (player.form === 'phoenix') birdTrick(''); }   // (Y: a trick; in a fight, the next shape)
@@ -14652,7 +14669,6 @@ function updateGods(dt) {
       if (Math.abs(level(nx, nz) - g.gy) < 1.2) { g.x = nx; g.z = nz; } else { v = 0; g.t = 0; }   // gods don't walk off ledges
     }
     const h = level(g.x, g.z), floats = form === 'animal' && g.look === 'swan' && h < WATER;
-    g.gy = floats ? WATER + 0.1 : h;
     g.gy = floats ? waterY(g.x, g.z) + 0.05 : h;
     // unmasked, they don't quite touch the ground
     const hover = form === 'god' && !g.morph ? 0.3 + Math.sin(time * 1.1 + g.x) * 0.1 : 0;
@@ -21765,6 +21781,7 @@ AP.el = (() => { const el = document.createElement('div'); el.className = 'mk'; 
 AP.beam = (() => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 700, 8, 1, true).translate(0, 350, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.15, 0.5), transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); m.visible = false; m.frustumCulled = false; scene.add(m); return m; })();
 const V_SAY = 'SAY: FLY · LAND · GLIDE · BIRD · DIVE · CLIMB · FASTER · BLOW · LEFT · WALK · STOP · GO THERE · MAP · CAMERA · CINEMATIC · PLAYERS · MENU · HANDS ON · BECOME A WHALE';
 function apClear() { AP.kind = ''; AP.until = 0; AP.tx = AP.ty = 0; AP.tb = false; AP.thenLand = false; }
+addEventListener('keydown', e => { if (!e.repeat && AP.kind && AP.kind !== 'go' && AP.kind !== 'catch' && /^(Key[WASD]|Arrow(Up|Down|Left|Right))$/.test(e.code) && down(e.code)) apClear(); }, true);   // (a word that set him going, a dive or a landing, said or misheard: steering again, he has it)
 function apTimed(x, y, secs, boost = false) { AP.kind = 'timed'; AP.tx = x; AP.ty = y; AP.tb = boost; AP.until = time + secs; }
 function apMark(w) {
   AP.wp = w; AP.beam.position.set(w.x, w.y, w.z); AP.beam.visible = true; WP.sel = -1; guideWind(w);
@@ -22189,7 +22206,7 @@ function updateAuto(dt) {
     case 'go': {
       const w = AP.wp; if (!w) { apClear(); break; }
       if (AP.follow) { const F = NET.peers.get(AP.follow); if (F && F.s && performance.now() - F.s.t < 15000) { w.x = F.pos.x; w.y = F.pos.y; w.z = F.pos.z; if (Math.hypot(w.x - p.pos.x, w.z - p.pos.z) < 40) break; } else AP.follow = null; }   // (following someone: the mark is wherever they are now; alongside them there is nothing to do)
-      if (Math.hypot(stick.x, stick.y) > 0.55 || ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].some(k => keys[k])) { apClear(); break; }   // (steering again: he has it)
+      if (Math.hypot(stick.x, stick.y) > 0.55 || down('KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight')) { apClear(); break; }   // (steering again: he has it)
       const dx = w.x - p.pos.x, dz = w.z - p.pos.z, d = Math.hypot(dx, dz), want = Math.atan2(-dx, -dz);
       if (p.form === 'phoenix' && AP.thenLand && Math.hypot(d, w.y - p.pos.y) < 240) {   // close enough: in on a curve, over anything in the way, a flare, and down on the very spot
         AP.thenLand = false; const S = { x: w.x, y: w.y, z: w.z, r: 2.6, name: '' }; apUnmark(); apClear(); perchGo(S); toast('LANDING'); break; }
@@ -22218,7 +22235,7 @@ const photo = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, roll: 0, fov: 50, sn
 function openPhoto(free) {
   if (state !== 'play') return;
   if (MATCH.phase === 'live' && MATCH.me.alive) { toast('NOT IN THE MIDDLE OF A FIGHT'); return; }   // (the world stood still for him alone: nothing could reach him)
-  state = 'photo'; timeK = 0.02; for (const k in keys) keys[k] = false;
+  state = 'photo'; timeK = 0.02; keys.TouchBoost = false;
   photo.pos.copy(camera.position); _e.setFromQuaternion(camera.quaternion, 'YXZ'); photo.yaw = _e.y; photo.pitch = _e.x; photo.roll = 0; photo.fov = camera.fov;
   document.body.classList.add('photo'); document.body.classList.remove('cinema');
   toast(TOUCH ? 'DRAG TO MOVE AND LOOK · PINCH FOR THE LENS · TAP TO KEEP IT · TAP THE CORNER TO GO BACK' : 'PHOTO CAMERA');
@@ -22236,7 +22253,7 @@ function snapPhoto() {
         .then(() => { photo.clip = 1; }, () => { photo.clip = -1; });
   } catch { photo.clip = -1; }
 }
-function closePhoto() { if (state !== 'photo') return; state = 'play'; timeK = 1; photo.run = false; if (photo.live) { photo.live = false; $('photoBar').querySelector('[data-a="live"]').classList.remove('on'); } document.body.classList.remove('photo'); for (const k in keys) keys[k] = false; }
+function closePhoto() { if (state !== 'photo') return; state = 'play'; timeK = 1; photo.run = false; if (photo.live) { photo.live = false; $('photoBar').querySelector('[data-a="live"]').classList.remove('on'); } document.body.classList.remove('photo') }
 // six ready-made framings of wherever he is
 function photoPreset(n) {
   const p = player, yaw = p.form === 'human' ? human.group.rotation.y : p.yaw, big = p.form === 'human' ? 1 : 9, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
@@ -23697,7 +23714,7 @@ function startTalk(g, said = null) {
   if (MENU.open) menuShow(false);   // (a conversation has the screen: the menu goes up out of its way)
   state = 'talk'; talk.god = g; talk.token++; talk.busy = false; talk.text = ''; talk.shown = 0; talk.idx = 0; talk.final = false; talk.hold = 0;
   talk.idle = 0; talk.nudges = 0; talk.after = null; talk.speaking = 'god'; talk.intro = null; talk.scareT = 0; tcam.shot = ''; g.scared = false; talk.gift = null; talk.thanks = false; talk.theirs = false; talk.said = 0;
-  for (const k in keys) keys[k] = false;
+  keys.TouchBoost = false;
   stick.x = stick.y = 0;
   player.vel.x = player.vel.z = 0;
   human.group.rotation.y = Math.atan2(-(g.x - player.pos.x), -(g.z - player.pos.z));   // he turns to face them
@@ -26364,7 +26381,7 @@ function openMap() {
   if (COSMOS.on) return cosmosMap(true);   // (out in space, the map is the map of the heavens)
   if (state !== 'play' || player.cine || player.sub || mapV.open) return;
   state = 'map'; mapV.open = true; mapV.pull = 0; mapV.hover = null; mapV.down = null; audio.sfx.mapOpen?.();
-  for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+  keys.TouchBoost = false; stick.x = stick.y = 0;
   const dpr = Math.min(devicePixelRatio, 2); mapCv.width = innerWidth * dpr; mapCv.height = innerHeight * dpr;
   // it opens out of where he is standing: close in on him, then the country spreads
   mapV.x = mapV.tx = player.pos.x; mapV.z = mapV.tz = player.pos.z; mapV.s = 0.34; mapV.ts = TOUCH ? 0.06 : 0.085;
@@ -26934,7 +26951,7 @@ function startWarp(x, z, y = null, yaw = null) {
   warp.yaw = yaw != null ? yaw : Math.hypot(x - p.pos.x, z - p.pos.z) > 5 ? Math.atan2(-(x - p.pos.x), -(z - p.pos.z)) : p.yaw;
   netWarp(p.pos, warp.to);   // (everyone else sees the light take him, and sees it set him down)
   state = 'warp';
-  for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+  keys.TouchBoost = false; stick.x = stick.y = 0;
   p.vel.set(0, 0, 0); p.wings = false; p.tumble = false; p.stumbleT = 0; p.rollT = 0; p.sliding = false; setManWings(0, 0, 0, 0, 0);
   if (p.form === 'human') { resetPose(); p.grounded = false; }
   const floor = Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER);
@@ -30018,7 +30035,6 @@ addEventListener('keydown', e => {
   }
   if (state === 'photo') {
     if (e.code === 'KeyT' && !e.repeat) { e.preventDefault(); return openChat(); }
-    keys[e.code] = true;
     if (e.code === 'KeyF' || e.code === 'Escape' || isPlus(e)) closePhoto();
     else if (e.code === 'Enter' || e.code === 'Space') snapPhoto();
     else if (/^Digit[1-9]$/.test(e.code)) photoPreset(+e.code[5]);
@@ -30033,13 +30049,12 @@ addEventListener('keydown', e => {
     if (e.code === 'KeyB') { e.preventDefault(); return openChat('/become '); }   // become anything
     if (isPlus(e)) { e.preventDefault(); return openPhoto(true); }
   }
-  keys[e.code] = true;
   if (e.repeat) return;
   switch (e.code) {
     case 'Space': pressSpace(); break;
     case 'KeyH': handsToggle(); break;
     case 'KeyC': TUT.cineOpen = true; cinema.manual = !cinema.manual; toast(cinema.manual ? 'CINEMATIC CAMERA' : PILOT.on ? 'PILOT VIEW' : 'FOLLOW CAMERA'); break;
-    case 'Backquote': pilotSet(); break;   // (the key under Esc: pilot view, on and off)
+    case 'Backquote': case 'IntlBackslash': pilotSet(); break;   // (the key under Esc: pilot view, on and off. On a Mac's international keyboard that key is sent as IntlBackslash)
     case 'Enter': dlgAdvance(); break;
     case 'KeyG': applyTier((tierIdx + 2) % 3, true); break;
     case 'Delete': case 'Backspace': if (!e.repeat) respawnTop(); break;
@@ -30057,7 +30072,6 @@ addEventListener('keydown', e => {
     case 'KeyR': gustBlow(); break;
     case 'KeyQ': if (!humanDive() && !e.repeat && (player.form === 'human' ? player.grounded : player.perch)) turnForm(); break;   // (on his feet, or on a perch: the other body, there. In the air it is Space, as it always was, and Q is the roll)
     case 'KeyO': if (!e.repeat) { REC.on ? recStop() : recStart(); } break;   // record what the lens sees (and again to stop)
-    case 'KeyJ': if (!e.repeat) wpMarkHere(); break;   // keep this place
     case 'KeyN': if (!e.repeat) wpCycle(); break;      // the next of his marks (and, after the last, none)
     case 'Home': if (!e.repeat) wpSelect(0, true); break;   // home: the summit, and he flies it himself
   }
@@ -30065,7 +30079,7 @@ addEventListener('keydown', e => {
 addEventListener('keydown', e => { if (e.code === 'Tab' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); if (!e.repeat) { if (who.pinned) { who.pinned = false; who.open = false; who.tabAt = 0; } else { who.open = true; who.tabAt = performance.now(); } who.t = 0; } }   // (a tap keeps the panel open, so its buttons can be pressed; held, it shows only while held)
   else if (e.code === 'Escape' && who.pinned && state === 'play' && !(e.target instanceof HTMLInputElement)) { who.pinned = false; who.open = false; e.preventDefault(); e.stopPropagation(); } }, true);
 addEventListener('keyup', e => { if (e.code !== 'Tab') return; if (who.tabAt && performance.now() - who.tabAt < 320) { who.pinned = true; who.open = true; } else who.open = false; who.tabAt = 0; });
-addEventListener('keyup', e => { keys[e.code] = false; if (['KeyA', 'ArrowLeft'].includes(e.code)) pro.kl = false; if (['KeyD', 'ArrowRight'].includes(e.code)) pro.kr = false; if (['KeyW', 'ArrowUp'].includes(e.code)) pro.ku = false; if (['KeyS', 'ArrowDown'].includes(e.code)) pro.kd = false; if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { if (state === 'prologue' && (e.code === 'Space' || !pro.pov)) proPress(false); if (state === 'title') titlePress(false); } });
+addEventListener('keyup', e => { if (['KeyA', 'ArrowLeft'].includes(e.code)) pro.kl = false; if (['KeyD', 'ArrowRight'].includes(e.code)) pro.kr = false; if (['KeyW', 'ArrowUp'].includes(e.code)) pro.ku = false; if (['KeyS', 'ArrowDown'].includes(e.code)) pro.kd = false; if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { if (state === 'prologue' && (e.code === 'Space' || !pro.pov)) proPress(false); if (state === 'title') titlePress(false); } });
 $('proSkip').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); proSkip(); });
 // the two choices before the story
 $('primerNote').textContent = (TOUCH ? 'turn it on or off any time from the word ICARUS' : 'press V any time to turn it on or off') + ' · players near you hear your voice, and what you say is shown to everyone as text';
@@ -30082,7 +30096,7 @@ $('primerQuiet').addEventListener('click', e => {
   pro.micAsk = 'quiet'; pro.waitMic = false; $('primer').classList.remove('on', 'asking'); audio.sfx.ui?.();
 });
 addEventListener('blur', () => {
-  for (const k in keys) keys[k] = false;
+  keysLetGo();
   dragging = false; looks.clear(); taps.clear(); joy = null; stick.x = stick.y = 0;
 });
 if (TOUCH) {
@@ -31342,7 +31356,7 @@ function birdStep(dt) {
   const M = LIVE, p = player, P = p.pos, K = birdK();
   if (!birdCan()) { birdAuto('', ''); return false; }
   const [ax, ay] = axes(), xr = XR.on && XR.mode === 'rider';
-  if (!xr && (Math.hypot(ax, ay) > 0.6 || keys.Space)) { birdAuto(''); return false; }   // (he has taken hold of it again)
+  if (!xr && (Math.hypot(ax, ay) > 0.6 || down('Space'))) { birdAuto(''); return false; }   // (he has taken hold of it again)
   M.t += dt; M.clear = 5 * K;
   if (!M.mv || M.mv.done) {
     if (M.mv && TRICK_K.has(M.mv.k)) { M.pitch = wrapAngle(M.pitch); M.roll = wrapAngle(M.roll); }
@@ -31752,7 +31766,7 @@ function godDash(x, z, y = null) {
   const dir = to.clone().sub(from).normalize(); to.addScaledVector(dir, -Math.min(140, d * 0.2));
   to.y = Math.max(to.y, Math.max(height(to.x, to.z), WATER) + 40);
   warp.dash = { t: 0, from, to, dir, T: clamp(d / 3000, 1.2, 3.2) + 0.55, wind: 0.55 }; warp.t = 0; warp.swapped = false; warp.home = false; warp.exact = null; warp.walkP = null;
-  state = 'warp'; for (const k in keys) keys[k] = false; stick.x = stick.y = 0; p.perch = false; p.takeoff = null; p.grounded = false; p.tumble = false;
+  state = 'warp'; keys.TouchBoost = false; stick.x = stick.y = 0; p.perch = false; p.takeoff = null; p.grounded = false; p.tumble = false;
   audio.sfx.whoosh?.(true); (audio.sfx.beamUp || audio.sfx.teleport)?.(); camShake = Math.max(camShake, 0.35);
   dlg.queue.length = 0; dlg.cur = null;
   return true;
@@ -34325,7 +34339,7 @@ function matchPractice(by, life = false, o = null) {   // (o: a game's knock-out
   matchBoom(p.pos.x, p.pos.y, p.pos.z, matchCol(NET.id), birdK() * 0.8, v, true, PATRON.id || ''); matchSend({ k: 're', id: M.id, v, l: life ? M.lives : undefined });
   const T = TRON.trails.get(NET.id); if (T) tronClear(T);
   M.reAt = performance.now() + (o ? o.ms : life ? 800 : 1500); M.deadAt = performance.now(); M.deadPos = (M.deadPos || new THREE.Vector3()).copy(p.pos); M.deadYaw = p.yaw; M.outT = 0; M.glide = null;
-  state = 'watch'; p.gone = true; p.cine = null; p.vel.set(0, 0, 0); for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+  state = 'watch'; p.gone = true; p.cine = null; p.vel.set(0, 0, 0); keys.TouchBoost = false; stick.x = stick.y = 0;
   if (o) { matchBig(o.big || 'BACK IN', 1100); chatLine('', `${by ? by.toUpperCase() + ' · ' : ''}${o.line || 'BACK ON YOUR LINE IN A MOMENT'}`, 'sys'); }
   else if (life) { matchBig('EXTRA LIFE', 1200, '#bff4ff'); chatLine('', `${by ? by.toUpperCase() + ' · ' : ''}YOUR EXTRA LIFE · BACK IN${M.lives ? ` · ${M.lives} MORE` : ''}`, 'sys'); }
   else { matchBig('PRACTICE', 1100); chatLine('', `${by ? by.toUpperCase() + ' · ' : ''}IT DOES NOT COUNT YET · BACK ON YOUR LINE`, 'sys'); }
@@ -34342,7 +34356,7 @@ function matchRespawn() {
 }
 function matchWatch(bring) {   // out, or never in: he watches
   const p = player; if (!MATCH.back) MATCH.back = { pos: p.pos.clone(), form: p.form, grounded: p.grounded, in: MATCH.me.in };
-  state = 'watch'; p.gone = true; p.cine = null; p.vel.set(0, 0, 0); for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+  state = 'watch'; p.gone = true; p.cine = null; p.vel.set(0, 0, 0); keys.TouchBoost = false; stick.x = stick.y = 0;
   if (bring) { p.pos.set(MATCH.cx, MATCH.base + 420, MATCH.cz); streamChunks(Math.floor(p.pos.x / CHUNK), Math.floor(p.pos.z / CHUNK), 40); camera.position.set(MATCH.cx + MATCH.R0 * 0.75, MATCH.base + 520, MATCH.cz + MATCH.R0 * 0.75); lookAt.set(MATCH.cx, MATCH.base + 220, MATCH.cz); }
   matchWatchNext();
 }
@@ -36423,7 +36437,7 @@ function cosmosPresent() {
 function cosmosMap(on) {
   const C = COSMOS, M = C.map; if (on === M.on) return;
   if (on) { if (!C.on) return; M.on = true; M.piv.copy(C.pos); M.q.copy(C.camQ); M.d = 300; M.td = Math.max(CZ_RG * 9, C.nearD * 3); M.pid = 'me'; M.keys = {};
-    for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+    keys.TouchBoost = false; stick.x = stick.y = 0;
     C.mapEl.classList.add('on'); document.body.classList.add('czmap'); czMapText(); audio.sfx.mapOpen?.(); }
   else { M.on = false; C.mapEl.classList.remove('on'); document.body.classList.remove('czmap'); C.camOff = null; audio.sfx.mapClose?.(); }
 }
