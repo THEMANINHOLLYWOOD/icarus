@@ -1093,12 +1093,12 @@ if (TOUCH) { let was = ''; try { was = sessionStorage.getItem('icarus.upright');
 
 // graphics tiers: same look, more light and detail as you go up. Picked from the GPU, then stepped down if frames drop.
 const TIERS = [
-  { name: 'LOW',   rt: 0.42, cell: 2, viewR: 5, fog: 1950, shadows: 0,    glow: 0,    deco: 48,  animals: 0.5, clouds: 160, dpr: 1.5, dof: 0 },
-  { name: 'HIGH',  rt: 0.6,  cell: 3, viewR: 7, fog: 2750, shadows: 1024, glow: 0.35, deco: 64,  animals: 0.8, clouds: 240, dpr: 2, dof: 1 },
-  { name: 'ULTRA', rt: 0.85, cell: 2, viewR: 9, fog: 3400, shadows: 2048, glow: 0.7,  deco: 104, animals: 1,   clouds: 320, dpr: 2, dof: 1 },
-];
+  { name: 'LOW',   rt: 0.42, cell: 2, viewR: 5, fog: 1950, far: 24000, shadows: 0,    glow: 0,    deco: 48,  animals: 0.5, clouds: 160, dpr: 1.5, dof: 0 },
+  { name: 'HIGH',  rt: 0.6,  cell: 3, viewR: 7, fog: 2750, far: 40000, shadows: 1024, glow: 0.35, deco: 64,  animals: 0.8, clouds: 240, dpr: 2, dof: 1 },
+  { name: 'ULTRA', rt: 0.85, cell: 2, viewR: 9, fog: 3400, far: 64000, shadows: 2048, glow: 0.7,  deco: 104, animals: 1,   clouds: 320, dpr: 2, dof: 1 },
+];   // (viewR: how many 400 m squares of country are built in full round him. fog: how far he sees down among the hills. far: how far from up high — see FAR)
 // phones run the top tier too, on a budget a phone GPU can hold; if frames still drop it steps down quietly
-if (TOUCH && !VISION) { Object.assign(TIERS[2], { rt: 0.6, viewR: 7, fog: 2900, shadows: 0, deco: 72, clouds: 200, dpr: 2, cell: 2 }); Object.assign(TIERS[1], { rt: 0.5, shadows: 0, clouds: 160, cell: 2 }); Object.assign(TIERS[0], { cell: 3 }); }   // (a phone: letters a little bigger than a computer's, and finer than they were)
+if (TOUCH && !VISION) { Object.assign(TIERS[2], { rt: 0.6, viewR: 7, fog: 2900, far: 30000, shadows: 0, deco: 72, clouds: 200, dpr: 2, cell: 2 }); Object.assign(TIERS[1], { rt: 0.5, far: 22000, shadows: 0, clouds: 160, cell: 2 }); Object.assign(TIERS[0], { far: 16000, cell: 3 }); }   // (a phone: letters a little bigger than a computer's, and finer than they were)
 function detectTier() {
   try {
     const gl = document.createElement('canvas').getContext('webgl2');
@@ -2880,7 +2880,7 @@ const waterMat = new THREE.ShaderMaterial({
     uAur: { value: 0 }, uShore: { value: null }, uShoreO: { value: new THREE.Vector3(0, 0, 0) }, uWakeB: { value: new THREE.Vector3(0, 0, 0) }, uFire: { value: new THREE.Vector4(0, 0, 0, 0) },
     uRip: { value: v4s(RIPPLES) }, uWake: { value: v4s(WAKE_N) }, uTsu: { value: v4s(TSU_N) }, uStyx: { value: new THREE.Vector4(0, 0, 0, 0) },
     uReefT: { value: null }, uSeaK: { value: 1 }, uSwellK: { value: 1 }, uWarm: { value: 0 }, uStorm: { value: 0 },   // (the sea's colours by place, and the weather on it: see updateSeaLook)
-    uTurq: { value: new THREE.Color(0x2fb8b0) }, uAzure: { value: new THREE.Color(0x1f74b8) }, uIndigo: { value: new THREE.Color(0x0b1e5a) }, uEmer: { value: new THREE.Color(0x1f9a6a) } }]),
+    uTurq: { value: new THREE.Color(0x2fb8b0) }, uAzure: { value: new THREE.Color(0x1f74b8) }, uIndigo: { value: new THREE.Color(0x0b1e5a) }, uEmer: { value: new THREE.Color(0x1f9a6a) }, uFarSky: { value: new THREE.Color(0x9fd3f6) } }]),
   vertexShader: `varying vec3 vWp; uniform vec4 uStyx;
     #include <fog_pars_vertex>
     ${SEA_GLSL}
@@ -2899,7 +2899,7 @@ const waterMat = new THREE.ShaderMaterial({
       vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
       #include <fog_vertex>
     }`,
-  fragmentShader: `uniform vec3 uDeep, uShallow, uZen, uHor, uSunCol, uSunDir, uTurq, uAzure, uIndigo, uEmer; uniform vec4 uFire; uniform float uAur, uWarm, uStorm; varying vec3 vWp;
+  fragmentShader: `uniform vec3 uDeep, uShallow, uZen, uHor, uSunCol, uSunDir, uTurq, uAzure, uIndigo, uEmer, uFarSky; uniform vec4 uFire; uniform float uAur, uWarm, uStorm; varying vec3 vWp;
     #include <fog_pars_fragment>
     ${SEA_GLSL}
     ${SWELL_GLSL}
@@ -2995,7 +2995,10 @@ const waterMat = new THREE.ShaderMaterial({
         float clearK = mix(smoothstep(0.0, 3.5, depth), smoothstep(0.0, 10.0 + 20.0 * reef, depth), (1.0 - uUnder) * (1.0 - uStorm * 0.7));
         gl_FragColor = vec4(c, clamp(max(mix(mix(0.42, 0.22, 1.0 - uUnder), 0.92, clearK), fres * 1.6 + foam), 0.0, 1.0));
       }
-      #include <fog_fragment>
+      #ifdef USE_FOG
+        float farFog = smoothstep(fogNear, fogFar, vFogDepth);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, mix(fogColor, uFarSky, farFog * farFog), farFog);   // (the sea goes out to the sky's own colour, as the far country does: see FAR)
+      #endif
     }`,
   transparent: true, fog: true, side: THREE.DoubleSide,
 });
@@ -3003,9 +3006,10 @@ waterMat.uniforms.uShore.value = SHORE.tex; waterMat.uniforms.uReefT.value = SHO
 const water = new THREE.Mesh((() => {
   // a disc that travels with the camera: fine near the lens, where waves have to move, and reaching the horizon
   const R = TOUCH ? 72 : 110, A = TOUCH ? 128 : 192, pos = [], idx = [];
-  for (let r = 0; r <= R; r++) { const t = r / R, rad = 9500 * Math.pow(t, 4) + t * 150;
+  const X = [14000, 22000, 36000, 60000, 96000], RR = R + X.length;   // (and five wide rings more, out past the edge of sight: see FAR)
+  for (let r = 0; r <= RR; r++) { const t = r / R, rad = r > R ? X[r - R - 1] : 9500 * Math.pow(t, 4) + t * 150;
     for (let a = 0; a < A; a++) { const an = a / A * Math.PI * 2; pos.push(Math.cos(an) * rad, 0, Math.sin(an) * rad); } }
-  for (let r = 0; r < R; r++) for (let a = 0; a < A; a++) { const b = (a + 1) % A, i0 = r * A + a, i1 = r * A + b, i2 = i0 + A, i3 = i1 + A; idx.push(i0, i1, i2, i1, i3, i2); }
+  for (let r = 0; r < RR; r++) for (let a = 0; a < A; a++) { const b = (a + 1) % A, i0 = r * A + a, i1 = r * A + b, i2 = i0 + A, i3 = i1 + A; idx.push(i0, i1, i2, i1, i3, i2); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); return g;
 })(), waterMat);
 water.position.y = WATER; water.frustumCulled = false;
@@ -3197,48 +3201,96 @@ function shove(c, x, y, z, R, dt) {
 }
 let birdV = 0;
 const SIZ = { k: 0, t: 0, rain: 0 };
-// ── The far country. Out past where the country is built in full, the land goes on: one coarse sheet of it, the same
-//    ground in the same colours, out to the edge of sight — so that from high up, or flying fast, there is always country to
-//    the horizon, going blue with distance, never a white wall. It is laid down a few rows a frame and swapped in whole when
-//    he has gone far enough from where it was centred; inside the built country it is not drawn at all.
-const FAR = { mesh: null, cx: 1e12, cz: 1e12, job: null, N: TOUCH ? 64 : 96, span: TOUCH ? 15000 : 21000, uR: { value: 0 }, k: 0, idx: null };
-function farMat() {
-  const m = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: 6, polygonOffsetUnits: 6 });
-  m.onBeforeCompile = sh => { sh.uniforms.uFarR = FAR.uR;
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vFarW;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvFarW = (modelMatrix * vec4(transformed, 1.0)).xz;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vFarW; uniform float uFarR;').replace('void main() {', 'void main() {\n  if (length(vFarW - cameraPosition.xz) < uFarR) discard;   // (the built country is here)'); };
+// ── The far country. Out past where the country is built in full, the land goes on, out to the edge of sight: the same
+//    ground in the same colours, laid down three times over, each sheet coarser and wider than the one inside it — the near
+//    hills every sixty-four metres out to four kilometres, the far country every two hundred or so out to ten, and the
+//    horizon every kilometre out to sixty-five: mountains, islands, the far ranges, the sea. So from high up, or flying fast,
+//    or in a headset, there is always country to the horizon, going blue with distance into the colour of the sky and never
+//    ending in a white wall. A sheet is laid down a few rows a frame and swapped in whole when he has gone far enough from
+//    where it was centred (what it shares with the sheet it replaces is copied, not worked out again); inside the built
+//    country none of them is drawn at all, and each leaves out the square the finer one inside it covers.
+//    (FAR.L: the sheets, finest first. FAR.mesh, FAR.span: the middle one, as it always was.)
+const PHONE = TOUCH && !VISION;
+const FAR = { mesh: null, job: null, uR: { value: 0 }, k: 0, sea: new THREE.Color(), sky: new THREE.Color(), built: 0, ms: 0,
+  L: (PHONE ? [[97, 64, 3, 0.14, 4], [65, 240, 6, 0.14, 7], [65, 1024, 18, 0.09, 12]] : [[129, 64, 3, 0.14, 4], [97, 224, 6, 0.14, 7], [129, 1024, 18, 0.09, 12]])
+    .map(([N, step, drop, slack, off], i) => ({ i, N, step, drop, slack, off, half: (N - 1) * step / 2, mesh: null, cx: 1e12, cz: 1e12, h: null, col: null, idx: null, uIn: { value: new THREE.Vector3(0, 0, 0) }, uDrop: { value: drop } })) };
+FAR.span = FAR.L[1].half * 2; FAR.reach = FAR.L[2].half * (1 - 2 * FAR.L[2].slack) * 0.97;   // (reach: how far the horizon sheet is sure to go, whichever way he went from its middle)
+// how far he can see from up high: his tier's distance (in a headset, all of it), and never past the last sheet
+const sightFar = () => Math.min(XR.on ? 64000 : tier.far || 24000, FAR.reach);
+function farMat(L) {
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: L.off, polygonOffsetUnits: L.off });
+  m.onBeforeCompile = sh => { sh.uniforms.uFarR = FAR.uR; sh.uniforms.uFarIn = L.uIn; sh.uniforms.uFarDrop = L.uDrop; sh.uniforms.uFarSea = { value: FAR.sea }; sh.uniforms.uFarSky = { value: FAR.sky };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vFarW;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvFarW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFarW; uniform float uFarR, uFarDrop; uniform vec3 uFarIn, uFarSea, uFarSky;')
+      .replace('void main() {', `void main() {
+  if (length(vFarW.xz - cameraPosition.xz) < uFarR) discard;   // (the built country is here)
+  if (max(abs(vFarW.x - uFarIn.x), abs(vFarW.z - uFarIn.y)) < uFarIn.z) discard;   // (and here the finer sheet)`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+  diffuseColor.rgb = mix(diffuseColor.rgb, uFarSea, smoothstep(${(WATER + 1.5).toFixed(1)}, ${(WATER - 2.5).toFixed(1)}, vFarW.y + uFarDrop));   // (under the sea it is the sea's colour: the shore is drawn where the water really meets the land, however coarse the sheet)`)
+      .replace('#include <fog_fragment>', `#ifdef USE_FOG
+    float farFog = smoothstep(fogNear, fogFar, vFogDepth);
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, mix(fogColor, uFarSky, farFog * farFog), farFog);   // (far enough off it is the colour of the sky it stands against)
+  #endif`); };
   m.customProgramCacheKey = () => 'far-country';
   return m;
 }
+const farPeaks = () => FAR.peaks || (FAR.peaks = [[MOUNT.x, MOUNT.z, MOUNT.R], ...VOLCANOES.map(v => [v.x, v.z, Math.sqrt(v.reach2 || 1e6)])]);
+// the ground at a point of a sheet. On the horizon's, a mountain can stand between two points a kilometre apart: there the
+// highest of five is taken, so Olympus and the volcanoes are on the skyline at their full height
+function farH(L, x, z) {
+  let h = overHeight(x, z);
+  if (L.step > 500) for (const P of farPeaks()) { const dx = x - P[0], dz = z - P[1], r = P[2] + L.step; if (dx * dx + dz * dz < r * r) { const e = L.step * 0.3;
+    h = Math.max(h, overHeight(x + e, z + e), overHeight(x - e, z + e), overHeight(x + e, z - e), overHeight(x - e, z - e), dx * dx + dz * dz < L.step * L.step * 0.5 ? overHeight(P[0], P[1]) : -1e9); break; } }
+  return h;
+}
 function farStep(dt) {
-  const over = realm === 'over', c = camera.position, p = player;
-  if (FAR.mesh) FAR.mesh.visible = over && state !== 'title' && state !== 'prologue';
-  if (!over) { FAR.k = 0; return; }
-  const N = FAR.N, step = FAR.span / (N - 1);
-  if (!FAR.job && Math.hypot(c.x - FAR.cx, c.z - FAR.cz) > FAR.span * 0.14) { const cx = Math.round(c.x / 250) * 250, cz = Math.round(c.z / 250) * 250; FAR.job = { cx, cz, j: 0, phase: 0, h: new Float32Array(N * N), pos: new Float32Array(N * N * 3), col: new Float32Array(N * N * 3) }; }
+  const over = realm === 'over', c = camera.position, p = player, show = over && state !== 'title' && state !== 'prologue';
+  for (const L of FAR.L) if (L.mesh) L.mesh.visible = show;
+  if (!over) { FAR.k = 0; waterMat.uniforms.uFarSky.value.copy(scene.fog.color); return; }
+  const sp = p.form === 'phoenix' ? p.speed : Math.hypot(p.vel.x, p.vel.y, p.vel.z);
+  if (!FAR.job) {   // whichever sheet he has gone furthest out of is laid again (the middle one first of all)
+    let best = null, bk = 1;
+    for (const L of FAR.L) { if (!FAR.mesh && L.i !== 1) continue; if (L.i === 0 && L.mesh && sp > 420) continue;   // (going that fast the near hills cannot keep up, and are not missed)
+      const k = L.mesh ? Math.max(Math.abs(c.x - L.cx), Math.abs(c.z - L.cz)) / (L.half * 2 * L.slack) : L.i === 1 ? 9 : 5; if (k > bk) { bk = k; best = L; } }
+    if (best) { const L = best, N = L.N, cx = Math.round(c.x / L.step) * L.step, cz = Math.round(c.z / L.step) * L.step;
+      FAR.job = { L, cx, cz, j: 0, phase: 0, h: new Float32Array(N * N), pos: new Float32Array(N * N * 3), col: new Float32Array(N * N * 3), di: L.h ? Math.round((cx - L.cx) / L.step) : 1e9, dj: L.h ? Math.round((cz - L.cz) / L.step) : 1e9, t: 0 }; }
+  }
   const J = FAR.job;
-  if (J) { const t0 = performance.now(), x0 = J.cx - FAR.span / 2, z0 = J.cz - FAR.span / 2, budget = !FAR.mesh ? 40 : TOUCH ? 1.2 : 2.2;
+  if (J) { const L = J.L, N = L.N, step = L.step, t0 = performance.now(), x0 = J.cx - L.half, z0 = J.cz - L.half, budget = !FAR.mesh ? 40 : !L.mesh ? (XR.on ? 2 : 5) : PHONE || XR.on ? 1.2 : 2.2;
+    const oh = L.h, oc = L.col, di = J.di, dj = J.dj;
     while (J.phase < 2 && performance.now() - t0 < budget) {
-      const j = J.j;
-      if (J.phase === 0) { for (let i = 0; i < N; i++) J.h[j * N + i] = overHeight(x0 + i * step, z0 + j * step); }
-      else for (let i = 0; i < N; i++) { const o = j * N + i, h = J.h[o], hx = J.h[j * N + Math.min(N - 1, i + 1)] - J.h[j * N + Math.max(0, i - 1)], hz = J.h[Math.min(N - 1, j + 1) * N + i] - J.h[Math.max(0, j - 1) * N + i];
-        const ny = 2 * step / Math.hypot(hx, 2 * step, hz), x = x0 + i * step, z = z0 + j * step;
-        J.pos[o * 3] = x; J.pos[o * 3 + 1] = h - 6; J.pos[o * 3 + 2] = z; terrainColor(x, z, h, ny, J.col, o * 3); }
+      const j = J.j, oj = j + dj, rowOld = oh && oj >= 0 && oj < N;
+      if (J.phase === 0) { for (let i = 0; i < N; i++) { const oi = i + di; J.h[j * N + i] = rowOld && oi >= 0 && oi < N ? oh[oj * N + oi] : farH(L, x0 + i * step, z0 + j * step); } }
+      else for (let i = 0; i < N; i++) { const o = j * N + i, h = J.h[o], x = x0 + i * step, z = z0 + j * step, oi = i + di;
+        J.pos[o * 3] = x; J.pos[o * 3 + 1] = h - L.drop; J.pos[o * 3 + 2] = z;
+        if (rowOld && oj > 0 && oj < N - 1 && oi > 0 && oi < N - 1) { const q = (oj * N + oi) * 3; J.col[o * 3] = oc[q]; J.col[o * 3 + 1] = oc[q + 1]; J.col[o * 3 + 2] = oc[q + 2]; continue; }
+        const hx = J.h[j * N + Math.min(N - 1, i + 1)] - J.h[j * N + Math.max(0, i - 1)], hz = J.h[Math.min(N - 1, j + 1) * N + i] - J.h[Math.max(0, j - 1) * N + i];
+        const ny = 2 * step / Math.hypot(hx, 2 * step, hz); terrainColor(x, z, h, ny, J.col, o * 3);
+        // (where the woods stand: the trees are not drawn this far off, but their green is)
+        { const w = h > WATER + 4 && h < 520 && ny > 0.8 ? forestAt(x, z) * smoothstep(520, 400, h) * smoothstep(0.8, 0.9, ny) * 0.62 : 0; if (w > 0) { const q = o * 3, T = noise2(x / 420 + 3.3, z / 420 - 6.1) > 0.1 ? COL.pine : COL.round; J.col[q] = lerp(J.col[q], T[0] * 0.8, w); J.col[q + 1] = lerp(J.col[q + 1], T[1] * 0.8, w); J.col[q + 2] = lerp(J.col[q + 2], T[2] * 0.8, w); } } }
       if (++J.j >= N) { J.j = 0; J.phase++; } }
+    J.t += performance.now() - t0;
     if (J.phase >= 2) {
-      if (!FAR.idx) { const I = []; for (let j = 0; j < N - 1; j++) for (let i = 0; i < N - 1; i++) { const a = j * N + i, b = a + 1, d = a + N, e = d + 1; I.push(a, d, b, b, d, e); } FAR.idx = I; }
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(J.pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(J.col, 3)); g.setIndex(FAR.idx); g.computeVertexNormals(); g.computeBoundingSphere();
-      if (!FAR.mesh) { FAR.mesh = new THREE.Mesh(g, farMat()); FAR.mesh.frustumCulled = false; FAR.mesh.renderOrder = -1; scene.add(FAR.mesh); } else { FAR.mesh.geometry.dispose(); FAR.mesh.geometry = g; }
-      FAR.cx = J.cx; FAR.cz = J.cz; FAR.job = null; } }
+      if (!L.idx) { const I = []; for (let j = 0; j < N - 1; j++) for (let i = 0; i < N - 1; i++) { const a = j * N + i, b = a + 1, d = a + N, e = d + 1; I.push(a, d, b, b, d, e); } L.idx = I; }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(J.pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(J.col, 3)); g.setIndex(L.idx); g.computeVertexNormals(); g.computeBoundingSphere();
+      if (!L.mesh) { L.mesh = new THREE.Mesh(g, farMat(L)); L.mesh.frustumCulled = false; L.mesh.renderOrder = -1; L.mesh.visible = show; scene.add(L.mesh); if (L.i === 1) FAR.mesh = L.mesh; } else { L.mesh.geometry.dispose(); L.mesh.geometry = g; }
+      L.cx = J.cx; L.cz = J.cz; L.h = J.h; L.col = J.col; FAR.job = null; FAR.built++; FAR.ms = J.t; } }
+  // each sheet leaves out the square the finer one covers (less a little, so they lap)
+  for (const L of FAR.L) { const F = L.i > 0 ? FAR.L[L.i - 1] : null; if (F && F.mesh) L.uIn.value.set(F.cx, F.cz, F.half - L.step * 1.5); else L.uIn.value.z = 0; }
   // how far he can see: from up high, or going fast, a long way; down among the hills, as before
-  const alt = c.y - Math.max(terrainAt(c.x, c.z), WATER), sp = p.form === 'phoenix' ? p.speed : Math.hypot(p.vel.x, p.vel.y, p.vel.z);
+  const alt = c.y - Math.max(terrainAt(c.x, c.z), WATER);
   // and on a wide shot (the director's long lenses, a camera far off him, the photo camera on a long lens) all the way out
   const wideShot = (cinema.on && cinema.shot && /^(profile|wide|crane|top|orbit|tele|scale|reveal|imax|pair|take)$/.test(cinema.shot.type)) || (state === 'photo' && camera.fov < 42) || (state === 'play' && c.distanceTo(p.pos) > 95) || state === 'stats';
   FAR.wide = lerp(FAR.wide || 0, wideShot ? 1 : 0, damp(wideShot ? 1.4 : 0.6, dt));
   VIEW_X = FAR.wide > 0.6 && !XR.on ? (TOUCH ? 1 : 2) : FAR.wide < 0.3 ? 0 : VIEW_X;
-  const want = FAR.mesh ? Math.max(smoothstep(60, 700, alt), smoothstep(110, 280, sp) * 0.75, FAR.wide) : 0;
+  // (in a headset there is no frame round the picture to end it: even standing on the ground he sees a long way)
+  const want = FAR.mesh ? Math.max(smoothstep(60, 700, alt), smoothstep(110, 280, sp) * 0.75, FAR.wide, XR.on ? 0.3 : 0) : 0;
   FAR.k = lerp(FAR.k, want, damp(want > FAR.k ? 1.6 : 0.8, dt));
   FAR.uR.value = Math.max(0, (VIEW_R - 1.6) * CHUNK - (FAR.lead || 0));   // (when the built country runs ahead of him, behind him it is the far country sooner)
+  // the sea out there, and the sky the last of the land fades into (what the sky itself shows at its foot, weather and all)
+  FAR.sea.copy(pal.water).lerp(pal.hor, 0.42);
+  FAR.sky.copy(skyMat.uniforms.hor.value).lerp(skyMat.uniforms.mistCol.value, skyMat.uniforms.mist.value).lerp(scene.fog.color, c.y < WATER ? 1 : clamp(Math.max(WX.fog || 0, cloudIn), 0, 1));
+  waterMat.uniforms.uFarSky.value.copy(FAR.sky);
 }
 function updateClouds(dt) {
   if (SIZ.k > 0) {
@@ -3291,8 +3343,9 @@ function updateClouds(dt) {
   { const sp = player.form === 'phoenix' ? player.speed : 0, fast = smoothstep(120, 300, sp); cloudIn = lerp(cloudIn, clamp(inside * 1.6, 0, 1) * (1 - 0.55 * fast), damp(3.5 + fast * 9, dt)); }   // (at speed he is through it in a breath)
   _cc.copy(pal.hor).lerp(WHITE_C, under ? 0.05 : 0.45);
   scene.fog.color.lerp(_cc, cloudIn * 0.8);
-  const fFar = lerp(lerp(fogFar, Math.max(fogFar, FAR.span * 0.46), FAR.k), FAR.span * 0.66, (FAR.wide || 0) * 0.9), fNear = lerp(lerp(260, 900, FAR.k), 1600, (FAR.wide || 0) * 0.8);   // (a wide shot sees nearly all the way to the far country's edge)
-  { const cf = Math.max(14000, fFar * 1.35); if (Math.abs(camera.far - cf) > 400) { camera.far = cf; camera.updateProjectionMatrix(); } }
+  // (from up high the air is clear to the horizon: the haze begins a long way off and comes on slowly. A wide shot sees at least nearly all the way to the far country's edge)
+  const sight = FAR.L[2].mesh ? Math.max(fogFar, sightFar()) : Math.max(fogFar, FAR.span * 0.46), fFar = lerp(lerp(fogFar, sight, FAR.k), Math.max(sight, FAR.span * 0.66), (FAR.wide || 0) * 0.9), fNear = lerp(lerp(260, Math.max(900, sight * 0.06), FAR.k), Math.max(1600, sight * 0.06), (FAR.wide || 0) * 0.8);
+  { const cf = Math.max(14000, fFar * 1.3); if (Math.abs(camera.far - cf) > 400) { camera.far = cf; camera.updateProjectionMatrix(); postMat.uniforms.uFar.value = cf; } }
   scene.fog.near = lerp(fNear, 40, cloudIn); scene.fog.far = lerp(fFar, 720, cloudIn);
   cinema.fogK = lerp(cinema.fogK, cinema.on && state === 'play' && cinema.shot && cinema.shot.type !== 'dir' && !under ? 1 : 0, damp(1.5, dt));
   if (cinema.fogK > 0.01) {   // the film camera: the haze begins just past him, and on a long lens it is thicker (cineHaze)
@@ -34000,6 +34053,7 @@ setTimeout(() => {
   if (window.__icarus) Object.assign(window.__icarus, { STU, stuOpen, stuClose, stuTab, stuMissions, stuProSeek, stuPlay, stuWatch, stuFetch, stuTest, stuBack, stuGo, stuStep, stuPP, stuRate, sceneClean, stuDone });
   if (window.__icarus) Object.assign(window.__icarus, { MD, PW, INKW, inkSay, inkNow, mdReady, mdHeard, mdShotAt, mdCamOn, mdSkip, matchBusy, matchWait, matchFire, matchUnqueue, matchFirst, matchRAt, matchWhere, matchParty, pwTake, pwShatter, matchBar, aresScript, miPose, MODEBAR, queueOf: () => MATCH.queue });   // (tests: the fight's opening, its words, one at a time)
   if (window.__icarus) Object.assign(window.__icarus, { SONIC, SOUND, sonicBoom, sonicTaps, sonicCone, peerBoom, nearMissTick });   // (tests: the sound barrier)
+  if (window.__icarus) Object.assign(window.__icarus, { FAR, TIERS, sightFar, farStep, xrLeave, tick, get dir3() { return dir3; } });   // (tests: the far country)
   frame();
 }, 30);
 </script>
