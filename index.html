@@ -21537,11 +21537,16 @@ function updateCinemaState(dt) {
   // on foot it is only ever asked for (C), and never indoors, where the walls would be in the way
   const foot = p.form === 'human' && state === 'play' && !p.cine && !p.gone && cinema.manual && !roomAt(p.pos.x, p.pos.y, p.pos.z);
   const [ax, ay] = axes();
-  const steering = Math.abs(ax) + Math.abs(ay) > 0.1;
-  cinema.idle = flying && !steering ? cinema.idle + dt : 0;
-  if (flying && cinema.autoT > 0) cinema.autoT -= dt;
+  const steering = Math.abs(ax) + Math.abs(ay) > 0.1 || Object.values(keys).some(Boolean) || !!(stick.x || stick.y);   // (any key held or touch is a hand on him, not just the stick)
   const alt = p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER);
-  const want = flying && (cinema.manual || cinema.autoT > 0 || cinema.idle > 6 && TUT.cineOpen) && !(alt < ROLL_ALT * 1.5 && !cinema.manual && cinema.autoT <= 0);
+  // the lens may take him by itself only when nothing can go wrong while he is not looking: never in a fight, nor with the god
+  // in him, nor fast, low, or with the ground coming up; unless the bird is flying itself (the autopilot, or "the bird flies")
+  const selfFlown = !!(AP.kind || BIRD.auto), calm = !MATCH.phase && state === 'play' && !GODM.on && (selfFlown || p.speed < 150 && alt > 140 && (p.danger || 0) < 0.04);
+  cinema.idle = flying && !steering && calm ? cinema.idle + dt : 0;
+  if (flying && cinema.autoT > 0) cinema.autoT -= dt;
+  const auto = !cinema.manual && (cinema.autoT > 0 || cinema.idle > 12 && TUT.cineOpen);
+  if (auto && cinema.on && !calm) cinema.autoT = 0;   // (and the moment it stops being safe, the lens is his again)
+  const want = flying && (cinema.manual || auto && calm) && !(alt < ROLL_ALT * 1.5 && !cinema.manual && cinema.autoT <= 0);
   const on = want || foot;
   if (on && cinema.on && (cinema.sc < 0.2) !== (p.form === 'human')) newShot();   // (he changed shape: the shots change size; on foot they are sized 0.085, and a bird made small is never under a quarter, so a hawk over Crete is not taken for a man and cut every frame)
   if (on && !cinema.on) { cinema.on = true; cinema.last = ''; newShot(); }
