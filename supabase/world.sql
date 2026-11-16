@@ -224,3 +224,11 @@ create index if not exists story_scenes_published on public.story_scenes (publis
 alter table public.story_scenes enable row level security;
 revoke all on public.story_scenes from anon, authenticated;
 grant select, insert, update, delete on public.story_scenes to service_role;
+
+-- ── Travellers' own agents (api/_mcp.js), and what a traveller and their agents say to each other (api/_talk.js).
+-- No table of their own: an agent is a row of `travellers` with phase 'agent', a sign-in waiting to be collected is one
+-- with phase 'pair', and a note between a traveller and one of their agents is one with phase 'note' (gone when it has
+-- been handed over, or a day old). Everything works without what follows; these two only save the server from reading
+-- the whole table to find them, once there are many travellers.
+create index if not exists travellers_agents on public.travellers ((save->>'owner')) where phase = 'agent';
+create index if not exists travellers_notes on public.travellers ((save->>'agent'), seen) where phase = 'note';
