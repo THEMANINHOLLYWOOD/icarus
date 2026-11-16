@@ -12759,7 +12759,7 @@ let camShake = 0;
 function respawnTop() {
   const p = player;
   if (state !== 'play' || p.cine || story.phase === 'summit' && p.grounded) return;
-  if (realm === 'under') setRealm('over', START.x, START.z);
+  if (realm === 'under') { questEvent.wasUnder = false; setRealm('over', START.x, START.z); }   // (given up down there: that is not coming back up alive)
   if (flags.morphed) {   // the light comes down for him, the way it does when he is carried anywhere, and sets him on the summit
     warp.home = true; startWarp(START.x, START.z, SUMMIT + 16, Math.atan2(MOUNT.x - EDGE.x, MOUNT.z - EDGE.z));
     if (state === 'warp') { toast('HOME · MOUNT OLYMPUS'); return; }
@@ -12902,7 +12902,7 @@ function updateDeath(dt) {
     if (death.t > 1.7) {
       death.thud = false;
       // back to the top: high above the summit, already falling (below the water there is no mountain: he drops in where he first came through)
-      if (realm === 'under') { setRealm('over', START.x, START.z); toast('THE DEAD GIVE YOU BACK · MOUNT OLYMPUS'); }   // (the dead do not keep him: he wakes falling onto Olympus)
+      if (realm === 'under') { questEvent.wasUnder = false; setRealm('over', START.x, START.z); toast('THE DEAD GIVE YOU BACK · MOUNT OLYMPUS'); }   // (the dead do not keep him: he wakes falling onto Olympus)
       wake.copy(START);
       udClear(); UD.grace = time + 10;
       { const soft = death.soft, ox = p.pos.x, oy = p.pos.y, oz = p.pos.z;
@@ -15356,7 +15356,7 @@ function updateStyx(dt) {
 }
 function styxGoal() {
   const c = otherById.charon;
-  if (!STYX.on || UNDER.side < 0 || !c) return '◇ FIND HADES';
+  if (!STYX.on || UNDER.side < 0 || !c) { const hx = hades.x - player.pos.x, hz = hades.z - player.pos.z; return hades.active ? `◇ FIND HADES · ${fmtDist(Math.hypot(hx, hz))} ${compass(hx, hz).toUpperCase()}` : '◇ FIND HADES'; }   // (over the river: how far his house is, and which way)
   const dx = c.x - player.pos.x, dz = c.z - player.pos.z;
   return `◇ CROSS THE STYX — FIND THE FERRYMAN · ${fmtDist(Math.hypot(dx, dz))} ${compass(dx, dz).toUpperCase()}`;
 }
@@ -24955,7 +24955,7 @@ const KINDS = {
   arena: () => 'fly Hermes’s rings round his island, every one, and claim them',
   // (the parts a story can be made of, besides the tasks above)
   go: (n, q) => `go to ${q?.to?.label || 'the place they named'}`, meet: (n, q) => `find ${q?.to?.label || 'the one they named'} and say what you were told to say`, torch: () => 'light one of the torches on the summit for your god',
-  under: () => 'go down into the Underworld, and come back up alive', trees: n => `cut ${n} trees with your wings`, stones: n => `send ${n > 1 ? n + ' of the hanging stones' : 'one of the hanging stones'} flying`,
+  under: () => realm === 'under' ? 'you are below: now come back up alive' : 'go down into the Underworld, and come back up alive', trees: n => `cut ${n} trees with your wings`, stones: n => `send ${n > 1 ? n + ' of the hanging stones' : 'one of the hanging stones'} flying`,
 };
 const RANGE = { dive: [600, 1100], skim: [300, 1500], walk: [200, 800], perfect: [1, 3], fall: [100, 400], hoops: [3, 12], fly: [2, 8], trees: [3, 20], stones: [1, 6] };
 const PERKS = {
@@ -25190,11 +25190,13 @@ function qlActive() {
 const qlBar = (v, w = 10) => '[' + '#'.repeat(Math.round(clamp(v, 0, 1) * w)) + '-'.repeat(w - Math.round(clamp(v, 0, 1) * w)) + ']';
 const qlDist = to => { if (!to) return ''; const dx = to.x - player.pos.x, dz = to.z - player.pos.z, d = Math.hypot(dx, dz); return d < 60 ? 'HERE' : `${fmtDist(d)} ${compass(dx, dz).toUpperCase().replace('NORTH', 'N').replace('SOUTH', 'S').replace('EAST', 'E').replace('WEST', 'W').replace('-', '')}`; };
 // Where an errand is best begun, when it has no place of its own: the sea for skimming, the nearest falls, an island, a
-// beacon not yet lit; failing that, the god who asked it of him. Every errand can be gone to.
+// beacon not yet lit, deep water for the way down; failing that, the god who asked it of him. Every errand can be gone to.
+// (Below, none of them: every errand is done up in the world, and the upper world's places are other places down here.)
 function qlWhere(e) {
-  if (!e) return null; if (e.to) return { x: e.to.x, z: e.to.z }; const P = player.pos, d2 = (x, z) => (x - P.x) ** 2 + (z - P.z) ** 2;
+  if (!e || realm === 'under') return null; if (e.to) return { x: e.to.x, z: e.to.z }; const P = player.pos, d2 = (x, z) => (x - P.x) ** 2 + (z - P.z) ** 2;
   const best = (L, f) => { let b = null, bd = Infinity; for (const o of L) { const w = f(o); if (!w) continue; const d = d2(w.x, w.z); if (d < bd) { bd = d; b = w; } } return b; };
   if (realm === 'over') switch (e.kind) {
+    case 'under': if (overHeight(P.x, P.z) < WATER - 8) return { x: P.x, z: P.z };   // (going under, burning: over deep water already, it is here; else the nearest sea)
     case 'skim': { const s = flySea(20000); if (s) return { x: s.x, z: s.z }; break; }
     case 'waterfall': { const f = best(waterfalls, f => ({ x: f.position.x, z: f.position.z })); if (f) return f; break; }
     case 'island': { const i = best(skyIslands, s => Math.hypot(s.x - MYKONOS.x, s.z - MYKONOS.z) > 50 ? { x: s.x, z: s.z } : null); if (i) return i; break; }
@@ -25207,7 +25209,7 @@ function qlWhere(e) {
 // carried there by the light, whoever he is, whenever he likes
 function qlGo(key) {
   const L = qlActive(), e = (key && L.find(x => x.key === key)) || qlTracked(); if (!e) { toast('NOTHING TO GO TO · TALK TO A GOD FOR AN ERRAND'); return false; }
-  story.track = e.key; const w = qlWhere(e); if (!w) { toast(`${e.name.toUpperCase()} · ${e.goal.toUpperCase()}`); return false; }
+  story.track = e.key; const w = qlWhere(e); if (!w) { toast(realm !== 'under' ? `${e.name.toUpperCase()} · ${e.goal.toUpperCase()}` : e.kind === 'under' ? 'THE WAY UP IS OVER YOUR HEAD · FLY UP INTO THE SEA' : `${e.name.toUpperCase()} · UP IN THE WORLD · FIND THE WAY UP FIRST`); return false; }
   if (!flags.morphed) { toast('NOT YET · YOU HAVE NO WINGS TO BE CARRIED ON'); return false; }
   if (state !== 'play' || player.cine) { toast('NOT NOW'); return false; }
   if ((w.x - player.pos.x) ** 2 + (w.z - player.pos.z) ** 2 < 220 * 220) { toast(`YOU ARE THERE · ${e.goal.toUpperCase()}`); return true; }
@@ -25220,11 +25222,12 @@ function qlUpdate() {
   if (!T) { QL.line = QL.line2 = ''; if (el && el.textContent) el.textContent = ''; } else {
     const head = `${T.name.toUpperCase()}${T.step ? ' ' + T.step : ''}`;
     QL.line = `${head} · ${T.goal}`; QL.god = T.god;
-    QL.line2 = [T.v >= 0 ? `${qlBar(T.v)} ${T.n >= 1 && T.n <= 30 ? `${Math.floor(T.v * T.n + 1e-6)}/${T.n}` : Math.round(T.v * 100) + '%'}` : '', qlDist(T.to || qlWhere(T)), flags.morphed ? (TOUCH ? 'tap here to go there' : 'Shift+J to go there') : ''].filter(Boolean).join(' · ');
+    const w = qlWhere(T), up = realm === 'under' ? (T.kind === 'under' ? 'UP · THROUGH THE SEA OVERHEAD' : 'UP IN THE WORLD') : '';   // (below, the place is above him)
+    QL.line2 = [T.v >= 0 ? `${qlBar(T.v)} ${T.n >= 1 && T.n <= 30 ? `${Math.floor(T.v * T.n + 1e-6)}/${T.n}` : Math.round(T.v * 100) + '%'}` : '', qlDist(w) || up, flags.morphed && w ? (TOUCH ? 'tap here to go there' : 'Shift+J to go there') : ''].filter(Boolean).join(' · ');
     if (el) { const h = `<b style="color:${PATRONS[T.god]?.[0] || '#ffd9a8'}">◆ ${head}</b> · ${T.goal}${QL.line2 ? `<br><i>${QL.line2}</i>` : ''}`; if (el._h !== h) { el._h = h; el.innerHTML = h; } }
   }
   if (!QL.mk) { const m = QL.mk = document.createElement('div'); m.className = 'mk wp'; m.innerHTML = '<b>◆</b><span></span>'; m.style.display = 'none'; $('markers').appendChild(m); }
-  const to = T && state === 'play' ? T.to || qlWhere(T) : null, show = !!to; if (show) QL.mk.style.color = PATRONS[T.god]?.[0] || '#ffd9a8';
+  const to = T && state === 'play' ? qlWhere(T) : null, show = !!to; if (show) QL.mk.style.color = PATRONS[T.god]?.[0] || '#ffd9a8';
   QL.mkTo = show ? to : null; QL.mkLabel = show ? `${T.name.toUpperCase()} · ${qlDist(to)}` : '';
   if (QL.open && (QL.t = (QL.t || 0) + 1) % 2 === 0) qlRender();
 }
@@ -25256,7 +25259,7 @@ function qlRender() {
   const col = g => PATRONS[g]?.[0] || '#ffd9a8';
   const tot = Object.keys(IS).filter(k => IS[k] > 0).map(k => `${ISTAT[k][1]} +${Math.round(IS[k] * 100)}% ${ISTAT[k][0]}`).join('   ');
   el.querySelector('.ql-body').innerHTML =
-    `<div class="ql-h">-- WHAT YOU ARE DOING --</div>` + (L.length ? L.map(e => `<button class="ql-q${T && e.key === T.key ? ' on' : ''}" data-k="${qlEsc(e.key)}"><b style="color:${col(e.god)}">${T && e.key === T.key ? '>' : ' '} ${qlEsc(e.name.toUpperCase())}${e.step ? ' · ' + qlEsc(e.step) : ''}</b>${e.title ? ` <u>${qlEsc(e.title)}</u>` : ''}<br><span>${qlEsc(e.goal)}</span><br><i>${e.v >= 0 ? qlBar(e.v, 16) + ' ' + (e.n >= 1 && e.n <= 30 ? `${Math.floor(e.v * e.n + 1e-6)}/${e.n}` : Math.round(e.v * 100) + '%') + ' · ' : ''}${(e.to || qlWhere(e)) ? qlDist(e.to || qlWhere(e)) + ' · ' : ''}${e.reward ? 'for ' + qlEsc(e.reward.toLowerCase()) + ' · ' : ''}${T && e.key === T.key ? 'FOLLOWING' : 'TOUCH TO FOLLOW'}</i>${flags.morphed && qlWhere(e) ? `<span class="ql-go" data-k="${qlEsc(e.key)}">[ GO THERE NOW ]</span>` : ''}</button>`).join('') : `<p class="ql-e">nobody has asked anything of you. kneel at a throne, or speak to a god.</p>`)
+    `<div class="ql-h">-- WHAT YOU ARE DOING --</div>` + (L.length ? L.map(e => `<button class="ql-q${T && e.key === T.key ? ' on' : ''}" data-k="${qlEsc(e.key)}"><b style="color:${col(e.god)}">${T && e.key === T.key ? '>' : ' '} ${qlEsc(e.name.toUpperCase())}${e.step ? ' · ' + qlEsc(e.step) : ''}</b>${e.title ? ` <u>${qlEsc(e.title)}</u>` : ''}<br><span>${qlEsc(e.goal)}</span><br><i>${e.v >= 0 ? qlBar(e.v, 16) + ' ' + (e.n >= 1 && e.n <= 30 ? `${Math.floor(e.v * e.n + 1e-6)}/${e.n}` : Math.round(e.v * 100) + '%') + ' · ' : ''}${qlWhere(e) ? qlDist(qlWhere(e)) + ' · ' : ''}${e.reward ? 'for ' + qlEsc(e.reward.toLowerCase()) + ' · ' : ''}${T && e.key === T.key ? 'FOLLOWING' : 'TOUCH TO FOLLOW'}</i>${flags.morphed && qlWhere(e) ? `<span class="ql-go" data-k="${qlEsc(e.key)}">[ GO THERE NOW ]</span>` : ''}</button>`).join('') : `<p class="ql-e">nobody has asked anything of you. kneel at a throne, or speak to a god.</p>`)
     + `<div class="ql-h">-- WHAT YOU CARRY (${items.length}) --</div>` + (tot ? `<p class="ql-tot">${qlEsc(tot)}</p>` : '') + (items.length ? items.slice().reverse().map(it => `<p class="ql-i"><b style="color:${col(it.from)}">${ISTAT[it.stat][1]} ${qlEsc(it.name)}</b> <i>+${it.amt}% ${ISTAT[it.stat][0]}${it.made ? ' · made for you' : ''}${it.with.length ? ' · shared with ' + qlEsc(it.with.join(', ')) : ''}</i></p>`).join('') : `<p class="ql-e">nothing yet. every errand you finish earns you something.</p>`)
     + `<div class="ql-h">-- DONE (${log.length}) --</div>` + (log.length ? log.map(d => `<p class="ql-d"><b style="color:${col(d.god)}">+ ${qlEsc(String(d.name).toUpperCase())}</b> ${qlEsc(d.goal)} <i>· ${ago(d.at)}${d.with?.length ? ` · with ${qlEsc(d.with.join(', '))}` : ''}${d.item ? ' · ' + qlEsc(d.item) : ''}</i></p>`).join('') : `<p class="ql-e">nothing finished yet.</p>`);
 }
@@ -25269,6 +25272,7 @@ function qlShow(on) {
 let questT = 0;
 function updateQuests(dt) {
   const ev = questEvent;
+  if (realm === 'under') ev.wasUnder = true; else if (ev.wasUnder && state === 'play') { ev.wasUnder = false; ev.home = true; }   // (up out of it, this moment: an old trip is not one an errand asked for)
   if (state === 'play' && realm === 'over') {
     const p = player, P = p.pos, isH = p.form === 'human', gnd = groundAt(P.x, P.z, P.y), alt = P.y - Math.max(gnd, WATER), stand = isH && p.grounded && !p.sliding;
     for (const q of quests) {
@@ -25307,8 +25311,7 @@ function updateQuests(dt) {
       if (ok) questDone(q);
     }
   }
-  if (realm === 'under') ev.wasUnder = true; else if (ev.wasUnder && state === 'play') { ev.wasUnder = false; ev.home = true; }
-  if (state === 'play') { ev.animal = false; ev.hoops = 0; ev.jet = false; ev.arena = ''; ev.tear = 0; ev.stones = 0; }
+  if (state === 'play') { ev.animal = false; ev.hoops = 0; ev.jet = false; ev.arena = ''; ev.tear = 0; ev.stones = 0; ev.home = false; }
   qlMarker();
   if ((questT -= dt) > 0) return;
   questT = 0.25;
