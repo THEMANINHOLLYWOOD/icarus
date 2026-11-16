@@ -4440,10 +4440,11 @@ const featherFx = { uAir: { value: 0 }, uFlex: { value: 0 }, uPulse: { value: 0 
 function makeFireMat(tint, k, char = null, who = WHO_ME) {
   const m = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
   m.userData.tint = { value: new THREE.Color(tint) }; m.userData.tintK = { value: k }; m.userData.char = char || { value: 0 }; m.userData.black = { value: 0 };
+  m.userData.fan = { value: new THREE.Vector2() };   // (how far the long feathers of each hand are spread: left, right; -1 shut like a fan, +1 thrown wide. See wingSolve)
   m.customProgramCacheKey = () => char ? 'fire-char' : 'fire';
   m.onBeforeCompile = sh => {
     sh.uniforms.uTime = worldFx.uTime; sh.uniforms.uTint = m.userData.tint; sh.uniforms.uTintK = m.userData.tintK; sh.uniforms.uChar = m.userData.char; sh.uniforms.uWho = who;
-    sh.uniforms.uAir = featherFx.uAir; sh.uniforms.uFlex = featherFx.uFlex; sh.uniforms.uBlack = m.userData.black; sh.uniforms.uPulse = featherFx.uPulse; sh.uniforms.uGhost = m.userData.ghost || { value: 0 };
+    sh.uniforms.uAir = featherFx.uAir; sh.uniforms.uFlex = featherFx.uFlex; sh.uniforms.uBlack = m.userData.black; sh.uniforms.uPulse = featherFx.uPulse; sh.uniforms.uGhost = m.userData.ghost || { value: 0 }; sh.uniforms.uFan = m.userData.fan;
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uTint; uniform float uTintK, uChar, uWho, uBlack, uPulse, uGhost;')
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>
         { float L = dot(gl_FragColor.rgb, vec3(0.35, 0.5, 0.15));
@@ -4464,8 +4465,14 @@ function makeFireMat(tint, k, char = null, who = WHO_ME) {
     // uv.x runs root→tip along each feather, uv.y is the feather's own number: tips shiver and flare, each out of step with the next
     // …and the air moves them: the faster he goes, the faster and harder the trailing edges flutter (a ripple running out
     // along each feather); slow, they lift and settle in long, lazy breaths; under load the tips bend up together
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime, uAir, uFlex;')
+    // …and the long feathers of the hand open and shut like a fan about the wrist (aFan marks them; the right wing is the left one
+    // turned over, which is how the two are told apart here): shut on the way up and in a dive, spread to brake and to turn
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime, uAir, uFlex; uniform vec2 uFan; attribute float aFan;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
+        if (aFan > 0.5) { float fk = determinant(mat3(modelMatrix)) < 0.0 ? uFan.y : uFan.x;
+          float fr = length(transformed.xz), fa = atan(-transformed.x, transformed.z);
+          fa *= 1.0 + (fk < 0.0 ? 0.6 : 0.2) * fk * smoothstep(0.0, 0.3, uv.x);
+          transformed.x = -sin(fa) * fr; transformed.z = cos(fa) * fr; }
         { float w = uv.x * uv.x;
           transformed.y += sin(uTime * (7.0 + 17.0 * uAir) - uv.x * 5.5 + uv.y * 40.0) * (0.025 + 0.085 * uAir) * w
                          + sin(uTime * 2.2 + uv.y * 11.0) * 0.06 * w * (1.0 - uAir * 0.65)
@@ -4542,11 +4549,14 @@ function wingGeos(F = FIRE, D = 1) {
   // hand: eleven primaries fanning from back to straight out, tips spread like fingers; a thumb of three small feathers at the wrist
   A = newFire();
   fireSolid(A, bone(H, 0.12, 0.05, F.mid, F.hot)); knuckle(A, 0.15, F.mid);
+  const fan0 = A.pos.length / 3;   // (from here to the thumb: the feathers that fan about the wrist)
   { const n = N(11); for (let i = 0; i < n; i++) { const t = i / (n - 1); featherAt(A, H[0] * t, -0.03 - t * 0.02, H[2] * t + 0.05, 0.52 + t * 0.95, 4.1 + Math.sin(t * 2.6) * 1.25, (0.46 - t * 0.1) * thin, F.mid, F.hot, F.tip, 0.16); } }
   { const n = N(9); for (let i = 0; i < n; i++) { const t = (i + 0.2) / n; featherAt(A, H[0] * t, 0.05, H[2] * t, 0.58 + t * 0.8, 1.6, 0.36 * thin, F.hot, F.hot, F.tip, 0.2, -0.05); } }
   { const n = N(8); for (let i = 0; i < n; i++) { const t = (i + 0.1) / n; featherAt(A, H[0] * t, 0.1, H[2] * t - 0.05, 0.62 + t * 0.7, 0.85, 0.28 * thin, F.hot, F.tip, F.tip, 0.24, -0.1); } }
+  const fan1 = A.pos.length / 3;
   for (let i = 0; i < 3; i++) featherAt(A, -0.1, 0.04, -0.12, 1.75 + i * 0.16, 0.95 - i * 0.14, 0.2, F.hot, F.tip, F.tip, 0.1, -0.05);
   out.push(fireGeo(A));
+  { const fan = new Float32Array(A.pos.length / 3); fan.fill(1, fan0, fan1); out[2].setAttribute('aFan', new THREE.BufferAttribute(fan, 1)); }
   return out;
 }
 function makeWing(F = FIRE, mat = fireMat) {
@@ -4554,6 +4564,7 @@ function makeWing(F = FIRE, mat = fireMat) {
   root.add(shoulder); shoulder.add(elbow); elbow.add(wrist); wrist.add(tip);
   const E = WING_E, Wr = WING_W, H = WING_H;
   elbow.position.set(...E); wrist.position.set(...Wr); tip.position.set(H[0] - 4.8, 0, H[2] + 0.5);
+  shoulder.rotation.order = 'ZYX';   // (lifted first, then turned about its own length: the twist of a wing is in the wing, wherever it is in its stroke)
   const G = wingGeos(F, 1), meshes = [shoulder, elbow, wrist].map((j, i) => { const m = new THREE.Mesh(G[i], mat); j.add(m); return m; });
   return { root, shoulder, elbow, wrist, tip, meshes, F };
 }
@@ -4642,7 +4653,7 @@ const capeTop = z => { let i = 0; while (i < 4 && z > CAPE_Z[i + 1]) i++; const 
 function updateTails(dt, snap, P = phoenix) {
   const G = P.group; G.updateMatrixWorld();
   const sc = G.scale.x, up = _n.set(0, 1, 0).transformDirection(G.matrixWorld), inv = _tinv.copy(G.matrixWorld).invert();
-  const own = P === phoenix, fan = own ? 1 - 0.78 * STOOP.tuck : 1, fast = own ? STOOP.fast : 0;   // (stooping, the tail closes to a blade and shivers)
+  const own = P === phoenix, tf = P.tf, fan = tf ? tf[0] : 1, ttw = tf ? tf[1] : 0, tdn = tf ? tf[2] : 0, ctw = Math.cos(ttw), stw = Math.sin(ttw), fast = own ? STOOP.fast : 0;   // (stooping, the tail closes to a blade and shivers; braking it is fanned and pressed down; going into a turn it is twisted against the roll: see wingSolve)
   const down = own && player.form === 'phoenix' && (player.perch || !!player.takeoff);
   // (his own, in the sea: a fish's tail. The feathers close into one stalk and open again at the end into a forked fluke, lying
   //  flat like a dolphin's, and a beat runs down it from the body to the tips, harder the harder he is swimming.)
@@ -4651,9 +4662,10 @@ function updateTails(dt, snap, P = phoenix) {
   const sw = own ? SWIMT.k : 0;
   for (const t of P.tails) {
     const seg = (t.root || !sw ? t.len : lerp(t.len, 6.4 + 5.8 * Math.abs(t.ang), sw)) * (t.root ? 1 : P.long || 1) / (t.N - 1) * sc, n = t.nodes, a = t.geo.attributes.position.array, ang = t.ang * fan * (t.root ? 1 : 1 - 0.82 * sw);   // (a bird's tail is longest in the middle, a fish's at its two points: in the sea the outer plumes lengthen and the middle ones draw in)
-    if (t.root) _p.copy(t.root); else _p.set(Math.sin(ang) * 0.25, 0.08, 1.6);
+    if (t.root) _p.copy(t.root); else _p.set(Math.sin(ang) * 0.25 * ctw, 0.08 + Math.sin(ang) * 0.25 * stw, 1.6);
     _p.applyMatrix4(G.matrixWorld);
-    _v.set(Math.sin(ang), -0.04, Math.cos(ang)).transformDirection(G.matrixWorld);
+    if (t.root) _v.set(Math.sin(ang), -0.04, Math.cos(ang)); else _v.set(Math.sin(ang) * ctw, -0.04 + Math.sin(ang) * stw - tdn, Math.cos(ang));
+    _v.transformDirection(G.matrixWorld);
     const fresh = snap || !t.ok || n[0].distanceToSquared(_p) > 3600;
     n[0].copy(_p); t.ok = true;
     for (let i = 1; i < t.N; i++) {
@@ -4668,12 +4680,12 @@ function updateTails(dt, snap, P = phoenix) {
       if (down) { const q = n[i], gy = groundAt(q.x, q.z, q.y + 3) + 0.06; if (q.y < gy) q.y = gy;   // (down: it lies along the ground, and gives way to what stands there)
         if (i % 3 === 0) { _tz.set(0, 0, 0); pushOut(q, _tz, 0.2); } }
     }
-    const px = Math.cos(t.ang), pz = -Math.sin(t.ang);
+    const px = Math.cos(t.ang) * (t.root ? 1 : ctw), py = t.root ? 0 : Math.cos(t.ang) * stw, pz = -Math.sin(t.ang);
     for (let i = 0; i < t.N; i++) {
       _s.copy(n[i]).applyMatrix4(inv);
       const u = i / (t.N - 1), h = t.half(u) * (sw > 0 && !t.root ? 1 + sw * 1.5 * smoothstep(0.5, 0.9, u) : 1), o = i * 6;
-      a[o] = _s.x - px * h; a[o + 1] = _s.y; a[o + 2] = _s.z - pz * h;
-      a[o + 3] = _s.x + px * h; a[o + 4] = _s.y; a[o + 5] = _s.z + pz * h;
+      a[o] = _s.x - px * h; a[o + 1] = _s.y - py * h; a[o + 2] = _s.z - pz * h;
+      a[o + 3] = _s.x + px * h; a[o + 4] = _s.y + py * h; a[o + 5] = _s.z + pz * h;
     }
     t.geo.attributes.position.needsUpdate = true;
   }
@@ -5753,13 +5765,21 @@ function resetPose() {
   human.legL.rotation.set(0, 0, 0); human.legR.rotation.set(0, 0, 0); human.armL.rotation.set(0, 0, 0); human.armR.rotation.set(0, 0, 0);
   human.shinL.rotation.set(0, 0, 0); human.shinR.rotation.set(0, 0, 0); human.foreL.rotation.set(0, 0, 0); human.foreR.rotation.set(0, 0, 0);
 }
-// One wing, joint by joint. (f: the shoulder's lift; fold: the elbow; wfold: the wrist; sweep: forward/back; stretch)
-function setWingSide(i, f, fold, wfold, sweep, stretch) {
+// One wing, joint by joint. (f: the shoulder's lift; fold: the elbow; wfold: the wrist; sweep: forward/back; stretch. And, where they
+// are given: tw, the whole wing turned leading edge up; ht, the hand turned further; ey and wy, the elbow and the wrist bent in the
+// wing's own plane, which is how a wing is drawn in.)
+function setWingSide(i, f, fold, wfold, sweep, stretch, tw = 0, ht = 0, ey = 0, wy = 0) {
   const w = phoenix.wings[i], sd = i === 0 ? 1 : -1;
-  w.shoulder.rotation.z = -f; w.elbow.rotation.z = -fold; w.wrist.rotation.z = -wfold;
-  w.root.rotation.y = sweep * sd; w.elbow.rotation.y = sweep * 0.35; w.wrist.rotation.y = sweep * 0.5 + wfold * 0.45;
+  w.shoulder.rotation.z = -f; w.shoulder.rotation.x = tw; w.elbow.rotation.z = -fold; w.wrist.rotation.z = -wfold; w.wrist.rotation.x = ht;
+  w.root.rotation.y = sweep * sd; w.elbow.rotation.y = sweep * 0.35 + ey; w.wrist.rotation.y = sweep * 0.5 + wfold * 0.45 + wy;
   w.shoulder.scale.x = stretch;
 }
+// (the same, for any bird's wing, to and from ten numbers: the nine above and, last, how far the hand's feathers are fanned)
+const WING_N = 10, W_TAU = Math.PI * 2;
+const wingSet = (w, sd, J) => { w.shoulder.rotation.z = -J[0]; w.shoulder.rotation.x = J[5]; w.elbow.rotation.z = -J[1]; w.wrist.rotation.z = -J[2]; w.wrist.rotation.x = J[6];
+  w.root.rotation.y = J[3] * sd; w.elbow.rotation.y = J[3] * 0.35 + J[7]; w.wrist.rotation.y = J[3] * 0.5 + J[2] * 0.45 + J[8]; w.shoulder.scale.x = J[4]; };
+const wingRead = (w, sd, J) => { J[0] = -w.shoulder.rotation.z; J[1] = -w.elbow.rotation.z; J[2] = -w.wrist.rotation.z; J[3] = w.root.rotation.y * sd; J[4] = w.shoulder.scale.x; J[5] = w.shoulder.rotation.x; J[6] = w.wrist.rotation.x;
+  J[7] = w.elbow.rotation.y - J[3] * 0.35; J[8] = w.wrist.rotation.y - J[3] * 0.5 - J[2] * 0.45; };
 // The bird's wings in the sea. A bird that swims with its wings (a puffin, a dipper, a gannet after its plunge) half folds
 // them and rows: a short hard stroke down and back with the hand spread, then the wing drawn up and forward close to the
 // body to slip through, and, when it is in no hurry, a glide before the next. The elbow comes after the shoulder and the hand
@@ -5768,11 +5788,11 @@ function setWingSide(i, f, fold, wfold, sweep, stretch) {
 // Turning, the outer wing pulls harder and the inner one is held out and back as a brake. (effort: 0 holding his place .. 1 all he has)
 function swimWings(dt, S, effort) {
   const p = player, now = time;
-  if (now - WR.t > 0.25) for (let i = 0; i < 2; i++) { const w = phoenix.wings[i], sd = i === 0 ? 1 : -1; WR.j[i].set([-w.shoulder.rotation.z, -w.elbow.rotation.z, -w.wrist.rotation.z, w.root.rotation.y * sd, w.shoulder.scale.x]); }
-  WR.t = now;
-  const e = S.eff = lerp(S.eff ?? effort, effort, damp(3, dt)), hz = lerp(0.5, 1.7, e);
-  const th = S.ph = ((S.ph || 0) + dt * hz * Math.PI * 2) % (Math.PI * 2), warp = t => t + 0.55 * Math.sin(t);   // (the pull is the short part of it)
-  const stroke = Math.cos(warp(th)), down = Math.sin(warp(th)), lagE = Math.cos(warp(th - 0.7)), lagW = Math.cos(warp(th - 1.35));   // (+1 the top of the stroke, -1 the bottom; down > 0 while it is pulling)
+  if (now - WR.ts > 0.25) for (let i = 0; i < 2; i++) wingRead(phoenix.wings[i], i === 0 ? 1 : -1, WR.j[i]);
+  WR.ts = now;
+  const e = S.eff = lerp(S.eff ?? effort, effort, damp(3, dt)), hz = lerp(0.5, 1.7, e) * clamp(1 / Math.sqrt(birdK()), 0.6, 1.8);   // (a small bird rows quicker, a great one slower)
+  const th = S.ph = ((S.ph || 0) + dt * hz * Math.PI * 2) % (Math.PI * 2), wth = th + 0.55 * Math.sin(th);   // (the pull is the short part of it)
+  const stroke = Math.cos(wth), down = Math.sin(wth), lagE = Math.cos(th - 0.7 + 0.55 * Math.sin(th - 0.7)), lagW = Math.cos(th - 1.35 + 0.55 * Math.sin(th - 1.35));   // (+1 the top of the stroke, -1 the bottom; down > 0 while it is pulling)
   const rec = Math.max(0, -Math.sin(th - 0.4)), recW = Math.max(0, -Math.sin(th - 1.1)), A = lerp(0.36, 1, e), bank = clamp(p.bank, -1.2, 1.2);
   for (let i = 0; i < 2; i++) {
     const sd = i === 0 ? 1 : -1, inside = bank * sd, pull = clamp(1 - inside * 0.55, 0.4, 1.5), hold = Math.max(0, inside);
@@ -5782,76 +5802,206 @@ function swimWings(dt, S, effort) {
     const wfold = 0.44 - A * 0.32 * Math.max(0, -lagW) * pull + A * 0.62 * recW + q * 1.5;
     const sweep = 0.52 - A * 0.36 * Math.sin(th - 0.3) * pull + hold * 0.26 + e * 0.12;             // (forward to catch the water, back through the pull)
     const stretch = 0.84 + A * 0.15 * Math.max(0, -stroke) * pull - e * 0.04;
-    const J = WR.j[i], k = damp(9, dt);   // (water: nothing snaps)
-    J[0] = lerp(J[0], f, k); J[1] = lerp(J[1], fold, k); J[2] = lerp(J[2], wfold, k); J[3] = lerp(J[3], sweep, damp(7, dt)); J[4] = lerp(J[4], stretch, damp(7, dt));
-    setWingSide(i, J[0], J[1], J[2], J[3], J[4]);
+    const J = WR.j[i], k = damp(9, dt), k2 = damp(7, dt);   // (water: nothing snaps)
+    J[0] = lerp(J[0], f, k); J[1] = lerp(J[1], fold, k); J[2] = lerp(J[2], wfold, k); J[3] = lerp(J[3], sweep, k2); J[4] = lerp(J[4], stretch, k2);
+    J[5] = lerp(J[5], A * 0.3 * down * pull, k); J[6] = lerp(J[6], -A * 0.35 * Math.sin(th - 1.1), k);   // (the blade of the wing turned to push on the way down, edge-on to slip back up)
+    J[7] = lerp(J[7], -0.25 * A * rec, k2); J[8] = lerp(J[8], 0.5 * A * recW, k2); J[9] = lerp(J[9], down > 0 ? 0.6 * A * pull : -0.7 * A, k2);   // (the hand spread to pull, shut to come back)
+    wingSet(phoenix.wings[i], sd, J);
     if (down > 0.55 && Math.random() < 0.25 + 0.5 * e) { phoenix.wings[i].tip.getWorldPosition(_v); emit(_v.x + rnd(0.6), _v.y + rnd(0.6), _v.z + rnd(0.6), rnd(2), 1.5 + Math.random() * 3, rnd(2), 0.5 + Math.random() * 0.6, [0.72, 0.9, 1.0], 6); }   // (what the hand leaves in the water at the end of its pull)
   }
+  fireMat.userData.fan.value.set(WR.j[0][9], WR.j[1][9]);
+  { const t = WR.tail, k = damp(4, dt); t[0] = lerp(t[0], 1, k); t[1] = lerp(t[1], -bank * 0.25, k); t[2] = lerp(t[2], 0, k); }
   p.wingF = (WR.j[0][0] + WR.j[1][0]) / 2; S.push = Math.max(0, down);
   featherFx.uAir.value = lerp(featherFx.uAir.value, 0.04 + 0.1 * e, damp(3, dt));
   featherFx.uFlex.value = lerp(featherFx.uFlex.value, clamp(down * A * 0.95 + Math.abs(bank) * 0.3, -0.75, 1), damp(7, dt));
 }
-// The bird's wings in flight. A beat is a stroke that runs out along the wing like a whip — the shoulder leads, the elbow
-// follows a moment later, the wrist later still — fast and spread on the way down, slower on the way up with the wrist
-// folded to slip back through the air, the whole wing reaching forward as it falls and drawing back as it rises. Beats
-// swell in and die away rather than switching on and off; between them the wing holds a gull's shape and trims itself,
-// each side on its own. Fast, the wings sweep back and flatten; slow, they spread wide; in a turn the inside wing dips
-// and flexes and the outside one lifts; diving, they fold into a teardrop a little at a time. Every joint is eased toward
-// where it is going, so nothing ever snaps.
-const WR = { t: -9, th: 0, A: 0, beat: 0, j: [new Float32Array(5), new Float32Array(5)] };
-const FOLDW = [-0.5, 0.35, 0.28, 0.8, 0.84];   // (at rest: the wings let down along his sides and drawn back, the hand half folded)
-function flyWings(dt, o) {
-  const p = player, now = time;
-  if (now - WR.t > 0.25) for (let i = 0; i < 2; i++) {   // (coming back from some other pose: start from where the wings are)
-    const w = phoenix.wings[i], sd = i === 0 ? 1 : -1;
-    WR.j[i].set([-w.shoulder.rotation.z, -w.elbow.rotation.z, -w.wrist.rotation.z, w.root.rotation.y * sd, w.shoulder.scale.x]);
+// ── The wings of a bird in flight. Nothing here is a loop that is played: every frame the wings are worked out again from how
+//    the bird is flying — how fast, how steeply, how far over it is lying and how quickly that is changing, the load on it, how
+//    hard it is working, whether it is braking, the air it is in — and from how big it is.
+//
+//    A BEAT is a stroke that runs out along the wing like a whip. The shoulder leads, the forearm is half a moment late and the
+//    hand later still, so that going down the tip is left above the wrist (the feathers bent up by what they are pushing) and
+//    coming up it hangs below it: from in front the wing makes a shallow bowl on the way down and an M on the way up. Down is
+//    the shorter half, the wing at its full length and reaching forward, its leading edge turned down, the hand's feathers
+//    spread; up, the elbow and wrist bend in the wing's own plane and draw the hand in toward the body, the hand turns edge-on
+//    and its feathers shut like a fan, and it all swings back. So the wingtip goes round an oval, forward and down, back and up.
+//    Slow, braking or leaving the ground the stroke leans further forward and back; fast, it is shallower.
+//
+//    SIZE. A bird scaled up beats slower by the square root of its size (Pennycuick's rule for one shape at different sizes):
+//    the hawk-sized bird over Crete two and a half times a second for every one of his, the keeper's a little over one in two.
+//    The small one beats deeper, bends its wing further on the way up, answers quicker and is thrown about more by rough air;
+//    the great one is slower in everything, stiffer, and its whip is longer.
+//
+//    HELD OUT, the wing is a gull's: wide, flat and slotted when slow; fast, the wrists pushed forward and the hands swept back.
+//    It is never quite still, each side trimming by itself; rough air knocks each wing about separately; load (a hard turn, a
+//    pull-out) lifts the wings and bends the tips. In a turn the inside wing drops, half folds and shuts its hand while the
+//    outside one reaches and spreads; going INTO the turn the wings are twisted against each other like ailerons, and the tail
+//    is twisted against the roll, as a hawk's is; coming out, both the other way.
+//
+//    THE STOOP is a falcon's, by stages as the speed builds: first the M (wrists forward, hands swept back, the wings still
+//    flying), then cupped (the hands laid back along the tail, the wrists standing a little off the body), then the teardrop
+//    (everything pinned, the tail shut to a blade). All the way down it is steered with the hands: the one on the inside of a
+//    turn let out a little, both of them to lift the nose, and neither ever quite still. PULLING OUT, the wings do not fly open:
+//    they come out through the same shapes under the load — cupped, the M with its tips bent up, then wide and high — and only
+//    then settle. BRAKING, they are spread to their full length, reached forward and turned up against the air like a parachute,
+//    the hand's feathers thrown wide and the tail fanned and pressed down, beating short and fast against the way he is going.
+//
+//    Everything is eased: what the wing is asked to be goes through a spring on every joint (the outer joints looser, so they
+//    arrive late and go a little past), and the beat is laid over that; so one state runs into the next and nothing snaps.
+function wingState() {
+  return { t: -9, ts: -9, th: 0, A: 0, beat: 0, was: 0, hz: 1.55, hzE: 0, evT: 9, slip: 0, pb: 0, py: 0, pp: 0, rr: 0, yr: 0, pr: 0, st: 0, flex: 0, cd: Math.random(), lazy: 3, tk: 0, tkP: 0, pl: 0, wDev: 0, wWas: null, tail: [1, 0, 0], fan: null,
+    j: [new Float32Array(WING_N), new Float32Array(WING_N)], b: [new Float32Array(WING_N), new Float32Array(WING_N)], v: [new Float32Array(WING_N), new Float32Array(WING_N)] };
+}
+const WR = wingState();   // (his own: th, where the wings are in their beat; A, how hard they are beating; beat, set to 1 by whatever makes him take one; j, the ten numbers of each wing as drawn)
+// (how the bird is flying, filled in afresh for each bird each frame: see flyWings and birdWings)
+const WS = { K: 1, sp: 0, pitch: 0, yaw: 0, bank: 0, roll: 0, g: 0, boost: 0, climb: 0, dive: 0, tuck: 0, pull: 0, flutter: 0, fold: 0, flare: 0, big: 0, ready: 0, turb: 0 };
+//                 lift  elbow  wrist  sweep stretch twist  hand   elbow  wrist  fan
+//                                                          twist  (in the wing's plane)
+const POSE_M   = [ 0.12, -0.10, -0.12, 0.25, 0.98,  0.00,  0.00, -0.70,  1.15, -0.50];   // (the M: wrists forward, hands swept back)
+const POSE_CUP = [ 0.02,  0.10, -0.05, 0.45, 0.72,  0.00,  0.00, -0.95,  1.75, -0.85];   // (cupped: hands back along the tail)
+const POSE_TEAR = [-0.22, 0.22,  0.05, 0.62, 0.46,  0.00,  0.00, -1.10,  2.00, -1.00];   // (the teardrop: pinned)
+const POSE_LOAD = [0.34, -0.05,  0.12, 0.20, 1.02,  0.12, -0.05, -0.60,  0.95, -0.20];   // (pulling out: the M again, carrying him, its tips bent up)
+const POSE_WIDE = [0.50, -0.12,  0.20, -0.05, 1.20, 0.16, -0.08,  0.00,  0.05,  1.00];   // (and then wide and high)
+const POSE_BRAKE = [0.38, -0.22, 0.06, -0.20, 1.20, 0.30,  0.10,  0.06, -0.10,  1.00];   // (braking: spread, reached forward, turned up against the air)
+const FOLDW    = [-0.5,   0.35,  0.28, 0.8,  0.84,  0,     0,     0,     0,    -0.8];    // (at rest: the wings let down along his sides and drawn back, the hand half folded)
+const WSPR_W = [30, 28, 26, 20, 20, 26, 26, 22, 22, 16], WSPR_Z = [0.85, 0.75, 0.6, 1, 1, 0.8, 0.7, 0.85, 0.7, 1];   // (each joint's spring: how quick, and how nearly it stops dead: the hand is the loosest)
+const _wt = new Float32Array(WING_N), _wo = new Float32Array(WING_N);
+const wingPh = t => t + 0.3 * (1 - Math.cos(t));   // (where in the stroke: 0 the top, pi the bottom, reached about two fifths of the way through the beat)
+const airRough = () => clamp(storm * 0.8 + gust * 0.12 + cloudIn * 0.4 + (WX.squall || 0) * 0.8 + (WX.thunder || 0) * 0.3, 0, 1.4);   // (how rough the air is where the lens is)
+function wingSolve(W, wings, dt, S) {
+  const now = time, K = S.K, fK = clamp(1 / Math.sqrt(K), 0.5, 2.6), fS = Math.sqrt(fK), idt = 1 / Math.max(dt, 1e-3);
+  if (now - W.t > 0.25) {   // (coming back from some other pose: start from where the wings are)
+    for (let i = 0; i < 2; i++) { wingRead(wings[i], i === 0 ? 1 : -1, W.j[i]); if (W.fan) W.j[i][9] = i ? W.fan.y : W.fan.x; W.b[i].set(W.j[i]); W.v[i].fill(0); }
+    W.pb = S.roll; W.py = S.yaw; W.pp = S.pitch; W.rr = W.yr = W.pr = 0;
   }
-  WR.t = now;
-  const sp = clamp((p.speed - 30) / 110, 0, 1), dive = o.dive, bank = clamp(p.bank, -1.2, 1.2);
-  // how hard the wings are working: a beat he just took, a steady drive when boosting or climbing hard
-  WR.beat = Math.max(0, WR.beat - dt / 0.7);
-  const want = Math.max(WR.beat > 0 ? 0.6 + WR.beat * 0.4 : 0, o.boost ? 0.75 : 0, o.climb * 0.55) * (1 - dive * 0.9);
-  WR.A = lerp(WR.A, want, damp(want > WR.A ? 7 : 3.2, dt));
-  const hz = lerp(1.55, 2.4, Math.max(o.boost ? 1 : 0, o.climb * 0.6));
-  WR.th = (WR.th + dt * hz * Math.PI * 2) % (Math.PI * 2);
-  const A = WR.A, th = WR.th, warp = t => t + 0.38 * Math.sin(t);   // (the downstroke takes less of the cycle than the upstroke)
-  const stroke = Math.cos(warp(th)), lagE = Math.cos(warp(th - 0.55)), lagW = Math.cos(warp(th - 1.0));
-  const upE = Math.max(0, -Math.sin(th - 0.5)), upW = Math.max(0, -Math.sin(th - 0.95));
+  W.t = now;
+  // how fast it is rolling, turning and pitching
+  W.rr = lerp(W.rr, clamp(wrapAngle(S.roll - W.pb) * idt, -5, 5), damp(9, dt)); W.pb = S.roll;
+  W.yr = lerp(W.yr, clamp(wrapAngle(S.yaw - W.py) * idt, -3, 3), damp(7, dt)); W.py = S.yaw;
+  W.pr = lerp(W.pr, clamp(wrapAngle(S.pitch - W.pp) * idt, -4, 4), damp(7, dt)); W.pp = S.pitch;
+  const sp = clamp((S.sp - 30) / 110, 0, 1), slow = 1 - smoothstep(8, 40, S.sp), dive = S.dive, flare = S.flare, g = S.g, bank = S.bank;
+  const q = 1 - S.pull, pullW = S.pull > 0 ? 1 - smoothstep(0.55, 1, q) : 0;
+  // the beat. A beat is taken when something sets W.beat (a climb, the brake, the boost, a lazy one to hold a glide). The wings of a
+  // bird his own size keep time with those, so the stroke down is the one that is heard and felt; a bird of another size keeps its own.
+  const lock = fK > 0.8 && fK < 1.25, ev = W.beat > W.was + 0.1; W.evT += dt;
+  if (ev) { if (W.A < 0.25) { W.th = 0; W.slip = 0; } else if (lock) W.slip = wrapAngle(-W.th); W.hzE = lock && W.evT > 0.3 && W.evT < 1.1 ? 1 / W.evT : 0; W.evT = 0; }
+  else if (W.evT > 1.3) W.hzE = 0;
+  W.beat = Math.max(0, W.beat - dt * fK / 0.7); W.was = W.beat;
+  const drive = Math.max(S.boost, S.climb * 0.6), want = Math.max(W.beat > 0 ? 0.6 + W.beat * 0.4 : 0, S.boost * 0.75, S.climb * 0.55) * (1 - dive * 0.9) * (1 - 0.8 * pullW) * (1 - S.fold);
+  W.A = lerp(W.A, want, damp((want > W.A ? 7 : 3.2) * fK, dt));
+  W.hz = lerp(W.hz, (W.hzE || lerp(1.55, 2.4, drive) * (1 + 0.25 * Math.max(flare, slow * S.climb))) * fK, damp(5, dt));
+  { let d = dt * W.hz * W_TAU; if (W.slip) { const u = W.slip * damp(7 * fK, dt); W.slip -= u; d = Math.max(0, d + u); } W.th = (W.th + d) % W_TAU; }
+  const amp = W.A * (1 + 0.3 * S.big) * (1 - 0.18 * sp * (1 - S.climb)) * clamp(Math.pow(K, -0.12), 0.85, 1.25);
+  const th = W.th, p0 = wingPh(th), p1 = wingPh(th - 0.5), p2 = wingPh(th - 0.95);
+  const s0 = Math.cos(p0), n0 = Math.sin(p0), n1 = Math.sin(p1), n2 = Math.sin(p2), d1 = Math.cos(p1) - s0, d2 = Math.cos(p2) - Math.cos(p1), up1 = Math.max(0, -n1), up2 = Math.max(0, -n2), dn0 = Math.max(0, n0);
+  const flexK = lerp(0.4, 0.8, clamp((fK - 0.58) / 1.92, 0, 1)) * (0.45 + 0.55 * sp) * (1 - 0.5 * flare), tilt = lerp(0.2, 0.42, Math.max(flare, slow));
+  // the stoop, by stages
+  const tk = S.tuck, stage = Math.max(dive * 0.4, Math.min(tk / 0.45, 1) * 0.4 + 0.6 * smoothstep(0.45, 1, tk)), kM = smoothstep(0, 0.4, stage), kC = smoothstep(0.42, 0.72, stage), kT = smoothstep(0.74, 1, stage);
+  W.st = stage;
+  const turb = S.turb * clamp(Math.pow(K, -0.35), 0.6, 1.9) * (1 - 0.7 * stage) * (1 - S.fold), wK = Math.pow(fK, 0.6) * (S.pull > 0.3 ? 1.7 : 1), ko = damp(60 * fS, dt), T = _wt, R = _wo;
   for (let i = 0; i < 2; i++) {
-    const sd = i === 0 ? 1 : -1, ph = i * 1.9;
-    const trim = Math.sin(now * 1.3 + ph) * 0.026 + Math.sin(now * 3.7 + ph * 0.6) * 0.012;   // a gliding wing is never quite still
-    const inside = bank * sd;                                                                // + for the wing on the inside of the turn
-    let f = 0.24 - sp * 0.1 - dive * 0.06 + trim - inside * 0.17 + A * (0.95 * stroke + 0.12);
-    let fold = lerp(-0.34 + sp * 0.12 + Math.max(0, inside) * 0.16, 0.78, dive) + A * (0.42 * upE + 0.18 * lagE * 0.4);
-    let wfold = fold * 0.6 + A * 0.55 * upW;
-    let sweep = 0.04 + sp * 0.22 + dive * 0.86 - A * 0.2 * Math.sin(th) + (o.boost ? 0.08 : 0);
-    let stretch = 1.12 - dive * 0.35 + (1 - sp) * 0.06 + A * 0.14 * Math.max(0, -stroke);
-    const tk = o.tuck || 0, pl = o.pull || 0, fl = o.flutter || 0;
-    if (tk > 0) { f -= 0.3 * tk; fold += 0.22 * tk; wfold += 0.3 * tk; sweep += 0.4 * tk; stretch -= 0.18 * tk; }   // (pinned to his sides: a teardrop of fire)
-    if (fl > 0) { const q = Math.sin(now * 41 + ph * 3) * Math.sin(now * 17 + i); wfold += q * 0.05 * fl; f += q * 0.02 * fl; }   // (the air tearing at what little of the wing is out)
-    if (pl > 0) { const e = pl * pl; f += 0.55 * e; fold -= 0.5 * e; wfold -= 0.4 * e; sweep -= (0.9 * dive + 0.35) * e; stretch += 0.22 * e; }   // (thrown wide all at once to stop the fall)
-    const J = WR.j[i], k = damp(pl > 0.3 ? 30 : tk > 0.5 ? 20 : 16, dt), fk = o.fold || 0;
-    if (fk > 0) { const W = FOLDW; f = lerp(f, W[0], fk); fold = lerp(fold, W[1], fk); wfold = lerp(wfold, W[2], fk); sweep = lerp(sweep, W[3], fk); stretch = lerp(stretch, W[4], fk); }   // (standing: the wings folded along his sides)
-    J[0] = lerp(J[0], f, k); J[1] = lerp(J[1], fold, k); J[2] = lerp(J[2], wfold, k); J[3] = lerp(J[3], sweep, damp(10, dt)); J[4] = lerp(J[4], stretch, damp(10, dt));
-    setWingSide(i, J[0], J[1], J[2], J[3], J[4]);
+    const sd = i === 0 ? 1 : -1, ph = i * 1.9, inside = bank * sd, in1 = Math.max(0, inside), out1 = Math.max(0, -inside);   // (inside: + for the wing on the inside of the turn)
+    const trim = Math.sin(now * 1.3 * fS + ph) * 0.026 + Math.sin(now * 3.7 * fS + ph * 0.6) * 0.012;   // a gliding wing is never quite still
+    const gu = turb > 0.01 ? (Math.sin(now * 2.9 * fS + ph) * Math.sin(now * 1.13 + i * 4.1) + 0.5 * Math.sin(now * 6.7 * fS + i * 2.2) * Math.sin(now * 2.31 + i)) * turb : 0;   // (rough air: each wing knocked about by itself)
+    const ail = clamp(W.rr * sd, -1.6, 1.6);   // (rolling toward this wing: it gives, and the other one takes)
+    // held out
+    T[0] = lerp(0.26, 0.15, sp) + trim - inside * 0.17 + g * 0.035 + gu * 0.09 - dive * 0.04 + S.ready * 0.5;
+    T[1] = lerp(-0.34, -0.2, sp) + in1 * 0.16 - g * 0.02 - gu * 0.05;
+    T[2] = T[1] * 0.6 + g * 0.03 + gu * 0.1;
+    T[3] = 0.04 + sp * 0.14 + S.boost * 0.08 + in1 * 0.05;
+    T[4] = 1.12 + (1 - sp) * 0.06 - in1 * 0.05 + out1 * 0.02;
+    T[5] = 0.03 + g * 0.02 + S.climb * 0.05 - ail * 0.12 + gu * 0.05;
+    T[6] = -0.03 - in1 * 0.06 - ail * 0.08;
+    T[7] = -sp * 0.2 - in1 * 0.1;
+    T[8] = sp * 0.34 + in1 * 0.28 + gu * 0.08;
+    T[9] = lerp(0.5, -0.15, sp) + out1 * 0.35 - in1 * 0.3 + g * 0.08;
+    if (stage > 0.001) {
+      for (let n = 0; n < WING_N; n++) T[n] = lerp(lerp(lerp(T[n], POSE_M[n], kM), POSE_CUP[n], kC), POSE_TEAR[n], kT);
+      const st = clamp(W.yr * sd * 1.6, -1, 1) * stage, pu = clamp(W.pr * 1.2, 0, 1) * stage, tr = Math.sin(now * 5.1 + i * 2.3) * Math.sin(now * 1.7 + i) * stage * (0.4 + 0.6 * kT);   // (steered with the hands)
+      T[8] -= 0.34 * st + 0.3 * pu + 0.05 * tr; T[4] += 0.05 * Math.max(0, st) + 0.05 * pu; T[0] += 0.07 * st + 0.05 * pu + 0.02 * tr; T[9] += 0.3 * Math.max(0, st) + 0.3 * pu; T[5] += 0.06 * pu;
+    }
+    if (pullW > 0) { const a = smoothstep(0, 0.25, q), b = smoothstep(0.25, 0.65, q); for (let n = 0; n < WING_N; n++) T[n] = lerp(T[n], lerp(lerp(POSE_CUP[n], POSE_LOAD[n], a), POSE_WIDE[n], b), pullW); }
+    if (flare > 0.001) { const k = flare * 0.85; for (let n = 0; n < WING_N; n++) T[n] = lerp(T[n], POSE_BRAKE[n], k); T[0] -= inside * 0.1 * flare; }
+    if (S.fold > 0) for (let n = 0; n < WING_N; n++) T[n] = lerp(T[n], FOLDW[n], S.fold);   // (standing: the wings folded along his sides)
+    // each joint on its spring toward that
+    const B = W.b[i], V = W.v[i], J = W.j[i];
+    for (let n = 0; n < WING_N; n++) { const w = WSPR_W[n] * wK, w2 = w * w; V[n] = (V[n] + w2 * dt * (T[n] - B[n])) / (1 + 2 * WSPR_Z[n] * w * dt + w2 * dt * dt); B[n] += V[n] * dt; }
+    // and the beat over it
+    const a = amp * (1 - 0.18 * inside);   // (round a turn the outer wing beats the deeper)
+    R[0] = B[0] + a * (0.95 * s0 + 0.12);
+    R[1] = B[1] + a * 0.95 * d1 * (d1 < 0 ? 0.9 : 0.6);
+    R[2] = B[2] + a * 1.05 * d2 * (d2 < 0 ? 1.25 : 0.7);
+    R[3] = B[3] - a * tilt * n0 + a * flexK * 0.12 * up1;
+    R[4] = B[4] + a * (0.08 * dn0 - 0.12 * flexK * up1);
+    R[5] = B[5] - a * 0.2 * n0 * (n0 > 0 ? 1 : 0.6);
+    R[6] = B[6] - a * 0.22 * n2 * (n2 > 0 ? 0.6 : 1.4);
+    R[7] = B[7] - a * flexK * 0.55 * up1;
+    R[8] = B[8] + a * flexK * 1.1 * up2;
+    R[9] = clamp(B[9] + a * (0.5 * dn0 - 1.1 * flexK * up2), -1, 1.2);
+    if (S.flutter > 0) { const u = Math.sin(now * 41 + ph * 3) * Math.sin(now * 17 + i) * S.flutter; R[2] += u * 0.05; R[0] += u * 0.02; R[8] += u * 0.04; }   // (the air tearing at what little of the wing is out)
+    for (let n = 0; n < WING_N; n++) J[n] = lerp(J[n], R[n], ko);
+    wingSet(wings[i], sd, J);
   }
-  p.wingF = (WR.j[0][0] + WR.j[1][0]) / 2;
-  featherFx.uPulse.value = lerp(featherFx.uPulse.value, clamp(A * Math.max(0, Math.sin(th)) * 1.25 + (o.boost ? 0.25 : 0), 0, 1), damp(9, dt));   // (the stroke down: the fire under a black wing shows through it)
-  if (fireMat.userData.black.value > 0.5 && state === 'play' && Math.random() < 0.35 + A * 0.6) {   // (and embers shaken out of the plumage, more on every beat)
+  if (W.fan) W.fan.set(W.j[0][9], W.j[1][9]);
+  // the tail: shut to a blade in the stoop; fanned and pressed down to brake; wider slow and in a turn; twisted against the roll
+  { const t = W.tail, k = damp(5 * fS, dt);
+    t[0] = lerp(t[0], (1 - 0.8 * smoothstep(0.3, 0.9, stage)) * (1 + 0.55 * flare + 0.3 * Math.abs(bank) + 0.25 * (1 - sp) * (1 - stage) + 0.4 * pullW), k);
+    t[1] = lerp(t[1], clamp(-W.rr * 0.3 - bank * 0.12, -0.6, 0.6), k);
+    t[2] = lerp(t[2], 0.4 * flare + 0.12 * S.climb * slow - 0.1 * pullW, k); }
+  W.flex = clamp(Math.abs(bank) * 0.45 + g * 0.16 + S.climb * 0.3 + 0.8 * pullW + amp * (0.45 * dn0 - 0.2 * Math.max(0, -n0)), -0.4, 1);   // (the load bending the feathers' tips)
+}
+// His own wings. (o: boost, whether the boost is held; climb, how hard he is climbing or braking; dive, how steeply he is going
+// down; tuck, how far into the stoop; pull, the pull-out, 1 at the moment of it and running out; flutter; fold, standing with them
+// shut. The rest is read off him.)
+function flyWings(dt, o) {
+  const p = player, S = WS, W = WR, G = p.perchGo, T = p.takeoff;
+  S.K = birdK(); S.sp = p.speed; S.pitch = p.pitch; S.yaw = p.yaw; S.bank = clamp(p.bank, -1.2, 1.2); S.roll = p.bank + FLIP.a; S.g = Math.min(SONIC.g || 0, 6);
+  S.boost = o.boost ? 1 : 0; S.climb = o.climb || 0; S.dive = o.dive || 0; S.tuck = o.tuck || 0; S.pull = o.pull || 0; S.flutter = o.flutter || 0; S.fold = o.fold || 0;
+  S.flare = Math.max(o.flare || 0, FLIP.brake, G ? smoothstep(0.5, 0.95, G.t / G.T) : 0) * (1 - S.fold) * (1 - S.dive);   // (the brake; and the last of a glide down onto a perch)
+  S.big = T ? 1 - clamp((T.t - 0.2) / 1, 0, 1) : 0; S.ready = T && !T.sprung ? T.sq : 0; S.turb = airRough();   // (leaving the ground: the wings lifted as he crouches, and the first beats the biggest)
+  if (!W.fan) W.fan = fireMat.userData.fan.value;
+  wingSolve(W, phoenix.wings, dt, S);
+  p.wingF = (W.j[0][0] + W.j[1][0]) / 2;
+  featherFx.uPulse.value = lerp(featherFx.uPulse.value, clamp(W.A * Math.max(0, Math.sin(wingPh(W.th))) * 1.25 + (o.boost ? 0.25 : 0), 0, 1), damp(9, dt));   // (the stroke down: the fire under a black wing shows through it)
+  if (fireMat.userData.black.value > 0.5 && state === 'play' && Math.random() < 0.35 + W.A * 0.6) {   // (and embers shaken out of the plumage, more on every beat)
     const w = phoenix.wings[Math.random() < 0.5 ? 0 : 1]; w.wrist.getWorldPosition(_v); w.tip.getWorldPosition(_n); _v.lerp(_n, Math.random());
     emit(_v.x + rnd(0.8), _v.y + rnd(0.5), _v.z + rnd(0.8), rnd(3) - dir3.x * 6, -1 - Math.random() * 4, rnd(3) - dir3.z * 6, 0.7 + Math.random() * 0.9, Math.random() < 0.75 ? [1.7, 0.22, 0.04] : [2.2, 0.9, 0.2], -2, 0.8 + Math.random() * 1.4); }
   // the air over the feathers
-  featherFx.uAir.value = lerp(featherFx.uAir.value, clamp((p.speed - 25) / 120, 0, 1) * (1 - dive * 0.3) + dive * 0.4, damp(3, dt));
-  featherFx.uFlex.value = lerp(featherFx.uFlex.value, clamp(Math.abs(bank) * 0.6 + o.climb * 0.5 + A * 0.3 * -stroke, -0.4, 1), damp(5, dt));
+  featherFx.uAir.value = lerp(featherFx.uAir.value, clamp((p.speed - 25) / 120, 0, 1) * (1 - S.dive * 0.3) + S.dive * 0.4, damp(3, dt));
+  featherFx.uFlex.value = lerp(featherFx.uFlex.value, W.flex, damp(8, dt));
 }
-function setWings(f, fold, sweep, stretch) {
+// Any other bird's wings (another player's, one of the game's own fliers, a god's), from nothing but how it is moving: the same
+// wings as his, worked from where it is going and how fast, how steeply, how far over it is lying and how quickly that changes.
+// (H: whatever is keeping the bird, which keeps its wings' state too; wing: the lift of its shoulders as its own player last sent
+// it, if one did, which says whether it is beating; gr: standing on the ground.)
+function birdWings(H, bird, fire, dt, vx, vy, vz, pitch, bank, yaw, wing, gr) {
+  const W = H.wr || (H.wr = wingState()), S = WS, v = Math.hypot(vx, vy, vz), elev = Math.asin(Math.sin(pitch)), dive = smoothstep(-0.2, -0.8, elev);
+  if (!W.fan) { W.fan = fire.userData.fan.value; bird.tf = W.tail; }
+  S.K = bird.group.scale.x / PHX_S; S.sp = v; S.pitch = pitch; S.yaw = yaw; S.bank = clamp(wrapAngle(bank), -1.2, 1.2); S.roll = bank;
+  W.tk = lerp(W.tk, dive * (0.45 + 0.55 * smoothstep(90, 220, v)), damp(dive > 0.15 ? 5 : 9, dt)); W.tkP = Math.max(W.tk, W.tkP - dt * 0.6);
+  if (W.tkP > 0.62 && dive < 0.12 && v > 110) { W.pl = 1; W.tkP = 0; W.beat = 1; }   // (it was folded hard and its nose has come up: the pull-out)
+  W.pl = Math.max(0, W.pl - dt / 0.85);
+  S.dive = dive * (1 - W.pl); S.tuck = W.tk * (1 - W.pl); S.pull = W.pl; S.flutter = smoothstep(130, 290, v) * dive; S.fold = gr ? 1 : 0; S.big = 0; S.ready = 0; S.turb = airRough();
+  S.g = Math.min(6, Math.hypot(W.yr * Math.cos(elev), W.pr) * v / 9.81);
+  if (wing !== W.wWas) { if (W.wWas !== null) W.wDev = Math.max(W.wDev, Math.abs(wing - W.wWas) * 1.6, Math.abs(wing - 0.2)); W.wWas = wing; }
+  W.wDev = Math.max(0, W.wDev - dt * 0.9);
+  const work = Math.max(smoothstep(0.2, 0.6, W.wDev) * (1 - dive), smoothstep(2, 12, vy) * smoothstep(0.08, 0.4, elev)), hover = gr ? 0 : smoothstep(22, 8, v);
+  S.climb = Math.max(work, hover); S.boost = work > 0.5 && v > 105 ? 1 : 0; S.flare = hover;
+  if ((W.cd -= dt) <= 0 && S.climb > 0.2 && !gr) { W.cd = hover > 0.5 ? 0.42 : S.boost ? 0.5 : 0.72; W.beat = 1; }   // (working: beat after beat, as he would)
+  else if (W.cd < -W.lazy && dive < 0.2 && !gr) { W.cd = 0; W.lazy = 2.4 + Math.random() * 3.4; W.beat = Math.max(W.beat, 0.55); }   // (and gliding: one lazy beat now and then)
+  wingSolve(W, bird.wings, dt, S);
+}
+// (a pose put on the wings whole, by the scenes that have one of their own: the old four numbers, and the rest left plain)
+function setWings(f, fold, sweep, stretch, tw = 0, fan = 0) {
   phoenix.wings.forEach((w, i) => {
-    w.shoulder.rotation.z = -f; w.elbow.rotation.z = -fold; w.wrist.rotation.z = -fold * 0.6;
+    w.shoulder.rotation.z = -f; w.shoulder.rotation.x = tw; w.elbow.rotation.z = -fold; w.wrist.rotation.z = -fold * 0.6; w.wrist.rotation.x = 0;
     w.root.rotation.y = sweep * (i === 0 ? 1 : -1); w.elbow.rotation.y = sweep * 0.35; w.wrist.rotation.y = sweep * 0.5 + fold * 0.3;
     w.shoulder.scale.x = stretch;
   });
+  fireMat.userData.fan.value.set(fan, fan); WR.tail[0] = 1; WR.tail[1] = WR.tail[2] = 0;
   player.wingF = f;
 }
+phoenix.tf = WR.tail;   // (his tail is fanned, twisted and pressed down as his wings say: see updateTails)
 
 // SPACE is the only button. On the ground it speaks, kindles, or sets him on fire. In the air it trades the bird
 // for a man hanging under its wings (to land) — and the winged man back for the bird.
@@ -8003,8 +8153,7 @@ function updatePeers(dt) {
     if (bird) {
       const G = A.bird.group; G.position.copy(P.pos); G.rotation.set(P.menu ? P.pitch : flipShow(P.pitch), P.yaw, P.bank, 'YXZ');   // (nose up as it climbs: a positive turn about x lifts the beak; round, if it loops; its roll is its own and its turn's)
       P.ph += dt * (1.2 + Math.hypot(P.s.vx, P.s.vy, P.s.vz) / 60);
-      const f = P.wing > 0.15 ? P.wing : 0.24 + Math.sin(P.ph * 1.4) * 0.06, dive = smoothstep(-0.2, -0.8, Math.asin(Math.sin(P.pitch)));
-      A.bird.wings.forEach((w, i) => { w.shoulder.rotation.z = -f; w.elbow.rotation.z = -lerp(-0.34, 0.75, dive); w.wrist.rotation.z = w.elbow.rotation.z * 0.6; w.root.rotation.y = dive * 0.9 * (i === 0 ? 1 : -1); w.shoulder.scale.x = 1.12 - dive * 0.35; });
+      if (!far) birdWings(P, A.bird, A.fire, dt, P.s.vx, P.s.vy, P.s.vz, P.pitch, P.bank, P.yaw, P.wing, P.gr);   // (its wings, from how it is flying: see wingSolve)
       updateTails(dt, false, A.bird);
       if (P.rider) { P.reins ||= reinPair(); riderOn(G, A.man.group, G.scale.x / PHX_S, P.reins, null, true); P.rode = true; }   // (someone riding theirs: there they are, up on its back, reins in hand)
       { const want = PHX_S * (P.bk || bigName(P.name)) * (P.gm ? 1.12 : 1) * (P.sm ? SMALL.MIN : 1), sc = G.scale.x; if (Math.abs(sc - want) > 0.003) G.scale.setScalar(Math.abs(sc - want) < 0.01 ? want : lerp(sc, want, damp(2.2, dt))); }   // (their bird's size is come to, not jumped to: a new name, the god waking)
@@ -10056,7 +10205,7 @@ function updateCourier(dt) {
   C.v.subVectors(G.position, C.was);
   if (a < 1 && C.v.lengthSq() > 1e-6) { G.rotation.y = Math.atan2(-C.v.x, -C.v.z); G.rotation.x = clamp(Math.atan2(C.v.y, Math.hypot(C.v.x, C.v.z)), -0.6, 0.6) * 0.8; } else { G.rotation.y = lerp(G.rotation.y, yaw, damp(4, dt)); G.rotation.x = lerp(G.rotation.x, 0, damp(4, dt)); }
   const out = smoothstep(C.T - 0.924, C.T, C.t); G.scale.setScalar(Math.max(0.001, PHX_S * 0.62 * (0.4 + 0.6 * smoothstep(0, 0.84, C.t)) * (1 - out)));
-  const fl = Math.sin(C.t * 9.5); for (let i = 0; i < 2; i++) { const w = C.bird.wings[i]; w.shoulder.rotation.z = -(0.2 + 0.55 * fl); w.elbow.rotation.z = -(0.1 + 0.25 * Math.max(0, -fl)); w.wrist.rotation.z = -(0.06 + 0.2 * Math.max(0, -Math.sin(C.t * 9.5 - 0.8))); }
+  { const iv = 1 / Math.max(dt, 1e-3); birdWings(C, C.bird, C.fire, dt, C.v.x * iv, C.v.y * iv, C.v.z * iv, G.rotation.x, 0, G.rotation.y, 0.2, 0); }   // (a small bird's wings, from how it is flying: quick, and hovering beside him once it is there)
   updateTails(dt, C.t < 0.1, C.bird);
   if (Math.random() < 0.6) emit(G.position.x + rnd(2), G.position.y + rnd(1), G.position.z + rnd(2), rnd(2), 1 + Math.random() * 2, rnd(2), 0.5 + Math.random() * 0.5, [0.7, 0.95, 1.6], 1, 0.9);
   if (out > 0 && !C.burst) { C.burst = true; burst(G.position.x, G.position.y, G.position.z, 90, 14, 0.9); shock(G.position.x, G.position.y, G.position.z, 0xa9dcff, 14, 0.6, true); }
@@ -29895,8 +30044,7 @@ function godBirdShow(B, name) { B.slot = nameSlot(); B.who.value = whoAlpha(B.sl
 function godBirdPose(B, dt) {
   const G = B.bird.group; G.position.copy(B.pos); G.rotation.set(B.pitch * 0.8, B.yaw, B.bank, 'XYZ');
   B.ph += dt * (1.5 + B.sp / 110);
-  const climb = clamp(B.vel.y / 30, 0, 1), f = 0.2 + Math.sin(B.ph) * (0.2 + 0.24 * climb), dive = smoothstep(-0.25, -0.8, B.pitch);
-  B.bird.wings.forEach((w, i) => { w.shoulder.rotation.z = -f; w.elbow.rotation.z = -lerp(-0.34, 0.75, dive); w.wrist.rotation.z = w.elbow.rotation.z * 0.6; w.root.rotation.y = dive * 0.9 * (i === 0 ? 1 : -1); w.shoulder.scale.x = 1.12 - dive * 0.35; });
+  birdWings(B, B.bird, B.fire, dt, B.vel.x, B.vel.y, B.vel.z, B.pitch, B.bank, B.yaw, 0.2, 0);   // (the same wings as any bird's, and at that size they beat slow and deep)
   updateTails(dt, false, B.bird);
   if (Math.random() < 0.6 && B.pos.distanceToSquared(camera.position) < 900 * 900) emit(B.pos.x + rnd(14), B.pos.y + rnd(4), B.pos.z + rnd(14), rnd(4) - B.vel.x * 0.2, rnd(3), rnd(4) - B.vel.z * 0.2, 0.6 + Math.random() * 0.6, [B.c.r * 2.2 + 0.3, B.c.g * 2.2 + 0.3, B.c.b * 2.2 + 0.3], 2, 1.4 + Math.random() * 1.6);
 }
@@ -34005,3 +34153,4 @@ setTimeout(() => {
 </script>
 </body>
 </html>
+  if (window.__icarus) Object.assign(window.__icarus, { WS, wingSolve, wingState, wingSet, wingRead, birdWings, airRough, WPOSE: { M: POSE_M, CUP: POSE_CUP, TEAR: POSE_TEAR, LOAD: POSE_LOAD, WIDE: POSE_WIDE, BRAKE: POSE_BRAKE, FOLD: FOLDW }, fireMat, featherFx, updateTails, updatePeers, body, PC, PT });   // (tests: the wings, and the swimmer)
