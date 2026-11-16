@@ -32484,7 +32484,7 @@ function updateMatch(dt) {
     GODM.forced = true; if (!GODM.on) godMode(true, true);
     if (state === 'play' && !M.glide) {   // (nothing puts him out while he is being flown in)
       if (p.form === 'phoenix' && !p.perch) p.speed = Math.max(p.speed, 46 * M.spd);
-      if (!rg && el > 1.5 && (p.perch || p.grounded || p.climb || p.swim || p.dive || p.form !== 'phoenix' && !p.tumble && !p.wings)) return matchOut('the ground');   // (falling or gliding as a man he is still in it: see FSH)
+      if (!rg && el > 1.5 && (p.perch || p.grounded || p.form !== 'phoenix' && (p.climb || p.swim || p.dive || !p.tumble && !p.wings))) return matchOut('the ground');   // (falling or gliding as a man he is still in it: see FSH)
       if (!rg && M.has && moF('walls', true) && !moImm()) { const hit = tronHit(M.prev.x, M.prev.y, M.prev.z, p.pos.x, p.pos.y, p.pos.z, NET.id, M.id, fshK()); if (hit) { if (M.glassT > performance.now() && !M.warm) pwShatter(p.pos.x, p.pos.y, p.pos.z, true); else return matchOut(hit.id === NET.id ? 'your own fire' : `${hit.name}’s fire`, hit.id); } }   // (with the glass broken for him, a wall shatters instead of him)
       M.prev.copy(p.pos); M.has = true;
       if (moF('edge', true) && Math.hypot(p.pos.x - M.cx, p.pos.z - M.cz) > M.R) { M.outT += dt; if (!rg && M.outT > (M.warm ? 2 : matchClosing(el) ? 0 : 3)) return matchOut('the ring'); } else M.outT = 0;   // (once it is closing, its edge is a wall)
