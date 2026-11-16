@@ -32644,7 +32644,7 @@ const MO_ORDER = ['hunger', 'snd', 'ctf', 'zombies', 'possess', 'speed', 'king',
 //    white an extra life. Where they come down, and what is in them, is from the fight's own name, the same on every
 //    screen; whoever is through one first has it, says so, and it is gone for everyone. Last one flying wins.
 const HG_K = [{ n: 'FIRE ×2', c: [3, 1.25, 0.32], hex: '#ffb070' }, { n: 'WIND', c: [0.9, 1.9, 3], hex: '#bfe6ff' }, { n: '+1 LIFE', c: [2.6, 2.9, 3], hex: '#f2fbff' }];
-MODES.hunger = { name: 'HUNGER GAMES', words: ['hunger', 'hungergames', 'hg'], min: 4, warm: 10, ring: 1.6, glass: false, winds: id => id === NET.id ? FB.winds : moCpu(id)?.winds || 0,
+MODES.hunger = { name: 'HUNGER GAMES', words: ['hunger', 'hungergames', 'hg'], min: 4, warm: 8, ring: 1.6, glass: false, winds: id => id === NET.id ? FB.winds : moCpu(id)?.winds || 0,
   line: 'start with nothing (no fire, no wind) · caches fall out of the sky all over a wide ring that closes: fire, a wind, an extra life · last one flying wins',
   ares: () => ['Nothing in your hands this time. No fire, no wind.', 'Caches fall out of the sky. Fly through one: orange is fire, blue a wind, white a life.', 'Your trail is still a wall, and the ring closes. Last one up wins.'],
   vet: 'Empty hands. Take the caches. Last one up.',
@@ -32678,7 +32678,7 @@ MODES.hunger = { name: 'HUNGER GAMES', words: ['hunger', 'hungergames', 'hg'], m
 function hgSpawn(at) {   // one cache, at so many seconds after GO: inside where the ring will be a little later
   const M = MATCH, r = MO.rnd, R = matchRAt(at + 8) * 0.8, a = r() * 6.2832, d = Math.sqrt(r()) * R, x = M.cx + Math.cos(a) * d, z = M.cz + Math.sin(a) * d, g = Math.max(groundAt(x, z, 9000), WATER);
   const y = clamp(Math.max(g + 80, M.base + 50) + r() * 260, g + 60, Math.max(g + 60, Math.min(M.base + 600, SKY_LIMIT - 120))), q = r();
-  MO.s.list.push({ i: MO.s.n++, x, y, z, kind: q < 0.5 ? 0 : q < 0.78 ? 1 : 2, t0: at, by: '', k: 1 }); MO.s.next += 4.5 + r() * 3.5;
+  MO.s.list.push({ i: MO.s.n++, x, y, z, kind: q < 0.5 ? 0 : q < 0.78 ? 1 : 2, t0: at, by: '', k: 1 }); MO.s.next += 3 + r() * 2.5;
 }
 const hgY = (Q, el) => Math.min(Q.y + 420 * (1 - miEase(clamp((el - Q.t0) / 4.2, 0, 1))), Math.max(Q.y, SKY_LIMIT - 60));   // (it falls out of the sky, and slows as it comes to its height; never from above where the sun burns)
 function hgTake(Q, id, mine) {
@@ -32735,7 +32735,7 @@ function svCall(el) {
     x = A.x + v.x * w * 0.85 + rnd(30); z = A.z + v.z * w * 0.85 + rnd(30); y = A.y + rnd(25); }
   else { const R = M.R * 0.9, a = Math.random() * 6.2832, d = Math.sqrt(Math.random()) * R; x = M.cx + Math.cos(a) * d; z = M.cz + Math.sin(a) * d; y = Math.max(M.base + 60, Math.max(groundAt(x, z, 9000), WATER) + 60) + Math.random() * 320; }
   svAdd(n, k, [x, y, z], w); moSay('hz', { n, t: k, p: [Math.round(x), Math.round(y), Math.round(z)], w });
-  MO.s.n++; MO.s.next = el + lerp(1.5, 0.55, smoothstep(0, 160, el)) * (0.75 + Math.random() * 0.5);
+  MO.s.n++; MO.s.next = el + lerp(1.2, 0.45, smoothstep(0, 50, el)) * (0.75 + Math.random() * 0.5);
 }
 function svAdd(n, k, p, w) {
   const M = MATCH, el = (performance.now() - M.liveAt) / 1000; if (MO.s.h.some(Z => Z.n === n) || !p.every(Number.isFinite) || Math.hypot(p[0] - M.cx, p[2] - M.cz) > M.R0 * 1.5) return;
@@ -32752,11 +32752,11 @@ function svStrike(Z) {   // it comes down: a bolt from the sky through the colum
 //    is his score, said to everyone as it grows and shown along the top; a crash, the ring or setting down takes it back
 //    to nothing and puts him on his line again, never out. Whoever is fastest when the clock stops wins.
 const spdK = v => `${Math.round((+v || 0) * 3.6)} KM/H`;
-MODES.speed = { name: 'TOP SPEED', words: ['speed', 'topspeed', 'fastest'], min: 3, warm: 0, dur: 120, walls: false, fire: false, glass: false, close: false, respawn: 1200,
+MODES.speed = { name: 'TOP SPEED', words: ['speed', 'topspeed', 'fastest'], min: 3, warm: 0, dur: 45, walls: false, fire: false, glass: false, close: false, respawn: 1200,
   line: 'no walls, no fire: the top speed you reach counts until you crash or land, then it starts again · fastest when the clock stops wins',
   ares: () => ['No walls, no fire. Just speed.', 'The fastest you go counts, until you crash or land. Then it starts again from nothing.', 'Fastest when the clock stops wins. Dive for it, and pull out in time.'],
   vet: 'Fastest wins. Crash and it starts again.',
-  ask: 'Your score is the top speed you have reached since you last crashed or landed. Dive to go fast and pull out before the ground. Two minutes; the fastest wins.',
+  ask: 'Your score is the top speed you have reached since you last crashed or landed. Dive to go fast and pull out before the ground. Forty-five seconds; the fastest wins.',
   setup() { MO.my.best = 0; MO.my.sent = 0; MO.my.sT = 0; MO.my.mark = 0; },
   score: v => spdK(v),
   tick(dt, el) {
@@ -32782,17 +32782,17 @@ MODES.speed = { name: 'TOP SPEED', words: ['speed', 'topspeed', 'fastest'], min:
 
 // ── King of the sky: a ring of fire drifts over Olympus, the same ring on every screen (from the fight's own name and
 //    the clock). Each second only one bird is inside it, that bird scores. Each says whether he is in it; whoever called
-//    it counts. Walls and fire still knock a bird out, but only for a moment. First to thirty, or the most at the end.
+//    it counts. Walls and fire still knock a bird out, but only for a moment. First to twenty, or the most at the end.
 function kingZone(el) {
   const M = MATCH, a0 = (miHash(M.id + ':king') % 628) / 100, a = a0 + el * 0.045, r = M.R0 * 0.3 * (0.65 + 0.35 * Math.sin(el * 0.07 + a0)), x = M.cx + Math.cos(a) * r, z = M.cz + Math.sin(a) * r;
   return { x, z, y: Math.max(M.base + 170, Math.max(groundAt(x, z, 9000), WATER) + 120) + 60 * Math.sin(el * 0.11 + a0), R: 95, H: 70 };
 }
 const kingIn = (P, Z) => !!P && Math.hypot(P.x - Z.x, P.z - Z.z) < Z.R && Math.abs(P.y - Z.y) < Z.H;
-MODES.king = { name: 'KING OF THE SKY', words: ['king', 'koth', 'hill', 'kingofthesky'], min: 4, warm: 10, dur: 180, glass: false, close: false, respawn: 3000, goal: 30,
-  line: 'a ring of fire drifts over Olympus: every second you are the only one inside it scores · first to 30, or the most when the clock stops',
-  ares: () => ['See the ring of fire over the mountain? It drifts.', 'Every second you are the only one inside it, you score. First to thirty.', 'Walls and fire still knock you out, but you are back in a moment.'],
-  vet: 'Hold the ring alone. First to thirty.',
-  ask: 'Be the only one inside the drifting ring of fire: a point a second. First to thirty, or the most at three minutes. A wall or a fireball knocks you out for three seconds.',
+MODES.king = { name: 'KING OF THE SKY', words: ['king', 'koth', 'hill', 'kingofthesky'], min: 4, warm: 8, dur: 60, glass: false, close: false, respawn: 2500, goal: 20,
+  line: 'a ring of fire drifts over Olympus: every second you are the only one inside it scores · first to 20, or the most when the clock stops',
+  ares: () => ['See the ring of fire over the mountain? It drifts.', 'Every second you are the only one inside it, you score. First to twenty.', 'Walls and fire still knock you out, but you are back in a moment.'],
+  vet: 'Hold the ring alone. First to twenty.',
+  ask: 'Be the only one inside the drifting ring of fire: a point a second. First to twenty, or the most when the clock stops. A wall or a fireball knocks you out for a moment.',
   setup() { MO.my.in = 0; MO.my.sT = 0; MO.s.sec = 0; MO.s.who = ''; },
   out: (id, by) => moKO(id, by),
   tick(dt, el) {
@@ -32822,7 +32822,7 @@ MODES.king = { name: 'KING OF THE SKY', words: ['king', 'koth', 'hill', 'kingoft
 //    Whoever holds it when the time runs out burns, and is out; rounds until one is left (or one round, and everyone but
 //    the one who burned has won it). No walls, no fire: a crash only puts a bird back on its line, flame and all. Who
 //    has it, and how long is left, is whoever called it's to say; whoever has it says whom he touched.
-MODES.tag = { name: 'FIRE TAG', words: ['tag', 'firetag'], min: 4, warm: 0, walls: false, fire: false, glass: false, close: false, respawn: 1500, round: 30, dur: 9999,
+MODES.tag = { name: 'FIRE TAG', words: ['tag', 'firetag'], min: 4, warm: 0, walls: false, fire: false, glass: false, close: false, respawn: 1200, round: 15, dur: 9999,
   line: 'one bird carries the flame: touch another to pass it · whoever holds it when the time runs out burns · rounds until one is left (/fly tag once: one round)',
   ares: () => ['One of you carries the flame. Touch someone to pass it on.', 'Whoever holds it when the time runs out burns.', MO.d?.once ? 'One round. Do not be the one holding it.' : 'Rounds, until one of you is left.'],
   vet: 'Pass the flame. Do not be holding it at the end.',
@@ -32881,13 +32881,13 @@ function tagBurn(it) {   // the time is up: whoever has it burns
 // ── Zombies: one bird starts as ash — grey, a little faster, no fire, no wind. Ash that touches a bird, or a wall of
 //    ash it flies into, or any out at all, turns that bird to ash too (and an out puts it back on its line, as ash). Ash
 //    let ash through, and the living let the living through. Each says when he has turned; whoever called it keeps who
-//    is ash, and says so. The living win if any of them are left at three minutes; the ash, when none are.
+//    is ash, and says so. The living win if any of them are left when the clock stops; the ash, when none are.
 const ZB_COL = '#8f8a84';
-MODES.zombies = { name: 'ZOMBIES', words: ['zombies', 'zombie', 'infection', 'ash'], min: 5, warm: 0, dur: 180, glass: false, close: false, respawn: 2500,
-  line: 'one bird starts as ash: whatever it touches (or burns) turns to ash too · ash is faster and has no fire · any left alive at three minutes win',
-  ares: () => ['One of you starts as ash. Ash is a little faster, and has no fire.', 'Ash that touches you, or a wall of ash you hit, makes you ash too.', 'The rest of you have fire. If any of you are left at three minutes, you win.'],
-  vet: 'Ash turns you. Keep away, burn them, last the three minutes.',
-  ask: 'Ash turns whoever it touches, and anyone knocked out turns too. Ash is faster and has no fire; the living have fire and a wind. Any of the living left at three minutes win.',
+MODES.zombies = { name: 'ZOMBIES', words: ['zombies', 'zombie', 'infection', 'ash'], min: 5, warm: 0, dur: 60, glass: false, close: false, respawn: 2000,
+  line: 'one bird starts as ash: whatever it touches (or burns) turns to ash too · ash is faster and has no fire · any left alive when the clock stops win',
+  ares: () => ['One of you starts as ash. Ash is a little faster, and has no fire.', 'Ash that touches you, or a wall of ash you hit, makes you ash too.', 'The rest of you have fire. If any of you are left when the clock stops, you win.'],
+  vet: 'Ash turns you. Keep away, burn them, last the minute.',
+  ask: 'Ash turns whoever it touches, and anyone knocked out turns too. Ash is faster and has no fire; the living have fire and a wind. Any of the living left when the clock stops win.',
   setup() { MO.z = new Set(); },
   clear() { MO.z = null; },
   side: id => MO.z && MO.z.has(id) ? 1 : 0,
@@ -32935,11 +32935,11 @@ function zbTurn(id, by, mine) {   // (one more is ash: said, shown, and counted 
 //    the way it was headed; they come back in yours, where you were. Whoever decided the out (the one knocked out, on
 //    his own screen; or whoever flies a house's bird) does the change and says where each was; each moves his own bird.
 //    Both walls go out with it. An out of nobody's doing puts a bird back on its line. Most possessions wins.
-MODES.possess = { name: 'POSSESSION', words: ['possess', 'possession', 'swap', 'body'], min: 3, warm: 10, dur: 180, glass: false, close: false, respawn: 1500,
+MODES.possess = { name: 'POSSESSION', words: ['possess', 'possession', 'swap', 'body'], min: 3, warm: 8, dur: 60, glass: false, close: false, respawn: 1200,
   line: 'knock someone out and you take over their bird where it was (place, speed, heading); they come back in yours · most possessions wins',
   ares: () => ['Knock one of them out, with your wall or your fire, and you take their bird. Right where it was.', 'They come back in yours. Nobody is out for long.', 'Most possessions when the clock stops wins.'],
   vet: 'Knock them out, take their bird. Most takes wins.',
-  ask: 'Knock someone out with your wall or a fireball and you swap: you are in their bird, where it was and as fast; they are in yours. Three minutes; the most possessions wins.',
+  ask: 'Knock someone out with your wall or a fireball and you swap: you are in their bird, where it was and as fast; they are in yours. A minute; the most possessions wins.',
   score: v => `${Math.round(v)} TAKEN`,
   out(id, by, kid) { if (kid && kid !== id && MATCH.roster.get(kid)?.alive && moPos(kid)) { const V = psSnap(id), K = psSnap(kid); if (V && K) { psDo(id, kid, V, K, true); return true; } } return moKO(id, by); },
   got(who, m) { if (m.op !== 'pos' || typeof m.by !== 'string' || m.by === who || !MATCH.roster.get(m.by)) return; const ok5 = a => Array.isArray(a) && a.length === 5 && a.every(Number.isFinite);
@@ -32971,16 +32971,16 @@ function psDo(victim, killer, V, K, mine) {
   modeBarSet();
 }
 
-// ── The juggernaut: one bird three times the size, four hits to bring down, its fire twice as quick and two winds a
+// ── The juggernaut: one bird three times the size, three hits to bring down, its fire twice as quick and two winds a
 //    life. Everyone else hunts it, and lets each other through. A hit on it that does not bring it down shatters off it
 //    (and a crash puts it back on its line, still itself); whoever brings it down becomes it. Whoever is the juggernaut
 //    says each hit he takes; whoever called it keeps who it is and how many hits are left, and counts the seconds each
 //    has been it. The most time as the juggernaut wins.
-MODES.jugg = { name: 'JUGGERNAUT', words: ['jugg', 'juggernaut', 'jug'], min: 4, warm: 10, dur: 180, glass: false, close: false, respawn: 3000, hits: 4,
-  line: 'one bird is three times the size and takes four hits · everyone else hunts it, and whoever brings it down becomes it · most time as the juggernaut wins',
-  ares: () => ['One of you is three times the size, and takes four hits to bring down.', 'Everyone else hunts it. Whoever brings it down becomes it.', 'Your time as the juggernaut is your score.'],
+MODES.jugg = { name: 'JUGGERNAUT', words: ['jugg', 'juggernaut', 'jug'], min: 4, warm: 8, dur: 60, glass: false, close: false, respawn: 2500, hits: 3,
+  line: 'one bird is three times the size and takes three hits · everyone else hunts it, and whoever brings it down becomes it · most time as the juggernaut wins',
+  ares: () => ['One of you is three times the size, and takes three hits to bring down.', 'Everyone else hunts it. Whoever brings it down becomes it.', 'Your time as the juggernaut is your score.'],
   vet: 'Bring the big one down, then be it.',
-  ask: 'The juggernaut is three times the size, takes four hits, and throws fire twice as fast. Everyone else hunts it together; whoever brings it down becomes it. The most seconds as the juggernaut wins.',
+  ask: 'The juggernaut is three times the size, takes three hits, and throws fire twice as fast. Everyone else hunts it together; whoever brings it down becomes it. The most seconds as the juggernaut wins.',
   setup() { MO.s.j = ''; MO.s.h = MODES.jugg.hits; MO.s.sec = 0; },
   side: id => id === MO.s.j ? 1 : 0, size: id => id === MO.s.j ? 3 : 0, col: id => id === MO.s.j ? '#ffd040' : '',
   cool: id => id === MO.s.j ? FB.cool / 2 : 0, winds: id => id === MO.s.j ? 2 : 1,
@@ -33023,18 +33023,18 @@ function jgSaid(id, was) {
 }
 
 // ── Search and destroy: two sides, rounds. One side attacks: one of them carries a fire charge, and there are two
-//    altars on the far side's half of the ring; held at an altar for four seconds the charge is lit, and twenty-five
+//    altars on the far side's half of the ring; held at an altar for three seconds the charge is lit, and fifteen
 //    seconds later the altar burns. The other side defends: bring them all down first, or hold at a lit altar four
 //    seconds to put it out. A carrier brought down drops the charge where he fell, for any of his side to pick up. One
 //    life a round; the round goes to whoever is left, or to the defenders when its time runs out unlit. First to three
 //    rounds of five; the sides swap after the second. Whoever called it runs the rounds and says them; each says what
 //    he did with the charge, and whoever called it decides.
-const SD = { hold: 4, fuse: 25, round: 80, R: 60 };
+const SD = { hold: 3, fuse: 15, round: 45, R: 60 };
 MODES.snd = { name: 'SEARCH AND DESTROY', words: ['snd', 'search', 'searchanddestroy', 'sd', 'bomb'], teams: 2, min: 4, warm: 0, dur: 9999, glass: false, close: false,
-  line: 'two sides: one carries a fire charge to one of two altars and lights it (hold there four seconds), the other stops them or puts it out · one life a round, best of five, sides swap halfway',
-  ares: () => ['Two sides. One side carries a fire charge, and there are two altars.', 'Attackers: take it to an altar and hold there four seconds to light it.', 'Defenders: stop them, or hold at a lit altar four seconds to put it out.', 'One life a round. First to three. Sides swap halfway.'],
+  line: 'two sides: one carries a fire charge to one of two altars and lights it (hold there three seconds), the other stops them or puts it out · one life a round, best of five, sides swap halfway',
+  ares: () => ['Two sides. One side carries a fire charge, and there are two altars.', 'Attackers: take it to an altar and hold there three seconds to light it.', 'Defenders: stop them, or hold at a lit altar three seconds to put it out.', 'One life a round. First to three. Sides swap halfway.'],
   vet: 'Light an altar or stop them. One life a round, first to three.',
-  ask: 'The attacking side carries a fire charge to either altar and holds there four seconds to light it; twenty-five seconds later it burns and they win the round. The defenders win by bringing them all down, holding a lit altar four seconds to put it out, or running out the clock. One life a round, first to three, sides swap after round two.',
+  ask: 'The attacking side carries a fire charge to either altar and holds there three seconds to light it; fifteen seconds later it burns and they win the round. The defenders win by bringing them all down, holding a lit altar three seconds to put it out, or running out the clock. One life a round, first to three, sides swap after round two.',
   setup() { Object.assign(MO.s, { r: 0, w: [0, 0], ph: 'gap', car: '', drop: null, lit: -1 }); MO.fuseAt = 0; MO.roundAt = 0; MO.gapAt = 0; MO.my.hold = 0; MO.my.askT = 0; MO.alt = null; MO.lastR = 0; },
   go() { if (MATCH.host) sdRound(); },
   win() {},   // (the rounds decide it: see sdEnd)
@@ -33119,14 +33119,14 @@ function sdEnd(side, why) {   // (whoever called it: a round won; and the whole 
 
 // ── Capture the flag: two sides, a banner of fire at each base. Touch theirs and it is yours to carry — slower, and
 //    with no fire to throw — home to your own base, while your own banner is there, and it is a capture. Brought down
-//    carrying it, you drop it where you fell; a touch from its own side sends it home, and so does twenty seconds left
-//    lying. A knock-out is for a moment only. First to three captures, or the most in five minutes.
-const CF = { R: 24, home: 45, back: 20000 };
-MODES.ctf = { name: 'CAPTURE THE FLAG', words: ['ctf', 'flag', 'captureflag', 'banner'], teams: 2, min: 4, warm: 10, dur: 300, glass: false, close: false, respawn: 3000, goal: 3,
-  line: 'each side has a flame banner at its base: grab theirs and bring it to yours while yours is home · the carrier is slower and has no fire, and drops it when knocked out · first to three',
-  ares: () => ['Two sides, two flame banners. Theirs is at their base.', 'Grab it and bring it to yours while yours is home. Carrying it, you are slower, and you have no fire.', 'Knocked out with it, you drop it. Your own side sends yours home with a touch. First to three.'],
-  vet: 'Take their banner home. First to three.',
-  ask: 'Touch the other side’s banner to carry it, and bring it to your own base while your own banner is there. The carrier is slower and cannot throw fire; knocked out, he drops it. A touch from its own side sends a dropped banner home. First to three captures, or the most at five minutes.',
+//    carrying it, you drop it where you fell; a touch from its own side sends it home, and so does fifteen seconds left
+//    lying. A knock-out is for a moment only. First to two captures, or the most in a minute and a half.
+const CF = { R: 24, home: 45, back: 15000 };
+MODES.ctf = { name: 'CAPTURE THE FLAG', words: ['ctf', 'flag', 'captureflag', 'banner'], teams: 2, min: 4, warm: 8, dur: 90, glass: false, close: false, respawn: 2500, goal: 2,
+  line: 'each side has a flame banner at its base: grab theirs and bring it to yours while yours is home · the carrier is slower and has no fire, and drops it when knocked out · first to two',
+  ares: () => ['Two sides, two flame banners. Theirs is at their base.', 'Grab it and bring it to yours while yours is home. Carrying it, you are slower, and you have no fire.', 'Knocked out with it, you drop it. Your own side sends yours home with a touch. First to two.'],
+  vet: 'Take their banner home. First to two.',
+  ask: 'Touch the other side’s banner to carry it, and bring it to your own base while your own banner is there. The carrier is slower and cannot throw fire; knocked out, he drops it. A touch from its own side sends a dropped banner home. First to two captures, or the most when the clock runs out.',
   setup() { MO.s.f = [{ st: 0, by: '', p: null, at: 0 }, { st: 0, by: '', p: null, at: 0 }]; MO.s.w = [0, 0]; MO.my.askT = 0; MO.base = null; },
   fire: id => !cfHas(id),
   nofire: () => 'NO FIRE WHILE YOU CARRY THE BANNER',
@@ -33190,16 +33190,16 @@ function cfDrop(id) {   // (brought down carrying it: it falls where he was)
 }
 function cfDown(t, p) { const F = MO.s.f[t]; F.st = p ? 2 : 0; F.by = ''; F.p = p; F.at = performance.now(); MO.dirty = true; if (matchSees()) chatLine('', `${teamName(t)}’S BANNER IS DOWN`, 'sys'); moSendSt(); }
 
-// ── The long race (/race long): a course of rings across the country, ten of them a kilometre and more apart, laid from
+// ── The long race (/race long): a course of rings across the country, six of them most of a kilometre apart, laid from
 //    the fight's own name so it is the same course for everyone, to be flown in order. No walls, no fire, no ring round
 //    it. A crash puts a bird back at the last ring it passed. Each says the rings he passes; the first through the last
-//    wins, or at five minutes whoever is furthest on (and nearest the next).
-const LG = { N: 10, R: 30 };
-MODES.long = { name: 'THE LONG RACE', words: ['long', 'longrace', 'checkpoints', 'course'], cmd: '/race long', min: 3, warm: 0, dur: 300, walls: false, fire: false, glass: false, close: false, edge: false, ringMesh: false, respawn: 1200,
+//    wins, or when the clock runs out whoever is furthest on (and nearest the next).
+const LG = { N: 6, R: 30 };
+MODES.long = { name: 'THE LONG RACE', words: ['long', 'longrace', 'checkpoints', 'course'], cmd: '/race long', min: 3, warm: 0, dur: 150, walls: false, fire: false, glass: false, close: false, edge: false, ringMesh: false, respawn: 1200,
   line: 'a long course of rings across the country, flown in order · a crash puts you back at the last ring you passed · first through the last ring wins',
   ares: () => ['A long course this time. Rings across the country, in order.', 'Miss one and you go back for it. Crash and you start again from the last one you took.', 'First through the last ring wins. No walls, no fire.'],
   vet: 'Ten rings, in order. First through the last.',
-  ask: 'Fly the rings in order, across the country; the next one is the bright one. A crash puts you back at the last ring you passed. First through the last ring wins; at five minutes, whoever is furthest on.',
+  ask: 'Fly the rings in order, across the country; the next one is the bright one. A crash puts you back at the last ring you passed. First through the last ring wins; when the clock runs out, whoever is furthest on.',
   setup() { MO.cps = lgCourse(); MO.my.n = 0; MO.my.sT = 0; },
   score: v => `${Math.round(v)} OF ${LG.N}`,
   slot(id, k, n) {   // (everyone on a line across the start, facing the first ring)
@@ -33225,7 +33225,7 @@ MODES.long = { name: 'THE LONG RACE', words: ['long', 'longrace', 'checkpoints',
 };
 function lgCourse() {   // (the rings: out from the middle, wandering, kept within a few kilometres of where it was called)
   const M = MATCH, r = moRnd('course'), L = []; let x = M.cx, z = M.cz, hd = r() * 6.2832, py = M.base + 150;
-  for (let i = 0; i < LG.N; i++) { hd += (r() - 0.5) * 1.3; const d = 750 + r() * 550; let nx = x - Math.sin(hd) * d, nz = z - Math.cos(hd) * d;
+  for (let i = 0; i < LG.N; i++) { hd += (r() - 0.5) * 1.3; const d = 600 + r() * 350; let nx = x - Math.sin(hd) * d, nz = z - Math.cos(hd) * d;
     if (Math.hypot(nx - M.cx, nz - M.cz) > 5500) { hd = Math.atan2(x - M.cx, z - M.cz) + (r() - 0.5) * 0.8; nx = x - Math.sin(hd) * d; nz = z - Math.cos(hd) * d; }
     const y = Math.max(overHeight(nx, nz), WATER) + 90 + r() * 140; L.push({ x: nx, y, z: nz, yaw: Math.atan2(nx - x, nz - z) }); x = nx; z = nz; py = y; }
   return L;
@@ -33265,16 +33265,16 @@ function gpPaint(f) {   // (every cell again: f(cell) gives [r, g, b, a] in 0..2
 const gp255 = (hex, k = 1, a = 160) => { _moc.set(hex); return [Math.min(255, _moc.r * 255 * k) | 0, Math.min(255, _moc.g * 255 * k) | 0, Math.min(255, _moc.b * 255 * k) | 0, a]; };
 
 // ── Domination (/fly territory): five rings of fire spread over the ring, standing still. Hold one, alone or with more
-//    of your side in it than any other side, for four seconds and it is yours: it burns in your colour, and the ground
+//    of your side in it than any other side, for three seconds and it is yours: it burns in your colour, and the ground
 //    round it lights up in your colour too, so the country fills with whoever holds what. Every second, a point for
 //    every ring held. Free for all, or in sides (/fly territory teams, /fly territory 2v2). Each says which ring he is
-//    in; whoever called it decides who holds what. A knock-out is for a moment. Most points at three minutes wins.
-const TR = { N: 5, R: 80, H: 70, take: 4, land: 300 };
-MODES.territory = { name: 'DOMINATION', words: ['territory', 'domination', 'dom', 'zones', 'points'], teamsOk: true, min: 4, warm: 10, dur: 180, glass: false, close: false, respawn: 3000,
-  line: 'five rings of fire over the ring: hold one (alone, or with more of your side in it) for four seconds and it burns in your colour, and so does the ground round it · a point a second for each ring · free for all or in sides (/fly territory teams)',
-  ares: () => ['Five rings of fire, standing over the mountain.', 'Hold one four seconds, alone or with more of your side than theirs, and it is yours. The ground round it burns your colour.', 'A point a second for every ring you hold. Walls and fire knock you out for a moment. Most at the end wins.'],
+//    in; whoever called it decides who holds what. A knock-out is for a moment. Most points when the clock stops wins.
+const TR = { N: 5, R: 80, H: 70, take: 3 }, trLand = () => MATCH.R0 * 0.42;   // (how far round a ring held its ground burns)
+MODES.territory = { name: 'DOMINATION', words: ['territory', 'domination', 'dom', 'zones', 'points'], teamsOk: true, min: 4, warm: 8, dur: 60, glass: false, close: false, respawn: 2500,
+  line: 'five rings of fire over the ring: hold one (alone, or with more of your side in it) for three seconds and it burns in your colour, and so does the ground round it · a point a second for each ring · free for all or in sides (/fly territory teams)',
+  ares: () => ['Five rings of fire, standing over the mountain.', 'Hold one three seconds, alone or with more of your side than theirs, and it is yours. The ground round it burns your colour.', 'A point a second for every ring you hold. Walls and fire knock you out for a moment. Most at the end wins.'],
   vet: 'Take the rings, hold them. Most points wins.',
-  ask: 'Hold a ring of fire for four seconds, alone or outnumbering everyone else in it, and it is yours, and the ground round it burns your colour. Every ring you hold scores a point a second. Most points at three minutes wins.',
+  ask: 'Hold a ring of fire for three seconds, alone or outnumbering everyone else in it, and it is yours, and the ground round it burns your colour. Every ring you hold scores a point a second. Most points when the clock stops wins.',
   setup() { gpMake(); MO.s.z = trPoints().map(P => ({ ...P, own: '', cap: '', pr: 0 })); MO.s.ts = [0, 0, 0, 0]; MO.s.sec = 0; MO.my.in = -1; MO.my.sT = 0; MO.paint = ''; MO.near = null; },
   clear() { gpHide(); },
   out: (id, by) => moKO(id, by),
@@ -33317,8 +33317,8 @@ const trName = k => k[0] === 't' && /^t[0-3]$/.test(k) ? teamName(+k[1]) : match
 function trPoints() { const M = MATCH, a0 = (miHash(M.id + ':dom') % 628) / 100, L = [[M.cx, M.cz]]; for (let k = 0; k < 4; k++) L.push([M.cx + Math.cos(a0 + k * 1.5708) * M.R0 * 0.5, M.cz + Math.sin(a0 + k * 1.5708) * M.R0 * 0.5]);
   return L.map(([x, z]) => ({ x, z, y: Math.max(M.base + 150, Math.max(groundAt(x, z, 9000), WATER) + 120) })); }
 function trPaint() {   // (the ground round each ring held, in its holder's colour: the nearest ring's, within reach of it)
-  const Z = MO.s.z; gpPaint(c => { const P = gpAt(c); let b = -1, bd = TR.land * TR.land; Z.forEach((q, i) => { const d = (P.x - q.x) ** 2 + (P.z - q.z) ** 2; if (d < bd) { bd = d; b = i; } });
-    return b >= 0 && Z[b].own ? gp255(trCol(Z[b].own), 1.1, 150 - Math.sqrt(bd) / TR.land * 70 | 0) : null; });
+  const Z = MO.s.z; gpPaint(c => { const P = gpAt(c); const LR = trLand(); let b = -1, bd = LR * LR; Z.forEach((q, i) => { const d = (P.x - q.x) ** 2 + (P.z - q.z) ** 2; if (d < bd) { bd = d; b = i; } });
+    return b >= 0 && Z[b].own ? gp255(trCol(Z[b].own), 1.1, 150 - Math.sqrt(bd) / LR * 70 | 0) : null; });
 }
 function trSaid(i) { const q = MO.s.z[i]; if (!q.own) return; if (matchSees()) chatLine('', `${q.own === trKey(NET.id) ? 'YOU TAKE' : trName(q.own) + ' TAKES'} RING ${'ABCDE'[i]}`, 'sys');
   if (camera.position.distanceToSquared(_v.set(q.x, q.y, q.z)) < 2400 * 2400) shock(q.x, q.y, q.z, new THREE.Color(trCol(q.own)).getHex(), 140, 1, true); MO.dirty = true; modeBarSet(); }
@@ -33329,14 +33329,14 @@ function trSaid(i) { const q = MO.s.z[i]; if (!q.own) return; if (matchSees()) c
 //    are out; fly back across your own and you are. A bird with no land left is out. No walls in the air, no fire;
 //    a crash is a moment back over home. Whoever called it watches every bird across the cells and decides all of it,
 //    and says it in small pieces: the lines as they grow (lt), a loop closed and the cells it took (lf), a bird cut out
-//    (lx), and now and then the whole of it (lg). Each screen paints the ground from that. Most land at three minutes,
+//    (lx), and now and then the whole of it (lg). Each screen paints the ground from that. Most land when the clock stops,
 //    or the last bird with any, wins.
-const LD = { start: 3, tick: 0.25, all: 4 };
-MODES.land = { name: 'LAND GRAB', words: ['land', 'landgrab', 'grab', 'claim'], min: 4, warm: 0, dur: 180, walls: false, fire: false, glass: false, close: false, respawn: 2500,
+const LD = { start: 4, tick: 0.25, all: 4 };
+MODES.land = { name: 'LAND GRAB', words: ['land', 'landgrab', 'grab', 'claim'], min: 4, warm: 0, dur: 60, walls: false, fire: false, glass: false, close: false, respawn: 2500,
   line: 'each bird starts with a patch of ground in its colour: fly out and your fire draws a line on the ground, come home and the loop is yours · cross an open line and its owner is out · most land wins',
   ares: () => ['Each of you has a patch of ground in your colour.', 'Fly out of it and your fire draws a line on the ground. Get home, and everything inside the loop is yours.', 'Cross someone’s open line and they are out. Cross your own, and you are. Most land wins.'],
   vet: 'Loops home. Cut their lines, mind your own.',
-  ask: 'Leave your ground and your fire draws a line on the ground; reach your ground again and everything inside the loop is yours, even other people’s land. Anyone crossing your open line puts you out, and so does crossing it yourself. Most land at three minutes wins.',
+  ask: 'Leave your ground and your fire draws a line on the ground; reach your ground again and everything inside the loop is yours, even other people’s land. Anyone crossing your open line puts you out, and so does crossing it yourself. Most land when the clock stops wins.',
   setup() { gpMake(); const n = GP.G * GP.G; MO.L = { own: new Uint8Array(n), tr: new Uint8Array(n), ids: [], tl: [], cell: [], sent: [], dead: new Set(), cnt: [], dirty: true, tT: 0, gT: 0 }; },
   clear() { gpHide(); MO.L = null; },
   out(id, by) { if (/cut|land/.test(by)) return false; return moKO(id, by); },   // (only a cut line, or no land left, is for good)
