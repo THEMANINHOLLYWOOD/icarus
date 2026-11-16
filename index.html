@@ -5686,8 +5686,22 @@ const flags = { morphed: false, faint: 0, deaths: 0, beganAt: 0, flapHintT: 0 };
 const story = { phase: 'summit', met: new Set(), known: new Set(), gossip: [], events: [], chain: null };
 const beaconsAwake = () => realm === 'over' && (story.phase === 'gods' || story.phase === 'free');
 
-const keys = {};
-const down = (...codes) => codes.some(c => keys[c]);
+const keys = {};   // (the keys as they are held: written only here, ahead of every other listener, so nothing that eats a key for itself can lose one or leave one held)
+// (what is held counts only while nothing else has the keys: a chat or the guide open, a conversation, the map, his record, a warp, a fight watched. Nothing is wiped when one of those comes: when it goes, whatever is still held counts again)
+const keysOff = () => state !== 'play' && state !== 'photo' && state !== 'dead' || CHAT.open || GUIDE.open || COSMOS.map.on;
+const down = (...codes) => !keysOff() && codes.some(c => keys[c]);
+const typingIn = t => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || !!t?.isContentEditable;
+const keysLetGo = () => { for (const k in keys) keys[k] = false; };
+addEventListener('keydown', e => {
+  const t = e.target;
+  if (t instanceof Element && t !== document.body && !(t.checkVisibility ? t.checkVisibility({ visibilityProperty: true }) : t.getClientRects().length)) {   // (the focus left on something since hidden, a closed panel's button or box: it lets go, and the key is the game's)
+    t.blur(); e.preventDefault(); e.stopImmediatePropagation(); document.body.dispatchEvent(new KeyboardEvent('keydown', e)); return; }
+  if (e.code === 'MetaLeft' || e.code === 'MetaRight') return keysLetGo();   // (with Cmd down a Mac sends no keyup for anything: what was held is let go, and a key pressed with it is a shortcut, not held)
+  if (!e.code || e.metaKey || typingIn(t)) return;   // (what is typed into a box is not flying)
+  keys[e.code] = true;
+}, true);
+addEventListener('keyup', e => { if (e.code === 'MetaLeft' || e.code === 'MetaRight') keysLetGo(); else if (e.code) keys[e.code] = false; }, true);
+document.addEventListener('visibilitychange', () => { if (document.hidden) keysLetGo(); });   // (the tab put away: its keyups go elsewhere)
 const stick = { x: 0, y: 0 };  // virtual thumbstick, -1..1, y up
 const boosting = () => down('ShiftLeft', 'ShiftRight', 'TouchBoost') || AP.boost || PAD.boost;
 function axes() {
@@ -8847,7 +8861,7 @@ function statsOpen() {
   if (MATCH.phase === 'live' && MATCH.me?.alive) { toast('NOT IN THE MIDDLE OF A FIGHT'); return; }
   if (MENU.open) menuShow(false); if (CHAT.open) closeChat(); if (QL.open) qlShow(false); if (GUIDE.open) guideShow(false);
   statsSend(false); state = 'stats'; Object.assign(STV, { on: true, t: 0, page: 0, pan: 0, panV: 0, sc: [], drag: null, map: false, said: -1, layKey: '' });
-  for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+  keys.TouchBoost = false; stick.x = stick.y = 0;
   STV.p0.copy(camera.position); STV.q0.copy(camera.quaternion); STV.fov0 = camera.fov;
   STV.yaw0 = player.form === 'human' ? human.group.rotation.y : player.yaw;
   STV.pages = statsPages(); statsWorld();
@@ -8859,7 +8873,7 @@ function statsClose() {
   if (STV.map) statsMapOut(false);
   STV.on = false; STV.drag = null; if (state === 'stats') state = 'play';
   STV.el.classList.remove('on', 'thru'); document.body.classList.remove('statsv', 'stvmap'); STV.plain.innerHTML = STV.nav.innerHTML = '';
-  for (const k in keys) keys[k] = false; audio.sfx.mapClose?.();
+  audio.sfx.mapClose?.();
 }
 const stvLast = () => STV.pages.length - 1;
 function statsGo(i) { const n = clamp(Math.round(i), 0, stvLast()); if (n !== STV.page) { STV.page = n; audio.sfx.mapTurn?.(0.5); } }
@@ -9223,7 +9237,7 @@ function guideShow(on, focus = true) {
   if (GUIDE.open === on) { if (on && focus && !TOUCH) $('guideIn').focus({ preventScroll: true }); return; }
   if (on && !(state === 'play' || state === 'map')) return;
   GUIDE.open = on; GUIDE.auto = false; $('guide').classList.toggle('open', on);
-  for (const k in keys) keys[k] = false;
+  keys.TouchBoost = false;
   if (on) { if (MENU.open) menuShow(false); if (EXPLAIN.i >= 0) { EXPLAIN.i = 1e9; explainPanel(); } $('guideAsked').textContent = ''; guideChips(); guideLine(GUIDE_HELLO, false); audio.sfx.guideOpen?.();
     if (focus && !TOUCH) $('guideIn').focus({ preventScroll: true }); try { localStorage.setItem('icarus.explained', '1'); } catch {} }
   else { $('guideIn').blur(); $('guide').classList.remove('think'); }
@@ -9473,14 +9487,13 @@ function chatFilter(f) {   // which kind of line the open log shows
 $('chatTabs').addEventListener('pointerdown', e => { const b = e.target.closest('button[data-f]'); if (!b) return; e.preventDefault(); e.stopPropagation(); chatFilter(b.dataset.f); audio.sfx.ui?.(); });
 function openChat(pre = '') {
   if (CHAT.open) return;
-  CHAT.open = true; for (const k in keys) keys[k] = false;
+  CHAT.open = true; keys.TouchBoost = false;
   const c = $('chat'), i = $('chatInput'); c.classList.remove('hidden'); c.classList.add('open');
   i.value = pre; i.focus({ preventScroll: true }); $('chatLog').scrollTop = 1e6; chShow();
 }
 function closeChat() {
   if (!CHAT.open) return;
   CHAT.open = false; $('chat').classList.remove('open'); $('chatInput').blur();
-  for (const k in keys) keys[k] = false;
 }
 // ── Everything can be typed. A line that begins with / is an order, not something said: /tp and /goto, /sethome and
 //    /home, the camera, the map, who to follow, what to become — the same things a voice can ask for, by name. /help
@@ -11518,14 +11531,16 @@ function flipNet(p) {
 }
 // a pad, if one is plugged in: the left stick flies, the right one looks round, the triggers are the fire and the brake,
 // the shoulders roll him, A is the one button (space), Y a trick
-const PAD = { x: 0, y: 0, roll: 0, brake: 0, boost: false, on: false, b: [] };
+const PAD = { x: 0, y: 0, roll: 0, brake: 0, boost: false, on: false, b: [], id: '', mid: [] };
 function padTick() {
   const gp = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g && g.connected && g.axes.length >= 2) : null;
-  if (!gp) { if (PAD.on) { PAD.on = false; PAD.x = PAD.y = PAD.roll = PAD.brake = 0; PAD.boost = false; } return; }
+  if (!gp) { if (PAD.on) { PAD.on = false; PAD.x = PAD.y = PAD.roll = PAD.brake = 0; PAD.boost = false; PAD.id = ''; } return; }
+  if (PAD.id !== gp.id) { PAD.id = gp.id; PAD.mid = []; }
   if (!PAD.on) { PAD.on = true; toast('A PAD · LEFT STICK FLIES · BUMPERS ROLL · TRIGGERS: FIRE AND BRAKE · IN A FIGHT X THROWS FIRE, B IS YOUR WIND, Y CHANGES YOUR SHAPE'); }
   const dz = v => Math.abs(v) < 0.15 ? 0 : (v - Math.sign(v) * 0.15) / 0.85, btn = i => !!(gp.buttons[i] && gp.buttons[i].pressed), val = i => gp.buttons[i] ? gp.buttons[i].value : 0;
-  PAD.x = dz(gp.axes[0]); PAD.y = -dz(gp.axes[1]); PAD.roll = (btn(4) ? 1 : 0) - (btn(5) ? 1 : 0); PAD.brake = val(6); PAD.boost = val(7) > 0.3;
-  if (gp.axes.length >= 4 && player.form === 'phoenix' && !dragging) camYawOff = clamp(camYawOff - dz(gp.axes[2]) * 0.04, -Math.PI, Math.PI);
+  const ax = i => { const v = gp.axes[i] || 0; if (Math.abs(v) < 0.15) PAD.mid[i] = true; return PAD.mid[i] ? dz(v) : 0; };   // (an axis counts once it has been seen at rest in the middle: one that rests at an end, a throttle or a trigger, would hold the nose down for good)
+  PAD.x = ax(0); PAD.y = -ax(1); PAD.roll = (btn(4) ? 1 : 0) - (btn(5) ? 1 : 0); PAD.brake = val(6); PAD.boost = val(7) > 0.3;
+  if (gp.axes.length >= 4 && player.form === 'phoenix' && !dragging) camYawOff = clamp(camYawOff - ax(2) * 0.04, -Math.PI, Math.PI);
   const was = PAD.b; PAD.b = gp.buttons.map(b => b.pressed);
   if (state === 'play' && PAD.b[0] && !was[0]) { const M = MATCH; if (M.phase === 'count' && M.placed && MD.id === M.id && Date.now() < M.t0) { if (MD.ask === 'ready') mdReady(); if (mdCamOn()) mdSkip(); } else pressSpace(); }   // (in a fight's opening, A is Space there: a yes when asked, and his own lens)
   if (state === 'play' && PAD.b[3] && !was[3]) { if (fshOn()) fshTo('next'); else if (player.form === 'phoenix') birdTrick(''); }   // (Y: a trick; in a fight, the next shape)
@@ -20542,6 +20557,7 @@ AP.el = (() => { const el = document.createElement('div'); el.className = 'mk'; 
 AP.beam = (() => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 700, 8, 1, true).translate(0, 350, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.15, 0.5), transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); m.visible = false; m.frustumCulled = false; scene.add(m); return m; })();
 const V_SAY = 'SAY: FLY · LAND · GLIDE · BIRD · DIVE · CLIMB · FASTER · BLOW · LEFT · WALK · STOP · GO THERE · MAP · CAMERA · CINEMATIC · PLAYERS · MENU · HANDS ON · BECOME A WHALE';
 function apClear() { AP.kind = ''; AP.until = 0; AP.tx = AP.ty = 0; AP.tb = false; AP.thenLand = false; }
+addEventListener('keydown', e => { if (!e.repeat && AP.kind && AP.kind !== 'go' && AP.kind !== 'catch' && /^(Key[WASD]|Arrow(Up|Down|Left|Right))$/.test(e.code) && down(e.code)) apClear(); }, true);   // (a word that set him going, a dive or a landing, said or misheard: steering again, he has it)
 function apTimed(x, y, secs, boost = false) { AP.kind = 'timed'; AP.tx = x; AP.ty = y; AP.tb = boost; AP.until = time + secs; }
 function apMark(w) {
   AP.wp = w; AP.beam.position.set(w.x, w.y, w.z); AP.beam.visible = true; WP.sel = -1; guideWind(w);
@@ -20958,7 +20974,7 @@ function updateAuto(dt) {
     case 'go': {
       const w = AP.wp; if (!w) { apClear(); break; }
       if (AP.follow) { const F = NET.peers.get(AP.follow); if (F && F.s && performance.now() - F.s.t < 15000) { w.x = F.pos.x; w.y = F.pos.y; w.z = F.pos.z; if (Math.hypot(w.x - p.pos.x, w.z - p.pos.z) < 40) break; } else AP.follow = null; }   // (following someone: the mark is wherever they are now; alongside them there is nothing to do)
-      if (Math.hypot(stick.x, stick.y) > 0.55 || ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].some(k => keys[k])) { apClear(); break; }   // (steering again: he has it)
+      if (Math.hypot(stick.x, stick.y) > 0.55 || down('KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight')) { apClear(); break; }   // (steering again: he has it)
       const dx = w.x - p.pos.x, dz = w.z - p.pos.z, d = Math.hypot(dx, dz), want = Math.atan2(-dx, -dz);
       if (p.form === 'phoenix' && AP.thenLand && Math.hypot(d, w.y - p.pos.y) < 240) {   // close enough: in on a curve, over anything in the way, a flare, and down on the very spot
         AP.thenLand = false; const S = { x: w.x, y: w.y, z: w.z, r: 2.6, name: '' }; apUnmark(); apClear(); perchGo(S); toast('LANDING'); break; }
@@ -20987,7 +21003,7 @@ const photo = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, roll: 0, fov: 50, sn
 function openPhoto(free) {
   if (state !== 'play') return;
   if (MATCH.phase === 'live' && MATCH.me.alive) { toast('NOT IN THE MIDDLE OF A FIGHT'); return; }   // (the world stood still for him alone: nothing could reach him)
-  state = 'photo'; timeK = 0.02; for (const k in keys) keys[k] = false;
+  state = 'photo'; timeK = 0.02; keys.TouchBoost = false;
   photo.pos.copy(camera.position); _e.setFromQuaternion(camera.quaternion, 'YXZ'); photo.yaw = _e.y; photo.pitch = _e.x; photo.roll = 0; photo.fov = camera.fov;
   document.body.classList.add('photo'); document.body.classList.remove('cinema');
   toast(TOUCH ? 'DRAG TO MOVE AND LOOK · PINCH FOR THE LENS · TAP TO KEEP IT · TAP THE CORNER TO GO BACK' : 'PHOTO CAMERA');
@@ -21005,7 +21021,7 @@ function snapPhoto() {
         .then(() => { photo.clip = 1; }, () => { photo.clip = -1; });
   } catch { photo.clip = -1; }
 }
-function closePhoto() { if (state !== 'photo') return; state = 'play'; timeK = 1; photo.run = false; if (photo.live) { photo.live = false; $('photoBar').querySelector('[data-a="live"]').classList.remove('on'); } document.body.classList.remove('photo'); for (const k in keys) keys[k] = false; }
+function closePhoto() { if (state !== 'photo') return; state = 'play'; timeK = 1; photo.run = false; if (photo.live) { photo.live = false; $('photoBar').querySelector('[data-a="live"]').classList.remove('on'); } document.body.classList.remove('photo') }
 // six ready-made framings of wherever he is
 function photoPreset(n) {
   const p = player, yaw = p.form === 'human' ? human.group.rotation.y : p.yaw, big = p.form === 'human' ? 1 : 9, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
@@ -22464,7 +22480,7 @@ function startTalk(g, said = null) {
   if (MENU.open) menuShow(false);   // (a conversation has the screen: the menu goes up out of its way)
   state = 'talk'; talk.god = g; talk.token++; talk.busy = false; talk.text = ''; talk.shown = 0; talk.idx = 0; talk.final = false; talk.hold = 0;
   talk.idle = 0; talk.nudges = 0; talk.after = null; talk.speaking = 'god'; talk.intro = null; talk.scareT = 0; tcam.shot = ''; g.scared = false; talk.gift = null; talk.thanks = false; talk.theirs = false; talk.said = 0;
-  for (const k in keys) keys[k] = false;
+  keys.TouchBoost = false;
   stick.x = stick.y = 0;
   player.vel.x = player.vel.z = 0;
   human.group.rotation.y = Math.atan2(-(g.x - player.pos.x), -(g.z - player.pos.z));   // he turns to face them
@@ -25118,7 +25134,7 @@ function openMap() {
   if (COSMOS.on) return cosmosMap(true);   // (out in space, the map is the map of the heavens)
   if (state !== 'play' || player.cine || player.sub || mapV.open) return;
   state = 'map'; mapV.open = true; mapV.pull = 0; mapV.hover = null; mapV.down = null; audio.sfx.mapOpen?.();
-  for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+  keys.TouchBoost = false; stick.x = stick.y = 0;
   const dpr = Math.min(devicePixelRatio, 2); mapCv.width = innerWidth * dpr; mapCv.height = innerHeight * dpr;
   // it opens out of where he is standing: close in on him, then the country spreads
   mapV.x = mapV.tx = player.pos.x; mapV.z = mapV.tz = player.pos.z; mapV.s = 0.34; mapV.ts = TOUCH ? 0.06 : 0.085;
@@ -25688,7 +25704,7 @@ function startWarp(x, z, y = null, yaw = null) {
   warp.yaw = yaw != null ? yaw : Math.hypot(x - p.pos.x, z - p.pos.z) > 5 ? Math.atan2(-(x - p.pos.x), -(z - p.pos.z)) : p.yaw;
   netWarp(p.pos, warp.to);   // (everyone else sees the light take him, and sees it set him down)
   state = 'warp';
-  for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+  keys.TouchBoost = false; stick.x = stick.y = 0;
   p.vel.set(0, 0, 0); p.wings = false; p.tumble = false; p.stumbleT = 0; p.rollT = 0; p.sliding = false; setManWings(0, 0, 0, 0, 0);
   if (p.form === 'human') { resetPose(); p.grounded = false; }
   const floor = Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y), WATER);
@@ -28518,7 +28534,6 @@ addEventListener('keydown', e => {
   }
   if (state === 'photo') {
     if (e.code === 'KeyT' && !e.repeat) { e.preventDefault(); return openChat(); }
-    keys[e.code] = true;
     if (e.code === 'KeyF' || e.code === 'Escape' || isPlus(e)) closePhoto();
     else if (e.code === 'Enter' || e.code === 'Space') snapPhoto();
     else if (/^Digit[1-9]$/.test(e.code)) photoPreset(+e.code[5]);
@@ -28533,7 +28548,6 @@ addEventListener('keydown', e => {
     if (e.code === 'KeyB') { e.preventDefault(); return openChat('/become '); }   // become anything
     if (isPlus(e)) { e.preventDefault(); return openPhoto(true); }
   }
-  keys[e.code] = true;
   if (e.repeat) return;
   switch (e.code) {
     case 'Space': pressSpace(); break;
@@ -28581,7 +28595,7 @@ $('primerQuiet').addEventListener('click', e => {
   pro.micAsk = 'quiet'; pro.waitMic = false; $('primer').classList.remove('on', 'asking'); audio.sfx.ui?.();
 });
 addEventListener('blur', () => {
-  for (const k in keys) keys[k] = false;
+  keysLetGo();
   dragging = false; looks.clear(); taps.clear(); joy = null; stick.x = stick.y = 0;
 });
 if (TOUCH) {
@@ -29795,7 +29809,7 @@ function birdStep(dt) {
   const M = LIVE, p = player, P = p.pos, K = birdK();
   if (!birdCan()) { birdAuto('', ''); return false; }
   const [ax, ay] = axes(), xr = XR.on && XR.mode === 'rider';
-  if (!xr && (Math.hypot(ax, ay) > 0.6 || keys.Space)) { birdAuto(''); return false; }   // (he has taken hold of it again)
+  if (!xr && (Math.hypot(ax, ay) > 0.6 || down('Space'))) { birdAuto(''); return false; }   // (he has taken hold of it again)
   M.t += dt; M.clear = 5 * K;
   if (!M.mv || M.mv.done) {
     if (M.mv && TRICK_K.has(M.mv.k)) { M.pitch = wrapAngle(M.pitch); M.roll = wrapAngle(M.roll); }
@@ -30201,7 +30215,7 @@ function godDash(x, z, y = null) {
   const dir = to.clone().sub(from).normalize(); to.addScaledVector(dir, -Math.min(140, d * 0.2));
   to.y = Math.max(to.y, Math.max(height(to.x, to.z), WATER) + 40);
   warp.dash = { t: 0, from, to, dir, T: clamp(d / 3000, 1.2, 3.2) + 0.55, wind: 0.55 }; warp.t = 0; warp.swapped = false; warp.home = false; warp.exact = null; warp.walkP = null;
-  state = 'warp'; for (const k in keys) keys[k] = false; stick.x = stick.y = 0; p.perch = false; p.takeoff = null; p.grounded = false; p.tumble = false;
+  state = 'warp'; keys.TouchBoost = false; stick.x = stick.y = 0; p.perch = false; p.takeoff = null; p.grounded = false; p.tumble = false;
   audio.sfx.whoosh?.(true); (audio.sfx.beamUp || audio.sfx.teleport)?.(); camShake = Math.max(camShake, 0.35);
   dlg.queue.length = 0; dlg.cur = null;
   return true;
@@ -32258,7 +32272,7 @@ function matchPractice(by, life = false, o = null) {   // (o: a game's knock-out
   matchBoom(p.pos.x, p.pos.y, p.pos.z, matchCol(NET.id), birdK() * 0.8, v, true, PATRON.id || ''); matchSend({ k: 're', id: M.id, v, l: life ? M.lives : undefined });
   const T = TRON.trails.get(NET.id); if (T) tronClear(T);
   M.reAt = performance.now() + (o ? o.ms : life ? 800 : 1500); M.deadAt = performance.now(); M.deadPos = (M.deadPos || new THREE.Vector3()).copy(p.pos); M.deadYaw = p.yaw; M.outT = 0; M.glide = null;
-  state = 'watch'; p.gone = true; p.cine = null; p.vel.set(0, 0, 0); for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+  state = 'watch'; p.gone = true; p.cine = null; p.vel.set(0, 0, 0); keys.TouchBoost = false; stick.x = stick.y = 0;
   if (o) { matchBig(o.big || 'BACK IN', 1100); chatLine('', `${by ? by.toUpperCase() + ' · ' : ''}${o.line || 'BACK ON YOUR LINE IN A MOMENT'}`, 'sys'); }
   else if (life) { matchBig('EXTRA LIFE', 1200, '#bff4ff'); chatLine('', `${by ? by.toUpperCase() + ' · ' : ''}YOUR EXTRA LIFE · BACK IN${M.lives ? ` · ${M.lives} MORE` : ''}`, 'sys'); }
   else { matchBig('PRACTICE', 1100); chatLine('', `${by ? by.toUpperCase() + ' · ' : ''}IT DOES NOT COUNT YET · BACK ON YOUR LINE`, 'sys'); }
@@ -32275,7 +32289,7 @@ function matchRespawn() {
 }
 function matchWatch(bring) {   // out, or never in: he watches
   const p = player; if (!MATCH.back) MATCH.back = { pos: p.pos.clone(), form: p.form, grounded: p.grounded, in: MATCH.me.in };
-  state = 'watch'; p.gone = true; p.cine = null; p.vel.set(0, 0, 0); for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+  state = 'watch'; p.gone = true; p.cine = null; p.vel.set(0, 0, 0); keys.TouchBoost = false; stick.x = stick.y = 0;
   if (bring) { p.pos.set(MATCH.cx, MATCH.base + 420, MATCH.cz); streamChunks(Math.floor(p.pos.x / CHUNK), Math.floor(p.pos.z / CHUNK), 40); camera.position.set(MATCH.cx + MATCH.R0 * 0.75, MATCH.base + 520, MATCH.cz + MATCH.R0 * 0.75); lookAt.set(MATCH.cx, MATCH.base + 220, MATCH.cz); }
   matchWatchNext();
 }
@@ -34354,7 +34368,7 @@ function cosmosPresent() {
 function cosmosMap(on) {
   const C = COSMOS, M = C.map; if (on === M.on) return;
   if (on) { if (!C.on) return; M.on = true; M.piv.copy(C.pos); M.q.copy(C.camQ); M.d = 300; M.td = Math.max(CZ_RG * 9, C.nearD * 3); M.pid = 'me'; M.keys = {};
-    for (const k in keys) keys[k] = false; stick.x = stick.y = 0;
+    keys.TouchBoost = false; stick.x = stick.y = 0;
     C.mapEl.classList.add('on'); document.body.classList.add('czmap'); czMapText(); audio.sfx.mapOpen?.(); }
   else { M.on = false; C.mapEl.classList.remove('on'); document.body.classList.remove('czmap'); C.camOff = null; audio.sfx.mapClose?.(); }
 }
