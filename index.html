@@ -27307,11 +27307,12 @@ function mapBoth(x, W, H, fits) {
   x.lineWidth = 1; line(Q.top, 'rgba(226,172,78,.6)'); line(Q.roof, 'rgba(120,160,255,.7)'); line(Q.fl, 'rgba(150,170,230,.55)'); line(Q.ft, 'rgba(150,170,230,.25)');
   const n = Q.top.length - 1; for (const k of [0, n]) { line([Q.top[k], Q.roof[k]], 'rgba(226,172,78,.35)'); line([Q.fl[k], Q.ft[k]], 'rgba(150,170,230,.3)'); }
   x.font = '9px "IBM Plex Mono", Menlo, monospace';
+  const wid = t => (UIL.on && UIL.buf ? uiAsc(t).length * UIL.cw : x.measureText(t).width);   // (how wide a name is, typed in the letters or written)
   { const u = -0.62 * M3.B, w = M3.w0 - 0.14 * M3.B, wx = M3.bc[0] + mapP.c * u + M3.fh[0] * w, wz = M3.bc[1] - mapP.s * u + M3.fh[1] * w, q = P3(wx, wz, relOf('under', wx, wz) + offU);   // (its name, on the dark just in front of the cut)
-    const t = 'T H E   U N D E R W O R L D', hw = x.measureText(t).width / 2 + 6, cx = clamp(q[0], hw, W - hw);   // (kept on the page, on a narrow one too)
+    const t = 'T H E   U N D E R W O R L D', hw = wid(t) / 2 + 6, cx = clamp(q[0], hw, W - hw);   // (kept on the page, on a narrow one too)
     if (on(q) && fits(cx, q[1], 27)) { x.fillStyle = 'rgba(160,180,255,.85)'; x.fillText(t, cx, q[1]); } }
   { const r = Q.roof[0], q = P3(r[0], r[2], WATER + offO), q2 = P3(r[0], r[2], r[1]), my = (q[1] + q2[1]) / 2;   // (how deep the roof of the dark is: as deep as he is carried through the sea)
-    const t = `${SEA.col} M UNDER THE SEA`, tw = x.measureText(t).width, rx = Math.max(q2[0] - 8, tw + 6);   // (to the left of the cut, or as near it as the page allows)
+    const t = `${SEA.col} M UNDER THE SEA`, tw = wid(t), rx = Math.max(q2[0] - 8, tw + 6);   // (to the left of the cut, or as near it as the page allows)
     if (on(q2) && fits(rx - tw / 2, my, 20)) { x.textAlign = 'right'; x.fillStyle = 'rgba(244,234,210,.6)'; x.fillText(t, rx, my); x.textAlign = 'center'; } }
 }
 function updateMap(dt) {
