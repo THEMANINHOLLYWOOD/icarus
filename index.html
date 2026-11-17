@@ -13518,7 +13518,7 @@ function updatePhoenix(dt) {
   p.climbT = pin > 0.6 && !PV ? (p.climbT || 0) + dt : Math.max(0, (p.climbT || 0) - dt * 3);   // (held: the nose keeps coming up, past a climb to straight up)
   const up = smoothstep(0.5, 1.6, p.climbT) * Math.max(smoothstep(35, 70, p.speed), smoothstep(1.4, 2.4, p.climbT)) + (FLIP.vert || 0);   // (fast, the nose comes right up; slower, it takes a longer hold)
   // held on, past straight up: over the top (or, on his back, S past straight down). Only his own hands do it, never the autopilot's
-  if (!FLIP.over && state === 'play' && !GODM.spent && !p.wasRiding && Math.abs(AP.ay || 0) < 0.05 && brk < 0.3 && !HY.on) {   // (in hyper, straight up is the way to space, not over the top)
+  if (!FLIP.over && state === 'play' && !GODM.spent && !p.wasRiding && Math.abs(AP.ay || 0) < 0.05 && brk < 0.3 && !HY.on && !COSMOS.lift && !(p.pos.y > SKY_LIMIT - 450 && realm === 'over' && !PL.on && !MATCH.phase && !XR.on)) {   // (and near the top of the sky, held up is the way out into space)   // (in hyper, straight up is the way to space, not over the top)
     if (pin > 0.6 && p.pitch > 1.36 && p.speed > 24 && !FLIP.vert) FLIP.over = 1;
     else if (pin < -0.6 && p.pitch < -1.3 && Math.cos(FLIP.a) < -0.5) FLIP.over = -1;
     if (FLIP.over) FLIP.qv = 0.35;   // (it goes on at about the rate it came up at, and gathers)
@@ -13532,7 +13532,7 @@ function updatePhoenix(dt) {
     if (pin < 0.2 && p.pitch > 1.15 && !FLIP.hung && brk < 0.2 && state === 'play') { FLIP.hung = true; FLIP.hangT = 1.1; }
     if (FLIP.hangT > 0) FLIP.hangT = pin > 0.2 || pin < -0.2 ? 0 : FLIP.hangT - dt; else if (p.pitch < 0.6) FLIP.hung = false;
     p.pitch = lerp(p.pitch, lerp((pin > 0 || FLIP.vert > 0 ? lerp(Math.max(0, pin) * 0.6, 1.45, Math.min(1, up)) : pin * (PV ? 1.05 : 1.38)) + trim * smoothstep(0.3, 0.05, Math.abs(pin)) * (1 - Math.min(1, up)), 0, brk), damp(FLIP.hangT > 0 ? 0.25 : p.pitch > 1.0 && pin < 0.2 && brk < 0.2 ? 0.6 : diving ? 4.5 : DIVE.pull > 0.05 ? lerp(PV ? 3.2 : 1.8, 3.6, DIVE.pull) : PV ? 3.2 : up > 0.2 ? 2.4 : 1.8, dt));   // (let go straight up and he carries on up a while, slowing)   // (out of a dive bomb: a hard pull-out, eased)
-    if (u < FLY.stall && !diving && brk < 0.2 && !(FLIP.hangT > 0)) p.pitch = lerp(p.pitch, -0.45, damp(2.5, dt));  // stall: the nose drops (where, goes with his size: see FLY)
+    if (u < FLY.stall && !diving && brk < 0.2 && !(FLIP.hangT > 0) && !COSMOS.lift) p.pitch = lerp(p.pitch, -0.45, damp(2.5, dt));  // stall: the nose drops (where, goes with his size: see FLY)
     if (GODM.spent) p.pitch = Math.min(p.pitch, -0.06);   // spent: the wings are heavy, and will not take him up
   }
   // a jetstream takes him if he flies into one: carried down its line, very fast, and it costs him nothing
@@ -38301,7 +38301,7 @@ function cosmosInit() {
   renderer.compileAsync?.(S, C.cam).catch(() => {});   // (its programs made ahead, while he is still climbing)
 }
 // going up: past the sky limit the blue goes out of the sky and the stars come through, by day
-const CZ_BLACK = new THREE.Color(0x01020a), CZ_DEEP = new THREE.Color(0x060c22);
+const CZ_BLACK = new THREE.Color(0x01020a), CZ_DEEP = new THREE.Color(0x060c22), CZ_VEIL = new THREE.Color().setRGB(0.004, 0.006, 0.016);   // (VEIL: the dark the picture goes through, up into space and down out of it)
 function cosmosSky(k) {
   if (k < 0.002) return;
   k = Math.pow(k, 0.6);   // (the blue goes early, the last of it slowly)
@@ -38317,15 +38317,22 @@ function cosmosStep(dt) {
   if (!C.on) {
     const can = state === 'play' && cosmosOpen(), want = can || C.cool > 0 ? smoothstep(SKY_LIMIT - 300, CZ_TOP, p.pos.y) : 0;
     C.up = lerp(C.up, want, damp(want > C.up ? 3 : 1.2, dt)); if (C.cool > 0) C.cool -= dt;
+    if (!PL.on) { const U = postMat.uniforms, out = C.lift ? smoothstep(CZ_TOP - 280, CZ_TOP, p.pos.y) : 0;
+      C.veil = Math.max(0, (C.veil || 0) - dt / 1.6); if (out > 0) U.uVeilCol.value.copy(CZ_VEIL); U.uVeil.value = veilK(Math.max(out, C.veil)); }
     if (!can && C.up < 0.002) return;
     if (can && p.pos.y > SKY_LIMIT - 400) { cosmosInit(); if (!C.tex.job && C.tex.at < 0) czGlobeStart(); czGlobeStep(TOUCH ? 1.5 : 2.5); }
-    if (can && p.pos.y > SKY_LIMIT - 200 && p.pitch > 0.1 && C.cool <= 0) {   // the air lets go of him: the higher, the faster he goes up (any climb will do: a shallow one is lifted as if it were steep)
-      const k = smoothstep(SKY_LIMIT - 200, CZ_TOP, p.pos.y); p.pos.y += (30 + 950 * k * k) * Math.max(0.45, Math.sin(p.pitch)) * dt;
+    const fly = can && C.cool <= 0 && p.form === 'phoenix' && !p.perch && !p.sub && !p.takeoff, dive = down('KeyS', 'ArrowDown') || stick.y < -0.5;
+    C.lift = fly && !dive && (C.lift ? p.pos.y > SKY_LIMIT - 320 : p.pos.y > SKY_LIMIT - 200 && p.pitch > 0.1);
+    if (C.lift) {   // the air lets go of him: the higher, the faster he goes up (any climb will do: a shallow one is lifted as if it were steep)
+      const k = smoothstep(SKY_LIMIT - 200, CZ_TOP, p.pos.y);
+      if (!FLIP.over && p.pitch < 1.36) p.pitch = Math.max(p.pitch, lerp(p.pitch, 0.45, damp(2.5, dt)));   // (held in a climb)
+      p.speed = Math.max(p.speed, 60 + 60 * k);
+      p.pos.y += (30 + 950 * k * k) * Math.max(0.45, Math.sin(Math.max(0.1, p.pitch))) * dt;
       postMat.uniforms.uSpeed.value = Math.max(postMat.uniforms.uSpeed.value, k * 0.8);
       if (!C.told && p.pos.y > SKY_LIMIT) { C.told = true; toast('THE SKY THINS · KEEP CLIMBING'); }
     }
     cosmosSky(C.up);
-    if (can && p.pos.y >= CZ_TOP && p.pitch > 0.1 && C.cool <= 0) cosmosEnter();
+    if (C.lift && p.pos.y >= CZ_TOP) cosmosEnter();
     return;
   }
   if (state !== 'play' || !cosmosOpen()) { cosmosLeave(state !== 'play'); return; }
@@ -38338,12 +38345,13 @@ function cosmosEnter() {
   czFrame(p.pos.x, p.pos.z, _czu, _czv, _czw);
   C.pos.copy(_czu).multiplyScalar(CZ_RG + p.pos.y - WATER);
   { const hx = -Math.sin(p.yaw), hz = -Math.cos(p.yaw), e = clamp(p.pitch, 0.25, 0.7); _czf.copy(_czv).multiplyScalar(hx).addScaledVector(_czw, hz).normalize().multiplyScalar(Math.cos(e)).addScaledVector(_czu, Math.sin(e)).normalize(); }   // (the way he was heading, climbing: never straight up, so his top is always the world's)
-  czLook(C.q, _czf, _czu); C.revealT = 4; C.v = Math.max(300, p.speed * 2); C.pv = 0; C.camOff = null; C.on = true; C.fadeT = CZ_FADE; C.cell = ''; C.nearB = null;
+  czLook(C.q, _czf, _czu); C.revealT = 4; C.v = Math.max(300, p.speed * 2); C.pv = 0; C.camOff = null; C.on = true; C.lift = false; C.fadeT = 0; C.veil = 1; postMat.uniforms.uVeilCol.value.copy(CZ_VEIL); postMat.uniforms.uVeil.value = 1; C.cell = ''; C.nearB = null;
   C.home = phoenix.group.parent; C.scene.add(phoenix.group); phoenix.group.visible = true; trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
   for (const T of C.trail.at) T.age = 9;
   document.body.classList.add('cosmos'); czBar(true);
-  toast(TOUCH ? 'SPACE · THE WORLD IS A GLOBE BELOW YOU · ◎ FOR THE MAP OF THE HEAVENS · DIVE BACK TO GO HOME' : 'SPACE · THE WORLD IS A GLOBE BELOW YOU · M FOR THE MAP OF THE HEAVENS · DIVE BACK INTO THE AIR TO GO HOME');
-  audio.sfx.whoosh?.(true); flash = Math.max(flash, 0.25);
+  SESSION.spaceTold = true;   // (he has found the way: no telling him how to break through again)
+  if (!C.saidHow) { C.saidHow = true; toast(TOUCH ? 'SPACE · ◎ FOR THE MAP OF THE HEAVENS · DIVE BACK TO GO HOME' : 'SPACE · M FOR THE MAP OF THE HEAVENS · DIVE BACK INTO THE AIR TO GO HOME'); }
+  audio.sfx.whoosh?.(true);
 }
 // back into the air: where he left the world, coming down the way he is going (quiet: something else has taken him, and
 // he is left where the world has put him)
@@ -38358,8 +38366,8 @@ function cosmosLeave(quiet = false) {
   p.pos.set(E.x, cosmosOpen() ? CZ_TOP - 80 : SKY_LIMIT - 160, E.z); p.yaw = yaw; p.pitch = -0.8; p.speed = 240; p.vy = 0; p.turn = 0; p.bank = 0; p.flame = 1; p.skyT = 0; p.fallTop = p.pos.y;
   dir3.set(-Math.sin(yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(yaw) * Math.cos(p.pitch));
   camera.position.set(p.pos.x + Math.sin(yaw) * phxDist, p.pos.y + phxDist * 0.5, p.pos.z + Math.cos(yaw) * phxDist); camYawOff = 0;
-  C.cool = 6; C.fadeT = CZ_FADE; C.up = 1; C.veil = 0; postMat.uniforms.uVeil.value = 0;
-  toast('THE WORLD AGAIN'); audio.sfx.whoosh?.(false);
+  C.cool = 6; C.fadeT = 0; C.up = 1; C.homeIn = 0; C.veil = 1; postMat.uniforms.uVeilCol.value.copy(CZ_VEIL); postMat.uniforms.uVeil.value = 1;
+  audio.sfx.whoosh?.(false);
 }
 // flying in space (in place of updatePhoenix): he turns and climbs about himself, his wings come level with whatever world
 // he is nearest, and the further he is from any of them the faster he goes — slow enough to skim one, fast enough to cross
@@ -38386,8 +38394,9 @@ function cosmosFly(dt) {
   // the ground of any world holds him off
   const P = C.pos, gl = P.length();
   if (gl > 1) { _czv.copy(P).divideScalar(gl); const floor = CZ_RG + czGlobeH(_czv) + 30;
+    if (gl - CZ_RG < CZ_ALT - 250 && f.dot(_czv) < -0.05 && !M) { cosmosLeave(false); return; }   // down into the air: home (first: fast, he can be past it and at the ground in one frame)
     if (gl < floor) { P.copy(_czv).multiplyScalar(floor); czSlide(_czv); }
-    else if (gl - CZ_RG < CZ_ALT - 250 && f.dot(_czv) < -0.05 && !M) { cosmosLeave(false); return; } }   // down into the air: home
+    C.homeIn = !M && f.dot(_czv) < -0.05 ? smoothstep(CZ_ALT + 450, CZ_ALT - 250, gl - CZ_RG) : 0; }
   for (const B of C.bodies) { _czv.subVectors(P, B.pos); const d = _czv.length(), floor = B.R * (1 + CZ_AMP[B.kind] * 0.7) + 25; if (d < floor && d > 1) { _czv.divideScalar(d); P.copy(B.pos).addScaledVector(_czv, floor); if (C.entry?.B !== B) czSlide(_czv); } }   // (going in through its air, he is held at the top of it and not turned)
   // the wings: beating as he climbs or hurries, folded back at a great speed
   p.speed = clamp(C.v, 40, 300); p.bank = lerp(p.bank, p.turn * 0.75, damp(3, dt)); p.pitch = 0; heat = 0; p.danger = 0; p.skyT = 0; p.flame = Math.min(1, p.flame + dt * 0.02);
@@ -39110,6 +39119,7 @@ function czVeil(dt) {
   const C = COSMOS, E = C.entry, U = postMat.uniforms;
   if (E) { U.uVeilCol.value.set(PL_SKY[E.B.kind][1]); C.veil = Math.max(C.veil || 0, smoothstep(1.2, 2.6, E.t)); }
   else C.veil = Math.max(0, (C.veil || 0) - dt / 1.6);
+  if (!E && (C.homeIn || 0) > C.veil) { U.uVeilCol.value.copy(CZ_VEIL); U.uVeil.value = veilK(C.homeIn); return; }
   U.uVeil.value = veilK(C.veil);
 }
 // the bird coming in: the heat round him, the stars going out, the black filling with the colour of its sky
