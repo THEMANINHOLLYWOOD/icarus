@@ -12960,7 +12960,7 @@ function sendChat(raw) {
   if (PG.on && /^(skip|next)$/i.test(text)) { pgSkip(); return; }
   if (text[0] !== '/' && mdHeard(text)) return;   // (a fight opening: what he writes is for Ares — see mdHeard)
   if (text[0] !== '/' && dpOn()) { const R = dirParse(text.toLowerCase()); if (R && (R.rich || R.any || R.adj.length && (DIR.s || DIR.next))) { chatLine('', `→ CAMERA · ${text.toUpperCase()}`, 'sys'); dpHear(text, true); return; } }   // (with the camera his, a shot written down is for the camera)
-  if (text[0] !== '/' && GFLY.on && state === 'play') { statsWords(text, true); chatLine(heroName, text); airSay(text); return; }   // (with a god beside him, what he writes is for the god: nobody else reads it)
+  if (text[0] !== '/' && (GFLY.on || CZG.on) && state === 'play') { statsWords(text, true); chatLine(heroName, text); airHear(text); return; }   // (with a god beside him, what he writes is for the god: nobody else reads it)
   statsWords(text, true);
   if (text[0] === '/' && !/^\/(become|be|turn into|shape|shift|transform into)\b/i.test(text) && text.slice(1).trim().split(/\s+/).length > 2) {   // (anything else after a slash is a request, in plain words: the keeper's agent does it for him; for anyone else, the gods)
     const ask = text.slice(1).trim(); if (flyAsk(ask, true)) return; if (MOD.admin) agentAsk(ask); else { chatLine(`${heroName} → THE GODS`, ask, 'dm me'); guideAsk(ask, { auto: true }); } return; }
@@ -25346,13 +25346,13 @@ function heard(text, recorded = false) {
   if (player.mount && words <= 4 && /\b(jump|leap|let go|get off)\b/.test(low)) return gflyLeap();
   if (flyAsk(text, false)) return;   // (how to fly: figure eights, the water, up and then down — said to the bird)
   if (birdHear(low, words)) return;   // (said to the bird)
-  if (GFLY.on && state === 'play' && words > 3 && !/^(say|shout|tell (them|everyone|everybody))\b/.test(low)) { airHear(text); return; }   // (more than an order's worth of words, with a god beside him: it is said to the god)
+  if ((GFLY.on || CZG.on) && state === 'play' && words > 3 && !/^(say|shout|tell (them|everyone|everybody))\b/.test(low)) { airHear(text); return; }   // (more than an order's worth of words, with a god beside him: it is said to the god)
   if (voiceDo(low, words, text)) return;   // an order: something to do, somewhere to go, something to show
   if (state === 'play' && !player.cine) { const sw = shiftWord(low, words); if (sw) return shapeshift(sw); }   // "become a whale"
   if (state === 'play' && words <= 3 && /\b(camera|photo|picture)\b/.test(low)) return openPhoto();
   if (state === 'photo') { if (/\b(back|camera|done)\b/.test(low)) closePhoto(); else if (/\b(take|keep|save|shoot)\b/.test(low)) snapPhoto(); return; }
   if (state === 'play' && cmd && words <= 3 && !player.cine) return voiceCommand(cmd);
-  if (state === 'play' && GFLY.on && !/^(say|shout|tell (them|everyone|everybody))\b/.test(low)) { airHear(text); return; }
+  if (state === 'play' && (GFLY.on || CZG.on) && !/^(say|shout|tell (them|everyone|everybody))\b/.test(low)) { airHear(text); return; }
   if (state === 'play' && GODM.on && !/^(say|shout|tell (them|everyone|everybody|him|her))\b/.test(low)) { guideAsk(text, { auto: true }); return; }   // (the god in him is flown by his voice: what is not an order the game knows is Gaia's to answer, and to do)
   if (state === 'play') { spoke(text); chatSay(text); }   // anything else he says, he has said out loud: whoever is near has heard it, and everyone can read it
 }
@@ -32930,7 +32930,7 @@ function hermesSays(lines) {
   g.history.push({ role: 'god', text: L.join(' ') }); say(L.map(text => ({ text, voice: g.id, title: g.name })), g.name, true); for (const t of L) chatLine(g.name.toUpperCase(), t, 'god');
 }
 // anything he says while a god is flying with him is said to the god, and to nobody else
-function airHear(text) { if (!GFLY.on) return false; airSay(text); return true; }
+function airHear(text) { if (CZG.on) { czgSay(text); return true; } if (!GFLY.on) return false; airSay(text); return true; }   // (and out in space the first time, his own god: see czgSay)
 function tourStart() {
   const g = godById.hermes; if (!g || GFLY.on || realm !== 'over' || player.form !== 'phoenix') return false;
   flags.toured = true; saveSoon();
@@ -33027,7 +33027,7 @@ function updateGfly(dt) {
       godBirdFly(B, F.x, F.y, F.z, _v.set(Q.s.vx || 0, Q.s.vy || 0, Q.s.vz || 0), 420, dt); godBirdPose(B, dt); } }
   else for (const Q of NET.peers.values()) if (Q.gfB) { Q.gfB.bird.group.visible = false; Q.gfB = null; }
   // the first flight: Hermes comes for him (anyone who had flown before is given it once more after Crete again — see creteReturn; /tour asks for it any time)
-  if (!GFLY.on && flags.morphed && !flags.toured && state === 'play' && realm === 'over' && p.form === 'phoenix' && !p.cine && !p.perch && !p.sub && !MATCH.phase && !LIVE.on) { GFLY.wait = (GFLY.wait || 0) + dt; if (GFLY.wait > 3.2) { GFLY.wait = 0; tourStart(); } }
+  if (!GFLY.on && !CZG.on && flags.morphed && !flags.toured && state === 'play' && realm === 'over' && p.form === 'phoenix' && !p.cine && !p.perch && !p.sub && !MATCH.phase && !LIVE.on) { GFLY.wait = (GFLY.wait || 0) + dt; if (GFLY.wait > 3.2) { GFLY.wait = 0; tourStart(); } }
   if (!GFLY.on) return;
   const B = GFLY.B, g = GFLY.g; GFLY.t += dt;
   if (realm !== 'over' || MATCH.phase || state === 'dead' || state === 'title' || p.sub && GFLY.t > 1) { gflyEnd(true); return; }
@@ -38352,12 +38352,14 @@ function cosmosEnter() {
   SESSION.spaceTold = true;   // (he has found the way: no telling him how to break through again)
   if (!C.saidHow) { C.saidHow = true; toast(TOUCH ? 'SPACE · ◎ FOR THE MAP OF THE HEAVENS · DIVE BACK TO GO HOME' : 'SPACE · M FOR THE MAP OF THE HEAVENS · DIVE BACK INTO THE AIR TO GO HOME'); }
   audio.sfx.whoosh?.(true);
+  czgWant();   // (the first time out, his own god comes up with him: see czgStart)
 }
 // back into the air: where he left the world, coming down the way he is going (quiet: something else has taken him, and
 // he is left where the world has put him)
 function cosmosLeave(quiet = false) {
   const C = COSMOS, p = player; if (!C.on) return;
   C.on = false; C.hy = false; if (C.map.on) cosmosMap(false);   // (hy: who came up in hyper comes down under the sky limit like anyone)
+  czgLeave(quiet, C.entry);   // (his god does not come down with him)
   (C.home || scene).add(phoenix.group); C.home = null; trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
   document.body.classList.remove('cosmos'); czBar(false); C.rocks.count = 0;
   if (quiet) return;
@@ -38379,6 +38381,7 @@ function cosmosFly(dt) {
   C.beatT = Math.max(0, C.beatT - dt);
   p.turn = lerp(p.turn, -ax, damp(4, dt)); C.pv = lerp(C.pv, pin, damp(4, dt));
   C.q.multiply(_czq.setFromAxisAngle(_czY, p.turn * 1.15 * dt)).multiply(_czq.setFromAxisAngle(_czX, C.pv * 1.3 * dt));
+  czgSteer(dt, ax, pin);   // (his god, leading him round the first time: see czgSteer)
   const f = _czf.set(0, 0, -1).applyQuaternion(C.q), u = _czu.set(0, 1, 0).applyQuaternion(C.q);
   // level with the nearest world
   { const B = C.nearB, c = B ? B.pos : _cz0; _czv.subVectors(C.pos, c).normalize(); const s = _czv.dot(f); _czw.copy(_czv).addScaledVector(f, -s);
@@ -38424,6 +38427,7 @@ function cosmosFrame(dt) {
   C.entryK = czEntryLook(); czVeil(dt);
   cosmosCam(dt);
   cosmosPlace(dt);
+  czgStep(dt);
   if ((C.hudT -= dt) <= 0) { C.hudT = 0.25; czBar(true); }
   if (C.map.on) czLabels();
 }
@@ -38675,7 +38679,235 @@ addEventListener('keydown', e => {
   else if (['KeyH', 'KeyQ', 'KeyX', 'KeyR', 'KeyF', 'KeyB', 'KeyL', 'KeyK'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); }
 }, true);
 addEventListener('keyup', e => { COSMOS.map.keys[e.code] = false; }, true);
-setTimeout(() => { if (window.__icarus) Object.assign(window.__icarus, { COSMOS, cosmosOpen, cosmosEnter, cosmosLeave, cosmosMap, cosmosStep, czFrame, czCell, czOrbit, czDial, czZoom, czFocus, CZ_TOP, CZ_RG }); }, 200);
+setTimeout(() => { if (window.__icarus) Object.assign(window.__icarus, { COSMOS, cosmosOpen, cosmosEnter, cosmosLeave, cosmosMap, cosmosStep, czFrame, czCell, czOrbit, czDial, czZoom, czFocus, CZ_TOP, CZ_RG, CZG, czgWant, czgStart, czgEnd, czgSay, czgFacts, czgLines }); }, 200);
+// ── The first time out. The first time he breaks through the top of the sky, the god he chose comes up through it with him,
+//    in the shape the gods take to fly (a great bird of their own fire, their name in its feathers), and shows him round: out
+//    over the world, past one of its moons, to a world he could go down to. It leans him the way it is going and never takes
+//    the stick from him (the moment he steers, it lets go, keeps with him and waits). It talks the whole way about what it has
+//    watched him do down there, for the gods see everything, and he can talk back. Once on each device, and never again.
+const CZG = { on: false, seen: false, g: null, B: null, wait: 0, i: 0, ph: '', t: 0, leg: 0, all: 0, stops: [], busy: false, pend: '', heard: -99, hands: 0, away: 0, side: 1, cardT: 0,
+  off: new THREE.Vector3(), q: new THREE.Quaternion(), tgt: new THREE.Vector3(), bank: 0, used: new Set(), gone: null, said: [] };
+const CZG_KEY = 'icarus.spaceGuide', _cg1 = new THREE.Vector3(), _cg2 = new THREE.Vector3(), _cg3 = new THREE.Vector3(), _cg4 = new THREE.Vector3(), _cg5 = new THREE.Vector3(), _cgq = new THREE.Quaternion();
+const czgSeen = () => { if (CZG.seen) return true; try { return !!localStorage.getItem(CZG_KEY); } catch { return false; } };
+const czgOk = () => state === 'play' && COSMOS.on && !MATCH.phase && !XR.on;
+const czgTc = s => String(s || '').charAt(0) + String(s || '').slice(1).toLowerCase();   // (SELENE, said aloud: Selene)
+// (from cosmosEnter: the first time, and only if he has a god of his own to come for him; a breath after he is through)
+function czgWant() { if (CZG.on || CZG.wait > 0 || !PATRON.id || !godById[PATRON.id] || czgSeen() || !czgOk()) return; CZG.wait = 2.6; }
+function czgStart() {
+  const C = COSMOS, g = godById[PATRON.id]; if (!g || !czgOk() || CZG.on) return false;
+  CZG.seen = true; try { localStorage.setItem(CZG_KEY, String(Date.now())); } catch {}
+  if (GFLY.on) gflyEnd(true);   // (one god at his wing at a time)
+  const B = godBird('space:' + g.id, g.id); C.scene.add(B.bird.group); godBirdShow(B, g.name);
+  const f = _cg1.set(0, 0, -1).applyQuaternion(C.q), n = _cg2.copy(C.pos).normalize(), r = _cg3.set(1, 0, 0).applyQuaternion(C.q);
+  CZG.side = Math.random() < 0.5 ? -1 : 1;
+  CZG.off.copy(n).multiplyScalar(-420).addScaledVector(f, -140).addScaledVector(r, CZG.side * 160);   // (up out of the world under him)
+  CZG.q.copy(C.q); CZG.used.clear();
+  Object.assign(CZG, { on: true, g, B, i: -1, ph: 'gap', t: 0.8, leg: 0, all: 0, busy: false, pend: '', heard: -99, hands: 0, away: 0, gone: null, said: [], bank: 0, stops: czgRoute() });
+  witness(`broke out through the top of the sky into space for the first time, and ${g.name} came up with him to show him round`);
+  toast(`${g.name.toUpperCase()} HAS COME UP WITH YOU`);
+  audio.sfx.halo?.(); flash = Math.max(flash, 0.2);
+  return true;
+}
+// the way round: the world under him first, then the nearest moon (the ringed one, if it is not much further), then the world
+// nearest that, to go down to. The moons go round, so each stop is a world, not a place.
+function czgRoute() {
+  const C = COSMOS, P = C.pos, L = C.bodies.filter(B => B.orbit && B.R), d = B => B.pos.distanceTo(P) - B.R;
+  const by = L.slice().sort((a, b) => d(a) - d(b)), ring = L.find(B => B.ring);
+  const moon = ring && by[0] && d(ring) < d(by[0]) * 1.4 + 15000 ? ring : by[0];
+  const dive = moon && L.filter(B => B !== moon).sort((a, b) => a.pos.distanceTo(moon.pos) - b.pos.distanceTo(moon.pos))[0];
+  const S = [{ id: 'hello' }, { id: 'globe', lead: true }];
+  if (moon && dive) S.push({ id: 'moon', lead: true, B: moon }, { id: 'dive', lead: true, B: dive }); else if (moon) S.push({ id: 'dive', lead: true, B: moon });
+  S.push({ id: 'bye' }); return S;
+}
+// every frame out there (from cosmosFrame, after everything else has been put where the eye sees it)
+function czgStep(dt) {
+  const T = CZG, C = COSMOS;
+  if (T.gone) czgGone(dt);
+  if (!T.on) { if (T.wait > 0 && (T.wait -= dt) <= 0) { if (C.map.on || C.entry || !czgOk()) T.wait = czgOk() ? 1 : 0; else czgStart(); } return; }
+  if (!czgOk()) return czgEnd(true);
+  T.all += dt; T.t -= dt;
+  const still = !T.busy && !dlg.cur && !dlg.queue.length && !voiceSrc, S = T.stops[T.i];
+  if (!C.entry) {   // (diving at a world: it holds back, and says nothing more until he has gone or pulled out)
+    if (T.ph === 'gap') { if (T.t <= 0 && still) czgNext(); }
+    else if (T.ph === 'say') { if (T.t <= 0 && still) { if (S?.id === 'bye') return czgEnd(false); T.ph = 'gap'; T.t = 1.4; } }
+    else if (T.ph === 'lead') czgLead(S, dt, still);
+  }
+  czgPlace(dt, T.B, false);
+}
+function czgNext() {
+  const T = CZG; let S = T.stops[++T.i]; if (!S) return czgEnd(false);
+  if (T.all > 140 && S.id !== 'bye') { T.i = T.stops.length - 1; S = T.stops[T.i]; }   // (a long way round already: time to go)
+  T.leg = 0; T.away = 0; T.waitSaid = false; T.cardT = 0;
+  if (S.lead) { T.ph = 'lead'; czgTarget(S); return; }
+  T.ph = 'say'; T.t = 1; czgSay('', { stop: S.id });
+  if (S.id === 'hello') { const N = T.g.name.toUpperCase(); keyCard(TOUCH ? '' : 'T', TOUCH ? `TALK TO ${N} · OUT LOUD, OR R · CHAT IN THE MENU` : `TALK TO ${N} · OUT LOUD, OR T TO TYPE`); } else keyCard('', '');
+}
+// where it is taking him: high over the world, a way round it from where he came out; or just off the side of a world
+function czgTarget(S) {
+  const C = COSMOS, T = CZG;
+  if (S.B) {   // (a point off its near limb, to one side: led past it, not into it — going down is for him to choose)
+    const n = _cg1.subVectors(C.pos, S.B.pos).normalize(); if (!S.s) S.s = new THREE.Vector3(CZG.side, 0, 0).applyQuaternion(C.q);
+    const s = _cg2.copy(S.s).addScaledVector(n, -S.s.dot(n)); if (s.lengthSq() < 1e-4) s.set(0, 1, 0).applyQuaternion(C.q).addScaledVector(n, -_cg2.dot(n)); s.normalize();
+    T.tgt.copy(S.B.pos).addScaledVector(n, S.B.R * 1.6).addScaledVector(s, S.B.R * 2); return; }
+  if (!S.at) { const n = _cg1.copy(C.pos).normalize(), f = _cg2.set(0, 0, -1).applyQuaternion(C.q); f.addScaledVector(n, -f.dot(n)); if (f.lengthSq() < 1e-4) f.set(1, 0, 0).applyQuaternion(C.q); f.normalize();
+    S.at = n.multiplyScalar(Math.cos(0.75)).addScaledVector(f, Math.sin(0.75)).normalize().multiplyScalar(CZ_RG * 1.9).clone(); }   // (always further out than he is: never down into the air, which would take him home)
+  T.tgt.copy(S.at);
+}
+function czgLead(S, dt, still) {
+  const T = CZG, C = COSMOS; czgTarget(S);
+  const d = S.B ? C.pos.distanceTo(S.B.pos) : C.pos.distanceTo(T.tgt), f = _cg1.set(0, 0, -1).applyQuaternion(C.q), to = _cg2.subVectors(T.tgt, C.pos).normalize();
+  const there = S.B ? d < S.B.R * (S.id === 'dive' ? 3.2 : 3.6) : d < 3500 || d < 12000 && f.dot(to) < 0;   // (or gone just past it)
+  if (T.hands > 0 && f.dot(to) < 0.5) T.away += dt; else { T.leg += dt; T.away = Math.max(0, T.away - dt * 0.5); }   // (gone his own way: the leg waits for him)
+  if (T.away > 7 && !T.waitSaid && still) { T.waitSaid = true; czgSay('', { stop: 'wait' }); return; }
+  if ((T.cardT -= dt) <= 0) { T.cardT = 0.5; const what = S.B ? `${S.B.name} · ${CZ_SAY[S.B.kind]}` : 'OVER THE WORLD', km = Math.max(0, (S.B ? d - S.B.R : d) / 1000);
+    keyCard('◇', `FOLLOW ${T.g.name.toUpperCase()} · ${what} · ${km < 10 ? km.toFixed(1) : Math.round(km)} KM${T.hands > 0 ? '' : ' · STEER ANY TIME'}`); }
+  if ((there || T.leg > 40) && still) { T.ph = 'say'; T.t = 1.2; keyCard('', ''); czgSay('', { stop: S.id, B: S.B }); }
+}
+// (from cosmosFly, after his own hands have turned him: while it leads and he has let go, his heading is drawn round toward
+// where it is going, gently, the pull coming on slowly, and round any world in the way; any touch of the controls and it
+// lets go at once)
+function czgSteer(dt, ax, pin) {
+  const T = CZG, C = COSMOS; if (!T.on) return;
+  if (Math.abs(ax) > 0.3 || Math.abs(pin) > 0.3) { T.hands = 2.5; return; }
+  T.hands -= dt; if (T.hands > 0 || C.map.on || C.entry || HY.on) return;
+  if (T.ph !== 'lead') { const N = T.stops[T.i + 1]; if (!N?.lead) return; czgTarget(N); }   // (while it talks, already on toward the next place; after the last, nothing: what he does with that world is his own)
+  const f = _cg1.set(0, 0, -1).applyQuaternion(C.q), to = _cg2.subVectors(T.tgt, C.pos); if (to.lengthSq() < 1) return; to.normalize();
+  czgClear(to, null, CZ_RG + CZ_ALT + 2000); for (const B of C.bodies) if (B.R && B.pos.distanceToSquared(C.pos) < (B.R * 8) ** 2) czgClear(to, B.pos, B.R * 1.9);   // (never led into a world, or down into the air of home)
+  _cg3.copy(f).lerp(to, damp(0.6, dt) * smoothstep(0, 1.5, -T.hands)).normalize(); C.q.premultiply(_cgq.setFromUnitVectors(f, _cg3));
+}
+// (a way that would pass through a world, closer to its middle than R, is bent out round its side)
+function czgClear(to, c, R) {
+  const P = COSMOS.pos, v = _cg4.copy(c || _cz0).sub(P), t = v.dot(to); if (t <= 0) return;
+  const s = _cg5.copy(to).multiplyScalar(t).sub(v), d = s.length(); if (d >= R) return;   // (s: from its middle out to the nearest the way comes)
+  if (d < 1e-3) s.set(1, 0, 0).applyQuaternion(COSMOS.q).addScaledVector(to, -_cg5.dot(to));
+  to.copy(c || _cz0).sub(P).addScaledVector(s.normalize(), R * 1.15).normalize();
+}
+// the bird, where the eye sees it: off his wing, or out ahead toward where it is taking him; held back above him while he dives
+// at a world; climbing away when it has gone
+function czgPlace(dt, B, gone) {
+  const T = CZG, C = COSMOS, G = B.bird.group, lead = !gone && T.ph === 'lead' && T.hands <= 0 && !C.entry;
+  const f = _cg1.set(0, 0, -1).applyQuaternion(C.q), u = _cg2.set(0, 1, 0).applyQuaternion(C.q), r = _cg3.crossVectors(f, u).normalize(), want = _cg4, hd = _cg5.copy(f);
+  if (gone) { const A = gone.away; T.off.addScaledVector(A, (60 + 300 * gone.t) * dt).addScaledVector(f, -90 * gone.t * dt); hd.copy(A).addScaledVector(f, 0.6).normalize(); }
+  else {
+    if (lead) { hd.subVectors(T.tgt, C.pos).normalize(); want.copy(hd).multiplyScalar(120).addScaledVector(r, T.side * 40).addScaledVector(u, 18); }
+    else if (C.entry) want.copy(f).multiplyScalar(-150).addScaledVector(u, 90).addScaledVector(r, T.side * 90);   // (it does not come down with him)
+    else want.copy(f).multiplyScalar(40).addScaledVector(r, T.side * 75).addScaledVector(u, 22);
+    want.addScaledVector(u, Math.sin(time * 0.7) * 6);
+    const lat = want.dot(r) - T.off.dot(r);   // (sliding across toward where it wants to be, it leans into it)
+    T.off.lerp(want, damp(T.all < 4 ? 0.8 : 1.3, dt)); T.bank = lerp(T.bank, clamp(-lat * 0.006, -0.7, 0.7), damp(2, dt));
+  }
+  czLook(_cgq, hd, u); T.q.slerp(_cgq, damp(2.5, dt));
+  G.position.copy(C.pos).add(T.off).sub(C.camPos); G.quaternion.copy(T.q).multiply(_cgq.setFromAxisAngle(_czZ, T.bank)); G.visible = !C.map.on || C.map.d < 3000;
+  birdWings(B, B.bird, B.fire, dt, 0, lead || gone ? 10 : 0, 90, lead || gone ? 0.25 : 0, T.bank, 0, 0.2, 0);   // (the same wings as any bird's: beating while it leads or climbs away, gliding beside him)
+  updateTails(dt, false, B.bird);
+  if (!C.map.on) { _cg4.copy(G.position).project(C.cam); if (_cg4.z < 1 && Math.abs(_cg4.x) < 0.95 && Math.abs(_cg4.y) < 0.9) inkNow(T.g.name.toUpperCase(), { sx: _cg4.x * 0.5 + 0.5, sy: 0.47 - _cg4.y * 0.5 }, PATRONS[T.g.id]?.[0] || null); }   // (its name beside it, in its colour)
+}
+function czgGone(dt) {
+  const G = CZG.gone; G.t += dt;
+  if (!COSMOS.on || G.t > 5.5) { czgDrop(G.B); CZG.gone = null; return; }
+  czgPlace(dt, G.B, G);
+}
+function czgDrop(B) { if (!B) return; B.bird.group.visible = false; B.bird.group.removeFromParent(); }
+// done: peeling off and climbing away (or, quiet, simply not there: he has gone down, or home, or something has taken him)
+function czgEnd(quiet) {
+  const T = CZG; T.wait = 0; if (!T.on) return;
+  T.on = false; T.ph = ''; T.busy = false; T.pend = ''; keyCard('', '');
+  if (quiet || !COSMOS.on) { czgDrop(T.B); return; }
+  const C = COSMOS, u = _cg1.set(0, 1, 0).applyQuaternion(C.q), r = _cg2.set(1, 0, 0).applyQuaternion(C.q);
+  T.gone = { B: T.B, t: 0, away: new THREE.Vector3().copy(r).multiplyScalar(T.side).addScaledVector(u, 0.7).normalize() };
+  toast(`${T.g.name.toUpperCase()} IS WATCHING`);
+  saveSoon();
+}
+// (from cosmosLeave: going down into a world, or back home into the air, it says one thing as he goes; it does not follow)
+function czgLeave(quiet, entry) {
+  const T = CZG; T.wait = 0; if (T.gone) { czgDrop(T.gone.B); T.gone = null; } if (!T.on) return;
+  const g = T.g;
+  if (entry || !quiet) { const t = entry ? pick(['Go on down. I stay up here — and I will be watching.', 'Down you go. I am not coming; I will be watching.']) : pick(['Home already? Fine. I will be watching.', 'Back down, then. We are always watching.']);
+    g.history.push({ role: 'god', text: t }); statsTalk(g.id, 'god', t); say([{ text: t, voice: voiceless(g) ? undefined : g.id, title: g.name }], g.name, true); chatLine(g.name.toUpperCase(), t, 'god'); }
+  czgEnd(true);
+}
+// what the gods have watched, said the way his own god would say it to him: his record, what they saw him do, what he told them
+function czgYou(t) {
+  t = String(t || '').replace(/^was /, 'were ').replace(/^is /, 'are ').replace(/^has /, 'have ').replace(/\bhe was\b/g, 'you were').replace(/\bhe is\b/g, 'you are').replace(/\bhe has\b/g, 'you have')
+    .replace(/\bhimself\b/g, 'yourself').replace(/\bhis\b/g, 'your').replace(/\bhim\b/g, 'you').replace(/\bhe\b/g, 'you');
+  return t.length > 90 ? t.slice(0, t.lastIndexOf(' ', 88)) + '…' : t;
+}
+const czgQuote = t => { t = String(t || '').replace(/ — \(you cut him off mid-sentence\)$/, '').replace(/\s+/g, ' ').trim().replace(/[.!?…]+$/, ''); return t.length > 64 ? t.slice(0, t.lastIndexOf(' ', 60)) + '…' : t; };
+function czgTold(g, n = 8) {   // (his own words to the gods, the last two to each: the others first, then his own god's from before tonight)
+  const L = [], his = m => m.role === 'mortal' && m.text && m.text[0] !== '(' && m.text.length > 5 && !m.space;
+  for (const o of [...gods, ...others]) { if (o === g || !o.history) continue; for (const m of o.history.filter(his).slice(-2)) L.push([o.id, czgQuote(m.text)]); }
+  for (const m of (g.history || []).filter(his).slice(-2)) L.push([g.id, czgQuote(m.text)]);
+  return L.slice(-n);
+}
+function czgFacts(g) {
+  const D = STATS.d || {}, F = [], nm = id => godById[id]?.name || otherById[id]?.name || cap(id);
+  const deaths = Math.max(flags.deaths | 0, D.deaths | 0), crashes = Math.max(stats.crashes | 0, D.crashes | 0), km = +D.km || 0, Q = story.qlog || [];
+  if (deaths) F.push(['deaths', `You died ${deaths} time${deaths === 1 ? '' : 's'} on Olympus. I counted.`]);
+  story.events.slice(-12).reverse().filter(e => !e.other && !/^broke out through the top of the sky/.test(e.text)).forEach((e, i) => F.push(['saw', `${i % 2 ? 'I was watching when' : 'I saw it when'} you ${czgYou(e.text)}.`]));
+  for (const [id, t] of czgTold(g)) F.push(['told', id === g.id ? `You said to me once, “${t}.” I remember.` : `You told ${nm(id)}, “${t}.” We all heard.`]);
+  if (km >= 1) F.push(['km', `${km >= 10 ? Math.round(km) : km.toFixed(1)} kilometres you have flown down there. I watched every one.`]);
+  if (crashes) F.push(['crashes', `${crashes} bad landing${crashes === 1 ? '' : 's'}${stats.perfect ? ` and ${stats.perfect} perfect one${stats.perfect === 1 ? '' : 's'}` : ''}. We keep count.`]);
+  if (D.top?.v > 40) F.push(['top', `${Math.round(D.top.v)} metres a second, your fastest. I saw that.`]);
+  if (Q.length) F.push(['quests', `${Q.length} task${Q.length === 1 ? '' : 's'} done for us${Q[0]?.god && godById[Q[0].god] ? `, the last of them for ${nm(Q[0].god)}` : ''}. Not bad.`]);
+  const met = [...story.met].filter(id => id !== g.id && godById[id]);
+  if (met.length) F.push(['met', met.length === 1 ? `You found ${nm(met[0])} already. ${nm(met[0])} talks about you.` : `You have found ${met.length} of us: ${met.slice(0, 3).map(nm).join(', ')}${met.length > 3 ? ' and more' : ''}. They talk about you.`]);
+  return F;
+}
+const CZG_PREF = { hello: ['deaths', 'km', 'saw'], globe: ['saw', 'km', 'crashes', 'top'], moon: ['told', 'met', 'saw'], bye: ['told', 'crashes', 'km', 'quests', 'saw'], talk: ['told', 'saw', 'deaths', 'km'] };
+function czgFact(g, pref) {
+  const F = czgFacts(g).filter(([, t]) => !CZG.used.has(t)), f = pref.map(k => F.find(x => x[0] === k)).find(Boolean) || F[0];
+  if (f) CZG.used.add(f[1]); return f ? f[1] : '';
+}
+// his own god's words, when there is nobody to ask (no keys, no network): a line or two for each stop, filled in from the above
+function czgLines(stop, text = '', S = null) {
+  const g = CZG.g || godById[PATRON.id], fact = () => czgFact(g, CZG_PREF[stop] || []), W = S ? czgTc(S.name) : '', K = S ? CZ_SAY[S.kind].toLowerCase() : '';
+  switch (stop) {
+    case 'hello': return [pick(['There you are. Out past the sky at last.', 'You made it through. I came up with you.']), fact() || 'I have watched you the whole way up.'];
+    case 'globe': return [pick(['Look back. That is home, with Olympus at the top of it.', 'There it is, the whole world. Olympus is the bright point at the top.']), fact()].filter(Boolean);
+    case 'moon': return [`That is ${W}, ${K}. ${S.ring ? 'Mind the rings.' : 'One of the world’s moons.'}`, fact()].filter(Boolean);
+    case 'dive': return [`${W}, ${K}. Dive straight at it and you go down into its air — you can land and walk there.`, `I will not follow you down. I stay up here.`];
+    case 'bye': return [fact(), pick(['That is the tour. I will be watching — we always are.', 'That is all of it. Go where you like. I will be watching.'])].filter(Boolean);
+    case 'wait': return [pick(['Go on, then. I will wait.', 'Your way, then. I will keep up.'])];
+  }
+  const low = String(text).toLowerCase(), B = COSMOS.nearB;
+  if (/\b(who are you|your name)\b/.test(low)) return [`${g.name}. You chose me, remember? Your fire burns in my colour.`];
+  if (/\b(where|what is (this|that)|what's (this|that))\b/.test(low)) return [B && COSMOS.nearD < B.R * 8 ? `That is ${czgTc(B.name)}, ${CZ_SAY[B.kind].toLowerCase()}. Dive at any world to go down to it.` : 'Space. The world is behind you and its moons go round it. Dive back into its air to go home.'];
+  if (/\b(home|go back|way back)\b/.test(low)) return ['Dive back at the world and you fall into its air. Home.'];
+  if (/\b(thank|thanks)\b/.test(low)) return ['You are welcome. You are mine; this is what that means.'];
+  if (TOUR_PANIC.test(text)) return ['Breathe. Nothing out here can hurt you. I would not let it.'];
+  return [pick(['I hear you. Out here there is nobody else to.', 'Mm. I heard that — we always hear you.', 'Say more. We have time out here.']), fact()].filter(Boolean);
+}
+const CZG_ASIDE = { hello: 'He has just broken out through the top of the sky, and you have come up beside him.', globe: 'You have led him out over the world.', moon: 'You are leading him past a moon.',
+  dive: 'You have brought him to a world he could go down to.', bye: 'The tour is over.', wait: 'He has turned off his own way instead of following you.' };
+const czgRecord = () => { const D = STATS.d || {}; return { km: Math.round(+D.km || 0), air: Math.round((+D.air || 0) / 60), quests: (story.qlog || []).length, talks: D.talks | 0, met: story.met.size, top: Math.round(D.top?.v || 0), dives: D.dives | 0, waves: D.tsunamis | 0, tricks: D.tricks | 0 }; };
+// what he says to his god out there, and what it says to him: the same mind and memory as on the ground, told where they are
+async function czgSay(text, o = {}) {
+  const T = CZG, g = T.g; if (!T.on || !g) return;
+  text = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 600);
+  if (T.busy) { if (text) T.pend = (T.pend ? T.pend + ' ' : '') + text; return; }
+  const stop = text ? 'talk' : o.stop || 'talk', S = o.B || null;
+  if (text) { T.heard = time; g.history.push({ role: 'mortal', text, space: 1 }); statsTalk(g.id, 'me', text); if (MANNERS.test(text)) g.thanked = true; }
+  else g.history.push({ role: 'mortal', text: `(${CZG_ASIDE[stop] || 'You are out in space with him.'})` });
+  T.busy = true;
+  let j = {};
+  if (API.chat) try {
+    const r = await fetch('/api/god', { method: 'POST', headers: authH({ 'Content-Type': 'application/json' }), signal: AbortSignal.timeout(9000),   // (a slow answer is not worth the wait out here: it has its own words)
+      body: JSON.stringify({ god: g.id, code: WORLD.code, form: 'phoenix', air: 'space', space: { stop, world: S ? S.name : '', kind: S ? CZ_KINDS[S.kind] : '' }, stage: g.history.filter(m => m.role === 'god').length, messages: g.history.slice(-40),
+        gossip: story.gossip.filter(x => x.god !== g.id).slice(-30), met: [...story.met, ...story.known], perks: Object.keys(perks).filter(k => perks[k]), time: dayName(), name: heroName !== 'ICARUS' ? heroName : '',
+        tone: text ? toneNow(text) : '', houses: myHouses(), favor: g.favor | 0, self: (story.self || []).slice(-14), rank: rankOf(), record: czgRecord(), told: czgTold(g, 10).map(([id, t]) => ({ god: id, text: t })),
+        witness: { deaths: Math.max(flags.deaths | 0, STATS.d?.deaths | 0), crashes: stats.crashes, perfect: stats.perfect, events: story.events.slice(-12).map(e => `${ago(e.t)}: he ${e.text}`) } }) });
+    j = r.ok ? await r.json().catch(() => ({})) : {};
+  } catch {}
+  T.busy = false;
+  if (!T.on || T.g !== g) return;
+  const L = (j.text ? [j.text] : czgLines(stop, text, S)).map(t => clean(String(t || ''))).filter(Boolean), all = L.join(' ');
+  if (all) { g.history.push({ role: 'god', text: all }); statsTalk(g.id, 'god', all); T.said.push(...L);
+    say(L.map(t => ({ text: t, voice: voiceless(g) ? undefined : g.id, title: g.name })), g.name, true); for (const t of L) chatLine(g.name.toUpperCase(), t, 'god'); }
+  if (j.mood) g.favor = clamp((g.favor | 0) + ({ warm: 1, amused: 1, proud: 2, bored: -1, hurt: -1, annoyed: -1, angry: -2 }[j.mood] || 0), -6, 6);
+  if (typeof j.learned === 'string' && j.learned.trim()) learnSelf(j.learned);
+  saveSoon();
+  if (T.pend) { const t = T.pend; T.pend = ''; setTimeout(() => czgSay(t), 400); }
+}
 // ───────────────────────── the worlds out there ─────────────────────────
 // ── Every world in the dark can be gone down to. Dive at one out in space and he goes into its air: the heat of coming in
 //    glows round him, the black fills with the colour of its sky, and he comes out high over its face, falling. Each kind
