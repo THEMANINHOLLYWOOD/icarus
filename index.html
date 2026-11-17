@@ -9426,7 +9426,7 @@ function drawAsciiUi(dt) {
     if (TOMB.say && shown) { const S = TOMB.say; uilPlate(S.c - (S.t1.length >> 1) - 1, S.r - (S.t2 ? 1 : 0), S.c + ((S.t1.length + 1) >> 1), S.r, 150); uilText(S.c - (S.t1.length >> 1), S.r, S.t1, 0, 235); if (S.t2) uilText(S.c - (S.t2.length >> 1), S.r - 1, S.t2, 1, 200); }
     if (state === 'stats' || STV.map) auiStats(dt);
     if (state === 'map' && mapV.open) auiMapChrome();
-    if (state === 'play' && !cl.contains('pro')) auiMarks();
+    if (state === 'play' && !cl.contains('pro') && !MENU.open) auiMarks();
     if (state === 'play' && PILOT.k > 0.35 && !cl.contains('pro')) auiPilot();
     if (state === 'play' && (HY.c > 0.01 || HY.on && time - HY.onT < 1.4) && !cl.contains('pro')) auiHyper();
     if (state !== 'title' && state !== 'stats' && !cl.contains('pro') && !cl.contains('photo')) { auiDom(); auiArea(dt); } else if (state === 'title' && AGC.open) auiDom('agentCard');
@@ -9777,8 +9777,9 @@ function mkInk(css) {
 }
 function auiMarks() {
   const box = $('markers'); if (!box || $('hud').classList.contains('hidden')) return;
-  MKI.cols.length = 0;
+  MKI.cols.length = 0; const occ = MKI.occ || (MKI.occ = []); occ.length = 0;
   const nx = UIL.nx, ny = UIL.ny, cw = UIL.cw, ch = UIL.ch, ra = ch / cw;
+  const room = (c0, c1, row) => { for (const dr of [0, -1, 1, -2, 2]) { const rr = row + dr; if (rr < 1 || rr > ny - 2) continue; let hit = false; for (let i = 0; i < occ.length; i += 3) if (occ[i] === rr && c0 - 1 <= occ[i + 2] && c1 + 1 >= occ[i + 1]) { hit = true; break; } if (!hit) { occ.push(rr, c0, c1); return rr; } } return -1; };
   for (const el of box.children) {
     if (el.style.display === 'none' || el.hidden) continue;
     const x = parseFloat(el.style.left), y = parseFloat(el.style.top); if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
@@ -9786,12 +9787,12 @@ function auiMarks() {
     const g = el.firstChild?.textContent || '', label = uiAsc(el.lastChild?.textContent || '').toUpperCase(), op = (el.style.opacity !== '' ? +el.style.opacity : 1) * (cl.contains('dim') || cl.contains('far') ? 0.55 : 1); if (op < 0.05) continue;
     const ink = el.style.color ? mkInk(el.style.color) : lit ? 2 : 13, br = 255 * Math.min(1, op) | 0, ph = time + (x * 0.013 + y * 0.007);
     const c = uilCol(x), r = wp ? uilRow(y) : uilRow(y - ch * 1.2), lc = v => clamp(v, 1, nx - 2);
-    const name = (t, row) => { if (!t) return; const c0 = clamp(c - (t.length >> 1), 1, Math.max(1, nx - 1 - t.length)); uilPlate(c0 - 1, row, c0 + t.length, row, 125 * op | 0); uilText(c0, row, t, ink, br); };
+    const name = (t, row) => { if (!t) return; const c0 = clamp(c - (t.length >> 1), 1, Math.max(1, nx - 1 - t.length)); row = room(c0 - 1, c0 + t.length, row); if (row < 0) return; uilPlate(c0 - 1, row, c0 + t.length, row, 125 * op | 0); uilText(c0, row, t, ink, br); };
     if (edge && MK_ARROW[g]) {   // off the screen: three arrows running in toward the edge it is beyond, the name beside them
       const [dx, dy, a] = MK_ARROW[g], c1 = lc(c), r1 = clamp(r, 2, ny - 3);
       for (let k = 0; k < 4; k++) { const f = ((time * 3 - k * 0.6) % 1 + 1) % 1, cc = c1 - dx * k * 2, rr = r1 - dy * k; uilPut(cc, rr, a.charCodeAt(0), k ? ink : 4, (120 + 135 * (1 - f)) * op | 0); }
       const t = label.slice(0, 26), side = dx > 0 ? c1 - t.length - 3 : dx < 0 ? c1 + 3 : c1 - (t.length >> 1), rowT = dy > 0 ? r1 - 2 : dy < 0 ? r1 + 2 : r1 + (r1 > ny / 2 ? -1 : 1);
-      { const c0 = clamp(side, 1, Math.max(1, nx - 1 - t.length)); uilPlate(c0 - 1, rowT, c0 + t.length, rowT, 130 * op | 0); uilText(c0, rowT, t, ink, br); }
+      { const c0 = clamp(side, 1, Math.max(1, nx - 1 - t.length)), rw = room(c0 - 1, c0 + t.length, rowT); if (rw >= 0) { uilPlate(c0 - 1, rw, c0 + t.length, rw, 130 * op | 0); uilText(c0, rw, t, ink, br); } }
       continue; }
     if (c < -2 || c > nx + 2 || r < 0 || r > ny) continue;
     if (wp || lit && !peer) {   // the errand, a kept place, a lit goal: a ring of sparks going round, brackets closing in
@@ -33710,14 +33711,17 @@ function agWeb(H, u) {
 // a bird in flight the same way), a few blocks fallen at their feet
 function agmRocksBuild(H) {
   if (H.rockMesh) return; ROCKS.matPart ||= rocksMat(true);
-  const acc = newAcc(); acc.sway = []; const S = H.rockS ||= { kind: 'meteora', id: 'ag' + H.o };
-  for (const R of H.rocks) { rockTower(acc, R.x, R.z, R.g - 12, R.top, R.face); const q = mulberry32(R.j * 31 + 7);
+  // (a few rocks a frame, not all fourteen at once: built in one go they stopped the picture for a fifth of a second as he came in)
+  const J = H.rockJob && H.rockJob.rocks === H.rocks ? H.rockJob : (H.rockJob = { rocks: H.rocks, acc: Object.assign(newAcc(), { sway: [] }), i: 0 });
+  const acc = J.acc, S = H.rockS ||= { kind: 'meteora', id: 'ag' + H.o };
+  for (const R of H.rocks.slice(J.i, J.i += 3)) { rockTower(acc, R.x, R.z, R.g - 12, R.top, R.face); const q = mulberry32(R.j * 31 + 7);
     for (let k = 0; k < 7; k++) { const b = q() * 6.283, d2 = R.R * (1.35 + q() * 0.9), bx = R.x + Math.cos(b) * d2, bz = R.z + Math.sin(b) * d2, s = 0.8 + q() * 2.2; part(acc, G.rock, bx, overHeight(bx, bz) + s * 0.25, bz, s, s * 0.7, s * 1.1, SANDST[k % 4], q() * 6.28, q(), q()); }
     ROCKS.cyls.push(R.cyl = { x: R.x, z: R.z, r: R.R * 0.96, y0: R.g - 6, y1: R.top - 0.6, what: 'a rock of the monks', S, rad: R.face }); }
-  const m = new THREE.Mesh(shardCen(accToGeo(acc)), ROCKS.matPart); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; scene.add(m); H.rockMesh = m;
+  if (J.i < H.rocks.length) return;
+  H.rockJob = null; const m = new THREE.Mesh(shardCen(accToGeo(acc)), ROCKS.matPart); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; scene.add(m); H.rockMesh = m;
 }
 function agmDropRocks(H) {
-  if (H.rockMesh) { scene.remove(H.rockMesh); H.rockMesh.geometry.dispose(); H.rockMesh = null; }
+  if (H.rockMesh) { scene.remove(H.rockMesh); H.rockMesh.geometry.dispose(); H.rockMesh = null; } H.rockJob = null;
   if (H.rockS) ROCKS.cyls = ROCKS.cyls.filter(c => c.S !== H.rockS);
   for (const R of H.rocks || []) { if (R.grp) { scene.remove(R.grp); agFree(R.grp); R.grp = null; } if (R.boxes) { ROCKS.boxes = ROCKS.boxes.filter(b => !R.boxes.includes(b)); R.boxes = null; } R.key = ''; }
 }
@@ -33817,8 +33821,8 @@ function agmMonBuild(H, R, a) {
   R.grp = new THREE.Group(); if (B.pos.length) R.grp.add(agMesh(B, AG.mat)); if (W.p.length) R.grp.add(agWoven(W)); if (Gl.pos.length) R.grp.add(agMesh(Gl, AG.glow)); const fl = agBloom(FL); if (fl) R.grp.add(fl); scene.add(R.grp);
 }
 // how far each monastery has got, from its own monk's timber; and the one whose has moved on made again (one in a frame)
-function agmMons(H, now) {
-  let built = false;
+function agmMons(H, now, busy = false) {
+  let built = busy;   // (one monastery made a frame at most, and none in a frame something else heavy was made in)
   for (const R of H.rocks) {
     const a = R.own >= 0 ? H.agents[R.own] : null;
     if (a) { const u = agTimber(a, now), f = clamp(0.08 + u / 40, 0, 1), fw = clamp(f / 0.7, 0, 1) * AGM.NC, full = Math.min(AGM.NC, Math.floor(fw)); R.st = { f, full, part: full >= AGM.NC ? 0 : fw - full, fr: clamp((f - 0.7) / 0.15, 0, 1), fd: clamp((f - 0.85) / 0.15, 0, 1), ft: clamp((u - 30) / 70, 0, 1) }; }
@@ -34162,9 +34166,10 @@ function updateAgents(dt) {
     agWoolsNow(H);
     let u = 0; for (const a of H.agents) u += agTimber(a, now); const st = H.st = agStanding(u), steps = st.now === 'home' ? 14 : st.now === 'hall' ? 16 : st.now === 'shrine' || st.now === 'tower' ? 10 : 2;
     const key = `${H.agents.map(a => a.id + (a.gone ? 0 : 1)).join()}|${st.k}|${Math.floor(st.f * steps)}|${H.god}|${H.woolSig}`;
-    if (key !== H.key) { H.key = key; H.plan = null; agBuild(H); }
-    agmRocks(H); agmRocksBuild(H); agmMons(H, now);
-    const wk = key + '|' + agReach(H, u); if (wk !== H.wkey) { H.wkey = wk; agWeb(H, u); }
+    // (the heavy makings each get a frame of their own as he comes in: the village, then the rocks, then the garlands)
+    let heavy = false; if (key !== H.key) { H.key = key; H.plan = null; agBuild(H); heavy = true; }
+    agmRocks(H); if (!heavy && !H.rockMesh) { agmRocksBuild(H); heavy = true; } agmMons(H, now, heavy || !H.rockMesh);
+    const wk = key + '|' + agReach(H, u); if (wk !== H.wkey && !heavy) { H.wkey = wk; agWeb(H, u); }
     agStill(H); agNear(H, cam); live.push(H);
     for (const b of H.br) agmBurnStep(H, b, dt, d);
     // the fires: smoke from the kitchens of those who are in, sparks from the village fire, the god's light at the shrine
