@@ -34596,7 +34596,10 @@ function cpuFly(C, dt) {
       if (!l || !r) C.turn = (!l && (r || want > 0) ? 1 : -1) * 1.9; else if (!blocked(0, 0.5)) { C.climb = 1.3; C.turn *= 0.3; } else if (!blocked(0, -0.5)) { C.climb = -1.3; C.turn *= 0.3; } else C.turn = (Math.random() < 0.5 ? 1 : -1) * 2.2;
       C.tgtT = Math.min(C.tgtT, 0.6); } }
   C.yaw += C.turn * dt; C.pitch = clamp(C.pitch + C.climb * dt, -0.7, 0.7); C.bank = lerp(C.bank, clamp(C.turn * 0.55, -1.1, 1.1), damp(4, dt));
-  C.prev.copy(C.pos); const cp = Math.cos(C.pitch), sp = C.speed * (C.spK || 1); C.pos.x -= Math.sin(C.yaw) * cp * sp * dt; C.pos.y += Math.sin(C.pitch) * sp * dt; C.pos.z -= Math.cos(C.yaw) * cp * sp * dt;   // (spK: a game making it quicker or slower)
+  // (its weight, as a god's — a fight is flown as gods, see FLY: slower going up, quicker coming down, the difference
+  //  gathering over a few seconds and going again when it flies level. On top of whatever speed its game gives it)
+  C.ev = (C.ev || 0) + (-FLY.g * 0.6 * Math.sin(C.pitch) - (C.ev || 0) * 0.35) * dt;
+  C.prev.copy(C.pos); const cp = Math.cos(C.pitch), sp = Math.max(30, C.speed * (C.spK || 1) + C.ev); C.pos.x -= Math.sin(C.yaw) * cp * sp * dt; C.pos.y += Math.sin(C.pitch) * sp * dt; C.pos.z -= Math.cos(C.yaw) * cp * sp * dt;   // (spK: a game making it quicker or slower)
   const T = tronTrail(C.id, C.name, moH('col', C.id) || (teamOf(C.id) >= 0 ? teamCol(teamOf(C.id)) : PATRONS[C.pat][0])); T.match = M.id; T.h = tronH(C.name); if (moF('walls', true)) tronLay(T, C.pos.x, C.pos.y, C.pos.z);
   // and what it has flown into
   let hit = moF('walls', true) && !(C.imm > time) ? tronHit(C.prev.x, C.prev.y, C.prev.z, C.pos.x, C.pos.y, C.pos.z, C.id, M.id, moK(C.id) || 1) : null;   // (the house's birds are all of the usual size, unless a game makes one bigger)
@@ -34617,7 +34620,7 @@ function cpuPractice(C, nb = false) {
   const M = MATCH; if (!nb) matchBoom(C.pos.x, C.pos.y, C.pos.z, matchCol(C.id), 0.8, C.speed, true, C.pat || ''); matchSend({ k: 're', id: M.id, who: C.id, v: Math.round(C.speed), l: M.warm ? undefined : C.lives || 0, q: nb ? 1 : undefined });
   const T = TRON.trails.get(C.id); if (T) tronClear(T); C.reAt = time + 1.4; cpuShow(C, false);
 }
-function cpuBack(C) { const S = moH('spawn', C.id) || matchSlotIn(C.slot || matchSlot(C.id)); C.reAt = 0; C.pos.set(S.x, S.y, S.z); C.prev.copy(C.pos); C.yaw = S.yaw; C.pitch = 0; C.bank = 0; C.tgtT = 0; C.immune = time + 2.5; }
+function cpuBack(C) { const S = moH('spawn', C.id) || matchSlotIn(C.slot || matchSlot(C.id)); C.reAt = 0; C.ev = 0; C.pos.set(S.x, S.y, S.z); C.prev.copy(C.pos); C.yaw = S.yaw; C.pitch = 0; C.bank = 0; C.tgtT = 0; C.immune = time + 2.5; }
 function updateMatch(dt) {
   const M = MATCH, p = player, now = Date.now(); lzStep(dt); updateBooms(dt); updateBlasts(dt); updatePylonBlaze(dt); updateAim(dt); teamPaintMe();
   if (M.againUntil && performance.now() > M.againUntil) { M.againUntil = 0; if (!M.inv) $('matchAsk').classList.remove('on'); }
