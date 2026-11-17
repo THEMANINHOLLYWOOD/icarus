@@ -283,6 +283,8 @@
     padding:8px 16px; border-radius:20px; background:rgba(6,7,12,.7); border:1px solid rgba(244,234,210,.1);
     font-size:13px; letter-spacing:.02em; color:var(--ink); opacity:0; transition:opacity .5s, transform .5s cubic-bezier(.16,1,.3,1), border-color .4s; white-space:nowrap; }
   #tut.on { opacity:1; transform:translate(-50%, 0); }
+  /* out on a world in space (see PL): home's errands and lessons wait */
+  body.planet #areaBar, body.planet #status { visibility:hidden; } body.planet #tut, body.planet #keyCard, body.planet #czBar button, body.planet #markers > :not(.peer) { display:none !important; }
   #tut b { font-weight:500; color:#fff4e2; }
   #tut .how { display:inline-flex; align-items:center; gap:4px; color:#ffd8a8; font-size:12px; }
   #tut kbd { font:inherit; font-size:11px; min-width:12px; text-align:center; padding:2px 7px; border:1px solid rgba(255,200,150,.42); border-bottom-width:2px; border-radius:6px;
@@ -1210,6 +1212,12 @@ function noise2(x, y) {
 // ───────────────────────── story & world data ─────────────────────────
 const WATER = -38;
 let realm = 'over';   // 'over': Olympus and the hills. 'under': the same country turned over, below the water.
+// (and out on one of the worlds in space, PL.on: see "the worlds out there". Its country lies a long way out from home, PL_O;
+//  PL_G is how heavy he is on each kind of world; netMe, which world the others are told he is in)
+const PL_O = 5e5, PL_N = 512, PL_TOP = 2200, PL_FLOOR = WATER + 40, PL_DEEP = 360, PL_G = [0.8, 0.7, 1.1, 0.45, 1, 0.95, 1, 0.85, 1.15];
+const PL = { on: false, pend: null, B: null, kind: 0, seed: 0, s: 0, name: '', net: '', g0: 9.81, H: null, M: null, G: null, job: null, jobFor: '', made: false, bk: null, isl: null, art: null, pal: null,
+  n: new THREE.Vector3(), ck: new THREE.Vector3(), fadeT: 0, heat: 0, told: {}, burnT: 0, sick: 0, nc: null, fillAt: new THREE.Vector3(1e9, 0, 0), boltT: 3, storm: 0, layT: 0, found: null, sun: new THREE.Vector3(0, 1, 0) };
+function netMe() { return PL.on ? PL.net : realm === 'under' ? 1 : 0; }
 const UNDER = { hades: null, arrive: null, ceil: 780, known: false, done: false };
 // what of it is kept between visits: where things are and what has happened, never the hall itself (which is built, each
 // time, from where Hades sits: written into a save it was a megabyte of stone, too big to send, and came back as something
@@ -1246,7 +1254,7 @@ const DEATH_DROP = 16;       // metres of fall that kill
 // skydiver's numbers). The air's push grows with the square of his speed, so he gathers speed quickly at first and then
 // more and more slowly. His jumps keep the heights they always had, so they are slower in the air now: a real jump that high.
 const GRAV = 9.81, MAN_VT = 55, HOP = Math.sqrt(GRAV / 30);   // (HOP: what a jump's push is now, for the same height as under the old, three-times pull)
-const manFall = (vy, vT, dt) => { const k = (vy / vT) ** 2; return vy > 0 ? vy - GRAV * (1 + k) * dt : vy - GRAV * clamp(1 - k, -2.5, 1) * dt; };   // (vy after dt, falling at terminal speed vT; going up, the air and his weight both slow him)
+const manFall = (vy, vT, dt) => { const k = (vy / vT) ** 2, g = PL.on ? GRAV * PL_G[PL.kind] : GRAV; return vy > 0 ? vy - g * (1 + k) * dt : vy - g * clamp(1 - k, -2.5, 1) * dt; };   // (vy after dt, falling at terminal speed vT; going up, the air and his weight both slow him)
 
 // `say` is what the voice actor is given (with stage cues); `text` is what the screen shows.
 // (the storyteller's lines and the thunder's were recorded once, like his own, and ship with the game)
@@ -1465,7 +1473,7 @@ function underHeight(x, z) {
   }
   return caveFloor(x, z, h);
 }
-function height(x, z) { return realm === 'under' ? underHeight(x, z) : overHeight(x, z); }
+function height(x, z) { return PL.on ? plH(x, z) : realm === 'under' ? underHeight(x, z) : overHeight(x, z); }
 // The ground is not fixed. Where burning rock comes down (or a bird comes in far too fast) it leaves a crater: a bowl
 // with a raised lip, scorched black, nothing growing in it, and the country is cut again to show it. And out past the
 // mountain there are lands the sea has taken: everything low is under water there, the hills left standing as islands.
@@ -1698,6 +1706,7 @@ function roostHas(x, z) {
   return ex * ex + ez * ez < R.r * R.r;
 }
 function groundAt(x, z, y = Infinity) {
+  if (PL.on) return plGround(x, z, y);   // (out on a world in space: its own ground)
   let g = terrainAt(x, z);
   if (ROOST.on && ROOST.realm === realm && y >= ROOST.top - 2.5 && roostHas(x, z)) g = Math.max(g, ROOST.top);
   if (ISLE && realm === 'over') {
@@ -2530,6 +2539,7 @@ function crownHit(x, y, z, m) {
 function hitTest(x, y, z, m) {
   _hit.gentle = false;
   if (MOD.noclip) return null;
+  if (PL.on) return plHit(x, y, z, m);
   if (realm === 'over' && CROWN.boxes.length && crownHit(x, y, z, m)) return _hit;
   if (realm === 'over' && (ROCKS.cyls.length || ROCKS.boxes.length) && stoneHit(x, y, z, m)) return _hit;
   const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK), lx = x - cx * CHUNK, lz = z - cz * CHUNK;
@@ -2579,6 +2589,7 @@ function hitTest(x, y, z, m) {
 // a man on foot (or under his wings) is stopped by trunks, rocks and walls
 function pushOut(pos, vel, m) {
   if (MOD.noclip && pos === player.pos) return null;
+  if (PL.on) return plPush(pos, vel, m);
   const cx = Math.floor(pos.x / CHUNK), cz = Math.floor(pos.z / CHUNK), g = chunks.get(cx + ',' + cz), S = g && g.userData.solids;
   let hit = null;
   if (realm === 'over' && CROWN.boxes.length && (pos.x - MOUNT.x) ** 2 + (pos.z - MOUNT.z) ** 2 < 345 * 345) for (const b of CROWN.boxes) {   // (the stone of Olympus stops a man the way it turns a bird)
@@ -3695,7 +3706,7 @@ function updateSonic(dt) {
   if (fly && p.speed >= SOUND) { if (S.armed && time - S.t > 2.5) { S.armed = false; S.t = time; sonicBoom(); } }
   else if (!fly || p.speed < SOUND * ARM) S.armed = true;
   // ── everyone else's, as they are told to us: only on a new message, never on one gone stale
-  const me = realm === 'under' ? 1 : 0, now = performance.now();
+  const me = netMe(), now = performance.now();
   if (NET.peers.size) for (const P of NET.peers.values()) {
     if (!P.s || P.form !== 'p' || P.realm !== me || now - P.s.t > 2500) continue;
     const v = Math.hypot(P.s.vx, P.s.vy, P.s.vz), o = P.son || (P.son = { armed: v < SOUND, t: -9, s: null });
@@ -4022,9 +4033,9 @@ function boomHouse(x, y, z, house = '', K = 1, dir = null, col = '') {
   if (audio.at3) audio.at3(x, y, z, HB_SFX[h], { vol: 0.8, ref: 40 * K, max: 1800 * K });
 }
 // a bird that explodes away from a fight is told to whoever is near enough to see it (in a fight the fight tells them: see matchOut)
-function boomSend(x, y, z, v) { if (!NET.on || !NET.ch) return; NET.ch.send({ type: 'broadcast', event: 'fx', payload: { i: NET.id, k: 'boom', x: Math.round(x), y: Math.round(y), z: Math.round(z), v: Math.round(v || 0), K: Math.round(birdK() * 100) / 100 } }); }
+function boomSend(x, y, z, v) { if (!NET.on || !NET.ch || PL.on) return; NET.ch.send({ type: 'broadcast', event: 'fx', payload: { i: NET.id, k: 'boom', x: Math.round(x), y: Math.round(y), z: Math.round(z), v: Math.round(v || 0), K: Math.round(birdK() * 100) / 100 } }); }
 function gotBoom(m) {
-  if (!ok(m.i) || state === 'title') return; const P = NET.peers.get(m.i); if (!P || flood(P) || P.realm !== (realm === 'under' ? 1 : 0)) return;
+  if (!ok(m.i) || state === 'title') return; const P = NET.peers.get(m.i); if (!P || flood(P) || P.realm !== netMe()) return;
   const x = num(m.x, -1e6, 1e6), y = num(m.y, -2000, 20000), z = num(m.z, -1e6, 1e6), K = (num(m.K, 0.3, 4) || 1) * clamp((num(m.v, 0, 3000) || 70) / 75, 0.55, 2.1), d = camera.position.distanceTo(HB.q.set(x, y, z));
   if (d > 1800 * Math.max(1, K)) return;
   const h = PATRONS[P.patron] ? P.patron : P.realm ? 'hades' : '';
@@ -5759,7 +5770,7 @@ function updateAudio(dt) {
       if (deep > 0.03) { audio.brush(i ? 1 : -1, deep, p.speed); if (Math.random() < deep * 0.9) emit(tip.x + rnd(0.8), tip.y + rnd(0.6), tip.z + rnd(0.8), rnd(5) - dir3.x * 8, 1 + Math.random() * 4, rnd(5) - dir3.z * 8, 0.5 + Math.random() * 0.7, pick(Math.random() < 0.5 ? LEAF : EMBER), 2.5); } }
   }
   // the other birds, each a fire going by; and the air off the one he is flying behind
-  if (audio.emit && state !== 'title') { const me = realm === 'under' ? 1 : 0, now = performance.now(); let n = 0;
+  if (audio.emit && state !== 'title') { const me = netMe(), now = performance.now(); let n = 0;
     for (const P of NET.peers.values()) { if (n >= 8 || !P.s || P.form !== 'p' || P.realm !== me || now - P.s.t > 6000 || P.pos.distanceToSquared(p.pos) > 900 * 900) continue; n++; audio.emit('bird:' + P.id, 'bird', P.pos.x, P.pos.y, P.pos.z, { vx: P.s.vx || 0, vy: P.s.vy || 0, vz: P.s.vz || 0, size: bigName(P.name), ttl: 0.8 }); }
     if (audio.wake && SLIP.k > 0.02) audio.wake(SLIP.k, 0); }
 }
@@ -7149,12 +7160,12 @@ function updateHuman(dt) {
     else if (!touched.soft && touched.y1 - p.pos.y < 1.4 && hs0 > 12 && toward > 0.5) { startTrip(); return; }
   }
   if (!pressed && !p.sliding) p.climbPush = 0;
-  if (realm === 'over') for (const b of BEACONS) {
+  if (realm === 'over' && !PL.on) for (const b of BEACONS) {
     const dx = p.pos.x - b.x, dz = p.pos.z - b.z, d = Math.hypot(dx, dz);
     if (d < 1.9 && d > 0.001 && p.pos.y < b.y + 14) { p.pos.x = b.x + dx / d * 1.9; p.pos.z = b.z + dz / d * 1.9; }
   }
   // temples are solid where they should be: he walks between the columns, not through them
-  for (const T of WORLD.shrines.length ? [...temples, ...WORLD.shrines.filter(S => S.group.visible)] : temples) if (Math.abs(p.pos.y - T.y) < 3 && Math.abs(p.pos.x - T.x) < T.hw + 5 && Math.abs(p.pos.z - T.z) < T.hd + 5)
+  if (!PL.on) for (const T of WORLD.shrines.length ? [...temples, ...WORLD.shrines.filter(S => S.group.visible)] : temples) if (Math.abs(p.pos.y - T.y) < 3 && Math.abs(p.pos.x - T.x) < T.hw + 5 && Math.abs(p.pos.z - T.z) < T.hd + 5)
     for (const c of T.cols) {
       const dx = p.pos.x - T.x - c.x, dz = p.pos.z - T.z - c.z, d = Math.hypot(dx, dz), rr = c.r + 0.3;
       if (d < rr && d > 0.001) { p.pos.x = T.x + c.x + dx / d * rr; p.pos.z = T.z + c.z + dz / d * rr; }
@@ -7169,7 +7180,7 @@ function updateHuman(dt) {
     if (!p.wings && !p.tumble) p.vel.y = manFall(p.vel.y, MAN_VT, dt);   // (falling: his weight, and the air; in a long fall, above)
     if (!p.wings && !p.tumble && p.vel.y < -22 && state === 'play') { p.tumble = true; p.spin.set(1.4, 0, rnd(0.5)); p.ffPull = p.ffTurn = 0; }   // a long drop: he stops stepping and starts falling
     p.pos.y += p.vel.y * dt;
-    if (p.pos.y <= floor2 && inWater && !p.wings && p.vel.y < -15 && state === 'play' && realm === 'over') { if (MATCH.phase === 'live' && MATCH.me.alive) { matchOut('the sea'); return; } startPlunge(); return; }   // (into the sea with speed on him: under he goes)
+    if (p.pos.y <= floor2 && inWater && !p.wings && p.vel.y < -15 && state === 'play' && realm === 'over' && !PL.on) { if (MATCH.phase === 'live' && MATCH.me.alive) { matchOut('the sea'); return; } startPlunge(); return; }   // (into the sea with speed on him: under he goes)
     if (p.pos.y <= floor2) {
       p.pos.y = floor2; p.grounded = true;
       if (p.wings) landWinged(Math.hypot(p.vel.x, p.vel.z), p.vel.y, inWater);
@@ -7188,7 +7199,7 @@ function updateHuman(dt) {
   const safe = p.grounded && !p.sliding;
   if (safe) {
     const drop = p.fallTop - p.pos.y;
-    if (!inWater && drop > DEATH_DROP * (1 + 1.5 * perks.feather)) { die('fall'); return; }   // (no fall that ends in water kills him)
+    if (!inWater && drop > DEATH_DROP * (1 + 1.5 * perks.feather) / (PL.on ? PL_G[PL.kind] : 1)) { die('fall'); return; }   // (no fall that ends in water kills him)
     p.fallTop = p.pos.y; p.burnout = false; p.fallCause = '';
     if (p.tumble) { p.tumble = false; resetPose(); }
     p.safeT += dt;
@@ -7280,6 +7291,7 @@ function updateHuman(dt) {
 // What is underfoot, for the sound of a step and what it kicks up: grass, leaf litter under the trees, sand at the water,
 // the shallows themselves, bare rock and snow on the heights, the stone of a temple floor, and the ash below.
 function groundKind(x, z, y) {
+  if (PL.on) return plKind(x, z, y);
   if (realm === 'under') return 'ash';
   const g = terrainAt(x, z);
   if (y - g > 0.5 || onPlatform(x, z, y + 0.5)) return 'stone';
@@ -8314,12 +8326,15 @@ function flood(P) { const t = performance.now(); P.rate = P.rate.filter(x => t -
 function gotState(m) {
   if (!m || !ok(m.i) || !Array.isArray(m.p) || !Array.isArray(m.v)) return;
   const P = peerOf(m.i); if (flood(P)) return;
-  const x = num(m.p[0], -1e6, 1e6), y = num(m.p[1], -2000, 20000), z = num(m.p[2], -1e6, 1e6);
+  // (on a world out in space: where on it, and which world it is, in place of where they left the sky)
+  const plk = typeof m.pl === 'string' && /^(n\d|-?\d{1,7},-?\d{1,7},-?\d{1,7}(m\d)?)$/.test(m.pl) && Array.isArray(m.pp) && Array.isArray(m.pv) ? m.pl : '', mv = plk ? m.pv : m.v;
+  let x = plk ? PL_O + num(m.pp[0], -1e5, 1e5) : num(m.p[0], -1e6, 1e6), y = num((plk ? m.pp : m.p)[1], -2000, 20000), z = plk ? PL_O + num(m.pp[2], -1e5, 1e5) : num(m.p[2], -1e6, 1e6);
+  if (plk && PL.on && PL.net === 'p:' + plk) { x = player.pos.x + plWrap(x - player.pos.x + PL_W / 2) - PL_W / 2; z = player.pos.z + plWrap(z - player.pos.z + PL_W / 2) - PL_W / 2; }   // (the copy of the square nearest him)
   const first = !P.s;
-  P.s = { x, y, z, vx: num(m.v[0], -400, 400), vy: num(m.v[1], -400, 400), vz: num(m.v[2], -400, 400), t: performance.now() };
+  P.s = { x, y, z, vx: num(mv[0], -400, 400), vy: num(mv[1], -400, 400), vz: num(mv[2], -400, 400), t: performance.now() };
   P.yawT = num(m.y, -10, 10); P.pitchT = num(m.pi, -3.2, 3.2); P.bankT = num(m.b, -3.2, 3.2); P.gm = m.gm === 1; P.sm = m.sm === 1; P.bk = typeof m.bk === 'number' && m.bk >= 0.5 && m.bk <= 3 ? m.bk : 0; P.fa = typeof m.fa === 'string' ? m.fa.slice(0, 10) : ''; P.rider = m.rd === 1; P.gf = Array.isArray(m.gf) && m.gf.length === 4 && typeof m.gf[0] === 'string' && Object.prototype.hasOwnProperty.call(PATRONS, m.gf[0]) ? { id: m.gf[0], x: num(m.gf[1], -1e6, 1e6), y: num(m.gf[2], -1e4, 1e5), z: num(m.gf[3], -1e6, 1e6), t: performance.now() } : null; P.ma = typeof m.ma === 'string' && m.ma.length < 12 ? m.ma : ''; if (Array.isArray(m.tp) && m.tp.length <= 180) { P.tpSeen = true; tronTake(P, m.ts | 0, m.tp); } P.menu = m.m === 1; if (typeof m.tk === 'string' && /^[a-z0-9]{2,10}:\d{1,7}$/.test(m.tk)) P.tk = m.tk;
   P.face = typeof m.fc === 'string' && /^\d{6}$/.test(m.fc) ? faceDecode(m.fc) : null;
-  { const was = P.form; P.form = ['h', 'w', 'p', 't', 'c'].includes(m.f) ? m.f : 'h'; if (was !== P.form) fshSeen(P, was); } P.realm = m.r ? 1 : 0; P.gr = m.g ? 1 : 0; P.wing = num(m.w, -1, 2);
+  { const was = P.form; P.form = ['h', 'w', 'p', 't', 'c'].includes(m.f) ? m.f : 'h'; if (was !== P.form) fshSeen(P, was); } P.realm = plk ? 'p:' + plk : m.r ? 1 : 0; P.plName = plk && typeof m.pn === 'string' ? m.pn.toUpperCase().replace(/[^A-Z ]/g, '').slice(0, 24) : ''; P.gr = m.g ? 1 : 0; P.wing = num(m.w, -1, 2);
   if (m.n) { const was = P.name; P.name = cleanName(m.n); if (was !== P.name) peerLook(P);
     if (was && was !== P.name && P.av && P.pos && state !== 'title' && P.pos.distanceToSquared(player.pos) < 1400 * 1400) {   // (a new name: seen from here, a burst of fire, and out of it the same traveller written differently)
       const K = Math.max(bigName(was), bigName(P.name)); burst(P.pos.x, P.pos.y + 0.6, P.pos.z, 260, 26 * K, 1.2); shock(P.pos.x, P.pos.y + 0.6, P.pos.z, 0xffb060, 40 * K, 1.0); shock(P.pos.x, P.pos.y + 0.6, P.pos.z, 0xfff0c0, 16 * K, 0.5, true); } }
@@ -8401,7 +8416,10 @@ function netSend(dt) {
   const r1 = q => Math.round(q * 10) / 10, r2 = q => Math.round(q * 100) / 100;
   NET.lastSent = { x: p.pos.x, y: p.pos.y, z: p.pos.z, f, yaw, fc, t: performance.now() };
   let tp, ts; { const T = TRON.trails.get(NET.id); if (T && T.n > T.start) { const end = T.base + T.n, g0 = Math.max(TRON.sent, T.base + T.start, end - 40); if (g0 < end) { ts = g0; tp = []; for (let gi = g0; gi < end; gi++) { const i = (gi - T.base) * 3; tp.push(r1(T.pts[i]), r1(T.pts[i + 1]) + (T.gap[gi - T.base] ? 2e6 : 0), r1(T.pts[i + 2])); } TRON.sent = end; } } }   // (a point of a gap told with its height raised out of the world: see tronTake)   // (the wall behind him: the pieces laid since he last said)
-  NET.ch.send({ type: 'broadcast', event: 's', payload: { i: NET.id, n: heroName, p: [r1(p.pos.x), r1(p.pos.y), r1(p.pos.z)], v: [r1(v.x), r1(v.y), r1(v.z)],
+  // (out on a world in space: to anyone, where he left the sky, standing still there, which is what those out in space look
+  //  like; and to those who know of the worlds, which one, and where on it: pl, pn, pp, pv)
+  const E = PL.on && COSMOS.exit, P0 = E ? _woV.set(E.x, E.y, E.z) : p.pos, pl = E ? { pl: PL.B.id, pn: PL.name, pp: [r1(p.pos.x - PL_O), r1(p.pos.y), r1(p.pos.z - PL_O)], pv: [r1(v.x), r1(v.y), r1(v.z)] } : null;
+  NET.ch.send({ type: 'broadcast', event: 's', payload: { i: NET.id, n: heroName, p: [r1(P0.x), r1(P0.y), r1(P0.z)], v: E ? [0, 0, 0] : [r1(v.x), r1(v.y), r1(v.z)], ...pl,
     ...(p.form === 'phoenix' ? (([a, b, c]) => ({ y: r2(a), pi: r2(b), b: r2(c) }))(flipNet(p)) : { y: r2(yaw), pi: r2(p.pitch || 0), b: r2(p.bank || 0) }), f, r: realm === 'under' ? 1 : 0, gm: GODM.on ? 1 : undefined, sm: SMALL.want < 1 ? 1 : undefined, bk: BIG.k && BIG.k < bigName(heroName) - 0.5 && !BIG.anim ? Math.round(BIG.k * 10) / 10 : undefined, fa: FAC.tag || undefined, rd: XR.on && XR.mode === 'rider' && p.form === 'phoenix' ? 1 : undefined, gf: GFLY.on ? [GFLY.g.id, Math.round(GFLY.B.pos.x), Math.round(GFLY.B.pos.y), Math.round(GFLY.B.pos.z)] : undefined, ma: MATCH.phase === 'live' && MATCH.me.alive ? MATCH.id : undefined, ts, tp, m: LIVE.on ? 1 : undefined, tk: LIVE.on && LIVE.tk ? LIVE.tk : undefined, g: p.grounded ? 1 : 0, w: r2(p.form === 'human' ? (a => a > 0.5 ? a : 0)((Math.abs(human.armL.rotation.z) + Math.abs(human.armR.rotation.z)) / 2) : p.wingF || 0), pt: PATRON.id || undefined, fc: fc || undefined,
     vk: VK.pub || undefined } });   // (in every one: someone just arrived has it at once, before anyone else can claim this id)
 }
@@ -8476,7 +8494,7 @@ function xrayStep(P, A, on) {
 //    it, so you can catch them and slingshot by. It costs nothing: you are being carried.
 const SLIP = { k: 0, told: false, fxT: 0, who: '' };
 function slipstream(dt) {
-  const p = player, me = realm === 'under' ? 1 : 0, now = performance.now(); let best = 0, bp = null, bsp = 0;
+  const p = player, me = netMe(), now = performance.now(); let best = 0, bp = null, bsp = 0;
   if (!p.perch && !p.sub && state === 'play') for (const P of NET.peers.values()) {
     if (P.form !== 'p' || P.realm !== me || !P.s || now - P.s.t > 2500) continue;
     const sp = Math.hypot(P.s.vx, P.s.vy, P.s.vz); if (sp < 25) continue;
@@ -8506,7 +8524,7 @@ function slipstream(dt) {
 function updatePeers(dt) {
   if (!NET.peers.size) return;
   if (aloneNow()) { for (const P of NET.peers.values()) if (P.av) { P.av.man.group.visible = P.av.bird.group.visible = false; if (P.label) P.label.style.display = 'none'; } return; }
-  const me = realm === 'under' ? 1 : 0, now = performance.now();
+  const me = netMe(), now = performance.now();
   for (const P of NET.peers.values()) {
     if (!P.s) continue;
     const away = me !== P.realm || now - P.s.t > 15000 || MATCH.phase === 'live' && MATCH.roster.get(P.id)?.alive === false && !MATCH.roster.get(P.id)?.left || P.ghostAt > P.s.t;   // (out of the fight: gone until it is over; one who left it flies on, seen; a ghost watching one is not seen at all)
@@ -8583,7 +8601,7 @@ function placeWaypoint(P, d, said, bird) {
 // Hold Tab: everyone who is here right now, in their colours, with how far away they are and which way to turn.
 const who = { open: false, t: 0, pinned: false, sel: '' };   // (sel: the row pointed at, or tapped: only it shows what can be done)
 function whoList() {
-  const now = performance.now(), me = realm === 'under' ? 1 : 0;
+  const now = performance.now(), me = netMe();
   return [...NET.peers.values()].filter(P => P.s && now - P.s.t < 15000).map(P => {
     const dx = P.pos.x - player.pos.x, dz = P.pos.z - player.pos.z, there = P.realm === me;
     camera.getWorldDirection(_n);
@@ -8610,7 +8628,7 @@ function updateWho(dt) {
   const formOf = P => [performance.now() - (P.ring?.t || -1e9) < 9000 ? 'in the rings' : P.form === 'p' ? '' : 'on foot', P.patron ? godById[P.patron]?.name || '' : ''].filter(Boolean).join(' · ');
   if (who.sel && !list.some(w => w.P.name === who.sel)) who.sel = '';
   let h = `<h4>IN THE SKY · ${list.length + 1}</h4>` + row(PATRONS[PATRON.id]?.[0] || '#ff1206', `${heroName}`, [player.form === 'phoenix' ? '' : 'on foot', PATRON.id ? godById[PATRON.id]?.name : ''].filter(Boolean).join(' · '), realm === 'under' ? 'below' : 'you', '');
-  for (const w of list) h += row(w.P.css || '#bfe6ff', (FRIENDS.has(w.P.name) ? '♦ ' : '') + w.P.name, formOf(w.P), w.there ? fmtDist(w.d) : (w.P.realm ? 'below' : 'above'), w.there ? w.arrow : '', w.P.name === who.sel ? ctl(w.P) : '', w.P.name);
+  for (const w of list) h += row(w.P.css || '#bfe6ff', (FRIENDS.has(w.P.name) ? '♦ ' : '') + w.P.name, formOf(w.P), w.there ? fmtDist(w.d) : (typeof w.P.realm === 'string' ? (w.P.plName || 'in space').toLowerCase() : w.P.realm ? 'below' : 'above'), w.there ? w.arrow : '', w.P.name === who.sel ? ctl(w.P) : '', w.P.name);
   if (!list.length) h += `<div class="none">${NET.on || NET.ch ? 'nobody else is flying right now' : 'not connected'}</div>`;
   else if (flags.morphed) h += `<div class="none">${TOUCH ? 'tap someone for more · tap their name again to fly there' : 'click a name to fly there · point at someone for more'}</div>`;
   if (MOD.admin) { const kb = (k, t, title) => `<s data-n="__k" data-k="${k}" title="${title}">${t}</s>`, off = Date.now() < DECREE.until && DECREE.npcs === '00000000';
@@ -8679,7 +8697,7 @@ function netCollide() {
   const p = player;
   if (!NET.on || p.form !== 'phoenix' || p.sub || p.cine || state !== 'play' || p.shade) return;
   if (MATCH.phase === 'count' && MATCH.me.in) return;   // (flown by a fight's opening and its glide in, wing over wing with the others in it: nobody is run into)
-  const me = realm === 'under' ? 1 : 0;
+  const me = netMe();
   for (const P of NET.peers.values()) {
     if (!P.s || P.form !== 'p' || P.realm !== me || P.menu || (P.ma || '') !== (MATCH.phase === 'live' && MATCH.me.alive ? MATCH.id : '')) continue;   // (a bird flying on its own is not run into; nor is one in a fight he is not in)
     if (p.pos.distanceToSquared(P.pos) > 5.5 * 5.5) continue;
@@ -8732,7 +8750,7 @@ const voiceOn = () => !!mic.stream && !VC.muted;   // (no voice connection of an
 // who can be joined by voice: someone in the world with him, heard from lately, close by, while he is playing
 function vcNear(P, far) {
   if (quiet(P)) return false;   // (muted or blocked: no call with them)
-  return !!P && !!P.s && performance.now() - P.s.t < 15000 && P.realm === (realm === 'under' ? 1 : 0) && (state === 'play' || state === 'talk') && player.pos.distanceTo(P.pos) < far;
+  return !!P && !!P.s && performance.now() - P.s.t < 15000 && P.realm === netMe() && (state === 'play' || state === 'talk') && player.pos.distanceTo(P.pos) < far;
 }
 // The call setup (which carries network addresses) is sealed to the one player it is for. Each visit makes an ECDH key pair
 // and gives out its public half in its position messages; an offer or answer is encrypted with the key the two of them
@@ -8834,7 +8852,7 @@ async function gotRtc(m) {
 // every frame: who should be joined, how loud each voice is and from which side, and who is talking
 function vcUpdate(dt) {
   if (!VC.ok || !AC) return;
-  const me = realm === 'under' ? 1 : 0, now = performance.now();
+  const me = netMe(), now = performance.now();
   if ((VC.t -= dt) <= 0) {
     VC.t = 0.6;
     for (const P of NET.peers.values()) {
@@ -8934,6 +8952,7 @@ function menuItems() {
     { g: 'C', ic: 'album', label: 'album', f: () => albumShow(true) },
     { g: 'A', ic: 'map', label: 'map', key: 'M', f: () => { if (state === 'play') openMap(); } },
     ...(COSMOS.on ? [{ g: 'A', ic: 'map', label: 'to earth', f: () => cosmosLeave(false) }] : []),   // (out in space: the way home)
+    ...(PL.on ? [{ g: 'A', ic: 'map', label: 'to space', f: plUp }] : []),   // (on a world out there: up out of its air)
     { g: 'A', ic: 'map', label: MINI.mode === 'off' ? 'minimap off' : MINI.mode === 'north' ? 'minimap north' : 'minimap', on: MINI.mode !== 'off', keep: true, f: miniCycle },
     { g: 'A', ic: 'who', label: 'players', key: 'Tab', badge: String(flyers), on: who.pinned, f: () => { who.pinned = !who.pinned; who.open = who.pinned; } },
     { g: 'R', ic: mic.denied ? 'micx' : 'mic', label: mic.denied ? 'no mic' : 'voice', key: 'V', on: !!mic.stream && !VC.muted, keep: true, f: menuMic },
@@ -9304,7 +9323,7 @@ function auiQuest() {
   QL.rows = top + MINI.drop + 2 - row;   // (counted from the top of the screen, small map and all)
 }
 function auiSay() {
-  if ((state === 'play' || state === 'map' && !M3.on) && !MENU.open && !who.open && !QL.open && !GUIDE.open && !MINI.who && !CTL.open) auiQuest(); else QL.rows = 0;   // (not over the standing map: it has its own heading; nor over the strip)
+  if ((state === 'play' || state === 'map' && !M3.on) && !PL.on && !MENU.open && !who.open && !QL.open && !GUIDE.open && !MINI.who && !CTL.open) auiQuest(); else QL.rows = 0;   // (out on a world in space, home's errands wait)   // (not over the standing map: it has its own heading; nor over the strip)
   const D = $('dialog'), sayH = h => { if (UIB.h !== h) { UIB.h = h; document.body.style.setProperty('--sayH', h + 'px'); } };
   if (!D || D.classList.contains('hidden')) return sayH(0);
   const text = ($('dlgText').textContent || '').trim(), title = ($('dlgTitle').textContent || '').trim(); if (!text) return sayH(0);
@@ -9972,8 +9991,9 @@ function miniTerrain(rr, rc, fx, fz, R) {
   for (let dr = -rr; dr <= rr; dr++) for (let dc = -rc; dc <= rc; dc++) {
     const u = dc / (rc + 0.5), v = dr / (rr + 0.5), i = ((dr + rr) * w + dc + rc) * 3;
     if (u * u + v * v > 1) { B[i] = -1; continue; }
-    const x = P.x + (u * rx + v * fx) * R, z = P.z + (u * rz + v * fz) * R, e = height(x, z) - WATER;
-    if (realm === 'over' && e < 0) { B[i] = 126; B[i + 1] = 13; B[i + 2] = e < -60 ? 56 : 80; }   // (the sea: darker where it is deep)
+    const x = P.x + (u * rx + v * fx) * R, z = P.z + (u * rz + v * fz) * R, e = (PL.on && PL.isl ? groundAt(x, z) : height(x, z)) - WATER;
+    if (PL.on && PL.isl && e < 60) { B[i] = 126; B[i + 1] = 0; B[i + 2] = 40; }   // (a giant of gas: only its islands, over the cloud)
+    else if (realm === 'over' && e < 0) { B[i] = 126; B[i + 1] = 13; B[i + 2] = e < -60 ? 56 : 80; }   // (the sea: darker where it is deep)
     else { const k = e < 20 ? 0 : e < 110 ? 1 : e < 320 ? 2 : e < 900 ? 3 : 4; B[i] = [46, 58, 43, 94, 42][k]; B[i + 1] = 0; B[i + 2] = [84, 104, 122, 140, 175][k]; }
   }
   MINI.bx = P.x; MINI.bz = P.z; MINI.ba = Math.atan2(fx, fz); MINI.bR = R;
@@ -9996,7 +10016,7 @@ function miniDraw(dt) {
   // how far it reaches: further the faster he goes
   const sp = p.form === 'phoenix' ? p.speed : Math.hypot(p.vel.x, p.vel.z), Rw = p.form === 'phoenix' ? clamp(500 + sp * 8, 700, 2600) : 420;
   MINI.R = lerp(MINI.R, Rw, damp(0.7, dt)); const R = MINI.R;
-  const key = `${rr}|${rc}|${realm}`;
+  const key = `${rr}|${rc}|${realm}|${PL.on ? PL.net : ''}`;
   if (MINI.bk !== key || Math.hypot(P.x - MINI.bx, P.z - MINI.bz) > R / rr * 0.3 || Math.abs(wrapAngle(Math.atan2(fx, fz) - MINI.ba)) > 0.05 || Math.abs(R / MINI.bR - 1) > 0.05) { MINI.bk = key; miniTerrain(rr, rc, fx, fz, R); }
   const B = MINI.buf, hot = el => el.matches(':hover') || document.activeElement === el, mapHot = hot($('miniMapHit'));
   for (let dr = -rr; dr <= rr; dr++) for (let dc = -rc; dc <= rc; dc++) { const i = ((dr + rr) * w + dc + rc) * 3; if (B[i] < 0) continue;
@@ -10007,11 +10027,12 @@ function miniDraw(dt) {
   { const u = -fx, v = -fz; uilPut(cc + Math.round(u * (rc + 0.2)), cr + Math.round(v * (rr + 0.2)), 78, 1, 250 * ease | 0); }   // N, on the rim
   // the errand he follows (looked up now and then: it hardly moves)
   if ((MINI.qwT -= dt) <= 0) { MINI.qwT = 0.6; try { MINI.qw = qlWhere(qlTracked()); } catch { MINI.qw = null; } }
-  if (MINI.qw) put(MINI.qw.x, MINI.qw.z, (time * 3 % 1) < 0.55 ? 42 : 43, 2, 255);
+  if (MINI.qw && !PL.on) put(MINI.qw.x, MINI.qw.z, (time * 3 % 1) < 0.55 ? 42 : 43, 2, 255);
+  if (PL.on && PL.art) put(PL.artG.position.x, PL.artG.position.z, (time * 3 % 1) < 0.55 ? 42 : 43, 2, 255);   // (out on a world: the thing to be found there)
   // Hermes, or whichever god is up with him
   if (GFLY.on && GFLY.B) put(GFLY.B.pos.x, GFLY.B.pos.z, GFLY.g.name.charCodeAt(0), inkCi('#' + GFLY.B.c.getHexString()), 240);
   // everyone else flying, in their colours
-  const now = performance.now(), me = realm === 'under' ? 1 : 0; let n = 0;
+  const now = performance.now(), me = netMe(); let n = 0;
   for (const Q of NET.peers.values()) { if (!Q.s || now - Q.s.t > 15000) continue; n++; if (Q.realm !== me || SHUN.block.has(Q.name)) continue;
     put(Q.pos.x, Q.pos.z, TRACK.id === Q.id ? 64 : FRIENDS.has(Q.name) ? 43 : 111, mkInk(Q.css || '#bfe6ff'), 245); }
   // him, in the middle
@@ -10019,7 +10040,7 @@ function miniDraw(dt) {
     uilPut(cc - 1, cr, 32, 0, 0); uilPut(cc + 1, cr, 32, 0, 0); uilPut(cc, cr, ch0, 2, 255 * ease | 0); }   // (a little room either side, so he is never lost in the hills)
   // under it: how fast and how high · where · which world, how many up, and the controls
   const kmh = Math.round((p.form === 'phoenix' ? p.speed : p.vel.length()) * 3.6), hi = Math.max(0, Math.round(P.y - Math.max(groundAt(P.x, P.z, P.y), WATER)));
-  const place = uiAsc(AREA.names.get(AREA.cur)?.name || '').toUpperCase().slice(0, Math.max(10, w + 6)), cnt = `${n + 1} ONLINE`, world = realm === 'under' ? 'UNDERWORLD' : 'OLYMPUS';
+  const place = PL.on ? CZ_SAY[PL.kind] : uiAsc(AREA.names.get(AREA.cur)?.name || '').toUpperCase().slice(0, Math.max(10, w + 6)), cnt = `${n + 1} ONLINE`, world = PL.on ? PL.name : realm === 'under' ? 'UNDERWORLD' : 'OLYMPUS';
   const rows = [`${kmh} KM/H  ${hi} M UP`]; if (place) rows.push(place);
   let r = cr - rr - 1, c1 = cc + rc;
   for (const t of rows) { uilClear(0, r, t.length + 1, r); uilPlate(0, r, t.length + 1, r, 150 * ease | 0); uilText(1, r, t, 0, (rows.indexOf(t) ? 165 : 200) * ease | 0); c1 = Math.max(c1, t.length + 1); r--; }
@@ -10042,7 +10063,7 @@ function miniWhoShow(on) {
 function miniWhoDraw() {
   const el = $('miniWho'), all = NET.peers.size ? whoList() : [], L = all.slice(0, 8);
   let h = `<div class="r h"><b>${all.length + 1} ONLINE</b><button type="button" data-a="x" aria-label="Close">X</button></div>`;
-  for (const w of L) { const P = w.P, d = w.there ? fmtDist(w.d) : P.realm ? 'below' : 'above';
+  for (const w of L) { const P = w.P, d = w.there ? fmtDist(w.d) : typeof P.realm === 'string' ? (P.plName || 'in space').toLowerCase() : P.realm ? 'below' : 'above';
     h += `<div class="r"><b style="color:${cEsc(P.css || '#bfe6ff')}">${FRIENDS.has(P.name) ? '+ ' : ''}${cEsc(P.name)}</b><i>${cEsc(d)}</i><button type="button" data-go="${cEsc(P.name)}">GO</button></div>`; }
   if (!L.length) h += `<div class="r"><i>${NET.on || NET.ch ? 'nobody else right now' : 'not connected'}</i></div>`;
   else if (all.length > L.length) h += `<div class="r"><i>and ${all.length - L.length} more · ${TOUCH ? 'ICARUS · A · players' : 'Tab'}</i></div>`;
@@ -10443,7 +10464,7 @@ function netFx(k) {
 function gotFx(m) {
   if (m?.k === 'boom') return gotBoom(m);   // (not a sound: a bird going up. See boomHouse)
   if (!m || !ok(m.i) || !FX_KINDS[m.k] || !AC) return;
-  const P = NET.peers.get(m.i); if (!P || flood(P) || P.realm !== (realm === 'under' ? 1 : 0) || state === 'title') return;
+  const P = NET.peers.get(m.i); if (!P || flood(P) || P.realm !== netMe() || state === 'title') return;
   const x = num(m.x, -1e6, 1e6), y = num(m.y, -2000, 20000), z = num(m.z, -1e6, 1e6), d = Math.hypot(x - player.pos.x, y - player.pos.y, z - player.pos.z);
   const far = m.c === 1 && P.crete;   // (someone in the opening, watched from the air: heard from much further off)
   if (d > (far ? 1700 : 170)) return;
@@ -10458,14 +10479,14 @@ function netSay(text, loud = 0.4) {
   const t = performance.now(); if (t - NET.say < 400) return;
   // (words only, never sound: anyone near with their voice on hears his real voice live; and nothing at all goes out unless
   // somebody is near enough to hear it)
-  let near = false; for (const P of NET.peers.values()) if (P.s && t - P.s.t < 15000 && P.realm === (realm === 'under' ? 1 : 0) && P.pos.distanceTo(player.pos) < 180) { near = true; break; }
+  let near = false; for (const P of NET.peers.values()) if (P.s && t - P.s.t < 15000 && P.realm === netMe() && P.pos.distanceTo(player.pos) < 180) { near = true; break; }
   if (!near) return;
   NET.say = t;
   NET.ch.send({ type: 'broadcast', event: 'say', payload: { i: NET.id, t: String(text).slice(0, 160), l: Math.round(loud * 100) / 100, x: Math.round(player.pos.x), y: Math.round(player.pos.y), z: Math.round(player.pos.z), r: realm === 'under' ? 1 : 0 } });
 }
 function gotSay(m) {
   if (!m || !ok(m.i)) return;
-  const P = NET.peers.get(m.i); if (!P || flood(P) || quiet(P) || P.realm !== (realm === 'under' ? 1 : 0)) return;
+  const P = NET.peers.get(m.i); if (!P || flood(P) || quiet(P) || P.realm !== netMe()) return;
   const d = P.s ? player.pos.distanceTo(P.pos) : 1e9, text = String(m.t || '').replace(/[<>]/g, '').slice(0, 160);
   if (d > 180) return;
   if (text) { P.said = text; P.saidT = performance.now(); }
@@ -11082,7 +11103,7 @@ function npcThem(fromId) {   // what can be told about whoever spoke
     return `${heroName} is ${f}, ${npcPlace(p.pos)}${realm === 'under' ? ', down in the Underworld' : ''}; their god is ${PATRON.id ? godById[PATRON.id]?.name || PATRON.id : 'not chosen yet'}; their rank is ${String(rankOf()).toLowerCase()}${flags.morphed ? '' : '; they are brand new to the game'}; lately they: ${(story.self || []).slice(-5).join('; ') || 'nothing much yet'}`; }
   const P = NET.peers.get(fromId); if (!P || !P.s) return '';
   const f = P.form === 'p' ? (P.gr ? 'on the ground as a bird' : 'flying as a phoenix') : P.form === 't' ? 'falling out of the sky' : P.form === 'c' ? 'climbing a cliff' : P.form === 'w' ? 'gliding on wax wings' : 'on foot';
-  return `${P.name} is ${f}, ${npcPlace(P.pos)}${P.realm ? ', down in the Underworld' : ''}${P.patron ? `; their god is ${godById[P.patron]?.name || P.patron}` : ''}${P.crete ? '; they are brand new, still on Crete at the very start' : mins != null && mins < 6 ? '; they only just arrived in the sky' : ''}${P.ma ? '; they are in a fight right now' : ''}${P.gm ? '; they are in god mode' : ''}`;
+  return `${P.name} is ${f}, ${npcPlace(P.pos)}${typeof P.realm === 'string' ? `, out in space on the world ${P.plName || 'they found'}` : P.realm ? ', down in the Underworld' : ''}${P.patron ? `; their god is ${godById[P.patron]?.name || P.patron}` : ''}${P.crete ? '; they are brand new, still on Crete at the very start' : mins != null && mins < 6 ? '; they only just arrived in the sky' : ''}${P.ma ? '; they are in a fight right now' : ''}${P.gm ? '; they are in god mode' : ''}`;
 }
 function npcSees(C, fromId) {   // what this one can see from where it is flying
   if (C.px == null) return ''; const me = { x: C.px, y: C.py, z: C.pz }, out = [];
@@ -13010,6 +13031,7 @@ function perchClear(pos) {   // moved out of whatever it is in, a few times over
 //    stands on it, the man it turns into stands on it, and either can walk to its edge and step off.
 const _top = { y: -1e9, kind: '', x: 0, z: 0, r: 0, c: 1, s: 0, hw: 0, hd: 0, R: 0 };
 function topAt(x, z, y) {   // (the highest top under (x, z) that is no more than a step above y; -1e9 if there is none)
+  if (PL.on) return plTop(x, z, y);
   const T = _top, lim = y + 2.5; T.y = -1e9; T.kind = '';
   const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK), lx = x - cx * CHUNK, lz = z - cz * CHUNK;
   for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
@@ -13256,6 +13278,7 @@ const flyDrag = (u, tuck = 0) => { const q = Math.max(u, 0.25) / FLY.md; return 
 // across, here a while and gone, drifting downwind, with the air coming down round its edge); the wind thrown up the face
 // of a slope that stands across it (only near the slope); and the hot air over a fire. In world metres a second.
 function airLift(x, y, z) {
+  if (PL.on) return plLift(x, y, z);
   if (realm !== 'over') return 0;
   const g = terrainAt(x, z), alt = y - Math.max(g, WATER); if (alt > 1800 || alt < -2) return 0;
   let w = 0;
@@ -13333,7 +13356,7 @@ function hyperTrail(x0, y0, z0) {
 const _hyC = new THREE.Color();
 function hyperPeers() {
   if (!NET.peers.size || SH.def) return;
-  const now = performance.now(), me = realm === 'under' ? 1 : 0, c = camera.position;
+  const now = performance.now(), me = netMe(), c = camera.position;
   for (const P of NET.peers.values()) {
     if (P.form !== 'p' || !P.s || now - P.s.t > 1500 || P.realm !== me || SHUN.block.has(P.name)) { P.hyL = null; continue; }
     const v = Math.hypot(P.s.vx, P.s.vy, P.s.vz);
@@ -13517,7 +13540,7 @@ function updatePhoenix(dt) {
   //  never in a fight. Before, it seized anyone who strayed near, turned him and pulled him in, and only a hard turn got him out)
   const handsOn = Math.abs(ax) > 0.15 || Math.abs(pin) > 0.15 || brk > 0.1, mayRide = state === 'play' && !MATCH.phase && !handsOn;
   if (!mayRide && p.wasRiding) { p.jetCool = Math.max(p.jetCool || 0, 1.5); p.gustCool = Math.max(p.gustCool || 0, 1.5); }
-  if ((p.jetCool = Math.max(0, (p.jetCool || 0) - dt)) <= 0 && jet.on && mayRide) {
+  if ((p.jetCool = Math.max(0, (p.jetCool || 0) - dt)) <= 0 && jet.on && mayRide && !PL.on) {
     const t = jetNearest(p.pos);
     const along = jet.d < 45 && t > 0.005 && t < 0.975 && (p.wasRiding || (jetAt(Math.min(1, t + 0.012), _v).sub(jetAt(t, _jp)).normalize(), -_v.x * Math.sin(p.yaw) * Math.cos(p.pitch) + _v.y * Math.sin(p.pitch) - _v.z * Math.cos(p.yaw) * Math.cos(p.pitch) > 0.55));   // (along his own heading, as it is now)
     if (along) { jetNearest(p.pos);
@@ -13532,7 +13555,7 @@ function updatePhoenix(dt) {
       if (t > 0.9) questEvent.jet = true;
     }
   }
-  if (!p.riding && mayRide && (p.gustCool = Math.max(0, (p.gustCool || 0) - dt)) <= 0 && GUST.list.length) {
+  if (!p.riding && mayRide && (p.gustCool = Math.max(0, (p.gustCool || 0) - dt)) <= 0 && GUST.list.length && !PL.on) {
     const R = gustAt(p.pos);
     if (R && R.d < 24 && R.u < 0.97 && -_gustD.x * Math.sin(p.yaw) * Math.cos(p.pitch) + _gustD.y * Math.sin(p.pitch) - _gustD.z * Math.cos(p.yaw) * Math.cos(p.pitch) > (p.wasRiding ? 0.2 : 0.55)) {
       if (FLIP.over) flipLevel();
@@ -13581,10 +13604,10 @@ function updatePhoenix(dt) {
   // over deep water a committed dive is allowed to go in: that is the way down. From below, the sea overhead is the way back.
   // (judged where his line of flight meets the surface, not where the pull-up looks: a lake is smaller than a fast dive's lookahead)
   const toWater = dir3.y < -0.3 ? (p.pos.y - WATER) / -dir3.y : 1e9;
-  const plunge = realm === 'over' && diving && toWater < 1200 && story.phase !== 'summit' && story.phase !== 'leap'
+  const plunge = realm === 'over' && !PL.on && diving && toWater < 1200 && story.phase !== 'summit' && story.phase !== 'leap'
     && groundAt(p.pos.x + dir3.x * toWater, p.pos.z + dir3.z * toWater, WATER) < WATER - 4;
   let ahead = Math.max(gAhead, WATER);
-  if (HY.on) { const ax2 = p.pos.x + dir3.x * look * 0.5, az2 = p.pos.z + dir3.z * look * 0.5; treesNear(ax2, az2, 16 * birdK(), (g, ck, i, t) => { if (!t.fell && t.top > ahead) ahead = t.top; }); }   // (skimming in hyper: over the treetops, never through the trunks)
+  if (HY.on && !PL.on) { const ax2 = p.pos.x + dir3.x * look * 0.5, az2 = p.pos.z + dir3.z * look * 0.5; treesNear(ax2, az2, 16 * birdK(), (g, ck, i, t) => { if (!t.fell && t.top > ahead) ahead = t.top; }); }   // (skimming in hyper: over the treetops, never through the trunks)
   // left alone he rides up over rising ground, as far as a bird can; folding his wings and diving, the ground is his to judge
   if (!MOD.noclip && !plunge && !diving && ahead + 10 * birdK() + (HY.on ? 14 : p.speed * 0.12) > p.pos.y + dir3.y * look) {   // (in hyper he is let down low, to skim)   // (a bigger bird keeps further off the ground: its wings reach further down)
     const need = clamp(Math.atan2(ahead + 14 - p.pos.y, look) + 0.12, 0.4, 0.85);
@@ -13615,8 +13638,8 @@ function updatePhoenix(dt) {
   hyperTrail(p0x, p0y, p0z);
   // (the way out is open to anyone: pointed up in hyper near the top of the sky, or simply climbing steeply up into it; it stays open
   //  until he is back down under it, see COSMOS. Level off up there instead and the sun still has him. Never in a fight.)
-  if (!XR.on && !MATCH.phase && (HY.on && p.pitch > 0.2 && p.pos.y > SKY_LIMIT - 900 || p.pitch > 0.12 && p.pos.y > SKY_LIMIT - 300)) COSMOS.hy = true; else if (COSMOS.hy && !HY.on && !COSMOS.on && (p.pos.y < SKY_LIMIT - 300 || MATCH.phase)) COSMOS.hy = false;
-  if (heat > 0.25 && !COSMOS.hy && !SESSION.spaceTold && state === 'play' && !MATCH.phase && !XR.on) { SESSION.spaceTold = true; toast('THE SUN · CLIMB STEEP TO BREAK THROUGH INTO SPACE'); }
+  if (!PL.on && !XR.on && !MATCH.phase && (HY.on && p.pitch > 0.2 && p.pos.y > SKY_LIMIT - 900 || p.pitch > 0.12 && p.pos.y > SKY_LIMIT - 300)) COSMOS.hy = true; else if (COSMOS.hy && !HY.on && !COSMOS.on && (p.pos.y < SKY_LIMIT - 300 || MATCH.phase)) COSMOS.hy = false;
+  if (heat > 0.25 && !COSMOS.hy && !PL.on && !SESSION.spaceTold && state === 'play' && !MATCH.phase && !XR.on) { SESSION.spaceTold = true; toast('THE SUN · CLIMB STEEP TO BREAK THROUGH INTO SPACE'); }
   if (plunge && gHere < WATER - 3 && p.pos.y < WATER + 5.1 * birdK() && state === 'play') { enterSea(-1); return; }
   // the sea overhead is the way back: climb into it and he goes through; graze it and it holds him under
   if (realm === 'under') { const rf = underRoof(p.pos.x, p.pos.z); if (rf < UNDER.ceil - 2 && p.pos.y > rf - 7) {   // (rock overhead, not water: it does not give)
@@ -13650,8 +13673,8 @@ function updatePhoenix(dt) {
   if (TOUCH && state === 'play') {
     const alt = p.pos.y - Math.max(gHere, WATER), sink = dir3.y * p.speed + p.vy;
     if (alt > 45) p.armed = true;
-    let site = TEMPLE.active && Math.hypot(p.pos.x - TEMPLE.x, p.pos.z - TEMPLE.z) < 90 && p.pos.y > TEMPLE.y;
-    for (const g of realm === 'under' ? [hades] : gods) if (g.active && !story.met.has(g.id) && !(g === hades && UNDER.done) && Math.hypot(p.pos.x - g.x, p.pos.z - g.z) < 85 && p.pos.y > g.gy) site = true;
+    let site = !PL.on && TEMPLE.active && Math.hypot(p.pos.x - TEMPLE.x, p.pos.z - TEMPLE.z) < 90 && p.pos.y > TEMPLE.y;
+    for (const g of PL.on ? [] : realm === 'under' ? [hades] : gods) if (g.active && !story.met.has(g.id) && !(g === hades && UNDER.done) && Math.hypot(p.pos.x - g.x, p.pos.z - g.z) < 85 && p.pos.y > g.gy) site = true;
     if (p.armed && !FLIP.over && gHere > WATER + 0.5 && (alt < ROLL_ALT * 0.8 && sink < -7 || site && alt < 60)) { openWings(alt < ROLL_ALT); return; }
   }
   p.bank = lerp(p.bank, p.turn * 0.75 + (stag > 0 ? Math.sin(time * 26) * stag * 0.9 : 0) + Math.sin(time * 0.8) * 0.035 * glide, damp(stag > 0 ? 9 : 3, dt));   // (gliding, he rocks a little on the air)
@@ -13668,10 +13691,10 @@ function updatePhoenix(dt) {
   } else if (p.flapCD < -(2.4 + glide * 3.4) && !diving) { p.flapCD = 0; p.flapPhase = 0; p.vy += 1; p.speed += 0.4 * BKf; audio.sfx.flap(0.4); fanFlap(0.2); if (WR.A < 0.25) WR.th = 0; WR.beat = Math.max(WR.beat, 0.55); }   // one lazy beat to hold the glide
 
   // the sky limit: linger above it and the sun takes your wings
-  const roof = SKY_LIMIT + perks.sun * 320 + (cosmosOpen() ? 1e7 : 0);   // (the keeper, with the god in him: no roof at all, see COSMOS)
+  const roof = SKY_LIMIT + perks.sun * 320 + (cosmosOpen() || PL.on ? 1e7 : 0);   // (out on a world, the top of its own air is the way out: see plStep)   // (the keeper, with the god in him: no roof at all, see COSMOS)
   heat = p.riding ? 0 : smoothstep(roof - 260, roof, p.pos.y);
   p.skyT = p.pos.y > roof && !p.riding ? p.skyT + dt : Math.max(0, p.skyT - dt);
-  updateHoops(dt);
+  if (!PL.on) updateHoops(dt);
   slipstream(dt);
   if (perks.tide && gHere < WATER && p.pos.y < WATER + 12) p.flame = Math.min(1, p.flame + dt * 0.07);
   if (p.skyT > 0.8) { burnOut('sun'); return; }
@@ -13710,6 +13733,7 @@ let camShake = 0;
 function respawnTop() {
   const p = player;
   if (state !== 'play' || p.cine || story.phase === 'summit' && p.grounded) return;
+  if (PL.on) plOff('home');   // (from a world out in space: back to the sky over home first, and carried down from there)
   if (realm === 'under') { questEvent.wasUnder = false; setRealm('over', START.x, START.z); }   // (given up down there: that is not coming back up alive)
   if (flags.morphed) {   // the light comes down for him, the way it does when he is carried anywhere, and sets him on the summit
     warp.home = true; startWarp(START.x, START.z, SUMMIT + 16, Math.atan2(MOUNT.x - EDGE.x, MOUNT.z - EDGE.z));
@@ -13771,7 +13795,7 @@ function die(how, kmh) {
   state = 'dead'; death.phase = 'impact'; death.t = 0; flags.deaths++; death.lava = how === 'lava' ? p.pos.y : null; p.perch = false;
   if (SH.def) endShift();
   { const dx = player.pos.x, dy = player.pos.y, dz = player.pos.z, gy = realm === 'over' ? groundAt(dx, dz, dy + 3) : -1e9;
-    if ((how === 'crash' || how === 'hit' || how === 'fall') && realm === 'over' && dy - gy < 14 && gy > WATER + 0.5) {   // (the earth keeps it: a pit, scorched, and whatever grows near it alight)
+    if ((how === 'crash' || how === 'hit' || how === 'fall') && realm === 'over' && !PL.on && dy - gy < 14 && gy > WATER + 0.5) {   // (the earth keeps it: a pit, scorched, and whatever grows near it alight)
       { const cr = (how === 'fall' ? 4.5 : 6.5) * (p.form === 'phoenix' ? birdK() : 1); crater(dx, dz, cr); if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'crater', payload: { i: NET.id, x: Math.round(dx), z: Math.round(dz), r: +cr.toFixed(1) } }); } scorch(dx, dz, 7 * (p.form === 'phoenix' ? birdK() : 1), gy); igniteNear(dx, dz, 16 * (p.form === 'phoenix' ? birdK() : 1), true);
       for (let i = 0; i < 70; i++) emit(dx + rnd(4), gy + 0.3, dz + rnd(4), rnd(5), 3 + Math.random() * 9, rnd(5), 1 + Math.random() * 1.6, pick(i % 3 ? EMBER : ASH), i % 3 ? 2.5 : -4, 0.7 + Math.random()); }
     worldMark('fall', dx, how === 'crash' || how === 'hit' || how === 'fall' ? Math.max(gy, WATER) : dy, dz, PATRON.id || ''); TOMB.at = 1e9; }
@@ -13853,6 +13877,7 @@ function updateDeath(dt) {
     if (death.t > 1.7) {
       death.thud = false;
       // back to the top: high above the summit, already falling (below the water there is no mountain: he drops in where he first came through)
+      if (PL.on) { plOff('death'); toast('BACK FROM ' + PL.name + ' · MOUNT OLYMPUS'); }   // (out on a world in space: he wakes over Olympus like anyone)
       if (realm === 'under') { questEvent.wasUnder = false; setRealm('over', START.x, START.z); toast('THE DEAD GIVE YOU BACK · MOUNT OLYMPUS'); }   // (the dead do not keep him: he wakes falling onto Olympus)
       wake.copy(START);
       udClear(); UD.grace = time + 10;
@@ -19818,7 +19843,7 @@ function updateSkid(dt) {
     if (p.form === 'phoenix' && !p.sub && !p.perch && !SH.def && !p.cine) { const hl = Math.hypot(dir3.x, dir3.z);   // (a bird goes the way dir3 points, at p.speed)
       skidFrom('me', p.pos.x, p.pos.y, p.pos.z, birdK(), p.speed || 0, HY.on ? 2 : GODM.on, hl > 0.05 ? dir3.x / hl : 0, hl > 0.05 ? dir3.z / hl : 1, true); }
     else if (S.runs.has('me')) S.runs.delete('me');
-    if ((S.scanT -= dt) < 0) { S.scanT = 0.07; const now = performance.now(), me = realm === 'under' ? 1 : 0, c = camera.position;
+    if ((S.scanT -= dt) < 0) { S.scanT = 0.07; const now = performance.now(), me = netMe(), c = camera.position;
       for (const P of NET.peers.values()) {
         if (P.form !== 'p' || !P.s || now - P.s.t > 1500 || P.realm !== me || SHUN.block.has(P.name) || (P.pos.x - c.x) ** 2 + (P.pos.z - c.z) ** 2 > 1400 * 1400) { if (S.runs.has(P.id)) S.runs.delete(P.id); continue; }
         const sp = Math.hypot(P.s.vx, P.s.vy, P.s.vz), hl = Math.hypot(P.s.vx, P.s.vz);
@@ -22677,7 +22702,7 @@ $('friendAsk').addEventListener('click', e => { e.stopPropagation(); $('friendAs
 for (const ev of ['pointerdown', 'pointerup', 'touchstart']) $('friendAsk').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 // whoever is standing right in front of him (to make a friend of, face to face)
 function peerNear(r) {
-  let best = null, bd = r * r; const me = realm === 'under' ? 1 : 0, now = performance.now();
+  let best = null, bd = r * r; const me = netMe(), now = performance.now();
   for (const P of NET.peers.values()) { if (!P.s || now - P.s.t > 8000 || P.realm !== me || SHUN.block.has(P.name) || P.crete || P.memory) continue; const d = P.pos.distanceToSquared(player.pos); if (d < bd) { bd = d; best = P; } }
   return best;
 }
@@ -22687,7 +22712,7 @@ function peerNear(r) {
 // higher or lower, a thread of light stands on them, and the map rings them. One at a time. Following is the same
 // person, with his own wings doing the flying.
 const TRACK = { id: '', aim: null };
-const peerLive = P => !!P && !!P.s && performance.now() - P.s.t < 15000 && P.realm === (realm === 'under' ? 1 : 0) && !SHUN.block.has(P.name);
+const peerLive = P => !!P && !!P.s && performance.now() - P.s.t < 15000 && P.realm === netMe() && !SHUN.block.has(P.name);
 function aimPeer() {
   if (state !== 'play' || player.cine || aloneNow()) return null;
   const mouse = !TOUCH && performance.now() - MOUSE.t < 6000, ax = mouse ? MOUSE.x / innerWidth * 2 - 1 : 0, ay = mouse ? -(MOUSE.y / innerHeight) * 2 + 1 : 0.22, asp = innerWidth / innerHeight;   // (with no pointer: a little above the middle, where whoever he is flying at sits over his own back)
@@ -22708,7 +22733,7 @@ const following = P => AP.kind === 'go' && AP.follow === P.id;
 function followPeer(P, on = !following(P)) {
   if (!P) return;
   if (!on) { if (following(P)) { AP.follow = null; apClear(); } toast(`NO LONGER FOLLOWING ${P.name}`); return; }
-  if (!peerLive(P)) { toast(P.realm !== (realm === 'under' ? 1 : 0) ? `${P.name} IS IN THE OTHER WORLD` : `${P.name} HAS GONE`); return; }
+  if (!peerLive(P)) { toast(typeof P.realm === 'string' && P.realm !== netMe() ? `${P.name} IS ON ${P.plName || 'ANOTHER WORLD'}` : P.realm !== netMe() ? `${P.name} IS IN THE OTHER WORLD` : `${P.name} HAS GONE`); return; }
   if (state === 'map') closeMap();
   apMark({ x: P.pos.x, y: P.pos.y, z: P.pos.z }); AP.kind = 'go'; AP.t0 = time; AP.follow = P.id; if (!TRACK.id) TRACK.id = P.id;
   toast(`FOLLOWING ${P.name}`);
@@ -22727,7 +22752,7 @@ function gotRing(m) {
   // (which of their rings that was, so a line taken up from them starts where they have got to; and if it is one of the
   // rings in front of him, he sees them go through it)
   if (P.trail) for (const q of P.trail.L) if (!q.done && (q.x - P.ring.x) ** 2 + (q.y - P.ring.y) ** 2 + (q.z - P.ring.z) ** 2 < 30 * 30) q.done = true;
-  if (P.realm === (realm === 'under' ? 1 : 0) && !aloneNow()) for (const h of hoops) if (h.alive && h.burn < 0 && (h.x - P.ring.x) ** 2 + (h.y - P.ring.y) ** 2 + (h.z - P.ring.z) ** 2 < 28 * 28) {
+  if (P.realm === netMe() && !aloneNow()) for (const h of hoops) if (h.alive && h.burn < 0 && (h.x - P.ring.x) ** 2 + (h.y - P.ring.y) ** 2 + (h.z - P.ring.z) ** 2 < 28 * 28) {
     const c = P.patron ? pcol(P.patron).map(v => v * 1.6) : [1.4, 1.5, 1.7], cy = Math.cos(h.yaw), sy = Math.sin(h.yaw);
     for (let i = 0; i < 60; i++) { const a = Math.random() * 6.28, cx = Math.cos(a), cz = Math.sin(a), out = 5 + Math.random() * 10; emit(h.x + cx * cy * HOOP_R, h.y + cz * HOOP_R, h.z - cx * sy * HOOP_R, cx * cy * out, cz * out, -cx * sy * out, 0.5 + Math.random() * 0.6, c, 1); }
     shock(h.x, h.y, h.z, P.css ? new THREE.Color(P.css).getHex() : 0xdfeeff, 30, 0.5, true); h.nextK = 1;
@@ -22738,7 +22763,7 @@ function gotRing(m) {
 const turned = a => { let t = 0; for (let i = 1; i < a.length; i++) t += wrapAngle(a[i][1] - a[i - 1][1]); return Math.abs(t); };
 const _fb = new THREE.CylinderGeometry(0.6, 0.6, 500, 6, 1, true).translate(0, 250, 0);
 function updateFriends(dt) {
-  const p = player, now = performance.now(), me = realm === 'under' ? 1 : 0;
+  const p = player, now = performance.now(), me = netMe();
   // a circle flown together
   if ((MYRING.sampleT -= dt) < 0) {
     MYRING.sampleT = 0.25;
@@ -22948,7 +22973,7 @@ function placeNamed(name) {
   const g = gods.find(g => n.includes(g.id) || g.revealed && n.includes(g.name.toLowerCase()));
   if (g && g.active) return { x: g.x, y: g.gy ?? groundAt(g.x, g.z), z: g.z, label: g.name };
   if (g) { const I = PANTHEON.isles.find(I => I.id === g.id); if (I) return { x: I.x, y: I.top, z: I.z, label: `${g.name}'s island` }; }
-  { const F = peerNamed(n); if (F && F.realm === (realm === 'under' ? 1 : 0)) return { x: F.pos.x, y: F.pos.y, z: F.pos.z, label: F.name, peer: F.id }; }   // another flier, by name
+  { const F = peerNamed(n); if (F && F.realm === netMe()) return { x: F.pos.x, y: F.pos.y, z: F.pos.z, label: F.name, peer: F.id }; }   // another flier, by name
   if (/\b(objective|quest|mission|errand|marker)\b/.test(n)) { const T = qlTracked(), w = T && T.key !== 'great' && T.key !== 'chain' ? qlWhere(T) : null; if (w) return { x: w.x, y: Math.max(groundAt(w.x, w.z), WATER), z: w.z, label: T.name.toLowerCase() }; }
   if (/\b(objective|quest|mission|marker|labou?r|next (one|god|stop)|where i('m| am) (meant|supposed) to (go|be))\b/.test(n) && GREAT.T) return { x: GREAT.T.x, y: GREAT.T.y, z: GREAT.T.z, label: GREAT.T.label.split(' · ')[0].toLowerCase() };
   if (/\b(objective|quest|mission|marker|next (one|god|stop)|where i('m| am) (meant|supposed) to (go|be))\b/.test(n)) { const c = chainInfo(); if (c && c.g) return { x: c.g.x, y: c.g.gy ?? groundAt(c.g.x, c.g.z), z: c.g.z, label: 'your objective' }; }
@@ -23058,7 +23083,7 @@ function voiceRun(a) {
       break; }
     case 'objective': { const o = $('obj')?.textContent?.trim(), q = $('quest')?.textContent?.trim(); toast((o || q || 'FOLLOW THE WIND').toUpperCase()); break; }
     case 'home': if (COSMOS.on) cosmosLeave(false); else respawnTop(); break;   // (out in space, home is the world)
-    case 'space_home': if (COSMOS.on) cosmosLeave(false); break;
+    case 'space_home': if (COSMOS.on) cosmosLeave(false); else if (PL.on) respawnTop(); break;
     case 'record': recStart(); break;
     case 'record_stop': recStop(); break;
     case 'mark_here': wpMarkHere(); break;
@@ -26459,7 +26484,7 @@ function saveData() {
       phase: story.phase === 'leap' ? 'summit' : story.phase, chain: story.chain || null, errands: story.errands || {}, manners: story.manners || {}, saga: story.saga || null, sagaOwed: story.sagaOwed || null, sagasDone: (story.sagasDone || []).slice(-12), met: [...story.met], gossip: story.gossip.slice(-80), events: story.events.slice(-40),
       deaths: flags.deaths, stats: { crashes: stats.crashes, perfect: stats.perfect, toldWings: stats.toldWings, toldCrash: stats.toldCrash, dove: stats.dove },
       day: dayT, titans: story.titans === 'march' ? 'stone' : story.titans, quests, perks: PERK0, known: [...story.known], intro: [...gods, hades, ...others].filter(g => g.introduced).map(g => g.id),
-      order: GOD_ORDER, lit: BEACONS.filter(b => b.lit).map(b => b.id), pos: checkpoint.toArray(),
+      order: GOD_ORDER, lit: BEACONS.filter(b => b.lit).map(b => b.id), pos: (PL.on ? PL.ck : checkpoint).toArray(),
       gods: Object.fromEntries(gods.map(g => [g.id, { h: g.history.slice(-40), r: g.revealed, f: Math.max(g.formIdx, g.wantForm), v: g.favor | 0 }])),
       others: Object.fromEntries(others.filter(o => o.history.length).map(o => [o.id, { h: o.history.slice(-20), r: o.revealed }])),
       great: { fire: GREAT.fire === 2 ? 1 : GREAT.fire, bolt: GREAT.bolt, race: GREAT.race, got: GREAT.got, best: GREAT.best }, self: (story.self || []).slice(-14), items: (story.items || []).slice(-48), inv: invSave(), qlog: (story.qlog || []).slice(0, 40), track: story.track || '', cv: story.cv | 0, toured: !!flags.toured, gw: GODM.word || '', patron: PATRON.id || '', ring: RING_DONE ? 1 : 0 });   // (patron, ring: his god, and whether he has flown through the ring of fire; the world counts the ring of rings from these)
@@ -26720,7 +26745,7 @@ function grantItem(it, quiet = false) {
   witness(`was given ${it.name}${it.with.length ? ` (shared with ${it.with.join(', ')})` : ''}`, true);
 }
 // everyone near enough when it is done did it with him
-const questWith = () => { const me = realm === 'under' ? 1 : 0, out = []; for (const P of NET.peers.values()) if (P.s && P.realm === me && P.pos.distanceTo(player.pos) < 220 && performance.now() - P.s.t < 8000 && P.name) out.push(P.name); return [...new Set(out)].slice(0, 6); };
+const questWith = () => { const me = netMe(), out = []; for (const P of NET.peers.values()) if (P.s && P.realm === me && P.pos.distanceTo(player.pos) < 220 && performance.now() - P.s.t < 8000 && P.name) out.push(P.name); return [...new Set(out)].slice(0, 6); };
 function questFinished(god, name, goal, size = 1) {   // logged, rewarded, shared
   const withN = questWith(), it = itemMake(god, size); if (!it) return; it.with = withN;
   (story.qlog ||= []).unshift({ god, name, goal: String(goal).slice(0, 90), item: it.name, with: withN, at: Date.now() }); story.qlog.length = Math.min(story.qlog.length, 40);
@@ -27284,6 +27309,7 @@ function welcomeBack(a) {
 // something the gods will talk about among themselves, and to whoever else is flying (the words are the server's)
 function worldDeed(k, god = '') { if (state !== 'loading' && state !== 'title') worldPost({ op: 'deed', k, god }); }
 function worldMark(kind, x, y, z, god = '') {
+  if (PL.on) return;   // (out on a world in space: nothing there is the world's)
   const m = { k: kind, x: Math.round(x), y: Math.round(y * 10) / 10, z: Math.round(z), g: god, s: (Math.random() * 2 ** 31) | 0, n: heroName, mine: true, at: new Date().toISOString() };
   if (kind === 'met' && WORLD.marks.some(o => o.k === 'met' && o.mine && o.g === god)) return;
   WORLD.marks.push(m);
@@ -27442,6 +27468,7 @@ function mapTile(tx, tz) {
 }
 function openMap() {
   if (COSMOS.on) return cosmosMap(true);   // (out in space, the map is the map of the heavens)
+  if (PL.on) { toast(`NO CHART OF ${PL.name} · CLIMB OUT FOR THE MAP OF THE HEAVENS`); return; }
   if (state !== 'play' || player.cine || player.sub || mapV.open) return;
   state = 'map'; mapV.open = true; mapV.pull = 0; mapV.hover = null; mapV.down = null; audio.sfx.mapOpen?.();
   keys.TouchBoost = false; stick.x = stick.y = 0;
@@ -27686,7 +27713,7 @@ function m3Update(dt) {
   if (M3.me.visible) { T.setXYZ(t++, P.x, P.y, P.z); T.setXYZ(t++, P.x, reliefH(P.x, P.z), P.z); }
   const now = performance.now();
   for (const Q of NET.peers.values()) { if (n >= 24 || !Q.s || now - Q.s.t > 15000 || SHUN.block.has(Q.name)) continue;
-    const qr = Q.realm ? 'under' : 'over', off = qr === realm ? 0 : M3.offX; if (qr !== realm && !both || !m3Vis(qr, Q.pos.x, Q.pos.z, true)) continue;
+    const qr = Q.realm ? 'under' : 'over', off = qr === realm ? 0 : M3.offX; if (typeof Q.realm === 'string' || qr !== realm && !both || !m3Vis(qr, Q.pos.x, Q.pos.z, true)) continue;
     _m3m.compose(_m3p.set(Q.pos.x, Q.pos.y + off, Q.pos.z), _m3q, _m3s.setScalar(k * 1.6)); M3.peers.setMatrixAt(n, _m3m); M3.peers.setColorAt(n, _m3c.set(Q.css || '#bfe6ff')); n++;
     T.setXYZ(t++, Q.pos.x, Q.pos.y + off, Q.pos.z); T.setXYZ(t++, Q.pos.x, relOf(qr, Q.pos.x, Q.pos.z) + off, Q.pos.z); }
   M3.peers.count = n; if (n) { M3.peers.instanceMatrix.needsUpdate = true; M3.peers.instanceColor.needsUpdate = true; }
@@ -28051,7 +28078,7 @@ function mapPaint(dt) {
     V.yaw = Math.abs(ty - V.yaw) < 0.0015 ? ty : lerp(V.yaw, ty, damp(R3 ? 14 : 6, dt)); V.T = Math.abs(tT - V.T) < 0.0015 ? tT : lerp(V.T, tT, damp(R3 ? 12 : 6, dt)); }
   // what the middle of the view looks at: the ground there — or him, at the height he is flying, while the view is on him
   { let near = player.pos, nd = Math.hypot(V.tx - player.pos.x, V.tz - player.pos.z);   // (or another flier, when it is on them: whoever is nearest the middle)
-    if (R3) for (const P of NET.peers.values()) if (P.s && P.realm === (realm === 'under' ? 1 : 0) && performance.now() - P.s.t < 15000) { const d = Math.hypot(V.tx - P.pos.x, V.tz - P.pos.z); if (d < nd) { nd = d; near = P.pos; } }
+    if (R3) for (const P of NET.peers.values()) if (P.s && P.realm === netMe() && performance.now() - P.s.t < 15000) { const d = Math.hypot(V.tx - P.pos.x, V.tz - P.pos.z); if (d < nd) { nd = d; near = P.pos; } }
     const th = lerp(reliefH(V.tx, V.tz), near.y, smoothstep(700, 150, nd)) + (V.hu || 0) + (both && M3.on ? M3.offX * 0.28 : 0); V.h = V.h ? lerp(V.h, th, damp(6, dt)) : th; }
   mapProj();
   x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
@@ -28089,8 +28116,8 @@ function mapPaint(dt) {
     if (label && fits(px, py + 15, label.length)) { x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = 'rgba(244,234,210,.75)'; x.fillText(label, px, py + 15); }
   };
   // everyone who is flying, where they are in the air (found first: their names are the ones that must not be written over)
-  const here = new Set(), me = realm === 'under' ? 1 : 0; V.hits.length = 0;
-  for (const P of NET.peers.values()) if (P.s && performance.now() - P.s.t < 15000 && (P.realm === me || both)) { const pr = P.realm ? 'under' : 'over', off = pr === realm ? 0 : M3.offX;
+  const here = new Set(), me = netMe(); V.hits.length = 0;
+  for (const P of NET.peers.values()) if (P.s && performance.now() - P.s.t < 15000 && typeof P.realm !== 'string' && (P.realm === me || both)) { const pr = P.realm ? 'under' : 'over', off = pr === realm ? 0 : M3.offX;
     if (pr === realm) here.add(P.name); if (SHUN.block.has(P.name) || !m3Vis(pr, P.pos.x, P.pos.z)) continue;
     const [bx, by] = P3(P.pos.x, P.pos.z, flat ? WATER : P.pos.y + off); V.hits.push({ P, x: bx, y: by, off, gy: flat ? by : mapSY(P.pos.x, P.pos.z, relOf(pr, P.pos.x, P.pos.z) + off) }); fits(bx, by + 16, P.name.length + 2); }
   if (mine) { const [qx, qy] = P3(player.pos.x, player.pos.z, flat ? WATER : player.pos.y); fits(qx, qy, 4); }
@@ -28137,7 +28164,7 @@ function mapPaint(dt) {
   { const fx = -Math.sin(yaw), fz = -Math.cos(yaw); x.beginPath(); x.moveTo(px, py); x.lineTo(px + (fx * mapP.c - fz * mapP.s) * 16, py + (fx * mapP.s + fz * mapP.c) * mapP.T * 16); x.stroke(); }
   x.fillStyle = '#ff8a3a'; x.font = 'bold 15px Menlo, monospace'; x.fillText('✦', px, py); }
   // a bird under the pointer: who it is, how far and how high, and that a click goes there
-  { V.memHits = []; const me2 = realm === 'under' ? 1 : 0; x.textAlign = 'center'; x.font = '10px "IBM Plex Mono", Menlo, monospace';   // where his pictures were taken, and his films: a small frame each
+  { V.memHits = []; const me2 = netMe(); x.textAlign = 'center'; x.font = '10px "IBM Plex Mono", Menlo, monospace';   // where his pictures were taken, and his films: a small frame each
     for (const m of MEMO.idx) { if ((m.r || 0) !== me2 || both && !m3Vis(realm, m.x, m.z)) continue; const sx = mapSX(m.x, m.z, flat ? WATER : m.y), sy = mapSY(m.x, m.z, flat ? WATER : m.y); if (!(sx >= -10 && sy >= -10 && sx <= W + 10 && sy <= H + 10)) continue; x.fillStyle = m.k === 'v' ? 'rgba(255,150,130,.85)' : 'rgba(244,234,210,.6)'; x.fillText(m.k === 'v' ? '▶' : '▣', sx, sy + 3); V.memHits.push({ id: m.id, x: sx, y: sy }); } }
   { V.wpHits = []; const L = wpAll();   // his marks: a star each, the chosen one brighter, each with its name
     for (let i = 0; i < L.length; i++) { const w = L[i], wr = w.home ? 'over' : realm, wo = wr === realm ? 0 : M3.offX; if (wr !== realm && !both || both && !m3Vis(wr, w.x, w.z)) continue;
@@ -28169,7 +28196,7 @@ function warpToPeer(P) {
   if (!P || !P.pos) return false;
   if (state === 'map') closeMap();
   if (!flags.morphed) { toast('YOU HAVE NO WINGS YET'); return false; }
-  if ((P.realm ? 1 : 0) !== (realm === 'under' ? 1 : 0)) { toast(P.realm ? `${P.name} IS BELOW, IN THE UNDERWORLD` : `${P.name} IS ABOVE, IN THE LIVING WORLD`); return false; }
+  if (P.realm !== netMe()) { toast(typeof P.realm === 'string' ? `${P.name} IS ON ${P.plName || 'ANOTHER WORLD'}, OUT IN SPACE` : P.realm ? `${P.name} IS BELOW, IN THE UNDERWORLD` : `${P.name} IS ABOVE, IN THE LIVING WORLD`); return false; }
   if (state !== 'play' || player.cine) { toast('NOT NOW'); return false; }
   who.pinned = who.open = false;
   const yaw = P.yaw || 0, lead = 2.7;   // (the carrying takes a few seconds, and they will not have waited: he is set down where they will be by then)
@@ -28239,6 +28266,7 @@ const warp = { t: 0, to: new THREE.Vector3(), swapped: false, yaw: 0, R: 8 };
 function startWarp(x, z, y = null, yaw = null) {
   const p = player;
   if (state !== 'play' || p.cine || !flags.morphed) return;
+  if (PL.on) plOff('warp');   // (carried anywhere from a world in space: home to the sky first)
   if (GODM.on && !warp.home && !warp.exact && godDash(x, z, y)) return;   // (the god in him does not wait to be carried)
   const g = Math.max(height(x, z), realm === 'over' ? groundAt(x, z) : -1e9, WATER), top = realm === 'under' ? UNDER.ceil - 100 : 1e9;   // (over a floating island: over the island, not inside it)
   warp.to.set(x, y != null ? clamp(y, g + 14, Math.max(g + 14, top)) : Math.min(top, g + (realm === 'under' ? 220 : 260)), z);   // (over a place: high above it. To a flier: where they are)
@@ -30629,7 +30657,7 @@ function menuMove(mv, dt) {
       }
       break; }
     case 'wing': {   // on another bird's wing: holding a place off it, matching it, doing what it does
-      const L = mv.L; if (!L.s || performance.now() - L.s.t > 5000 || !L.menu || L.realm !== (realm === 'under' ? 1 : 0)) { mv.done = true; break; }
+      const L = mv.L; if (!L.s || performance.now() - L.s.t > 5000 || !L.menu || L.realm !== netMe()) { mv.done = true; break; }
       const k = M.slot, side = k % 2 ? -1 : 1, row = (k >> 1) + 1, KK = Math.max(K, bigName(L.name)), chase = Math.floor(mv.t / 22) % 2 === 1;
       const ly = L.yaw, fx = -Math.sin(ly), fz = -Math.cos(ly), rx = Math.cos(ly), rz = -Math.sin(ly);
       const ox = chase ? 0 : side * 16 * KK * row, ob = chase ? 24 * KK * row : 13 * KK * row;
@@ -30646,7 +30674,7 @@ function menuMove(mv, dt) {
 }
 // who else is on the menu, near enough to fly with; the one with the lowest number leads
 function menuPeers() {
-  const M = LIVE, out = [], now = performance.now(), me = realm === 'under' ? 1 : 0;
+  const M = LIVE, out = [], now = performance.now(), me = netMe();
   for (const P of NET.peers.values()) if (P.menu && P.s && now - P.s.t < 5000 && P.realm === me && P.pos.distanceToSquared(player.pos) < 3200 * 3200) out.push(P);
   let L = null; for (const P of out) if (String(P.id) < String(NET.id) && (!L || String(P.id) < String(L.id))) L = P;
   M.lead = L; M.slot = L ? out.filter(P => P !== L && String(P.id) < String(NET.id)).length : 0;
@@ -32241,7 +32269,7 @@ function xmapStep() {
     const N = XMAP.N, gi = clamp(Math.round(((x - XMAP.cx) / S + 0.5) * (N - 1)), 0, N - 1), gj = clamp(Math.round(((z - XMAP.cz) / S + 0.5) * (N - 1)), 0, N - 1), gy = (Math.max(XMAP.hs[gj * N + gi], WATER) - WATER) * E;
     d.children[0].scale.set(1, Math.max(0.001, (d.position.y - gy) / (inv * (big || 1))), 1); };
   const marks0 = [];
-  for (const P of NET.peers.values()) { if (!P.seen || P.memory || (P.realm ? 'under' : 'over') !== realm) continue; const col = P.patron && PATRONS[P.patron] ? PATRONS[P.patron][0] : '#ffffff';
+  for (const P of NET.peers.values()) { if (!P.seen || P.memory || typeof P.realm === 'string' || (P.realm ? 'under' : 'over') !== realm) continue; const col = P.patron && PATRONS[P.patron] ? PATRONS[P.patron][0] : '#ffffff';
     if (P.form === 'p' && fly(P.pos.x, P.pos.y, P.pos.z, col, P.yaw)) { const d = XMAP.birds[nb - 1]; marks0.push({ x: d.position.x, y: d.position.y, z: d.position.z, peer: P, label: P.name }); } else dot(P.pos.x, P.pos.y, P.pos.z, col, 1.25, { peer: P, label: P.name }); }
   marks.push(...marks0);
   if (realm === 'over') for (const G of gods) { if (!G.active || !PATRONS[G.id]) continue; dot(G.x, (G.gy ?? WATER) + 30, G.z, PATRONS[G.id][0], 0.8, { w: { x: G.x, y: (G.gy ?? WATER) + 40, z: G.z }, label: G.revealed ? G.name : 'someone' }); }
@@ -32347,6 +32375,8 @@ function frame() {
 }
 function tick(dt) {
   time += dt;
+  if (PL.pend) { const B = PL.pend; PL.pend = null; if (COSMOS.on) plEnter(B); }   // (down through a world's air: see plEnter)
+  if (PL.on) return plTick(dt);   // (out on a world in space: its own frame, and home stands still)
   carryOff();   // (back to where the stone he is on was built: he does his own moving from there)
   if (state === 'prologue') return updatePrologue(stuPro(dt));   // (stuPro: the keeper's studio, watching the opening)
   if (pro.waitMic) { pro.waitMic = false; $('primer').classList.remove('on'); }   // (the voice is only ever asked for over the black before the story)
@@ -38024,7 +38054,7 @@ const COSMOS = { on: false, up: 0, cool: 0, fadeT: 0, built: false, told: false,
   dNear: 1e9, beatT: 0, ringL: new THREE.Vector3(), ringR: 0, ringY: 1e9, tex: { data: null, tex: null, job: null, upT: 0, at: -1e9, n: -1 }, map: { on: false, piv: new THREE.Vector3(), q: new THREE.Quaternion(), d: 600, td: 60000, pid: 'me', keys: {}, hits: [] }, hudT: 0, trail: null };
 const _czC = new THREE.Color(), _czv = new THREE.Vector3(), _czw = new THREE.Vector3(), _czf = new THREE.Vector3(), _czu = new THREE.Vector3(), _czq = new THREE.Quaternion(), _czm = new THREE.Matrix4(), _cz0 = new THREE.Vector3(), _czX = new THREE.Vector3(1, 0, 0), _czY = new THREE.Vector3(0, 1, 0), _czZ = new THREE.Vector3(0, 0, 1);
 // whether the way up is open to him now
-function cosmosOpen() { const p = player; return (!!MOD.admin && GODM.on || COSMOS.hy) && realm === 'over' && !XR.on && p.form === 'phoenix' && !p.cine && !p.sub && !p.perch && !p.mount && !p.ferry; }
+function cosmosOpen() { const p = player; return (!!MOD.admin && GODM.on || COSMOS.hy) && realm === 'over' && !PL.on && !XR.on && p.form === 'phoenix' && !p.cine && !p.sub && !p.perch && !p.mount && !p.ferry; }
 // past a few kilometres, nearer and smaller in proportion (everything out to the end of space fits in twice that)
 const czK = d => d <= CZ_D0 ? 1 : CZ_D0 * (2 - CZ_D0 / d) / d;
 // where a place in the world is on the globe: as far from the pole as it is from Olympus, in the same direction. The unit
@@ -38351,12 +38381,13 @@ function cosmosFly(dt) {
   f.set(0, 0, -1).applyQuaternion(C.q);
   C.pos.addScaledVector(f, C.v * dt);
   if (C.nearB && C.nearD < C.nearB.R * 3) C.pos.add(C.nearB.dp);   // (carried along with the world he is near)
+  if (!M) { czEntry(dt, f); if (PL.pend) return; }   // (diving at a world: into its air, see czEntry)
   // the ground of any world holds him off
   const P = C.pos, gl = P.length();
   if (gl > 1) { _czv.copy(P).divideScalar(gl); const floor = CZ_RG + czGlobeH(_czv) + 30;
     if (gl < floor) { P.copy(_czv).multiplyScalar(floor); czSlide(_czv); }
     else if (gl - CZ_RG < CZ_ALT - 250 && f.dot(_czv) < -0.05 && !M) { cosmosLeave(false); return; } }   // down into the air: home
-  for (const B of C.bodies) { _czv.subVectors(P, B.pos); const d = _czv.length(), floor = B.R * (1 + CZ_AMP[B.kind] * 0.7) + 25; if (d < floor && d > 1) { _czv.divideScalar(d); P.copy(B.pos).addScaledVector(_czv, floor); czSlide(_czv); } }
+  for (const B of C.bodies) { _czv.subVectors(P, B.pos); const d = _czv.length(), floor = B.R * (1 + CZ_AMP[B.kind] * 0.7) + 25; if (d < floor && d > 1) { _czv.divideScalar(d); P.copy(B.pos).addScaledVector(_czv, floor); if (C.entry?.B !== B) czSlide(_czv); } }   // (going in through its air, he is held at the top of it and not turned)
   // the wings: beating as he climbs or hurries, folded back at a great speed
   p.speed = clamp(C.v, 40, 300); p.bank = lerp(p.bank, p.turn * 0.75, damp(3, dt)); p.pitch = 0; heat = 0; p.danger = 0; p.skyT = 0; p.flame = Math.min(1, p.flame + dt * 0.02);
   flyWings(dt, { boost, dive: 0, climb: clamp(Math.abs(C.pv), 0, 1) * 0.6, tuck: smoothstep(1500, 40000, C.v) * 0.8, flutter: 0, pull: 0 });
@@ -38380,6 +38411,7 @@ function cosmosFrame(dt) {
   { _czv.copy(C.pos).applyQuaternion(_czq.copy(C.rings.quaternion).invert()); const rr = Math.hypot(_czv.x, _czv.z) / CZ_RG; C.ringY = _czv.y; C.ringR = rr; C.ringL.copy(_czv);
     C.dNear = Math.min(nd, rr > 1.45 && rr < 3.32 ? Math.abs(_czv.y) + 30 : 1e12); }
   C.rush = lerp(C.rush, smoothstep(300, 30000, C.v), damp(3, dt));
+  C.entryK = czEntryLook();
   cosmosCam(dt);
   cosmosPlace(dt);
   if ((C.hudT -= dt) <= 0) { C.hudT = 0.25; czBar(true); }
@@ -38511,7 +38543,7 @@ function cosmosPresent() {
   const n0 = U.uNear.value, fa = U.uFar.value, r0 = U.uRays.value, s0 = U.uSpeed.value, h0 = U.uHeat.value, b0 = U.uDof.value;
   _czv.copy(CZ_SUN).multiplyScalar(25000).project(C.cam); const face = _czf.set(0, 0, -1).applyQuaternion(C.camQ).dot(CZ_SUN);
   if (Number.isFinite(_czv.x)) U.uSunUV.value.set(_czv.x * 0.5 + 0.5, _czv.y * 0.5 + 0.5);
-  U.uNear.value = C.cam.near; U.uFar.value = C.cam.far; U.uRays.value = _czv.z < 1 && !C.map.on ? smoothstep(0.3, 0.9, face) * 0.45 : 0; U.uSpeed.value = C.map.on ? 0 : C.rush * 0.7; U.uHeat.value = 0; U.uDof.value = 0; U.uFade.value = f0 * k;   // (no blur for distance out here: everything is far, and all of it should be sharp)
+  U.uNear.value = C.cam.near; U.uFar.value = C.cam.far; U.uRays.value = _czv.z < 1 && !C.map.on ? smoothstep(0.3, 0.9, face) * 0.45 : 0; U.uSpeed.value = C.map.on ? 0 : C.rush * 0.7; U.uHeat.value = (C.entryK || 0) * (0.8 + Math.sin(time * 20) * 0.15); U.uDof.value = 0; U.uFade.value = f0 * k;   // (no blur for distance out here: everything is far, and all of it should be sharp)
   present(C.scene, C.cam);
   U.uNear.value = n0; U.uFar.value = fa; U.uRays.value = r0; U.uSpeed.value = s0; U.uHeat.value = h0; U.uDof.value = b0; U.uFade.value = f0;
 }
@@ -38615,7 +38647,7 @@ function czUI() {
 function czBar(on) {
   const C = COSMOS, el = C.barEl; if (!el) return;
   el.classList.toggle('on', on && !C.map.on); if (!on) return;
-  const km = Math.max(0, (C.pos.length() - CZ_RG) / 1000), B = C.nearB, near = B && C.nearD < B.R * 8 ? `NEAR ${B.name} · ${CZ_SAY[B.kind]}` : C.ringR > 1.45 && C.ringR < 3.3 && Math.abs(C.ringY || 1e9) < 3000 ? 'IN THE RINGS' : '';
+  const km = Math.max(0, (C.pos.length() - CZ_RG) / 1000), B = C.nearB, near = C.entry ? `INTO THE AIR OF ${C.entry.B.name}` : B && C.nearD < B.R * 8 ? `NEAR ${B.name} · ${CZ_SAY[B.kind]}${C.nearD < B.R * 2.5 ? ' · DIVE AT IT TO GO DOWN' : ''}` : C.ringR > 1.45 && C.ringR < 3.3 && Math.abs(C.ringY || 1e9) < 3000 ? 'IN THE RINGS' : '';
   el.firstChild.textContent = `IN SPACE · ${km < 100 ? km.toFixed(1) : Math.round(km).toLocaleString()} KM OUT · ${C.found.size} WORLDS FOUND`;
   el.children[1].textContent = near || (TOUCH ? 'dive back into the air to go home' : 'M · the map of the heavens · dive back into the air to go home');
   if (C.map.on) czMapText();
@@ -38634,6 +38666,568 @@ addEventListener('keydown', e => {
 }, true);
 addEventListener('keyup', e => { COSMOS.map.keys[e.code] = false; }, true);
 setTimeout(() => { if (window.__icarus) Object.assign(window.__icarus, { COSMOS, cosmosOpen, cosmosEnter, cosmosLeave, cosmosMap, cosmosStep, czFrame, czCell, czOrbit, czDial, czZoom, czFocus, CZ_TOP, CZ_RG }); }, 200);
+// ───────────────────────── the worlds out there ─────────────────────────
+// ── Every world in the dark can be gone down to. Dive at one out in space and he goes into its air: the heat of coming in
+//    glows round him, the black fills with the colour of its sky, and he comes out high over its face, falling. Each kind
+//    is a country of its own, made from the world's seed (so it is the same for everyone who goes there): grey rock and
+//    craters under a black sky; white ice, blue crevasses and spires; black basalt and rivers of fire, where a man burns
+//    and the bird is fed; an ocean of islands; dunes and mesas in the wind; a forest of trees in colours no tree has;
+//    fields of tall crystal; green mist, poison pools and white bones. A giant of gas has no ground at all: banded cloud,
+//    one layer under another, islands of it floating to come down on, lightning, and under them a weight of air that will
+//    not let him go deeper. Somewhere on every world is a thing left there to be found. Climbing straight up out of its
+//    air puts him back in space beside it; dying there, he wakes on Olympus like anyone.
+//    (It is drawn with the world's own scene and lens, but on a layer of its own: nothing of home is on it, so none of it
+//    is drawn, and none of it moves while he is away (see plTick, which runs in place of tick). The country is a square
+//    five kilometres a side that repeats, worked out once as he comes in, and it lies a long way out from home (PL_O), so
+//    nothing of home is ever under him. Gravity is the world's own: FLY.g for the bird, manFall for the man.)
+const PL_W = PL_N * STEP, PL_BW = 32 * STEP, PL_NB = PL_N / 32, PL_NH = 48, PL_FS = 8;   // (the square; its squares of things, 320 m; the near ground 48 steps each way, the far ground in steps of 8)
+const PL_SKY = [['#030407', '#26272c'], ['#4a7fc0', '#d6ecff'], ['#140403', '#7a2a14'], ['#6a4a2e', '#f0d4a4'], ['#2462c8', '#c4e2ff'], ['#7a4c22', '#f6d6a2'], ['#185a80', '#bcefe0'], ['#24104e', '#dcb4ff'], ['#1c2806', '#86a63a']];   // (each kind's sky: overhead, and at the horizon)
+const PL_FOG = [[1500, 14000], [600, 9000], [400, 6500], [300, 5200], [800, 11000], [500, 8000], [400, 7000], [700, 9500], [200, 4200]];
+const PL_GLOW = ['#000000', '#3a8cff', '#ff6a14', '#000000', '#000000', '#000000', '#000000', '#3affe8', '#a8ff30'];
+const PL_THING = ['A RUIN', 'A MONOLITH', 'A BEACON', 'AN ARTEFACT'];
+const PL_TREE = ['#ff4fd8', '#7a3cff', '#19e6c8', '#ffb020', '#3affa0', '#ff5a3a', '#4ab0ff'];
+const plWrap = v => ((v % PL_W) + PL_W) % PL_W;
+const plLay = o => { o.traverse(c => c.layers.set(1)); return o; };   // (on the worlds' layer only)
+const plKeep = o => { if (o) o.traverse(c => c.layers.enable(1)); return o; };   // (on both: his own body, his fire, what flies off him)
+const _woC = new THREE.Color(), _woC2 = new THREE.Color(), _woV = new THREE.Vector3(), _woM = new THREE.Matrix4(), _woQ = new THREE.Quaternion(), _woS = new THREE.Vector3(), _woE = new THREE.Euler();
+// noise that repeats with the square: value noise on a lattice that wraps (P, its spacing in steps, divides the square)
+function plHash(i, j, s) { let h = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(s, 1442695041)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
+function plVN(x, z, P, s) {
+  const n = PL_N / P, gx = x / P, gz = z / P, ix = Math.floor(gx), iz = Math.floor(gz), fx = gx - ix, fz = gz - iz, ux = fx * fx * (3 - 2 * fx), uz = fz * fz * (3 - 2 * fz);
+  const a = ((ix % n) + n) % n, b = ((iz % n) + n) % n, a1 = (a + 1) % n, b1 = (b + 1) % n, h00 = plHash(a, b, s), h10 = plHash(a1, b, s), h01 = plHash(a, b1, s), h11 = plHash(a1, b1, s);
+  return h00 + (h10 - h00) * ux + (h01 - h00) * uz + (h00 - h10 - h01 + h11) * ux * uz;
+}
+function plF(x, z, s, P = 128, oct = 5) { let t = 0, a = 1, w = 0; for (let o = 0; o < oct && P >= 2; o++, P /= 2, a *= 0.5) { t += a * (plVN(x, z, P, s + o * 17) * 2 - 1); w += a; } return t / w; }
+// a field of craters: up to two in every square of 32 steps, each a bowl with a lip
+function plCrater(x, z, s) {
+  const C = 32, n = PL_N / C, ci = Math.floor(x / C), cj = Math.floor(z / C); let dh = 0;
+  for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
+    const ii = ci + a, jj = cj + b, wi = ((ii % n) + n) % n, wj = ((jj % n) + n) % n;
+    for (let k = 0; k < 2; k++) {
+      if (plHash(wi, wj, s + 101 + k) < 0.3) continue;
+      const cx = (ii + plHash(wi, wj, s + 7 + k)) * C, cz = (jj + plHash(wi, wj, s + 13 + k)) * C, R = 3 + plHash(wi, wj, s + 19 + k) ** 2 * 15, d = Math.hypot(x - cx, z - cz) / R;
+      if (d > 1.7) continue;
+      dh += d < 1 ? -R * STEP * 0.24 * (1 - d * d) + R * STEP * 0.13 * d ** 8 : R * STEP * 0.13 * Math.exp(-(((d - 1) / 0.25) ** 2));
+    }
+  }
+  return dh;
+}
+// the ground of each kind, at a step of the square (and what it is made of: plMat, plGlow)
+let plMat = 0, plGlow = 0;
+function plLand(k, x, z, s) {
+  plMat = 0; plGlow = 0; let h;
+  switch (k) {
+    case 0: { const r = 1 - Math.abs(plF(x, z, s + 3, 128, 4)); h = 70 + 120 * plF(x, z, s, 256, 5) + 260 * r ** 4 + plCrater(x, z, s); if (h < 60) plMat = 3; break; }
+    case 1: { h = 70 + 70 * plF(x, z, s, 256, 5) + 14 * plF(x, z, s + 9, 16, 2); const c = Math.abs(plF(x, z, s + 5, 64, 3)); if (c < 0.045) { const e = 1 - c / 0.045; h -= 20 * Math.sqrt(e); plMat = 2; plGlow = e * 0.25; } break; }
+    case 2: { const r = 1 - Math.abs(plF(x, z, s + 3, 128, 4)); h = 60 + 110 * plF(x, z, s, 256, 5) + 150 * r ** 3; const c = Math.abs(plF(x, z, s + 9, 128, 3));
+      if (c < 0.04) { const e = 1 - c / 0.04; h -= 10 * Math.sqrt(e); plMat = 1; plGlow = Math.min(1, e * 1.4); }
+      if (h < 25) { plMat = 1; plGlow = Math.max(plGlow, smoothstep(25, 5, h)); h = Math.max(h, 8); } break; }
+    case 4: { const isl = smoothstep(0.6, 0.9, plVN(x, z, 64, s + 3)) * (0.55 + 0.45 * plVN(x, z, 16, s + 4)); h = -95 + 60 * plF(x, z, s, 256, 5) + 250 * isl + 20 * plF(x, z, s + 8, 16, 2) * isl; break; }
+    case 5: { const u = TAU_ * (40 * x + 12 * z) / PL_N + 2.6 * plF(x, z, s + 2, 64, 3), dune = (0.5 + 0.5 * Math.sin(u)) ** 2 * 24 * (0.45 + 0.55 * plVN(x, z, 64, s + 5));
+      h = 40 + 45 * plF(x, z, s, 256, 4) + dune; const v = plVN(x, z, 64, s + 7) + 0.12 * plF(x, z, s + 8, 16, 3);
+      if (v > 0.6) { const t = smoothstep(0.6, 0.64, v), top = 170 + 80 * plVN(x, z, 128, s + 9); h = lerp(h, top - (t < 1 ? (1 - t) * 30 : 0), t); if (t > 0.3) plMat = 5; } break; }
+    case 6: h = 50 + 95 * plF(x, z, s, 256, 5) + 18 * plF(x, z, s + 3, 32, 3); break;
+    case 7: { h = 40 + 60 * plF(x, z, s, 256, 4) + 8 * Math.abs(plF(x, z, s + 4, 16, 2)); if (Math.abs(plF(x, z, s + 6, 64, 3)) < 0.03) { plMat = 6; plGlow = 0.6; } break; }
+    case 8: { h = 30 + 55 * plF(x, z, s, 256, 5); const q = plF(x, z, s + 6, 32, 3); if (q < -0.2) { h = lerp(h, WATER - 5, smoothstep(-0.2, -0.34, q)); plMat = 4; } break; }
+    default: h = PL_FLOOR;
+  }
+  return Math.max(h, k === 4 || k === 8 ? -220 : WATER + 4);
+}
+// what is under a place: the height (at a step exactly, between them eased; a giant of gas has only the floor far down)
+function plH(x, z) {
+  if (!PL.H) return PL_FLOOR;
+  const gx = (x - PL_O) / STEP, gz = (z - PL_O) / STEP, ix = Math.floor(gx), iz = Math.floor(gz), fx = gx - ix, fz = gz - iz, N = PL_N, H = PL.H;
+  const i0 = ((ix % N) + N) % N, j0 = ((iz % N) + N) % N, i1 = (i0 + 1) % N, j1 = (j0 + 1) % N, a = H[j0 * N + i0], b = H[j0 * N + i1], c = H[j1 * N + i0], d = H[j1 * N + i1];
+  return a + (b - a) * fx + (c - a) * fz + (a - b - c + d) * fx * fz;
+}
+const plAt = (A, x, z) => { const i = ((Math.round((x - PL_O) / STEP) % PL_N) + PL_N) % PL_N, j = ((Math.round((z - PL_O) / STEP) % PL_N) + PL_N) % PL_N; return A ? A[j * PL_N + i] : 0; };
+// the islands of a giant of gas (one in most squares): the one under a place, if any
+const _woI = { top: 0, x: 0, z: 0, r: 0, I: null };
+function plIsle(x, z, under = false) {
+  if (!PL.isl) return null;
+  const lx = plWrap(x - PL_O), lz = plWrap(z - PL_O), bi = Math.floor(lx / PL_BW), bj = Math.floor(lz / PL_BW);
+  for (let db = -1; db <= 1; db++) for (let da = -1; da <= 1; da++) {
+    const ua = bi + da, ub = bj + db, wa = (ua + PL_NB) % PL_NB, wb = (ub + PL_NB) % PL_NB, I = PL.isl[wb * PL_NB + wa]; if (!I) continue;
+    const ex = lx - (I.lx + (ua - wa) * PL_BW), ez = lz - (I.lz + (ub - wb) * PL_BW), R = under ? I.r * 1.05 : I.r;
+    if (ex * ex + ez * ez < R * R) { _woI.top = I.top; _woI.x = x - ex; _woI.z = z - ez; _woI.r = I.r; _woI.I = I; return _woI; }
+  }
+  return null;
+}
+// the things standing on the ground near a place, each with where it is in the world now (it repeats with the square)
+function plNear(x, z, f) {
+  const B = PL.bk; if (!B) return;
+  const lx = plWrap(x - PL_O), lz = plWrap(z - PL_O), bi = Math.floor(lx / PL_BW), bj = Math.floor(lz / PL_BW);
+  for (let db = -1; db <= 1; db++) for (let da = -1; da <= 1; da++) {
+    const ua = bi + da, ub = bj + db, wa = (ua + PL_NB) % PL_NB, wb = (ub + PL_NB) % PL_NB, L = B[wb * PL_NB + wa]; if (!L) continue;
+    for (const it of L) if (it.sol && f(it.sol, x - (lx - (it.lx + (ua - wa) * PL_BW)), z - (lz - (it.lz + (ub - wb) * PL_BW)))) return;
+  }
+  if (PL.art && PL.art.sol) { const A = PL.art, ax = x - (plWrap(x - PL_O - A.lx + PL_W / 2) - PL_W / 2), az = z - (plWrap(z - PL_O - A.lz + PL_W / 2) - PL_W / 2); f(A.sol, ax, az); }
+}
+function plGround(x, z, y = Infinity) {
+  let g = plH(x, z);
+  if (ROOST.on && ROOST.realm === realm && y >= ROOST.top - 2.5 && roostHas(x, z)) g = Math.max(g, ROOST.top);
+  if (PL.isl) { const I = plIsle(x, z); if (I && y >= I.top - 2.5) g = Math.max(g, I.top); }
+  return g;
+}
+function plTop(x, z, y) {
+  const T = _top, lim = y + 2.5; T.y = -1e9; T.kind = '';
+  plNear(x, z, (s, sx, sz) => { const top = s.y1 + 0.06, r = s.pr || s.r; if (top > lim || top <= T.y) return false; const ex = x - sx, ez = z - sz; if (ex * ex + ez * ez >= r * r) return false; T.y = top; T.kind = 'cyl'; T.x = sx; T.z = sz; T.r = r; return false; });
+  return T.y;
+}
+function plHit(x, y, z, m) {
+  let h = null;
+  plNear(x, z, (s, sx, sz) => {
+    const ex = x - sx, ez = z - sz, rr = s.r + m, d2 = ex * ex + ez * ez; if (d2 > rr * rr || y < s.y0 - m || y > s.y1 + m) return false;
+    const d = Math.sqrt(d2) || 0.01, top = y - s.y1, bot = s.y0 - y;
+    if (top > -m && top > d - s.r) { _hit.nx = 0; _hit.ny = 1; _hit.nz = 0; } else if (bot > -m && bot > d - s.r) { _hit.nx = 0; _hit.ny = -1; _hit.nz = 0; } else { _hit.nx = ex / d; _hit.ny = 0; _hit.nz = ez / d; }
+    _hit.soft = !!s.soft; _hit.what = s.what; _hit.core = 1 - d / rr; h = _hit; return true; });
+  if (h) return h;
+  if (PL.isl) { const I = plIsle(x, z, true); if (I) { const d = I.top - y, r = I.r; if (d > 2.5 && d < 8 + r * 1.6) {   // (the cloud under an island's top: widest just under it, gone to nothing below)
+    const ex = x - I.x, ez = z - I.z, R = r * (1 - 0.85 * clamp((d - 6) / (r * 1.5), 0, 1)) + m, d2 = ex * ex + ez * ez;
+    if (d2 < R * R) { const dd = Math.sqrt(d2) || 0.01; _hit.nx = ex / dd * 0.9; _hit.ny = -0.44; _hit.nz = ez / dd * 0.9; _hit.soft = true; _hit.what = 'a cloud island'; _hit.core = 1 - dd / R; return _hit; } } } }
+  return null;
+}
+function plPush(pos, vel, m) {
+  let hit = null;
+  plNear(pos.x, pos.z, (s, sx, sz) => {
+    const rr = (s.soft ? s.t : s.r) + m; if (pos.y > s.y1 || pos.y + 1.8 < s.y0) return false;
+    const ex = pos.x - sx, ez = pos.z - sz, d2 = ex * ex + ez * ez; if (d2 > (rr + 0.06) * (rr + 0.06) || d2 < 1e-4) return false;
+    const d = Math.sqrt(d2), nx = ex / d, nz = ez / d, vn = vel.x * nx + vel.z * nz;
+    if (d < rr) { pos.x = sx + nx * rr; pos.z = sz + nz * rr; }
+    if (vn < 0) { vel.x -= nx * vn; vel.z -= nz * vn; }
+    hit = { x: sx, z: sz, r: s.r, t: 0, soft: false, y0: s.y0, yb: s.y0, y1: s.y1, what: s.what }; return false; });
+  return hit;
+}
+// the air going up: over the rivers of fire, and in the great columns that rise through a giant of gas
+function plLift(x, y, z) {
+  const k = PL.kind;
+  if (k === 2) { const m = plAt(PL.M, x, z), g = plH(x, z); return m === 1 && y - g < 700 ? 5 * plAt(PL.G, x, z) / 255 * smoothstep(700, 200, y - g) : 0; }
+  if (k !== 3) return 0;
+  const t = Date.now() / 1000, S = 640, a = Math.floor((x - PL_O) / S), b = Math.floor((z - PL_O) / S);
+  let w = 0; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const i = a + dx, j = b + dz; if (plHash(i & 1023, j & 1023, PL.s + 61) < 0.4) continue;
+    const cx = PL_O + (i + 0.2 + 0.6 * plHash(i & 1023, j & 1023, PL.s + 62)) * S, cz = PL_O + (j + 0.2 + 0.6 * plHash(i & 1023, j & 1023, PL.s + 63)) * S, R = 120 + 90 * plHash(i & 1023, j & 1023, PL.s + 64), r = Math.hypot(x - cx, z - cz);
+    if (r < R) w += 6 * (1 - (r / R) ** 2) * (0.6 + 0.4 * Math.sin(t * 0.2 + i)); }
+  return w;
+}
+function plKind(x, z, y) {
+  const g = plH(x, z), k = PL.kind, m = plAt(PL.M, x, z);
+  if (k === 3 || y - g > 0.5) return 'stone';
+  if (g < WATER + 0.25) return 'water';
+  return k === 1 ? 'snow' : k === 5 || k === 4 && g < WATER + 6 ? 'sand' : k === 2 || k === 0 && m === 3 ? 'ash' : k === 6 ? 'leaves' : k === 8 ? 'ash' : 'rock';
+}
+
+// ── the making: the ground worked out a few rows a frame while he comes in through the air, then what stands on it
+function plGenStart(B) {
+  if (PL.jobFor === B.id) return;
+  PL.jobFor = B.id; PL.kind = B.kind; PL.seed = B.seed; PL.s = B.seed % 9973; PL.bk = null; PL.isl = null; PL.art = null;
+  PL.pal = plPal(B);
+  if (B.kind === 3) { PL.H = null; PL.job = null; plPropsMake(); return; }
+  PL.H = PL.H || new Float32Array(PL_N * PL_N); PL.M = PL.M || new Uint8Array(PL_N * PL_N); PL.G = PL.G || new Uint8Array(PL_N * PL_N); PL.job = { j: 0 };
+}
+function plPal(B) { const r = mulberry32(B.seed); return CZ_PAL[B.kind][0].map(h => new THREE.Color(h).offsetHSL((r() - 0.5) * 0.08, (r() - 0.5) * 0.2, (r() - 0.5) * 0.1)); }   // (the very colours its face had from space: see czMat)
+function plGenStep(budget) {
+  const J = PL.job; if (!J) return;
+  const t0 = performance.now(), k = PL.kind, s = PL.s, H = PL.H, M = PL.M, G = PL.G;
+  while (J.j < PL_N && performance.now() - t0 < budget) { const j = J.j++; for (let i = 0; i < PL_N; i++) { const o = j * PL_N + i; H[o] = plLand(k, i, j, s); M[o] = plMat; G[o] = Math.round(plGlow * 255); } }
+  if (J.j >= PL_N) { PL.job = null; plPropsMake(); }
+}
+// what stands on it, square by square, from the seed: rocks, spires, columns of basalt, trees, crystal, bones; or, on a
+// giant of gas, its islands. And the one thing on every world that was left there
+function plPropsMake() {
+  const k = PL.kind, P = PL.pal, B = PL.bk = [];
+  if (k === 3) PL.isl = [];
+  for (let b = 0; b < PL_NB; b++) for (let a = 0; a < PL_NB; a++) {
+    const r = mulberry32((PL.seed ^ Math.imul(a + 1, 73856093) ^ Math.imul(b + 1, 19349663)) >>> 0), L = [];
+    const at = () => { const lx = (a + r()) * PL_BW, lz = (b + r()) * PL_BW; return [lx, lz, plH(PL_O + lx, PL_O + lz)]; };
+    const put = (t, lx, lz, y, s, h, c, sol, rot = r() * TAU_, tilt = 0) => L.push({ t, lx, lz, y, s, h, c, sol, rot, tilt });
+    const n = (m, p = 1) => Math.floor(m * (0.6 + 0.8 * r()) * (r() < p ? 1 : 0));
+    if (k === 3) {   // an island of cloud, its top flat, in most squares
+      if (r() < 0.85) { const lx = (a + 0.15 + 0.7 * r()) * PL_BW, lz = (b + 0.15 + 0.7 * r()) * PL_BW, top = 460 + r() * 900, rr = 18 + r() ** 1.5 * 52;
+        PL.isl[b * PL_NB + a] = { lx, lz, top, r: rr, reef: r() < 0.45, c: _woC.copy(P[0]).lerp(P[2], r() * 0.5).getHex(), rs: r() * 1e6 | 0 }; }
+      B.push(L); continue;
+    }
+    if (k === 0) for (let i = n(7); i-- > 0;) { const [lx, lz, y] = at(); const s = 1.5 + r() ** 3 * 9; put('rk', lx, lz, y - s * 0.25, s, s, _woC.copy(P[0]).lerp(P[2], r()).getHex(), s > 2.5 ? { r: s * 0.85, t: s * 0.85, y0: y - 1, y1: y + s * 0.7, what: 'a boulder' } : null); }
+    if (k === 1) { for (let i = n(3); i-- > 0;) { const [lx, lz, y] = at(); if (plAt(PL.M, PL_O + lx, PL_O + lz) === 2) continue; const s = 3 + r() * 9, h = 25 + r() ** 2 * 140; put('sp', lx, lz, y - 2, s, h, _woC.copy(P[0]).lerp(P[1], r() * 0.6).getHex(), { r: s * 0.5, pr: Math.min(2.2, s * 0.3), y0: y - 2, y1: y + h * 0.9, what: 'a spire of ice' }); }
+      for (let i = n(4); i-- > 0;) { const [lx, lz, y] = at(); const s = 1 + r() * 4; put('rk', lx, lz, y - s * 0.3, s, s * 0.8, _woC.copy(P[3]).lerp(P[1], r() * 0.5).getHex(), null); } }
+    if (k === 2) { for (let c = n(2); c-- > 0;) { const [cx, cz] = at(); for (let i = 3 + (r() * 5 | 0); i-- > 0;) { const lx = cx + (r() - 0.5) * 22, lz = cz + (r() - 0.5) * 22, y = plH(PL_O + lx, PL_O + lz); if (plAt(PL.M, PL_O + lx, PL_O + lz) === 1) continue;
+        const s = 2.5 + r() * 3, h = 8 + r() ** 1.5 * 42; put('col', lx, lz, y - 1, s, h, _woC.copy(P[0]).lerp(P[1], r() * 0.7).getHex(), { r: s, y0: y - 1, y1: y + h - 1, what: 'a column of basalt' }); } }
+      for (let i = n(2); i-- > 0;) { const [lx, lz, y] = at(); const s = 1.5 + r() * 2.5, h = 10 + r() * 18; put('sp', lx, lz, y - 1, s, h, 0x0c0a0e, { r: s * 0.5, pr: 1.2, y0: y - 1, y1: y + h * 0.85, what: 'a spike of glass' }, r() * TAU_, (r() - 0.5) * 0.4); } }
+    if (k === 4) { for (let i = n(6); i-- > 0;) { const [lx, lz, y] = at(); if (y < WATER + 4) continue; const h = 7 + r() * 9, s = 2.5 + r() * 3.5; put('tr', lx, lz, y, s, h, _woC.copy(P[1]).lerp(P[3], r() * 0.3).getHex(), { r: s * 0.8, t: 0.45, y0: y, y1: y + h + s * 0.5, soft: true, what: 'a tree' }); }
+      for (let i = n(1, 0.5); i-- > 0;) { const [lx, lz, y] = at(); if (y > WATER - 4) continue; const s = 6 + r() * 12, h = WATER - y + 18 + r() * 50; put('col', lx, lz, y, s, h, _woC.copy(P[2]).lerp(P[0], 0.4).getHex(), { r: s, y0: y, y1: y + h, what: 'a stack of rock' }); } }
+    if (k === 5) { for (let i = n(2); i-- > 0;) { const [lx, lz, y] = at(); const s = 3 + r() * 5, h = 12 + r() * 32; put('col', lx, lz, y - 1, s, h, _woC.copy(P[1]).lerp(P[2], r() * 0.5).getHex(), { r: s, y0: y - 1, y1: y + h - 1, what: 'a pillar of sandstone' }); }
+      for (let i = n(3); i-- > 0;) { const [lx, lz, y] = at(); const s = 1 + r() * 3; put('rk', lx, lz, y - s * 0.3, s, s * 0.8, _woC.copy(P[2]).getHex(), null); } }
+    if (k === 6) for (let i = n(26); i-- > 0;) { const [lx, lz, y] = at(); if (y < WATER + 2) continue; const h = 10 + r() * 26, s = 4 + r() * 8, c = new THREE.Color(PL_TREE[Math.floor(r() * PL_TREE.length)]).lerp(P[2], r() * 0.3).getHex();
+      put('tr', lx, lz, y, s, h, c, { r: s * 0.8, t: 0.5 + h * 0.02, y0: y, y1: y + h + s * 0.6, soft: true, what: 'a tree that is not a tree' }); }
+    if (k === 7) for (let i = n(9); i-- > 0;) { const [lx, lz, y] = at(); const s = 1.5 + r() * 5, h = 10 + r() ** 1.6 * 70, c = _woC.copy(P[1 + Math.floor(r() * 3)]).lerp(P[3], r() * 0.3).getHex();
+      put('cr', lx, lz, y - 2, s, h, c, { r: s * 0.7, pr: Math.min(2, s * 0.5), y0: y - 2, y1: y + h * 0.88, what: 'a shard of crystal' }, r() * TAU_, (r() - 0.5) * 0.5); }
+    if (k === 8) { for (let i = n(6); i-- > 0;) { const [lx, lz, y] = at(); if (y < WATER + 1) continue; const s = 1.2 + r() ** 2 * 6; put('rk', lx, lz, y - s * 0.3, s, s * 0.9, _woC.copy(P[3]).lerp(P[2], r() * 0.25).getHex(), s > 2.5 ? { r: s * 0.8, t: s * 0.8, y0: y - 1, y1: y + s * 0.6, what: 'a white rock, or a bone' } : null); }
+      if (r() < 0.5) { const [lx, lz, y] = at(), s = 8 + r() * 14, rot = r() * TAU_; for (let q = -2; q <= 2; q++) put('rib', lx + Math.sin(rot) * q * s * 0.45, lz + Math.cos(rot) * q * s * 0.45, Math.min(y, plH(PL_O + lx + Math.sin(rot) * q * s * 0.45, PL_O + lz + Math.cos(rot) * q * s * 0.45)) - 1, s * (1 - Math.abs(q) * 0.15), s, _woC.copy(P[3]).getHex(), null, rot); } }
+    B.push(L);
+  }
+  // the thing to find: where the seed puts it (on land, or the island nearest)
+  { const r = mulberry32(PL.seed + 4242), type = Math.floor(r() * 4); let lx = r() * PL_W, lz = r() * PL_W, y;
+    if (k === 3) { let best = null, bd = 1e18; for (const I of PL.isl) if (I) { const d = (I.lx - lx) ** 2 + (I.lz - lz) ** 2; if (d < bd) { bd = d; best = I; } } lx = best.lx; lz = best.lz; y = best.top; }
+    else { y = plH(PL_O + lx, PL_O + lz); for (let t = 0; t < 400 && y < WATER + 3; t++) { lx = plWrap(lx + 37); lz = plWrap(lz + 91); y = plH(PL_O + lx, PL_O + lz); } }
+    const H = [12, 34, 26, 16][type];
+    PL.art = { type, lx, lz, y, h: H, sol: type === 0 ? null : { r: type === 1 ? 5 : 3, pr: 3, y0: y - 2, y1: y + H, what: PL_THING[type].toLowerCase() } }; }
+}
+
+// ── what it is drawn with, made once and dressed for each world
+const PL_TVS = `attribute vec3 color; attribute float aGlow; varying vec3 vC, vN; varying float vG, vD; varying vec2 vP;
+  void main() { vC = color; vG = aGlow; vN = normal; vP = position.xz; vec4 mv = modelViewMatrix * vec4(position, 1.0); vD = -mv.z; gl_Position = projectionMatrix * mv; }`;
+const PL_TFS = `uniform vec3 uSun, uSunC, uAmb, uFog, uGlowC; uniform float uFogN, uFogF, uTime; uniform vec2 uOff; varying vec3 vC, vN; varying float vG, vD; varying vec2 vP;
+  void main() { vec3 n = normalize(vN); vec2 q = vP + uOff; float d = max(dot(n, uSun), 0.0);
+    vec3 c = vC * (uAmb + uSunC * d);
+    float g = vG * (0.72 + 0.28 * sin(uTime * 1.6 + q.x * 0.031 + q.y * 0.027) * sin(uTime * 0.7 + q.y * 0.011));
+    c += uGlowC * g * 1.7;
+    gl_FragColor = vec4(mix(c, uFog, smoothstep(uFogN, uFogF, vD) * (1.0 - 0.6 * g)), 1.0); }`;
+const PL_SVS = `varying vec3 vD; void main() { vD = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const PL_SFS = `uniform vec3 uZen, uHor, uLow, uSun, uSunC, uRingN; uniform float uUp, uTime, uBand, uRing; varying vec3 vD;
+  void main() { vec3 d = normalize(vD); float y = d.y;
+    vec3 c = mix(uHor, uZen, smoothstep(-0.02, 0.6, y));
+    c = mix(c, uLow, smoothstep(0.0, -0.3, y));
+    if (uBand > 0.0) c *= 1.0 - uBand * 0.22 * (sin(y * 34.0 + sin(d.x * 3.0 + d.z * 2.0 + uTime * 0.03) * 2.2) * 0.5 + 0.5);
+    float s = max(dot(d, uSun), 0.0); c += uSunC * (pow(s, 700.0) * 5.0 + pow(s, 10.0) * 0.3);
+    if (uRing > 0.0) { float rr = abs(dot(d, uRingN)); c += vec3(0.95, 0.88, 0.74) * uRing * smoothstep(0.03, 0.008, rr) * smoothstep(-0.02, 0.12, y) * (0.55 + 0.45 * sin(dot(d, normalize(cross(uRingN, vec3(0.0, 1.0, 0.0)))) * 80.0)); }
+    gl_FragColor = vec4(mix(c, vec3(0.004, 0.006, 0.016), uUp), 1.0); }`;
+const PL_WVS = `uniform vec2 uOff; varying vec3 vV; varying vec2 vP; void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = -mv.xyz; vP = position.xz + uOff; gl_Position = projectionMatrix * mv; }`;
+const PL_WFS = `uniform vec3 uDeep, uSky, uSunV, uUpV, uFog, uGlow; uniform float uFogN, uFogF, uTime; varying vec3 vV; varying vec2 vP;
+  ${CZ_GLSL}
+  void main() { float w = czN(vec3(vP * 0.035, uTime * 0.25)) * 0.6 + czN(vec3(vP * 0.12, uTime * 0.45)) * 0.4;
+    vec3 v = normalize(vV), n = normalize(uUpV + (vec3(w, 0.0, czN(vec3(vP.yx * 0.05, uTime * 0.3))) - 0.5) * 0.14);
+    float fr = pow(1.0 - max(dot(v, n), 0.0), 4.0), sp = pow(max(dot(reflect(-uSunV, n), v), 0.0), 90.0);
+    vec3 c = mix(uDeep * (0.8 + 0.4 * w), uSky, fr * 0.75) + vec3(1.0, 0.95, 0.85) * sp * 1.5 + uGlow * (0.55 + 0.45 * w);
+    gl_FragColor = vec4(mix(c, uFog, smoothstep(uFogN, uFogF, length(vV))), 1.0); }`;
+const PL_CVS = `varying vec2 vP; varying float vD; uniform vec2 uOff; void main() { vP = position.xy + uOff; vec4 mv = modelViewMatrix * vec4(position, 1.0); vD = -mv.z; gl_Position = projectionMatrix * mv; }`;
+const PL_CFS = `uniform vec3 uCol, uCol2, uFog; uniform float uTime, uFogF, uK, uSeed, uDark; varying vec2 vP; varying float vD;
+  ${CZ_GLSL}
+  void main() { vec2 q = vP * 0.0016; float b = sin(q.y * 9.0 + czN(vec3(q * 2.0, uSeed)) * 4.0 + uTime * 0.02) * 0.5 + 0.5;
+    float n = czN(vec3(q * 5.0 + vec2(uTime * 0.012, 0.0), uSeed)) * 0.6 + czN(vec3(q * 17.0, uSeed + uTime * 0.02)) * 0.4;
+    float a = smoothstep(0.38, 0.78, n * 0.7 + b * 0.42) * uK * (1.0 - smoothstep(uFogF * 0.4, uFogF * 1.4, vD));
+    if (a < 0.02) discard;
+    gl_FragColor = vec4(mix(mix(uCol, uCol2, b), uFog, 0.25) * (1.0 - uDark * smoothstep(0.5, 1.0, n)), a); }`;
+function plMake() {
+  if (PL.made) return; PL.made = true;
+  const G = PL.grp = new THREE.Group(); G.visible = false; scene.add(G);
+  const tu = () => ({ uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunC: { value: new THREE.Color() }, uAmb: { value: new THREE.Color() }, uFog: { value: new THREE.Color() }, uGlowC: { value: new THREE.Color() }, uFogN: { value: 200 }, uFogF: { value: 3000 }, uTime: { value: 0 }, uOff: { value: new THREE.Vector2() } });
+  PL.tU = tu(); const tmat = new THREE.ShaderMaterial({ uniforms: PL.tU, vertexShader: PL_TVS, fragmentShader: PL_TFS });
+  const grid = (n) => { const g = new THREE.BufferGeometry(), idx = []; for (let b = 0; b < n - 1; b++) for (let a = 0; a < n - 1; a++) { const v = b * n + a; idx.push(v, v + n, v + 1, v + n + 1, v + 1, v + n); }   // (cut the same way as terrainAt, so the feet are on the ground drawn)
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * n * 3), 3)); g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(n * n * 3), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * n * 3), 3)); g.setAttribute('aGlow', new THREE.BufferAttribute(new Float32Array(n * n), 1)); g.setIndex(idx); return g; };
+  for (const key of ['near', 'far']) { const m = new THREE.Mesh(grid(PL_NH * 2 + 1), tmat); m.frustumCulled = false; G.add(m); PL[key] = m; }
+  PL.sky = new THREE.Mesh(new THREE.SphereGeometry(11000, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false, vertexShader: PL_SVS, fragmentShader: PL_SFS,
+    uniforms: { uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uLow: { value: new THREE.Color() }, uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunC: { value: new THREE.Color() }, uRingN: { value: new THREE.Vector3(0, 1, 0) }, uUp: { value: 0 }, uTime: { value: 0 }, uBand: { value: 0 }, uRing: { value: 0 } } }));
+  PL.sky.renderOrder = -10; PL.sky.frustumCulled = false; G.add(PL.sky);
+  { const r = mulberry32(77), p = []; for (let i = 0; i < 1600; i++) { const u = r() * TAU_, v = Math.acos(1 - 2 * r()); p.push(Math.sin(v) * Math.cos(u) * 10000, Math.cos(v) * 10000, Math.sin(v) * Math.sin(u) * 10000); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+    PL.stars = new THREE.Points(g, new THREE.PointsMaterial({ size: 2, sizeAttenuation: false, color: 0xdfe6ff, transparent: true, opacity: 0, depthWrite: false, fog: false })); PL.stars.frustumCulled = false; PL.stars.renderOrder = -9; G.add(PL.stars); }
+  PL.wU = { uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uSunV: { value: new THREE.Vector3() }, uUpV: { value: new THREE.Vector3() }, uFog: PL.tU.uFog, uGlow: { value: new THREE.Color() }, uFogN: PL.tU.uFogN, uFogF: PL.tU.uFogF, uTime: PL.tU.uTime, uOff: { value: new THREE.Vector2() } };
+  PL.sea = new THREE.Mesh(new THREE.PlaneGeometry(26000, 26000, 1, 1).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: PL.wU, vertexShader: PL_WVS, fragmentShader: PL_WFS })); PL.sea.frustumCulled = false; G.add(PL.sea);
+  PL.clouds = [1750, 1080, 420].map((y, i) => { const U = { uCol: { value: new THREE.Color() }, uCol2: { value: new THREE.Color() }, uFog: PL.tU.uFog, uTime: PL.tU.uTime, uFogF: PL.tU.uFogF, uK: { value: 1 }, uSeed: { value: i * 7.3 }, uDark: { value: 0 }, uOff: { value: new THREE.Vector2() } };
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(16000, 16000, 1, 1), new THREE.ShaderMaterial({ uniforms: U, vertexShader: PL_CVS, fragmentShader: PL_CFS, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor }));   // (the picture's own alpha left as it was: it says where he is, for the letters)
+    m.rotation.x = -Math.PI / 2; m.frustumCulled = false; m.renderOrder = 2; m.userData.y = y; G.add(m); return m; });
+  PL.hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.9); PL.dirL = new THREE.DirectionalLight(0xffffff, 1.6); PL.boltL = new THREE.PointLight(0xd8d0ff, 0, 1400, 0); G.add(PL.hemi, PL.dirL, PL.boltL);
+  // the things on the ground, each kind of them one instanced mesh, filled with those near him
+  const lam = () => new THREE.MeshLambertMaterial({ color: 0xffffff }), inst = (geo, mat, n) => { const m = new THREE.InstancedMesh(geo, mat, n); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.setColorAt(0, _woC.set(1, 1, 1)); G.add(m); return m; };
+  PL.im = {
+    rk: inst(new THREE.DodecahedronGeometry(1, 0), lam(), 1600),
+    sp: inst(new THREE.ConeGeometry(1, 1, 6, 1).translate(0, 0.5, 0), lam(), 900),
+    col: inst(new THREE.CylinderGeometry(1, 1, 1, 6, 1).translate(0, 0.5, 0), lam(), 1400),
+    trk: inst(new THREE.CylinderGeometry(0.35, 0.55, 1, 5, 1).translate(0, 0.5, 0), lam(), 3000),
+    crn: inst(new THREE.IcosahedronGeometry(1, 0), lam(), 3000),
+    cr: inst(new THREE.OctahedronGeometry(1, 0).scale(1, 1, 0.7).translate(0, 1, 0), new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 90, specular: 0xffffff, emissive: 0x1a1030 }), 1800),
+    rib: inst(new THREE.TorusGeometry(1, 0.06, 5, 18, Math.PI), lam(), 500),
+    disc: inst(new THREE.CylinderGeometry(1, 0.82, 1, 22, 1).translate(0, -0.5, 0), lam(), 420),
+    puff: inst(new THREE.IcosahedronGeometry(1, 1), lam(), 3000),
+    reef: inst(new THREE.ConeGeometry(1, 1, 5, 1).translate(0, 0.5, 0), lam(), 1400) };
+  PL.artG = new THREE.Group(); G.add(PL.artG);
+  plLay(G);
+  // his own body, his fire and what comes off it: seen on both layers
+  [particles, phoenix.group, human.group, phoenix.light, shadow, fireLight, morphLight, pillar, trailRib.mesh, boltRib.mesh, ...rings.map(r => r.m), ...SONIC.cones.map(c => c.m)].forEach(plKeep);
+}
+// a world's own look: its sky, its air, its light, its sea, its ground and the thing on it
+function plDress(B) {
+  const k = B.kind, P = PL.pal, S = PL_SKY[k], U = PL.sky.material.uniforms, r = mulberry32(B.seed + 17);
+  PL.sun = new THREE.Vector3(Math.cos(r() * TAU_), 0, Math.sin(r() * TAU_)).multiplyScalar(0.75).setY(0.45 + r() * 0.4).normalize();
+  U.uZen.value.set(S[0]); U.uHor.value.set(S[1]); U.uLow.value.set(S[1]).lerp(P[k === 3 ? 1 : 2], 0.5).multiplyScalar(k === 3 ? 0.55 : 0.8); U.uSun.value.copy(PL.sun);
+  U.uSunC.value.set(k === 2 ? '#ffb070' : k === 1 ? '#e8f4ff' : k === 0 ? '#f4f6ff' : '#fff0d8'); U.uBand.value = k === 3 ? 1 : 0;
+  U.uRing.value = B.rings || B.ring ? 1 : 0; U.uRingN.value.set(r() - 0.5, 1.6, r() - 0.5).normalize();
+  const T = PL.tU; T.uSun.value.copy(PL.sun); T.uSunC.value.copy(U.uSunC.value).multiplyScalar(k === 0 ? 1.25 : 1.0); T.uAmb.value.set(S[1]).multiplyScalar(k === 0 ? 0.12 : 0.36);
+  T.uFog.value.set(S[1]); T.uFogN.value = PL_FOG[k][0]; T.uFogF.value = PL_FOG[k][1]; T.uGlowC.value.set(PL_GLOW[k]);
+  if (k === 8) T.uFog.value.lerp(P[2], 0.25);
+  PL.hemi.color.set(S[1]); PL.hemi.groundColor.copy(P[k === 3 ? 1 : 2]).multiplyScalar(0.5); PL.hemi.intensity = k === 0 ? 0.35 : 0.85; PL.dirL.color.copy(U.uSunC.value); PL.dirL.position.copy(PL.sun).multiplyScalar(1000); PL.dirL.intensity = 1.7;
+  PL.stars.material.opacity = k === 0 ? 0.9 : 0;
+  // the sea: the ocean's, the poison's pools (lit from within), or none
+  PL.sea.visible = k === 4 || k === 8; PL.wU.uDeep.value.copy(k === 8 ? P[0] : P[0]).multiplyScalar(k === 8 ? 0.35 : 0.8); PL.wU.uSky.value.set(S[1]); PL.wU.uGlow.value.set(k === 8 ? '#3a6a08' : '#000000');
+  for (const c of PL.clouds) { c.visible = k === 3; const u = c.material.uniforms; u.uCol.value.copy(P[0]).lerp(P[2], 0.3); u.uCol2.value.copy(P[1]); }
+  PL.near.visible = PL.far.visible = k !== 3;
+  for (const m of Object.values(PL.im)) m.count = 0;
+  // the thing left there
+  const A = PL.art, G = PL.artG; while (G.children.length) { const c = G.children.pop(); c.traverse(o => { o.geometry?.dispose(); o.material?.dispose?.(); }); }
+  const stone = new THREE.MeshLambertMaterial({ color: _woC.copy(P[3]).lerp(new THREE.Color('#c8c0b0'), 0.5) }), glowC = new THREE.Color(PL_GLOW[k] !== '#000000' ? PL_GLOW[k] : '#ffd27a');
+  if (A.type === 0) { for (let i = 0; i < 9; i++) { const a = i / 9 * TAU_, fell = i % 4 === 3, c = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, fell ? 9 : 10 + (i % 3) * 1.5, 10), stone);
+      c.position.set(Math.cos(a) * 10, fell ? 1.1 : 5, Math.sin(a) * 10); if (fell) c.rotation.set(Math.PI / 2, a, 0); G.add(c); }
+    for (let i = 0; i < 4; i++) { const a = (i * 2 + 0.5) / 9 * TAU_ * 1.1, l = new THREE.Mesh(new THREE.BoxGeometry(7, 1.2, 2.2), stone); l.position.set(Math.cos(a) * 10, 11.2, Math.sin(a) * 10); l.rotation.y = -a + Math.PI / 2; G.add(l); }
+    const d = new THREE.Mesh(new THREE.CylinderGeometry(12, 13, 1, 24), stone); d.position.y = 0.3; G.add(d); }
+  else if (A.type === 1) { const m = new THREE.Mesh(new THREE.BoxGeometry(4, 34, 10), new THREE.MeshLambertMaterial({ color: 0x050507 })); m.position.y = 15; m.rotation.y = 0.4; G.add(m); }
+  else if (A.type === 2) { const m = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.6, 22, 8), stone); m.position.y = 11; G.add(m);
+    const o = new THREE.Mesh(new THREE.IcosahedronGeometry(3, 1), new THREE.MeshBasicMaterial({ color: glowC.clone().multiplyScalar(2.2) })); o.position.y = 26; o.userData.spin = 0.6; G.add(o); }
+  else { const o = new THREE.Mesh(new THREE.OctahedronGeometry(4.5, 0), new THREE.MeshBasicMaterial({ color: glowC.clone().multiplyScalar(2) })); o.position.y = 12; o.userData.spin = 1.1; o.userData.bob = 1; G.add(o);
+    const t = new THREE.Mesh(new THREE.TorusGeometry(7, 0.25, 6, 48), new THREE.MeshBasicMaterial({ color: glowC.clone().multiplyScalar(1.4) })); t.position.y = 12; t.rotation.x = 1.2; t.userData.spin = -0.4; G.add(t); }
+  { const b = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 1400, 8, 1, true).translate(0, 700, 0), new THREE.MeshBasicMaterial({ color: glowC, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    b.userData.beam = true; G.add(b); }   // (a thread of light up from it: it can be seen from anywhere on this world)
+  plLay(G);
+}
+// the ground round him, built out of the square: the near ground at every step, the far at every eighth (the far let down
+// under the near, so the near is what is seen where both are)
+function plGround3(m, step, cx, cz, hole) {
+  const n = PL_NH * 2 + 1, g = m.geometry, pos = g.attributes.position.array, nor = g.attributes.normal.array, col = g.attributes.color.array, gl = g.attributes.aGlow.array;
+  const H = PL.H, M = PL.M, Gl = PL.G, N = PL_N, k = PL.kind, P = PL.pal, d = step * STEP;
+  const hAt = (i, j) => H[(((j % N) + N) % N) * N + (((i % N) + N) % N)];
+  for (let b = 0; b < n; b++) for (let a = 0; a < n; a++) {
+    const ci = cx + (a - PL_NH) * step, cj = cz + (b - PL_NH) * step, i = ((ci % N) + N) % N, j = ((cj % N) + N) % N, o = b * n + a, q = j * N + i;
+    const h = H[q], mt = M[q], hx = (hAt(ci + step, cj) - hAt(ci - step, cj)) / (2 * d), hz = (hAt(ci, cj + step) - hAt(ci, cj - step)) / (2 * d), sl = Math.hypot(hx, hz);
+    const inner = hole && Math.abs(a - PL_NH) * step < PL_NH - 8 && Math.abs(b - PL_NH) * step < PL_NH - 8;
+    pos[o * 3] = (a - PL_NH) * d; pos[o * 3 + 1] = h - (hole ? (inner ? 40 : 1.5) : 0); pos[o * 3 + 2] = (b - PL_NH) * d;
+    const nl = Math.hypot(hx, 1, hz); nor[o * 3] = -hx / nl; nor[o * 3 + 1] = 1 / nl; nor[o * 3 + 2] = -hz / nl;
+    plColor(k, P, h, sl, mt, plHash(i, j, 5), _woC); col[o * 3] = _woC.r; col[o * 3 + 1] = _woC.g; col[o * 3 + 2] = _woC.b; gl[o] = Gl[q] / 255;
+  }
+  for (const a of ['position', 'normal', 'color', 'aGlow']) g.attributes[a].needsUpdate = true;
+  m.position.set(PL_O + cx * STEP, 0, PL_O + cz * STEP);
+}
+function plColor(k, P, h, sl, mt, nz, c) {
+  const st = smoothstep(0.55, 1.1, sl), e = h - WATER;
+  switch (k) {
+    case 0: c.copy(P[2]).lerp(P[0], clamp(e / 380, 0, 1) * 0.8 + nz * 0.15).lerp(P[3], st * 0.6); if (mt === 3) c.multiplyScalar(0.7); break;
+    case 1: c.copy(P[3]).lerp(P[0], 0.3 + nz * 0.3).lerp(P[1], st * 0.8); if (mt === 2) c.copy(P[2]).lerp(P[1], 0.3); break;
+    case 2: c.copy(P[0]).lerp(P[1], nz * 0.6 + st * 0.3); if (mt === 1) c.copy(P[2]).multiplyScalar(0.5); break;
+    case 4: if (e < 0) c.copy(P[2]).multiplyScalar(0.45).lerp(P[0], clamp(-e / 60, 0, 1)); else if (e < 6) c.copy(P[2]); else c.copy(P[1]).lerp(P[2], st * 0.6).lerp(P[3], smoothstep(150, 230, e)); break;
+    case 5: c.copy(P[0]).lerp(P[1], nz * 0.25 + st * 0.4); if (mt === 5) c.copy(Math.floor(h / 9) % 2 ? P[1] : P[2]).lerp(P[0], smoothstep(0.6, 0.2, sl) * 0.7); break;
+    case 6: c.copy(P[1]).lerp(P[0], st * 0.7 + nz * 0.2).lerp(P[2], smoothstep(100, 180, e) * 0.5); break;
+    case 7: c.copy(P[0]).lerp(P[2], nz * 0.35).lerp(P[3], st * 0.25); if (mt === 6) c.copy(P[1]); break;
+    case 8: c.copy(P[1]).multiplyScalar(0.75).lerp(P[2], nz * 0.3 + st * 0.2); if (mt === 4) c.copy(P[0]).lerp(P[2], 0.4); break;
+    default: c.copy(P[0]);
+  }
+  return c;
+}
+// the things near him put in their instanced meshes (again whenever he has moved a way), round where he is now
+function plFill() {
+  const p = player, cx = Math.round(p.pos.x / 50) * 50, cz = Math.round(p.pos.z / 50) * 50, lx = plWrap(cx - PL_O), lz = plWrap(cz - PL_O), bi = Math.floor(lx / PL_BW), bj = Math.floor(lz / PL_BW), R = PL.kind === 3 ? 3400 : 1900, nb = Math.ceil(R / PL_BW) + 1;
+  PL.fillAt.copy(p.pos);
+  const I = PL.im; for (const m of Object.values(I)) { m.count = 0; m.position.set(cx, 0, cz); }
+  const add = (m, x, y, z, sx, sy, sz, rot, tilt, c) => { if (m.count >= m.instanceMatrix.count) return; _woE.set(tilt, rot, tilt * 0.6); _woQ.setFromEuler(_woE); _woM.compose(_woV.set(x - cx, y, z - cz), _woQ, _woS.set(sx, sy, sz)); m.setMatrixAt(m.count, _woM); m.setColorAt(m.count, _woC.setHex(c)); m.count++; };
+  for (let db = -nb; db <= nb; db++) for (let da = -nb; da <= nb; da++) {
+    const ua = bi + da, ub = bj + db, wa = ((ua % PL_NB) + PL_NB) % PL_NB, wb = ((ub % PL_NB) + PL_NB) % PL_NB, ox = cx - lx + (ua - wa) * PL_BW, oz = cz - lz + (ub - wb) * PL_BW;
+    if (PL.isl) { const S = PL.isl[wb * PL_NB + wa]; if (S) { const x = ox + S.lx, z = oz + S.lz; if (Math.hypot(x - cx, z - cz) < R) {
+      const r = mulberry32(S.rs); add(I.disc, x, S.top, z, S.r, 5 + S.r * 0.08, S.r, r() * TAU_, 0, S.c);
+      for (let q = 0; q < 6; q++) { const a = r() * TAU_, d = S.r * (0.15 + r() * 0.6), s = S.r * (0.35 + r() * 0.35); add(I.puff, x + Math.cos(a) * d, S.top - 5 - s * (0.5 + r() * 0.6), z + Math.sin(a) * d, s, s * 0.7, s, r() * TAU_, 0, _woC2.setHex(S.c).lerp(PL.pal[1], 0.3).getHex()); }
+      if (S.reef) for (let q = 0; q < 7; q++) { const a = r() * TAU_, d = S.r * r() * 0.75, h = 4 + r() * 14, s = 0.8 + r() * 1.8; add(I.reef, x + Math.cos(a) * d, S.top - 0.5, z + Math.sin(a) * d, s, h, s, r() * TAU_, (r() - 0.5) * 0.5, new THREE.Color(PL_TREE[q % PL_TREE.length]).lerp(PL.pal[0], 0.35).getHex()); } } } }
+    const L = PL.bk[wb * PL_NB + wa]; if (!L) continue;
+    for (const it of L) { const x = ox + it.lx, z = oz + it.lz; if (Math.abs(x - cx) > R || Math.abs(z - cz) > R) continue;
+      switch (it.t) {
+        case 'rk': add(I.rk, x, it.y, z, it.s, it.h * 0.75, it.s * 0.9, it.rot, 0.3, it.c); break;
+        case 'sp': add(I.sp, x, it.y, z, it.s, it.h, it.s, it.rot, it.tilt, it.c); break;
+        case 'col': add(I.col, x, it.y, z, it.s, it.h, it.s, it.rot, 0, it.c); break;
+        case 'tr': add(I.trk, x, it.y, z, it.s * 0.18 + 0.3, it.h, it.s * 0.18 + 0.3, it.rot, 0, _woC2.setHex(it.c).multiplyScalar(0.35).getHex());
+          add(I.crn, x, it.y + it.h, z, it.s, it.s * (PL.kind === 6 ? 0.55 : 0.4), it.s, it.rot, 0, it.c); if (PL.kind === 6 && it.s > 7) add(I.crn, x, it.y + it.h * 0.72, z, it.s * 0.7, it.s * 0.4, it.s * 0.7, it.rot + 1, 0, _woC2.setHex(it.c).offsetHSL(0.08, 0, 0).getHex()); break;
+        case 'cr': add(I.cr, x, it.y, z, it.s, it.h / 2, it.s, it.rot, it.tilt, it.c); break;
+        case 'rib': add(I.rib, x, it.y, z, it.s, it.s * 1.3, it.s, it.rot + Math.PI / 2, 0, it.c); break;
+      }
+    }
+  }
+  for (const m of Object.values(I)) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+}
+
+// ── going down, and coming back up
+function plEnter(B) {
+  const C = COSMOS, p = player; plMake();
+  if (PL.jobFor !== B.id) plGenStart(B); while (PL.job) plGenStep(1e9); if (!PL.bk) plPropsMake();
+  const n = PL.n.subVectors(C.pos, B.pos).normalize();
+  const lx = (Math.atan2(n.x, n.z) / TAU_ + 0.5) * PL_W, lz = Math.acos(clamp(n.y, -1, 1)) / Math.PI * PL_W;   // (where he came down is where on its face he was over)
+  _czf.set(0, 0, -1).applyQuaternion(C.q); _czw.set(0, 1, 0).cross(n); if (_czw.lengthSq() < 1e-4) _czw.set(1, 0, 0); _czw.normalize(); _czu.crossVectors(n, _czw);
+  const yaw = Math.atan2(-_czf.dot(_czw), -_czf.dot(_czu)) || 0;
+  cosmosLeave(true); C.entry = null;
+  Object.assign(PL, { on: true, B, kind: B.kind, name: B.name, net: 'p:' + B.id, fadeT: 1.1, heat: 1, told: {}, nc: null, burnT: 0, sickT: 0, boltT: 2 + Math.random() * 3 });
+  PL.ck.copy(checkpoint); PL.fillAt.set(1e9, 0, 0);
+  plDress(B); PL.grp.visible = true; camera.layers.set(1);
+  PL.fog0 = [scene.fog.color.clone(), scene.fog.near, scene.fog.far]; scene.fog.color.copy(PL.tU.uFog.value); scene.fog.near = PL_FOG[B.kind][0]; scene.fog.far = PL_FOG[B.kind][1];
+  PL.g0 = FLY.g; FLY.g = PL.g0 * PL_G[B.kind];
+  p.pos.set(PL_O + lx, PL_TOP - 900, PL_O + lz); p.yaw = yaw; p.pitch = -0.5; p.speed = 150; p.vy = 0; p.turn = 0; p.bank = 0; p.flame = 1; p.skyT = 0; p.fallTop = p.pos.y; p.danger = 0; p.burnout = false;
+  dir3.set(-Math.sin(yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(yaw) * Math.cos(p.pitch));
+  camera.position.set(p.pos.x + Math.sin(yaw) * phxDist, p.pos.y + phxDist * 0.5, p.pos.z + Math.cos(yaw) * phxDist); camYawOff = 0;
+  trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
+  document.body.classList.add('planet'); flash = Math.max(flash, 0.45); NET.sendT = 0;
+  if (!PL.found) try { PL.found = new Set(JSON.parse(localStorage.getItem('icarus.planets.found') || '[]')); } catch { PL.found = new Set(); }
+  toast(`${B.name} · ${CZ_SAY[B.kind]}`); audio.sfx.whoosh?.(false);
+  plStep(0);
+}
+// out of it: up into space beside it, home (a warp, or the menu's way home), or the death that wakes on Olympus
+function plOff(how) {
+  if (!PL.on) return;
+  const p = player, C = COSMOS, B = PL.B;
+  PL.on = false; PL.grp.visible = false; camera.layers.set(0); FLY.g = PL.g0;
+  if (PL.fog0) { scene.fog.color.copy(PL.fog0[0]); scene.fog.near = PL.fog0[1]; scene.fog.far = PL.fog0[2]; }
+  checkpoint.copy(PL.ck); document.body.classList.remove('planet'); czBar(false); PL.boltL.intensity = 0; ROOST.on = false;
+  postMat.uniforms.uFlashCol.value.setRGB(1, 0.75, 0.45); trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
+  if (how === 'death') return;
+  const E = C.exit; if (E) p.pos.set(E.x, E.y, E.z);
+  if (how === 'up' && B) return cosmosResume(B);
+  p.pos.y = Math.min(p.pos.y, SKY_LIMIT - 160); C.cool = 6; C.hy = false;   // (home: under the top of the sky, so it does not take him straight back up)
+}
+// back out in space, just above the world he left, going up and away from it
+function cosmosResume(B) {
+  const C = COSMOS, p = player; cosmosInit();
+  _czv.copy(PL.n); _czw.set(0, 1, 0).cross(_czv); if (_czw.lengthSq() < 1e-4) _czw.set(1, 0, 0); _czw.normalize();
+  C.pos.copy(B.pos).addScaledVector(_czv, B.R * 1.12 + 500);
+  _czf.copy(_czv).multiplyScalar(0.75).addScaledVector(_czw, 0.66).normalize(); czLook(C.q, _czf, _czv);
+  C.revealT = 0; C.v = 320; C.pv = 0; C.camOff = null; C.on = true; C.hy = true; C.fadeT = CZ_FADE; C.nearB = B; C.entry = null; C.cool = 0;
+  C.home = phoenix.group.parent; C.scene.add(phoenix.group); phoenix.group.visible = true; for (const T of C.trail.at) T.age = 9;
+  p.form = 'phoenix'; p.perch = false; p.sub = null;
+  document.body.classList.add('cosmos'); czBar(true); toast(`OUT OF THE AIR OF ${B.name} · SPACE`); audio.sfx.whoosh?.(true); flash = Math.max(flash, 0.25);
+}
+// (the menu's way off a world: up out of its air at once, as the bird)
+function plUp() { if (!PL.on || state !== 'play') return; const p = player; if (p.form !== 'phoenix') toBird(); p.perch = false; p.takeoff = null; p.perchGo = null; plOff('up'); }
+// out in space, diving at a world: in it goes, through its air (and pulled up and away, he skips off it)
+function czEntry(dt, f) {
+  const C = COSMOS, P = C.pos;
+  if (!C.entry) {
+    if (HY.on || XR.on) return;
+    for (const B of C.bodies) { _czv.subVectors(B.pos, P); const d = _czv.length(), alt = d - B.R; if (d < 1 || alt > Math.max(320, B.R * 0.1)) continue;
+      if (f.dot(_czv.divideScalar(d)) > 0.4) { C.entry = { B, t: 0 }; plGenStart(B); toast(`INTO THE AIR OF ${B.name}`); audio.sfx.whoosh?.(true); break; } }
+    return;
+  }
+  const E = C.entry, B = E.B; _czv.subVectors(B.pos, P); const d = _czv.length() || 1; _czv.divideScalar(d);
+  if (f.dot(_czv) < -0.25 || !C.bodies.includes(B)) { C.entry = null; toast('OUT OF ITS AIR AGAIN'); return; }
+  E.t += dt; plGenStep(TOUCH ? 5 : 9);
+  C.v = lerp(C.v, 240, damp(1.5, dt));
+  _czw.copy(f).lerp(_czv, damp(0.7, dt)).normalize(); C.q.premultiply(_czq.setFromUnitVectors(f, _czw));   // (the nose drawn down into it)
+  if (E.t > 2.6 && !PL.pend) PL.pend = B;   // (taken down at the start of the next frame, before the world moves on)
+}
+// the bird coming in: the heat round him, the stars going out, the black filling with the colour of its sky
+function czEntryLook() {
+  const C = COSMOS, E = C.entry, e = E ? smoothstep(0.2, 2.6, E.t) : 0;
+  if (!C.scene) return 0;
+  C.scene.background.setRGB(0, 0, 0); if (e > 0) C.scene.background.lerp(_woC.set(PL_SKY[E.B.kind][1]), e * 0.8);
+  C.starM.uniforms.uK.value = 1 - e; C.back.visible = e < 0.95;
+  return e;
+}
+
+// ── the frame on a world, in place of tick: his own moving, the lens, his fire, the others there, and the picture
+function plTick(dt) {
+  const p = player;
+  if ((saveT -= dt) <= 0) { saveT = 20; saveGame(); }
+  if (state === 'play' || state === 'talk') {
+    if (p.cine) updateCine(dt);
+    else if (p.form === 'human') { heat = lerp(heat, 0, damp(3, dt)); updateHuman(dt); }
+    else updatePhoenix(dt);
+  } else if (state === 'dead') updateDeath(dt);
+  else if (state === 'photo') { if (photo.live && p.form === 'phoenix' && !p.perch && !p.sub) flyWings(dt, { boost: false, dive: 0, climb: 0.7 }); }
+  else if (state === 'warp') updateWarp(dt);
+  if (!PL.on) return;   // (taken out of it this frame: the world's own frame is the next one)
+  turnTick(dt); updateTail(dt); updateSmall(dt); xfTick(dt); padTick(); flipTick(dt);
+  updateCinemaState(dt);
+  updateModels(dt); updateAsh(dt); updateBird(dt); updateShift(dt); applyMirror(dt);
+  updateNet(dt);
+  updateCamera(dt);
+  if (dbgCam.on) { camera.position.copy(dbgCam.p); camera.up.set(0, 1, 0); camera.lookAt(dbgCam.l); camera.fov = dbgCam.fov; camera.updateProjectionMatrix(); }
+  plStep(dt);
+  if (!PL.on) return;
+  updateSonic(dt); updateParticles(dt); updateDialog(dt); updateTalk(dt);
+  updateHUD(dt); updateHealth(); updateWho(dt); updateRec(dt); updateMenuFx(); updateCorner(dt); drawAsciiUi(dt);
+  updateAudio(dt);
+  flash = Math.max(0, flash - (timeK > 0 ? dt / timeK : dt) * 1.6);
+  const U = postMat.uniforms; U.uFlash.value = flash;
+  U.uDanger.value = lerp(U.uDanger.value, state === 'play' ? Math.max(p.form === 'phoenix' ? p.danger || 0 : 0, PL.sick || 0) : 0, damp(8, dt));
+  dreadT -= dt; U.uFade.value = lerp(U.uFade.value, 1, damp(2.5, dt));
+  U.uHeat.value = Math.max(heat, PL.heat * 0.9) * (0.85 + Math.sin(time * 20) * 0.15);
+  { camera.updateMatrixWorld(); _v.copy(camera.position).addScaledVector(PL.sun, 800).project(camera); camera.getWorldDirection(_n);
+    if (Number.isFinite(_v.x) && Number.isFinite(_v.y)) U.uSunUV.value.set(_v.x * 0.5 + 0.5, _v.y * 0.5 + 0.5);
+    U.uRays.value = lerp(U.uRays.value, _v.z < 1 && PL.kind !== 3 && PL.kind !== 8 ? smoothstep(0.15, 0.85, _n.dot(PL.sun)) * 0.5 : 0, damp(2, dt)); }
+  if (CAMB.T) camBlend(dt);
+  if (TURNC.T) turnCam(dt);
+  if (window.__icarus?.testCam) window.__icarus.testCam(camera);
+  PL.sky.position.copy(camera.position); PL.stars.position.copy(camera.position);
+  { const f0 = U.uFade.value, k = PL.fadeT > 0 ? 1 - 0.95 * Math.pow(PL.fadeT / 1.1, 1.5) : 1; U.uFade.value = f0 * k; present(scene, camera); U.uFade.value = f0; }
+  if (DP.grab) { const r = DP.grab; DP.grab = null; r(dpFrame()); }
+  if (photo.snap) { photo.snap = false; const done = photo.blobR; photo.blobR = null;
+    canvas.toBlob(b => { done?.(b); if (!b) return; albumAdd(b).then(ok => toast(ok ? 'KEPT · YOU CAN GO BACK INTO IT FROM THE ALBUM' : 'COULD NOT KEEP IT HERE · IT IS COPIED')); }); flash = 0.5; audio.sfx.ui(); }
+}
+// the world itself, every frame: its ground and things kept round him, its weather, its weight and heat, the way out
+function plStep(dt) {
+  const p = player, k = PL.kind, cp = camera.position, T = PL.tU;
+  if (XR.on) { plOff('home'); return; }   // (the headset cannot be out there: home)
+  PL.fadeT = Math.max(0, PL.fadeT - dt); PL.heat = Math.max(0, PL.heat - dt * 0.35); T.uTime.value = time; PL.sky.material.uniforms.uTime.value = time;
+  if (PL.H) { const cx = Math.round((p.pos.x - PL_O) / STEP / 16) * 16, cz = Math.round((p.pos.z - PL_O) / STEP / 16) * 16;
+    if (!PL.nc || cx !== PL.nc[0] || cz !== PL.nc[1]) { PL.nc = [cx, cz]; plGround3(PL.near, 1, cx, cz, false); plGround3(PL.far, PL_FS, cx, cz, true); T.uOff.value.set(PL.near.position.x - PL_O, PL.near.position.z - PL_O); } }
+  if (p.pos.distanceTo(PL.fillAt) > 160) plFill();
+  PL.sky.position.copy(cp); PL.stars.position.copy(cp);
+  const up = smoothstep(PL_TOP - 700, PL_TOP + 150, cp.y); PL.sky.material.uniforms.uUp.value = up; if (k) PL.stars.material.opacity = up * 0.9;
+  if (PL.sea.visible) { PL.sea.position.set(Math.round(cp.x / 200) * 200, WATER, Math.round(cp.z / 200) * 200); PL.wU.uOff.value.set(PL.sea.position.x - PL_O, PL.sea.position.z - PL_O);
+    camera.updateMatrixWorld(); const vm = camera.matrixWorldInverse; PL.wU.uSunV.value.copy(PL.sun).transformDirection(vm); PL.wU.uUpV.value.set(0, 1, 0).transformDirection(vm); }
+  if (k === 3) for (const c of PL.clouds) { c.position.set(Math.round(cp.x / 200) * 200, c.userData.y, Math.round(cp.z / 200) * 200); c.material.uniforms.uOff.value.set(c.position.x - PL_O, -(c.position.z - PL_O)); c.material.uniforms.uDark.value = PL.storm * 0.6; }
+  // the thing left there: where it is nearest him, turning; found, once, when he comes to it
+  { const A = PL.art, G = PL.artG, ax = p.pos.x - (plWrap(p.pos.x - PL_O - A.lx + PL_W / 2) - PL_W / 2), az = p.pos.z - (plWrap(p.pos.z - PL_O - A.lz + PL_W / 2) - PL_W / 2);
+    G.position.set(ax, A.y, az); for (const c of G.children) { if (c.userData.spin) c.rotation.y = time * c.userData.spin; if (c.userData.bob) c.position.y = 12 + Math.sin(time * 1.3) * 1.2; }
+    if (state === 'play' && Math.hypot(p.pos.x - ax, p.pos.z - az) < 45 && Math.abs(p.pos.y - A.y) < 60 && !PL.found.has(PL.B.id)) {
+      PL.found.add(PL.B.id); try { localStorage.setItem('icarus.planets.found', JSON.stringify([...PL.found].slice(-400))); } catch {}
+      toast(`YOU FOUND ${PL_THING[A.type]} ON ${PL.name}`); burst(ax, A.y + 12, az, 220, 18, 1.2); shock(ax, A.y + 12, az, 0xfff0c0, 40, 1.0); audio.sfx.chime?.();
+      witness(`came down on the world ${PL.name}, out past the sky, and found ${PL_THING[A.type].toLowerCase()} there`); } }
+  // others who are here: drawn on this layer too
+  for (const P of NET.peers.values()) if (P.av && !P.av.l1) { P.av.l1 = true; plKeep(P.av.man.group); plKeep(P.av.bird.group); }
+  if ((PL.layT -= dt) <= 0) { PL.layT = 1; plKeep(phoenix.group); plKeep(human.group); plKeep(MORPH.mesh); plKeep(SH.mesh); for (const b of BOOM.list) plKeep(b.mesh); }   // (and whatever has been put on him or made since)
+  if (state !== 'play') return;
+  const bird = p.form === 'phoenix', fly = bird && !p.perch && !p.sub && !p.takeoff;
+  // the top of its air: the air lets go of him, and above it he is in space again
+  if (fly && p.pos.y > PL_TOP - 300 && p.pitch > 0.25) { const kk = smoothstep(PL_TOP - 300, PL_TOP + 150, p.pos.y); p.pos.y += (25 + 300 * kk * kk) * Math.max(0.45, Math.sin(p.pitch)) * dt;
+    if (!PL.told.up) { PL.told.up = true; toast(`THE AIR THINS · KEEP CLIMBING TO LEAVE ${PL.name}`); } }
+  if (fly && p.pos.y > PL_TOP + 150) { plOff('up'); return; }
+  if (p.pos.y > PL_TOP + 120 && !(fly && p.pitch > 0.1)) p.pos.y = lerp(p.pos.y, PL_TOP + 100, damp(2, dt));
+  // a giant of gas: too deep, and the weight of its air throws him back up
+  if (k === 3) { const d = smoothstep(PL_DEEP, PL_DEEP - 260, p.pos.y);
+    if (d > 0) { if (fly) { p.vy = lerp(p.vy, 34 * d, damp(2.5, dt)); p.pos.y += 45 * d * d * dt; if (p.pitch < 0.35 * d) p.pitch = lerp(p.pitch, 0.4, damp(2.5 * d, dt)); p.danger = Math.max(p.danger || 0, d * 0.75); }
+      else if (!bird) { p.vel.y = lerp(p.vel.y, 16 * d, damp(3, dt)); p.fallTop = p.pos.y; if (p.grounded && p.pos.y < PL_DEEP - 100) { p.grounded = false; p.vel.y = 12; } }
+      camShake = Math.max(camShake, 0.3 * d); if (!PL.told.deep) { PL.told.deep = true; toast(bird ? 'THE WEIGHT OF THE AIR · YOU CAN GO NO DEEPER' : 'THE DEEP WILL NOT HAVE YOU · IT THROWS YOU BACK UP · CATCH FIRE'); } }
+    // storms: where they are the cloud goes dark, the air shakes him, and the lightning comes often
+    PL.storm = lerp(PL.storm, smoothstep(0.55, 0.8, plVN((p.pos.x - PL_O) / STEP + time * 0.4, (p.pos.z - PL_O) / STEP, 64, PL.s + 91)), damp(0.5, dt));
+    if (fly && PL.storm > 0.1) { p.vy += rnd(14) * PL.storm * dt * 6; camShake = Math.max(camShake, 0.12 * PL.storm); if (!PL.told.storm && PL.storm > 0.5) { PL.told.storm = true; toast('A STORM IN THE CLOUD'); } } }
+  // lightning, on a giant of gas and in the fire's smoke
+  if (k === 3 || k === 2) { PL.boltT -= dt * (1 + PL.storm * 4); PL.boltL.intensity *= Math.exp(-dt * 9);
+    if (PL.boltT <= 0) { PL.boltT = (k === 3 ? 3 : 7) + Math.random() * 6; const a = Math.random() * TAU_, r = 250 + Math.random() * 900, x = p.pos.x + Math.cos(a) * r, z = p.pos.z + Math.sin(a) * r, y0 = k === 3 ? PL.clouds[(Math.random() * 2 + 1) | 0].userData.y : plH(x, z) + 380;
+      PL.boltL.position.set(x, y0, z); PL.boltL.intensity = 40; flash = Math.max(flash, r < 600 ? 0.3 : 0.15); postMat.uniforms.uFlashCol.value.setRGB(0.8, 0.8, 1);
+      let bx = x, bz = z; for (let i = 0; i < 60; i++) { bx += rnd(7); bz += rnd(7); emit(bx, y0 - i * 6, bz, 0, 0, 0, 0.18 + Math.random() * 0.12, [1.6, 1.6, 2.2], 0, 2.2); } } }
+  // the heat of a world of fire: the bird is at home in it, and fed; a man burns
+  if (k === 2) {
+    if (bird) p.flame = Math.min(1, p.flame + dt * 0.06);
+    else if (p.grounded && !p.swim) { const lava = plAt(PL.M, p.pos.x, p.pos.z) === 1; PL.burnT += dt * (lava ? 4 : 1);
+      if (Math.random() < 0.5) emit(p.pos.x + rnd(0.6), p.pos.y + 0.2, p.pos.z + rnd(0.6), rnd(1), 2 + Math.random() * 3, rnd(1), 0.8, pick(PL.burnT > 2 ? EMBER : ASH), 3);
+      if (PL.burnT > 1.5 && !PL.told.burn) { PL.told.burn = true; toast('THE GROUND BURNS · A MAN CANNOT STAND HERE · CATCH FIRE'); }
+      if (PL.burnT > 5) { PL.burnT = 0; if (!(flags.morphed && turnBird())) { die('lava'); return; } toast('THE FIRE TAKES YOU · HERE THE PHOENIX IS AT HOME'); } }
+    else PL.burnT = Math.max(0, PL.burnT - dt); }
+  // a world of poison: its pools sicken a man and put his fire out
+  if (k === 8) { const inPool = p.form === 'human' && p.swim || bird && !p.perch && p.pos.y < WATER + 8 && plH(p.pos.x, p.pos.z) < WATER;
+    PL.sick = lerp(PL.sick || 0, inPool ? 0.8 : 0, damp(inPool ? 1 : 0.6, dt)); if (inPool) { p.flame = Math.max(0.02, p.flame - dt * 0.05); if (!PL.told.pool) { PL.told.pool = true; toast('THE POOL IS POISON · GET OUT OF IT'); } } }
+  else PL.sick = 0;
+  // the air of the place round him, a few motes a frame
+  { const cn = k === 0 ? 0 : 3, R = 70;
+    for (let i = 0; i < cn; i++) { const x = cp.x + rnd(R), z = cp.z + rnd(R), y = cp.y + rnd(R * 0.6);
+      if (k === 1) emit(x, y + 20, z, rnd(1), -2 - Math.random() * 2, rnd(1), 3, [0.95, 0.97, 1], 0, 0.5);
+      else if (k === 2) emit(x, Math.max(y - 30, plH(x, z) + 1), z, rnd(1), 3 + Math.random() * 5, rnd(1), 2.2, pick(EMBER), 2, 0.5);
+      else if (k === 3) { if (Math.random() < 0.4) emit(x, y, z, rnd(3), rnd(1), rnd(3), 3, [0.9, 0.85, 0.75], 0, 1.4); }
+      else if (k === 4) { const g = plH(x, z); if (g < WATER && cp.y < WATER + 60) emit(x, WATER + 0.5, z, rnd(2) + 3, 2 + Math.random() * 2, rnd(2), 1.2, [0.85, 0.92, 1], -6, 0.5); }
+      else if (k === 5) emit(x, plH(x, z) + 1 + Math.random() * 8, z, 14 + rnd(3), rnd(1), 5 + rnd(2), 1.6, [0.9, 0.75, 0.5], -1, 0.45);
+      else if (k === 6) { if (Math.random() < 0.5) emit(x, y, z, rnd(0.6), rnd(0.4), rnd(0.6), 4, pick([[1, 0.4, 0.9], [0.4, 1, 0.7], [0.6, 0.5, 1]]), 0, 0.35); }
+      else if (k === 7) { if (Math.random() < 0.5) emit(x, plH(x, z) + Math.random() * 30, z, 0, 0.3, 0, 0.5, [1.6, 1.4, 2], 0, 0.4); }
+      else if (k === 8) emit(x, plH(x, z) + Math.random() * 4, z, rnd(0.5), 0.6, rnd(0.5), 4, [0.55, 0.8, 0.2], 0, 1.6); } }
+  plBar();
+}
+// the line at the top, out on a world
+function plBar() {
+  const el = COSMOS.barEl; if (!el || (PL.barT = (PL.barT || 0) - 1) > 0) return; PL.barT = 15;
+  el.classList.toggle('on', state === 'play' && !document.body.classList.contains('photo'));
+  el.firstChild.textContent = `ON ${PL.name} · ${CZ_SAY[PL.kind]} · ${PL_G[PL.kind].toFixed(2)} G`;
+  el.children[1].textContent = PL.found?.has(PL.B.id) ? `${PL_THING[PL.art.type].toLowerCase()} found here · climb straight up to leave` : `there is something to find here: follow the thread of light · climb straight up to leave`;
+}
+setTimeout(() => { if (window.__icarus) Object.assign(window.__icarus, { PL, plEnter, plOff, plH, plGround, plIsle, plTop, plGenStart, cosmosResume, PL_O, PL_TOP, PL_W }); }, 200);
 // ───────────────────────── the keeper's studio ─────────────────────────
 // His alone (MOD.admin: a signed-in email the server lists, never a name), opened from his part of the players panel or
 // with /studio, closed with Esc. Three pages. MISSIONS: every beat of the story and every errand the game has, each a
