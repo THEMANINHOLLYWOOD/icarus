@@ -598,6 +598,9 @@
   #mapNorth span { display:block; line-height:0; } #mapNorth svg { display:block; margin:auto; }
   #map { touch-action:none; }
   #mapMode { position:absolute; right:calc(var(--sr) + 14px); top:calc(var(--st) + 10px); min-height:40px; padding:8px 14px; border:1px solid rgba(226,172,78,.4); border-radius:20px; background:rgba(5,7,13,.5); color:#e8c078; font:inherit; font-size:10px; letter-spacing:.22em; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  /* above, below or both: the same kind of button, under the dial (or in its place, when the map lies flat) */
+  #mapLayer { position:absolute; right:calc(var(--sr) + 14px); top:calc(var(--st) + 110px); min-height:40px; padding:8px 14px; border:1px solid rgba(130,160,255,.45); border-radius:20px; background:rgba(5,7,13,.5); color:#a9bcff; font:inherit; font-size:10px; letter-spacing:.22em; cursor:pointer; -webkit-tap-highlight-color:transparent; white-space:nowrap; }
+  #map.flat #mapLayer { top:calc(var(--st) + 60px); }
   /* phones: sideways, please; a stick that is only there while you touch it; the tilt horizon; how to fly */
   #turn { display:none; }
   html.upright #turn { display:none !important; }
@@ -834,7 +837,7 @@
   body.asciiui #markers .mk b, body.asciiui #markers .mk span { -webkit-text-fill-color:transparent !important; text-shadow:none !important; background:transparent !important; filter:none !important; animation:none !important; }
   body.asciiui .godeye .mk::after { display:none; }
   body.asciiui #mapTitle, body.asciiui #mapHint { visibility:hidden; }
-  body.asciiui #mapMode, body.asciiui #mapNorth { color:transparent !important; background:transparent !important; border-color:transparent !important; } body.asciiui #mapNorth svg { opacity:0; }
+  body.asciiui #mapMode, body.asciiui #mapNorth, body.asciiui #mapLayer { color:transparent !important; background:transparent !important; border-color:transparent !important; } body.asciiui #mapNorth svg { opacity:0; }
   /* his record, in the sky (see STV): the page catches the hand; with the letters off, the same page is written out on it */
   #stv { position:fixed; inset:0; z-index:11; display:none; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; }
   #stv.on { display:block; } #stv.thru { pointer-events:none; } #stv .stvk { pointer-events:auto; }
@@ -1014,7 +1017,7 @@
   <form id="guideForm" autocomplete="off"><button class="gb" id="guideMic" type="button" aria-label="Speak to her"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11.5a6 6 0 0 0 12 0M12 17.5V21M9 21h6"/></svg></button><input id="guideIn" maxlength="160" autocomplete="off" autocapitalize="sentences" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="Ask her" placeholder="ask how to do anything · or tell her to do it"><button class="gb" id="guideGo" type="submit" aria-label="Ask">↵</button></form></div></div>
 <div id="health"><button id="healthPill" type="button" aria-label="Site health" aria-expanded="false" aria-controls="healthBox"><i></i><span></span></button><div id="healthBox"></div></div>
 <button id="newcomer" type="button"></button><button id="friendAsk" type="button"></button><div id="xfCard" role="status" aria-live="polite"></div><div id="bag" role="dialog" aria-label="Your bag"></div><button id="craftBtn" type="button" aria-label="Your bag: what you can make">MAKE</button><button id="waveBtn" type="button"></button><button id="flipBtn" type="button" aria-label="Turn over">⟲</button><div id="bldBar" role="toolbar" aria-label="The builder"></div><div id="xfList" role="dialog" aria-label="What has been brought to you"></div><input id="xfPick" type="file" tabindex="-1" aria-hidden="true"><div id="who"></div><div id="mini"><button id="miniMapHit" type="button" aria-label="Open the map"></button><button id="miniWhoHit" type="button" aria-label="Who is flying"></button><button id="miniKeysHit" type="button" aria-label="Controls"></button></div><div id="miniWho" role="dialog" aria-label="Who is flying"></div><div id="ctlCard" role="dialog" aria-label="Controls"></div><div id="pgCard" role="status" aria-live="polite"></div><button id="micBtn" type="button" aria-label="Microphone"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15"/><path class="x" d="M2 2l12 12" style="display:none"/></svg></button><button id="whoBtn" type="button"></button>
-<div id="map"><canvas id="mapC"></canvas><div id="mapTitle"></div><div id="mapHint"></div><button id="mapMode" type="button" aria-label="Flat map or 3D model">FLAT</button><button id="mapNorth" type="button" aria-label="Turn the map north up"><span><svg viewBox="0 0 16 16" width="18" height="18"><path d="M8 1.5l3 6.5H5z" fill="currentColor"/><path d="M8 14.5L5 8h6z" fill="none" stroke="currentColor" stroke-width="1"/></svg></span></button></div>
+<div id="map"><canvas id="mapC"></canvas><div id="mapTitle"></div><div id="mapHint"></div><button id="mapMode" type="button" aria-label="Flat map or 3D model">FLAT</button><button id="mapNorth" type="button" aria-label="Turn the map north up"><span><svg viewBox="0 0 16 16" width="18" height="18"><path d="M8 1.5l3 6.5H5z" fill="currentColor"/><path d="M8 14.5L5 8h6z" fill="none" stroke="currentColor" stroke-width="1"/></svg></span></button><button id="mapLayer" type="button" aria-label="Show the world above, the Underworld below, or both" style="display:none">BOTH</button></div>
 
 
 <video id="heroVid" muted loop playsinline preload="auto" poster="video/hero-poster.jpg" aria-hidden="true"></video>
@@ -9642,7 +9645,7 @@ addEventListener('keydown', e => {
 // looked at afresh when something in it changes, or every quarter of a second, and typed in again every frame from that.
 const AUID = { ids: ['agentCard', 'agx', 'chat', 'who', 'prompt', 'warn', 'mic', 'modeBar', 'newcomer', 'friendAsk', 'xfCard', 'xfList', 'waveBtn', 'flipBtn', 'diveBtn', 'formBtn', 'craftBtn', 'bag', 'bldBar', 'matchBig', 'fightCard', 'matchAsk', 'dpBar', 'dpExit', 'recChip', 'guide', 'qlog', 'healthPill', 'looks', 'patron', 'tut', 'miniWho', 'ctlCard', 'pgCard'],
   panels: new Set(['agentCard', 'agx', 'who', 'xfCard', 'xfList', 'bag', 'bldBar', 'guide', 'qlog', 'looks', 'patron', 'fightCard', 'miniWho', 'ctlCard', 'pgCard']), roots: [], mo: null };
-const UIASC = { '⟲': '@', '✕': 'X', '×': 'x', '◂': '<', '▸': '>', '‹': '<', '›': '>', '«': '<<', '»': '>>', '→': '->', '←': '<-', '↑': '^', '↓': 'v', '●': '*', '◉': '@', '◎': '@', '◆': '<>', '◇': '<>', '✦': '*', '✧': '+', '⌂': 'n', '♣': '&', '△': '^', '▲': '^', '▶': '>', '▦': '#', '▣': '#', '†': '+', '—': '-', '–': '-', '…': '...', '’': "'", '‘': "'", '“': '"', '”': '"', '·': '\x7f', '•': '\x7f', '\x7f': '\x7f', '²': '2', '³': '3', '°': 'o', '✓': 'v', '★': '*', '☆': '*', '♥': '<3', '✎': '>_', '⚑': 'P', '⏵': '>', '⏸': '||' };
+const UIASC = { '⟲': '@', '✕': 'X', '×': 'x', '◂': '<', '▸': '>', '‹': '<', '›': '>', '«': '<<', '»': '>>', '→': '->', '←': '<-', '↑': '^', '↓': 'v', '●': '*', '◉': '@', '◎': '@', '◆': '<>', '◇': '<>', '✦': '*', '✧': '+', '⌂': 'n', '♣': '&', '△': '^', '▲': '^', '▼': 'v', '▶': '>', '▦': '#', '▣': '#', '†': '+', '—': '-', '–': '-', '…': '...', '’': "'", '‘': "'", '“': '"', '”': '"', '·': '\x7f', '•': '\x7f', '\x7f': '\x7f', '²': '2', '³': '3', '°': 'o', '✓': 'v', '★': '*', '☆': '*', '♥': '<3', '✎': '>_', '⚑': 'P', '⏵': '>', '⏸': '||' };
 const uiAsc = s => String(s || '').replace(/[^\x20-\x7e]/g, ch => UIASC[ch] ?? (/[À-ÿ]/.test(ch) ? ch.normalize('NFD')[0] : ''));
 function auidInit() {
   postMat.uniforms.uMk.value[5].setRGB(0.66, 0.86, 1);   // (the last of the marks' inks is the cool blue the page uses for the post and the sea)
@@ -9774,7 +9777,7 @@ function auiMapChrome() {
   const nx = UIL.nx, ny = UIL.ny, t = uiAsc($('mapTitle').textContent).toUpperCase(), h = uiAsc($('mapHint').textContent).toUpperCase(), wrap = (s, n) => { const L = ['']; for (const w of s.split(' ')) { const i = L.length - 1, u = L[i] ? L[i] + ' ' + w : w; if (L[i] && u.length > n) L.push(w); else L[i] = u; } return L; };
   if (t) wrap(t, nx - 30).slice(0, 2).forEach((ln, i) => { const c0 = (nx - ln.length) >> 1, r = ny - 2 - i; uilPlate(c0 - 1, r, c0 + ln.length, r, 190); uilText(c0, r, ln, i ? 0 : 1, i ? 190 : 235); });
   if (h && !STV.map) wrap(h, nx - 6).slice(0, 2).forEach((ln, i, A) => { const c0 = (nx - ln.length) >> 1, r = 1 + (A.length - 1 - i); uilPlate(c0 - 1, r, c0 + ln.length, r, 180); uilText(c0, r, ln, 0, 175); });
-  for (const [id, lab] of [['mapMode', $('mapMode').textContent.trim()], ['mapNorth', 'N ' + MK_ARROW[['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'][((Math.round(Math.atan2(mapP.s, mapP.c * Math.max(mapP.T, 0.2)) / (Math.PI / 4)) % 8) + 8) % 8]][2]]]) {
+  for (const [id, lab] of [['mapMode', $('mapMode').textContent.trim()], ['mapLayer', uiAsc($('mapLayer').textContent.trim())], ['mapNorth', 'N ' + MK_ARROW[['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'][((Math.round(Math.atan2(mapP.s, mapP.c * Math.max(mapP.T, 0.2)) / (Math.PI / 4)) % 8) + 8) % 8]][2]]]) {
     const b = $(id); if (!b || b.style.display === 'none') continue; const q = rectOf(b, 300); if (q.width < 2) continue;
     const row = uilRow(q.top + q.height / 2), c0 = uilCol(q.left + q.width / 2) - ((lab.length + 4) >> 1), hot = b.matches(':hover');
     uilPlate(c0, row, c0 + lab.length + 3, row, hot ? 240 : 205); uilPut(c0, row, 91, hot ? 2 : 1, 255); uilPut(c0 + lab.length + 3, row, 93, hot ? 2 : 1, 255); uilText(c0 + 2, row, lab, hot ? 2 : 1, 240); }
@@ -22282,7 +22285,7 @@ function voiceRun(a) {
     case 'around': if (p.form === 'human' && p.grounded) { human.group.rotation.y += Math.PI; camYaw += Math.PI; } else apTimed(1, 0, 2.6); toast('TURNING ROUND'); break;
     case 'walk': case 'run': AP.kind = 'walk'; AP.run = a === 'run'; AP.until = time + 25; toast(a === 'run' ? 'RUN' : 'WALK'); break;
     case 'stop': apClear(); AP.q.length = 0; if (AP.wp) apUnmark(); toast('STOP'); break;
-    case 'go_there': if (state === 'map') { const w = { x: mapV.x, z: mapV.z }; w.y = Math.max(groundAt(w.x, w.z), WATER); closeMap(); apMark(w); } else apMark(gazePoint()); AP.kind = 'go'; AP.t0 = time; break;
+    case 'go_there': if (state === 'map' && mapV.vr && mapV.vr !== realm) { toast(mapWayHint(mapV.vr)); break; } if (state === 'map') { const w = { x: mapV.x, z: mapV.z }; w.y = Math.max(groundAt(w.x, w.z), WATER); closeMap(); apMark(w); } else apMark(gazePoint()); AP.kind = 'go'; AP.t0 = time; break;
     case 'map': if (XR.on) xmapShow(!XMAP.on); else if (state === 'map') closeMap(); else if (state === 'play') openMap(); break;
     case 'photo': if (state === 'play') openPhoto(true); break;
     case 'snap': if (state === 'photo') snapPhoto(); else if (state === 'play') { openPhoto(true); setTimeout(() => snapPhoto(), 250); } break;
@@ -26691,12 +26694,20 @@ function cellLook(x, z) {
   if (noise2(x / 650 + 91.7, z / 650 - 37.3) > 0.22) return ['"', '#4a8a34'];
   return h > 140 ? ['n', '#9cbc50'] : [',', '#74aa3e'];
 }
+// (the tiles of the world he is in are kept in mapTiles, where charting marks them stale; the other world's, while the
+//  flat map shows it, in a smaller store of their own)
+const mapTilesX = new Map(); mapTilesX.r = '';
+function mapTileMap() {
+  if (!mapV.open || realm === (mapV.real || realm)) return mapTiles;
+  if (mapTilesX.r !== realm) { for (const o of mapTilesX.values()) o.cv.width = o.cv.height = 0; mapTilesX.clear(); mapTilesX.r = realm; }
+  return mapTilesX;
+}
 function mapTile(tx, tz) {
-  const key = tx + ',' + tz;
-  let t = mapTiles.get(key);
-  if (t) { mapTiles.delete(key); mapTiles.set(key, t); }   // (the most recently looked at last: the longest unseen go first)
-  else { t = { cv: document.createElement('canvas'), stale: true, any: false }; t.cv.width = t.cv.height = TILE * TPX * 2; mapTiles.set(key, t);
-    if (mapTiles.size > 180) for (const [k, o] of mapTiles) { if (mapTiles.size <= 150) break; o.cv.width = o.cv.height = 0; mapTiles.delete(k); } }   // (each one is a quarter of a megabyte of picture: no more than the map can show kept)
+  const key = tx + ',' + tz, M = mapTileMap();
+  let t = M.get(key);
+  if (t) { M.delete(key); M.set(key, t); }   // (the most recently looked at last: the longest unseen go first)
+  else { t = { cv: document.createElement('canvas'), stale: true, any: false }; t.cv.width = t.cv.height = TILE * TPX * 2; M.set(key, t);
+    if (M.size > 180) for (const [k, o] of M) { if (M.size <= 150) break; o.cv.width = o.cv.height = 0; M.delete(k); } }   // (each one is a quarter of a megabyte of picture: no more than the map can show kept)
   if (t.stale) {
     t.stale = false; t.any = false;
     const x = t.cv.getContext('2d'), S = mapCells[realm];
@@ -26722,11 +26733,10 @@ function openMap() {
   const dpr = Math.min(devicePixelRatio, 2); mapCv.width = innerWidth * dpr; mapCv.height = innerHeight * dpr;
   // it opens out of where he is standing: close in on him, then the country spreads
   mapV.x = mapV.tx = player.pos.x; mapV.z = mapV.tz = player.pos.z; mapV.s = 0.34; mapV.ts = TOUCH ? 0.06 : 0.085;
-  const Tt = WORLD.totals;
-  $('mapTitle').textContent = `${realm === 'under' ? 'THE UNDERWORLD' : 'OLYMPUS AND THE HILLS'} · ${(mapCells[realm].size * MAPC * MAPC / 1e6).toFixed(0)} KM² SEEN BY YOU`
-    + (Tt && Tt.cells ? ` · ${Math.round(Tt.cells * MAPC * MAPC / 1e6).toLocaleString()} KM² CHARTED BY ${Math.max(1, Tt.travellers)} ${Tt.travellers === 1 ? 'TRAVELLER' : 'TRAVELLERS'}` : '');
+  if (mapV.layer !== 'both') mapV.layer = realm;   // (one world or the other: always the one he is in, to begin with)
+  mapV.vr = realm; mapV.both = false; mapV.vrKey = ''; mapTitle(realm, false);
   if (WORLD.lookT > 20) WORLD.lookT = 0.2;   // a fresh look at the world while the map is open
-  mapHint(); mapV.T = 1; mapV.h = player.pos.y; mapV.ptr = null; mapV.hot = null;   // (it opens lying flat, and stands up)
+  mapHint(); mapLayerShow(); mapV.T = 1; mapV.h = player.pos.y; mapV.ptr = null; mapV.hot = null;   // (it opens lying flat, and stands up)
   mapEl.classList.add('open'); audio.sfx.ui();
 }
 function closeMap() {
@@ -26734,6 +26744,12 @@ function closeMap() {
   if (!mapV.open) return;
   mapV.open = false; mapEl.classList.remove('open'); M3.on = false; M3.keys = {}; mapV.m3c = false; mapEl.classList.remove('m3'); document.body.classList.remove('map3');
   if (state === 'map') state = 'play';
+}
+// the heading: which country, how much of it he has seen, how much everyone has (and, with both, the other under or over it)
+function mapTitle(r, both) {
+  const Tt = WORLD.totals, name = q => (q === 'under' ? 'THE UNDERWORLD' : 'OLYMPUS AND THE HILLS');
+  $('mapTitle').textContent = `${name(r)}${both ? (r === 'over' ? ' · AND UNDER IT, THE UNDERWORLD' : ' · AND OVER IT, THE HILLS') : ''} · ${(mapCells[r].size * MAPC * MAPC / 1e6).toFixed(0)} KM² SEEN BY YOU`
+    + (Tt && Tt.cells && r === realm ? ` · ${Math.round(Tt.cells * MAPC * MAPC / 1e6).toLocaleString()} KM² CHARTED BY ${Math.max(1, Tt.travellers)} ${Tt.travellers === 1 ? 'TRAVELLER' : 'TRAVELLERS'}` : '');
 }
 // The map is a model of the country standing on a table. Laid flat it is read from straight above; stood up it is a thing
 // in three dimensions that can be turned, tipped back and pushed into, with everyone who is flying hung over it at the
@@ -26751,7 +26767,10 @@ Object.assign(mapV, { yaw: 0, yaw3: 0, T: 1, T3: 0.52, h: 0, hits: [], hot: null
 //    What has not been charted is there only as a dark shape. (The names, the marks and the birds are still written over
 //    it on the page, each put where this eye sees its place.)
 const M3 = { on: false, scene: null, cam: null, lv: [], idx: null, N: TOUCH ? 97 : 137, C: new THREE.Vector3(), f: new THREE.Vector3(0, -1, 0), r: new THREE.Vector3(1, 0, 0), u: new THREE.Vector3(0, 0, -1),
-  tan: Math.tan(25 * Math.PI / 180), D: 5000, px: NaN, py: NaN, keys: {}, realm: '', marksKey: '', bg: new THREE.Color(0x070a12) };
+  tan: Math.tan(25 * Math.PI / 180), D: 5000, px: NaN, py: NaN, keys: {}, realm: '', marksKey: '', bg: new THREE.Color(0x070a12),
+  // (with both worlds: the block's middle, its half-width, the way into it from the eye, where the cut is across it, and
+  //  how far the other world is drawn above or below this one)
+  bc: [0, 0], B: 1000, fh: [0, -1], w0: 0, offX: 0, CUT_N: TOUCH ? 40 : 64, CUT_R: 19, CUT_F: 7, cutP: null };
 const M3_K = [4.2, 19, 86], M3_MIN = [420, 2400, 11000];   // how wide each of the three is, in view-distances (and never narrower than this)
 function m3Init() {
   if (M3.scene) return;
@@ -26759,16 +26778,27 @@ function m3Init() {
   M3.cam = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 5, 900000);
   S.add(new THREE.HemisphereLight(0xdfe8ff, 0x2a2018, 1.2)); const sun = new THREE.DirectionalLight(0xfff0d8, 1.7); sun.position.set(-0.55, 0.7, -0.4); S.add(sun);
   { const I = [], N = M3.N; for (let j = 0; j < N - 1; j++) for (let i = 0; i < N - 1; i++) { const a = j * N + i, b = a + 1, d = a + N, e = d + 1; I.push(a, d, b, b, d, e); } M3.idx = I; }
-  for (let i = 0; i < (TOUCH ? 2 : 3); i++) {
-    const hole = { value: new THREE.Vector3(0, 0, -1) }, mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  // (the block both worlds are cut to, when both are shown: its four sides, and for the world above a fifth, the cut that
+  //  opens the dark under it. Shown alone, a world is not cut at all: the planes stand a long way off)
+  renderer.localClippingEnabled = true;
+  M3.clipO = [0, 1, 2, 3, 4].map(() => new THREE.Plane(new THREE.Vector3(1, 0, 0), 1e9)); M3.clipU = [0, 1, 2, 3, 4].map(() => new THREE.Plane(new THREE.Vector3(1, 0, 0), 1e9));
+  for (let i = 0; i < (TOUCH ? 2 : 3) + 1; i++) {
+    const hole = { value: new THREE.Vector3(0, 0, -1) }, mat = new THREE.MeshLambertMaterial({ vertexColors: true, clippingPlanes: M3.clipO });
     // (each wider mesh is cut away where the finer one inside it has been built)
     mat.onBeforeCompile = sh => { sh.uniforms.uHole = hole;
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vM3;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvM3 = position.xz;');
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vM3; uniform vec3 uHole;').replace('void main() {', 'void main() {\n  if (uHole.z > 0.0 && max(abs(vM3.x - uHole.x), abs(vM3.y - uHole.y)) < uHole.z) discard;'); };
     const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat); mesh.frustumCulled = false; mesh.visible = false; S.add(mesh);
-    M3.lv.push({ i, mesh, mat, hole, key: '', job: null, cx: 0, cz: 0, half: 0, built: false });
+    const L = { i, mesh, mat, hole, key: '', job: null, cx: 0, cz: 0, half: 0, built: false, r: '' };
+    if (i < (TOUCH ? 2 : 3)) M3.lv.push(L); else { L.i = 0; M3.ot = L; }   // (the last is the other world, built like the nearest of this one's)
   }
-  M3.sea = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x1b3d6b, transparent: true, opacity: 0.84 })); M3.sea.renderOrder = 1; S.add(M3.sea);
+  M3.sea = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x1b3d6b, transparent: true, opacity: 0.84, clippingPlanes: M3.clipO })); M3.sea.renderOrder = 1; S.add(M3.sea);
+  // the faces of the block, where it is cut: the beds of rock under the hills down to the roof of the dark, and the black
+  // stone under the dark down to the foot of it (one mesh, its points moved as the block is moved)
+  { const NS = M3.CUT_N, rows = M3.CUT_R + M3.CUT_F, g = new THREE.BufferGeometry(), I = [];
+    for (const [r0, nr] of [[0, M3.CUT_R], [M3.CUT_R, M3.CUT_F]]) for (let j = r0; j < r0 + nr - 1; j++) for (let i = 0; i < NS - 1; i++) { const a = j * NS + i, b = a + 1, d = a + NS, e = d + 1; I.push(a, d, b, b, d, e); }
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NS * rows * 3), 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(NS * rows * 3), 3).setUsage(THREE.DynamicDrawUsage)); g.setIndex(I);
+    M3.cut = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })); M3.cut.frustumCulled = false; M3.cut.visible = false; S.add(M3.cut); }
   // him: a bright dart at the height he is at; everyone else a bead; each on a thread down to the ground under them
   M3.me = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.7, 6).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xff8a3a, fog: false })); S.add(M3.me);
   M3.peers = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 10, 8), new THREE.MeshBasicMaterial({ fog: false }), 24); M3.peers.count = 0; M3.peers.frustumCulled = false; M3.peers.setColorAt(0, new THREE.Color(1, 1, 1)); S.add(M3.peers);
@@ -26777,11 +26807,16 @@ function m3Init() {
 }
 // what stands on it: the crown of Olympus, the ring of fire, the beacons, the islands of the gods
 function m3Marks() {
-  const key = `${realm}|${BEACONS.filter(b => b.lit).length}|${mapCells[realm].size >> 5}|${typeof torchHouse === 'function' ? torchHouse() : ''}`;
+  const ov = realm === 'over' || mapV.both;   // (the world above is on the table: alone, or over the dark)
+  M3.marks.position.y = realm === 'over' ? 0 : M3.offX;
+  const key = `${realm}|${ov}|${BEACONS.filter(b => b.lit).length}|${mapCells.over.size >> 5}|${typeof torchHouse === 'function' ? torchHouse() : ''}`;
   if (key === M3.marksKey) return; M3.marksKey = key;
   const G = M3.marks; for (const o of [...G.children]) { G.remove(o); o.geometry?.dispose(); o.material?.dispose(); }
-  if (realm !== 'over') return;
-  const add = (geo, col, x, y, z, fog = true) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: col, fog })); m.position.set(x, y, z); G.add(m); return m; };
+  if (ov) asRealm('over', m3MarksOver);
+}
+function m3MarksOver() {
+  const G = M3.marks;
+  const add = (geo, col, x, y, z, fog = true) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: col, fog, clippingPlanes: M3.clipO })); m.position.set(x, y, z); G.add(m); return m; };
   if (CROWN.pylons.length) { const cx = MOUNT.x, cz = MOUNT.z + 6, top = CROWN.pylons[0].top;
     for (const p of CROWN.pylons) add(new THREE.CylinderGeometry(5, 9, p.H, 6), new THREE.Color(p.hex).multiplyScalar(1.4), p.x, p.g + p.H / 2, p.z);
     add(new THREE.TorusGeometry(170, 5, 6, 48).rotateX(Math.PI / 2), 0xffe2a0, cx, top + 24, cz); }
@@ -26792,34 +26827,100 @@ function m3Marks() {
 }
 // the three meshes: each asks for the ground under the view at its own width, and is rebuilt (a few rows a frame) when the view has moved or changed enough
 function m3Build(dt, hurry) {
-  const V = mapV, N = M3.N, known = mapCells[realm].size >> 4, t0 = performance.now(), budget = hurry ? 26 : TOUCH ? 2.4 : 4;
-  for (const L of M3.lv) {
-    let span = Math.max(M3_MIN[L.i], M3.D * M3_K[L.i]); span = 2 ** (Math.round(Math.log2(span) * 2) / 2);
-    const cell = span / (N - 1), snap = cell * 10, cx = Math.round(V.tx / snap) * snap, cz = Math.round(V.tz / snap) * snap, key = `${realm}|${cx}|${cz}|${span}|${known}`;
-    if (key !== L.key && (!L.job || L.job.key !== key)) L.job = { key, cx, cz, span, cell, j: 0, phase: 0, h: new Float32Array(N * N), pos: new Float32Array(N * N * 3), col: new Float32Array(N * N * 3) };
-  }
-  const under = realm === 'under', colOf = under ? underColor : terrainColor;
-  for (const L of M3.lv) { const J = L.job; if (!J) continue;
+  const V = mapV, N = M3.N, t0 = performance.now(), budget = hurry ? 26 : TOUCH ? 2.4 : 4, both = V.both, other = realm === 'over' ? 'under' : 'over';
+  // what each mesh should be: this world's three (or, with both, only the nearest, made finer: just wider than the block),
+  // and with both the other world's one, the same size and in the same place
+  const want = (L, r, span) => { span = 2 ** (Math.round(Math.log2(span) * 2) / 2);
+    const cell = span / (N - 1), snap = cell * 10, cx = Math.round(V.tx / snap) * snap, cz = Math.round(V.tz / snap) * snap, key = `${r}|${cx}|${cz}|${span}|${mapCells[r].size >> 4}`;
+    if (key !== L.key && (!L.job || L.job.key !== key)) L.job = { key, r, cx, cz, span, cell, j: 0, phase: 0, h: new Float32Array(N * N), pos: new Float32Array(N * N * 3), col: new Float32Array(N * N * 3) }; };
+  const near = Math.max(M3_MIN[0], M3.B * 2.5);
+  for (const L of M3.lv) if (!both || !L.i) want(L, realm, both ? near : Math.max(M3_MIN[L.i], M3.D * M3_K[L.i])); else L.job = null;
+  if (both) want(M3.ot, other, near); else M3.ot.job = null;
+  for (const L of both ? [M3.lv[0], M3.ot] : M3.lv) { const J = L.job; if (!J) continue;
     const x0 = J.cx - J.span / 2, z0 = J.cz - J.span / 2, st = J.cell;
-    while (J.phase < 2 && performance.now() - t0 < budget) { const j = J.j;
+    asRealm(J.r, () => { while (J.phase < 2 && performance.now() - t0 < budget) { const j = J.j;   // (the ground and its colours as they are in that world)
       if (J.phase === 0) for (let i = 0; i < N; i++) J.h[j * N + i] = height(x0 + i * st, z0 + j * st);
       else for (let i = 0; i < N; i++) { const o = j * N + i, h = J.h[o], hx = J.h[j * N + Math.min(N - 1, i + 1)] - J.h[j * N + Math.max(0, i - 1)], hz = J.h[Math.min(N - 1, j + 1) * N + i] - J.h[Math.max(0, j - 1) * N + i];
         const ny = 2 * st / Math.hypot(hx, 2 * st, hz), x = x0 + i * st, z = z0 + j * st, o3 = o * 3;
-        J.pos[o3] = x; J.pos[o3 + 1] = h; J.pos[o3 + 2] = z; colOf(x, z, h, ny, J.col, o3);
+        J.pos[o3] = x; J.pos[o3 + 1] = h; J.pos[o3 + 2] = z; terrainColor(x, z, h, ny, J.col, o3);
         if (!mapKnown(x, z)) { const g = (J.col[o3] + J.col[o3 + 1] + J.col[o3 + 2]) * 0.05; J.col[o3] = g + 0.035; J.col[o3 + 1] = g + 0.042; J.col[o3 + 2] = g + 0.06; } }   // (never charted: a dark shape, no more)
-      if (++J.j >= N) { J.j = 0; J.phase++; } }
+      if (++J.j >= N) { J.j = 0; J.phase++; } } });
     if (J.phase < 2) break;   // (the nearer one first; the wider ones wait their turn)
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(J.pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(J.col, 3)); g.setIndex(M3.idx); g.computeVertexNormals();
-    L.mesh.geometry.dispose(); L.mesh.geometry = g; L.mesh.visible = true; L.key = J.key; L.cx = J.cx; L.cz = J.cz; L.half = J.span / 2; L.built = true; L.job = null;
+    L.mesh.geometry.dispose(); L.mesh.geometry = g; L.key = J.key; L.r = J.r; L.cx = J.cx; L.cz = J.cz; L.half = J.span / 2; L.built = true; L.job = null;
+    L.hg = J.h; L.gx0 = x0; L.gz0 = z0; L.gc = st;   // (its heights kept, for the faces of the block to be cut along)
   }
   // each wider one is cut away under the finer one inside it (as that one stands now, not as it will)
   for (const L of M3.lv) { const F = M3.lv[L.i - 1]; if (F && F.built) L.hole.value.set(F.cx, F.cz, F.half - (F.half * 2 / (N - 1)) * 1.5); else L.hole.value.z = -1; }
+}
+// the height of the ground a mesh was built of, anywhere over it (between its points, as its triangles lie)
+function m3Hat(L, x, z) {
+  const N = M3.N, fx = clamp((x - L.gx0) / L.gc, 0, N - 1.001), fz = clamp((z - L.gz0) / L.gc, 0, N - 1.001), i = fx | 0, j = fz | 0, u = fx - i, v = fz - j, H = L.hg, o = j * N + i;
+  return (H[o] * (1 - u) + H[o + 1] * u) * (1 - v) + (H[o + N] * (1 - u) + H[o + N + 1] * u) * v;
+}
+// ── The block, when both worlds are shown: a square of the country cut out of the earth round the middle of the view,
+//    turned to face the eye. The world he is in is the near side of it or the far side; the cut between them goes
+//    across, and tipping the model back moves it, opening more of the dark (or, from below, more of the world above).
+//    The world below is drawn as far under this one as it is: under the sea, and seven hundred and twenty metres under
+//    that, the roof of it (see swapSea: it is the same distance he is carried through the water).
+function m3Block() {
+  const V = mapV, B = M3.B = M3.D * clamp(0.27 * innerWidth / innerHeight, 0.17, 0.48), k = smoothstep(0.95, 0.3, V.T);
+  // (how far the other world is drawn above or below this one: as far as it is, and further as the view draws back, as a
+  //  drawing of a cut through the earth stretches its depths, so the two never run together into one sheet)
+  M3.ex = clamp(M3.D / 9000, 1, 3); M3.offX = (realm === 'over' ? -1 : 1) * (UNDER.ceil + SEA.col - WATER) * M3.ex;
+  M3.bc[0] = V.x; M3.bc[1] = V.z; M3.fh[0] = -mapP.s; M3.fh[1] = -mapP.c;
+  M3.w0 = (realm === 'over' ? lerp(-0.7, -0.08, k) : lerp(0.7, 0.08, k)) * B;   // (never so far over that the middle of the view is not on his own world)
+  const rx = mapP.c, rz = -mapP.s, fx = M3.fh[0], fz = M3.fh[1], cr = rx * V.x + rz * V.z, cf = fx * V.x + fz * V.z, set = (pl, nx, nz, c) => { pl.normal.set(nx, 0, nz); pl.constant = c; };
+  for (const A of [M3.clipO, M3.clipU]) {
+    if (!V.both) { for (const pl of A) set(pl, 1, 0, 1e9); continue; }
+    set(A[0], rx, rz, B - cr); set(A[1], -rx, -rz, B + cr); set(A[2], fx, fz, B - cf); set(A[3], -fx, -fz, B + cf); set(A[4], 1, 0, 1e9);
+  }
+  if (V.both) set(M3.clipO[4], fx, fz, -M3.w0 - cf);   // (the world above is opened on the near side of the cut)
+}
+// whether a place of one world or the other is on the part of the block that shows (always, with one world shown)
+function m3Vis(r, x, z) {
+  if (!mapV.both) return true;
+  const dx = x - M3.bc[0], dz = z - M3.bc[1], u = dx * mapP.c - dz * mapP.s, w = dx * M3.fh[0] + dz * M3.fh[1], B = M3.B;
+  return Math.abs(u) <= B && Math.abs(w) <= B && (r === 'over' ? w >= M3.w0 : w <= M3.w0);
+}
+// the beds of the rock, as they show on a cut face: pale limestone, warm sand, dark schist and red clay in turn, gently
+// bent; the soil at the top of it; and going down to the roof of the dark, black stone with the cold blue in its seams
+const M3BED = { soil: col('#4b3d27'), lime: col('#aea893'), sand: col('#9a7f5c'), schist: col('#4d4b55'), clay: col('#7a5642'), basalt: col('#2b2c36'), ob: col('#1d2036'), vein: [0.42, 0.66, 1.6], sea: col('#1d4a86'), seaD: col('#0c2246') };
+function m3Bed(y, dTop, dRoof, u, out, o) {
+  const b = (y + 60 * noise2(u / 1400 + 3.1, y / 800 - 1.7)) / 140, k = Math.floor(b), L = [M3BED.lime, M3BED.sand, M3BED.schist, M3BED.clay, M3BED.sand, M3BED.schist, M3BED.lime, M3BED.clay][((k % 8) + 8) % 8];
+  let r = L[0], g = L[1], bl = L[2]; const mix = (c, t) => { r = lerp(r, c[0], t); g = lerp(g, c[1], t); bl = lerp(bl, c[2], t); };
+  mix(M3BED.soil, smoothstep(45, 6, dTop)); mix(M3BED.basalt, smoothstep(320, 90, dRoof)); mix(M3BED.vein, smoothstep(26, 4, dRoof) * 0.85);
+  const dim = 0.62 + 0.38 * smoothstep(900, 0, dTop); out[o] = r * dim; out[o + 1] = g * dim; out[o + 2] = bl * dim;
+}
+// the faces where the block is cut, built along the ground the two meshes were made of: across it at the cut, from the
+// hills (or the sea, and its floor) down to the roof of the dark; and its near side, from the floor of the dark down
+function m3Cut() {
+  const V = mapV, C = M3.cut, Lo = realm === 'over' ? M3.lv[0] : M3.ot, Lu = realm === 'over' ? M3.ot : M3.lv[0];
+  C.visible = V.both && Lo.built && Lu.built && Lo.r === 'over' && Lu.r === 'under'; if (!C.visible) { M3.cutP = null; return; }
+  const NS = M3.CUT_N, KR = M3.CUT_R, KF = M3.CUT_F, B = M3.B, cx = M3.bc[0], cz = M3.bc[1], rx = mapP.c, rz = -mapP.s, fx = M3.fh[0], fz = M3.fh[1], w0 = M3.w0;
+  const offO = realm === 'over' ? 0 : M3.offX, offU = realm === 'under' ? 0 : M3.offX, foot = offU + WATER - 420;
+  const pos = C.geometry.attributes.position.array, cl = C.geometry.attributes.color.array, P = M3.cutP = { top: [], gr: [], roof: [], fl: [], ft: [], foot, offO, offU };
+  const put = (j, i, x, y, z) => { const o = (j * NS + i) * 3; pos[o] = x; pos[o + 1] = y; pos[o + 2] = z; return o; };
+  for (let i = 0; i < NS; i++) {
+    const u = -B + 2 * B * i / (NS - 1), x = cx + rx * u + fx * w0, z = cz + rz * u + fz * w0, g = m3Hat(Lo, x, z), gr = g + offO, top = Math.max(g, WATER) + offO, roof = Math.min(underRoof(x, z) + offU, gr - 30);
+    P.top.push([x, top, z]); P.gr.push([x, gr, z]); P.roof.push([x, roof, z]);
+    for (let j = 0; j < KR; j++) {
+      const y = j === 0 ? top : j < 3 ? gr : lerp(gr, roof, (j - 2) / (KR - 3)), o = put(j, i, x, y, z);
+      if (j < 2 && top > gr + 0.5) { const c = j ? M3BED.seaD : M3BED.sea; cl[o] = c[0]; cl[o + 1] = c[1]; cl[o + 2] = c[2]; }   // (the sea, where the cut goes through it)
+      else m3Bed(y - offO, gr - y, y - roof, u, cl, o);
+    }
+    const xf = cx + rx * u - fx * B, zf = cz + rz * u - fz * B, fl = Math.max(m3Hat(Lu, xf, zf) + offU, foot + 40);
+    P.fl.push([xf, fl, zf]); P.ft.push([xf, foot, zf]);
+    for (let j = 0; j < KF; j++) { const t = j / (KF - 1), y = lerp(fl, foot, t), o = put(KR + j, i, xf, y, zf), vein = Math.abs(noise2(u / 260 + 4.4, y / 70 - 2.2)) < 0.05 ? 0.7 : 0;
+      const c = M3BED.ob, d = 0.9 - 0.45 * t; cl[o] = lerp(c[0] * d, M3BED.vein[0], vein); cl[o + 1] = lerp(c[1] * d, M3BED.vein[1], vein); cl[o + 2] = lerp(c[2] * d, M3BED.vein[2], vein); }
+  }
+  C.geometry.attributes.position.needsUpdate = true; C.geometry.attributes.color.needsUpdate = true;
 }
 // the eye: behind the place it looks at, by the distance the zoom gives, as high as the tip says
 function m3Cam() {
   const V = mapV, W = innerWidth, H = innerHeight, el = Math.asin(clamp(V.T, 0.05, 1)), D = M3.D = H / (2 * Math.max(V.s, 1e-4) * M3.tan), ce = Math.cos(el), se = Math.sin(el), C = M3.C;
   C.set(V.x + mapP.s * D * ce, V.h + D * se, V.z + mapP.c * D * ce);
-  { const g = Math.max(reliefH(C.x, C.z), realm === 'under' ? -1e9 : WATER) + Math.max(6, D * 0.035); if (C.y < g) C.y = g; if (realm === 'under') C.y = Math.min(C.y, Math.max(g, underRoof(C.x, C.z) - 12)); }   // (never under the ground, nor through the roof of the dark)
+  { const g = Math.max(reliefH(C.x, C.z), realm === 'under' ? -1e9 : WATER) + Math.max(6, D * 0.035); if (C.y < g) C.y = g; if (realm === 'under' && !V.both) C.y = Math.min(C.y, Math.max(g, underRoof(C.x, C.z) - 12)); }   // (never under the ground, nor through the roof of the dark: unless the world above is shown over it)
   M3.f.set(V.x - C.x, V.h - C.y, V.z - C.z).normalize(); M3.r.set(mapP.c, 0, -mapP.s); M3.u.crossVectors(M3.r, M3.f).normalize();
   const cam = M3.cam; cam.position.copy(C); cam.up.copy(M3.u); cam.lookAt(V.x, V.h, V.z); cam.aspect = W / H; cam.near = Math.max(2, D * 0.02); cam.far = Math.max(60000, D * 260); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
 }
@@ -26848,24 +26949,31 @@ function m3Fly(dt) {
 addEventListener('keyup', e => { M3.keys[e.code] = false; });
 addEventListener('blur', () => { M3.keys = {}; });
 // every frame the map is standing: the meshes, the sea, the things that stand on it, and everyone on it
-const _m3m = new THREE.Matrix4(), _m3c = new THREE.Color(), _m3s = new THREE.Vector3(), _m3q = new THREE.Quaternion();
+const _m3m = new THREE.Matrix4(), _m3c = new THREE.Color(), _m3s = new THREE.Vector3(), _m3p = new THREE.Vector3(), _m3q = new THREE.Quaternion();
 function m3Update(dt) {
-  m3Init(); const V = mapV, under = realm === 'under';
+  m3Init(); const V = mapV, under = realm === 'under', both = V.both, other = under ? 'over' : 'under', mine = realm === V.real;
   if (M3.realm !== realm) { M3.realm = realm; for (const L of M3.lv) { L.key = ''; L.job = null; L.built = false; L.mesh.visible = false; } M3.bg.set(under ? 0x05060c : 0x070a12); M3.marksKey = ''; }
+  if (M3.ot.r && M3.ot.r !== other) { const L = M3.ot; L.key = ''; L.r = ''; L.job = null; L.built = false; L.mesh.visible = false; }
+  m3Block();
   m3Fly(dt);
-  m3Build(dt, !M3.lv[0].built);
+  m3Build(dt, !M3.lv[0].built || both && !M3.ot.built);
   m3Marks();
+  for (const L of M3.lv) { L.mesh.visible = L.built && (!both || !L.i); L.mat.clippingPlanes = under ? M3.clipU : M3.clipO; }
+  M3.ot.mesh.visible = both && M3.ot.built; M3.ot.mesh.position.y = M3.offX; M3.ot.mat.clippingPlanes = other === 'under' ? M3.clipU : M3.clipO;
+  m3Cut();
   const out = M3.lv[M3.lv.length - 1], far = Math.max(out.built ? out.half : 0, M3.D * 8, 4000);
   M3.scene.fog.near = far * 0.42; M3.scene.fog.far = far * 1.02;
-  M3.sea.visible = !under; M3.sea.position.set(V.x, WATER, V.z); M3.sea.scale.set(far * 2.6, 1, far * 2.6);
-  // him and everyone, at the height they are at
+  M3.sea.visible = !under || both; M3.sea.position.set(V.x, WATER + (under ? M3.offX : 0), V.z); M3.sea.scale.set(far * 2.6, 1, far * 2.6);
+  // him and everyone, at the height they are at (him only on the world he is in; the others on whichever world they are in)
   const P = player.pos, k = Math.max(2.5, M3.D * 0.016), yaw = player.form === 'human' ? human.group.rotation.y : player.yaw, T = M3.threads.geometry.attributes.position; let n = 0, t = 0;
+  M3.me.visible = mine && m3Vis(realm, P.x, P.z, true);
   M3.me.position.copy(P); M3.me.rotation.set(0, yaw, 0); M3.me.scale.setScalar(k * 1.5);
-  T.setXYZ(t++, P.x, P.y, P.z); T.setXYZ(t++, P.x, reliefH(P.x, P.z), P.z);
-  const me = under ? 1 : 0, now = performance.now();
-  for (const Q of NET.peers.values()) { if (n >= 24 || !Q.s || now - Q.s.t > 15000 || Q.realm !== me || SHUN.block.has(Q.name)) continue;
-    _m3m.compose(Q.pos, _m3q, _m3s.setScalar(k * 1.6)); M3.peers.setMatrixAt(n, _m3m); M3.peers.setColorAt(n, _m3c.set(Q.css || '#bfe6ff')); n++;
-    T.setXYZ(t++, Q.pos.x, Q.pos.y, Q.pos.z); T.setXYZ(t++, Q.pos.x, reliefH(Q.pos.x, Q.pos.z), Q.pos.z); }
+  if (M3.me.visible) { T.setXYZ(t++, P.x, P.y, P.z); T.setXYZ(t++, P.x, reliefH(P.x, P.z), P.z); }
+  const now = performance.now();
+  for (const Q of NET.peers.values()) { if (n >= 24 || !Q.s || now - Q.s.t > 15000 || SHUN.block.has(Q.name)) continue;
+    const qr = Q.realm ? 'under' : 'over', off = qr === realm ? 0 : M3.offX; if (qr !== realm && !both || !m3Vis(qr, Q.pos.x, Q.pos.z, true)) continue;
+    _m3m.compose(_m3p.set(Q.pos.x, Q.pos.y + off, Q.pos.z), _m3q, _m3s.setScalar(k * 1.6)); M3.peers.setMatrixAt(n, _m3m); M3.peers.setColorAt(n, _m3c.set(Q.css || '#bfe6ff')); n++;
+    T.setXYZ(t++, Q.pos.x, Q.pos.y + off, Q.pos.z); T.setXYZ(t++, Q.pos.x, relOf(qr, Q.pos.x, Q.pos.z) + off, Q.pos.z); }
   M3.peers.count = n; if (n) { M3.peers.instanceMatrix.needsUpdate = true; M3.peers.instanceColor.needsUpdate = true; }
   T.needsUpdate = true; M3.threads.geometry.setDrawRange(0, t);
 }
@@ -26882,7 +26990,25 @@ const mapSX = (wx, wz, h) => M3.on ? (mapPt(wx, h ?? reliefH(wx, wz), wz), M3.px
 const mapSY = (wx, wz, h) => M3.on ? (mapPt(wx, h, wz), M3.py) : ((wx - mapV.x) * mapP.s + (wz - mapV.z) * mapP.c) * mapV.s * mapP.T + innerHeight * mapP.mid - (h - mapV.h) * mapV.s * mapP.hs;
 // the place on the ground under a point of the screen (on the level h; mapPick then walks it onto the hills themselves)
 function mapAt(px, py, h = mapV.h) { if (M3.on) return m3At(px, py, h); const V = mapV, u = (px - innerWidth / 2) / V.s, v = (py - innerHeight * mapP.mid + (h - V.h) * V.s * mapP.hs) / (V.s * mapP.T); return [V.x + u * mapP.c + v * mapP.s, V.z - u * mapP.s + v * mapP.c]; }
-function mapPick(px, py) { let p = mapAt(px, py, WATER); if (mapP.hs > 0.02) for (let i = 0; i < 6; i++) { const q = mapAt(px, py, reliefH(p[0], p[1])); p = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; } return p; }
+function mapPickAt(px, py, off = 0) { let p = mapAt(px, py, WATER + off); if (mapP.hs > 0.02) for (let i = 0; i < 6; i++) { const q = mapAt(px, py, reliefH(p[0], p[1]) + off); p = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; } return p; }
+const mapPick = (px, py) => mapPickAt(px, py, 0);
+// the place under a point of the page, and which world it is in: the one shown, or with both, whichever part of the block
+// the eye meets there first (the world above where it is not cut away; through the cut, the dark under it). out: off it.
+function mapPickL(px, py) {
+  const V = mapV, vr = V.vr || realm;
+  if (!V.both || !M3.on) { const [x, z] = asRealm(vr, () => mapPick(px, py)); return { x, z, r: vr }; }
+  const oO = vr === 'over' ? 0 : M3.offX, oU = vr === 'under' ? 0 : M3.offX;
+  const a = asRealm('over', () => mapPickAt(px, py, oO)); if (m3Vis('over', a[0], a[1])) return { x: a[0], z: a[1], r: 'over' };
+  const b = asRealm('under', () => mapPickAt(px, py, oU)); return { x: b[0], z: b[1], r: 'under', out: !m3Vis('under', b[0], b[1]) };
+}
+// the lie of the country round Hades, laid out for the map when he is up here and it has not been yet this time (as it
+// would have been had he come up from it: built, hidden, and no fire of it burning in the world above)
+function mapPrimeUnder() {
+  if (HL.on || !UNDER.hades || !UNDER.arrive || realm !== 'over' || mapV.primed) return; mapV.primed = true;
+  try { asRealm('under', placeStyx); } catch (e) { console.warn('map: the country below', e); }
+  for (const f of STYX.fires || []) pyres.delete(f); pyres.delete(FERRY.lamp);
+  for (const g of [STYX.group, FERRY.group, HL.group]) if (g) g.visible = false;
+}
 const mapKnown = (x, z) => { const k = packCell(Math.floor(x / MAPC), Math.floor(z / MAPC)); return mapCells[realm].has(k) || WORLD.cells[realm].has(k); };
 const mapMax = () => (mapV.relief ? 7 : 0.3), mapMin = () => (mapV.relief ? 0.011 : 0.022);
 function mapZoom(f, px, py) {
@@ -26915,7 +27041,7 @@ function mapBirdAt(px, py, r) { let best = null, bd = r * r; for (const h of map
   mapEl.addEventListener('pointermove', e => {
     const pt = pts.get(e.pointerId), V = mapV;
     V.ptr = e.pointerType === 'touch' ? null : { x: e.clientX, y: e.clientY };
-    if (!pt) { V.hover = mapPick(e.clientX, e.clientY); return; }
+    if (!pt) { V.hover = mapPickL(e.clientX, e.clientY); return; }
     const dx = e.clientX - pt.x, dy = e.clientY - pt.y; pt.x = e.clientX; pt.y = e.clientY;
     if (pts.size >= 2) {   // pinch to push in, twist to turn it, slide both fingers up or down to tip it
       const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y), ang = Math.atan2(b.y - a.y, b.x - a.x), my = (a.y + b.y) / 2;
@@ -26929,7 +27055,7 @@ function mapBirdAt(px, py, r) { let best = null, bd = r * r; for (const h of map
       else { const u = dx / V.s, v = dy / (V.s * mapP.T); wx = u * mapP.c + v * mapP.s; wz = -u * mapP.s + v * mapP.c; }
       V.tx -= wx; V.tz -= wz; V.x -= wx; V.z -= wz;
       if ((V.dragS = (V.dragS || 0) + Math.hypot(dx, dy)) > 150) { V.dragS = 0; audio.sfx.mapMove?.(); } }   // (the table sliding under the hand)
-    V.hover = mapPick(e.clientX, e.clientY);
+    V.hover = mapPickL(e.clientX, e.clientY);
   });
   const up = e => {
     pts.delete(e.pointerId); tw = null;
@@ -26937,13 +27063,18 @@ function mapBirdAt(px, py, r) { let best = null, bd = r * r; for (const h of map
     const held = d ? performance.now() - d.t : 0;
     if (!d || d.moved || d.turn || e.type !== 'pointerup' || held > 3500 || !mapV.open) return;
     { const hit = (mapV.wpHits || []).find(h => Math.hypot(h.x - e.clientX, h.y - e.clientY) < (e.pointerType === 'touch' ? 26 : 16));   // one of his marks: chosen (or, pressed and held, forgotten)
+      if (hit && mapV.vr && mapV.vr !== realm) { audio.sfx.mapNo?.(); toast(mapWayHint(mapV.vr)); return; }   // (a mark in the other world: his to see, not to choose from here)
       if (hit) { audio.sfx.mapPick?.(); if (held > 500 || e.shiftKey) wpForget(hit.i); else wpSelect(hit.i === WP.sel ? -1 : hit.i); return; } }
     { const hit = (mapV.memHits || []).find(h => Math.hypot(h.x - e.clientX, h.y - e.clientY) < (e.pointerType === 'touch' ? 22 : 12));   // a picture's place: the picture
       if (hit) { audio.sfx.mapPick?.(); closeMap(); albumShow(true).then(() => { const i = ALBUM.list.findIndex(a => a.id === hit.id); if (i >= 0) albumView(i); }); return; } }
-    if (held > 500 || e.shiftKey) { const [x, z] = mapPick(e.clientX, e.clientY); if (wpAdd(x, Math.max(reliefH(x, z), WATER), z)) wpSelect(wpAll().length - 1); return; }   // (pressed and held, or with shift: a mark is kept there)
-    const P = mapBirdAt(e.clientX, e.clientY, e.pointerType === 'touch' ? 32 : 20);   // a bird under the finger: go to them
+    const keep = held > 500 || e.shiftKey, P = keep ? null : mapBirdAt(e.clientX, e.clientY, e.pointerType === 'touch' ? 32 : 20);   // a bird under the finger: go to them (in the other world, it says how)
+    if (P && (P.realm ? 'under' : 'over') !== realm) { audio.sfx.mapNo?.(); toast(mapWayHint(P.realm ? 'under' : 'over').replace('THAT IS', `${P.name} IS`)); return; }
     if (P) { audio.sfx.mapPick?.(); warpToPeer(P); return; }
-    const [x, z] = mapPick(e.clientX, e.clientY);
+    const q = mapPickL(e.clientX, e.clientY);   // (where it is, and in which world: a place in the other one cannot be gone to, nor kept, from here)
+    if (q.out) { audio.sfx.mapNo?.(); return; }
+    if (q.r !== realm) { audio.sfx.mapNo?.(); toast(mapWayHint(q.r)); return; }
+    if (keep) { if (wpAdd(q.x, Math.max(reliefH(q.x, q.z), WATER), q.z)) wpSelect(wpAll().length - 1); return; }   // (pressed and held, or with shift: a mark is kept there)
+    const { x, z } = q;
     if (mapKnown(x, z) && flags.morphed) { audio.sfx.mapPick?.(); closeMap(); startWarp(x, z); }
     else audio.sfx.mapNo?.();   // (nobody has been there: nothing to be carried to)
   };
@@ -26985,22 +27116,50 @@ function mapBird(x, P, px, py, W, H, hot) {
 // a valley a dip in them; the sea's edge is one blue line. Only what has been charted is drawn. The weather hangs over it
 // where it is — rain as strokes, thunder as z's, mist as dots, the golden light as stars, the heaving sea as waves — and
 // the tornadoes stand where they stand.
-const RELIEF = { key: '', next: null, levels: [], hc: new Map(), wx: [], wxT: 0, wxKey: '', n: 92 };
+const RELIEF = { key: '', next: null, levels: [], hc: new Map(), hcU: new Map(), wx: [], wxT: 0, wxKey: '', n: 92 };   // (hc: the heights of the world above, hcU: of the one below, each kept apart)
 try { mapV.relief = localStorage.getItem('icarus.map3d') !== '0'; } catch { mapV.relief = true; }
-function reliefH(wx, wz) { const k = Math.round(wx / 40) * 100003 + Math.round(wz / 40); let h = RELIEF.hc.get(k); if (h === undefined) { if (RELIEF.hc.size > 8000) RELIEF.hc.clear(); h = Math.max(height(wx, wz), WATER); RELIEF.hc.set(k, h); } return h; }
+function reliefH(wx, wz) { const C = realm === 'under' ? RELIEF.hcU : RELIEF.hc, k = Math.round(wx / 40) * 100003 + Math.round(wz / 40); let h = C.get(k); if (h === undefined) { if (C.size > 8000) C.clear(); h = Math.max(height(wx, wz), WATER); C.set(k, h); } return h; }
+// The map can be of either country, whichever he is in: what it draws of the other is drawn as if he were there (the
+// ground, its colours, what has been charted of it), and put back the moment it is done.
+function asRealm(r, fn) { const was = realm; if (r === was) return fn(); realm = r; try { return fn(); } finally { realm = was; } }
+const relOf = (r, x, z) => asRealm(r, () => reliefH(x, z));
 function mapMode(on = !mapV.relief) {
   const V = mapV; if (V.open) audio.sfx.mapFlip?.();
   V.relief = on; if (on) V.yaw3 = wrapAngle(V.yaw3) + Math.round(V.yaw / TAU_) * TAU_;   // (it stands up facing the way it was last left)
   try { localStorage.setItem('icarus.map3d', on ? '1' : '0'); } catch {}
-  $('mapMode').textContent = on ? 'FLAT' : '3D'; $('mapNorth').style.display = on ? '' : 'none';
-  if (V.open) mapHint();
+  $('mapMode').textContent = on ? 'FLAT' : '3D'; $('mapNorth').style.display = on ? '' : 'none'; mapEl.classList.toggle('flat', !on);
+  if (V.open) { mapHint(); mapLayerShow(); }
 }
 function mapHint() {
+  const two = mapLayerOK(), both = two && mapV.relief && mapV.layer === 'both';
   $('mapHint').textContent = !flags.morphed ? 'you have only seen the mountain'
-    : TOUCH ? (mapV.relief ? 'drag · pinch to zoom · two fingers turn and tip · tap a place to go there' : 'tap a bird or a place and the gods will carry you there · pinch in to close')
-    : mapV.relief ? 'drag or W A S D to fly · right-drag turns and tips · scroll zooms · click a place to go there' : 'click a bird, or anywhere anyone has been, and the gods will carry you there · M to close';
+    : TOUCH ? (mapV.relief ? `drag · pinch to zoom · two fingers turn and tip${both ? ' (tip it to see below)' : ''} · tap a place to go there` : 'tap a bird or a place and the gods will carry you there · pinch in to close')
+    : mapV.relief ? `drag or W A S D to fly · right-drag turns and tips · scroll zooms · click a place to go there${two ? ' · U above, below or both' : ''}` : `click a bird, or anywhere anyone has been, and the gods will carry you there${two ? ' · U the other world' : ''} · M to close`;
 }
-$('mapMode').textContent = mapV.relief ? 'FLAT' : '3D'; $('mapNorth').style.display = mapV.relief ? '' : 'none';
+$('mapMode').textContent = mapV.relief ? 'FLAT' : '3D'; $('mapNorth').style.display = mapV.relief ? '' : 'none'; mapEl.classList.toggle('flat', !mapV.relief);
+// ── Above and below. The Underworld is the same country, under the sea: standing, the map can show the world above, the
+//    one below, or both at once — a block cut out of the earth, the hills on top, the rock under them in its beds, and
+//    under that the dark country, with the throats that go down from one to the other drawn through the stone. Tipped
+//    back, more of the dark is opened. Lying flat, it is one or the other: the plan of the world above, or of the one below.
+//    (Only once he knows there is a world below; and opened, it is always on the one he is in.)
+try { mapV.layer = ['over', 'under', 'both'].includes(localStorage.getItem('icarus.mapLayer')) ? localStorage.getItem('icarus.mapLayer') : 'both'; } catch { mapV.layer = 'both'; }
+const mapLayerOK = () => !XR.on && (UNDER.known || UNDER.seen || realm === 'under' || mapCells.under.size > 0);
+function mapLayerShow() {
+  const b = $('mapLayer'), ok = mapLayerOK(), V = mapV; b.style.display = ok ? '' : 'none'; if (!ok) return;
+  const shown = V.relief && V.layer === 'both' ? 'both' : V.layer === 'both' ? realm : V.layer;
+  b.textContent = shown === 'both' ? '◆ BOTH' : shown === 'under' ? '▼ BELOW' : '▲ ABOVE';
+}
+// the next of them: standing, both → the one he is in → the other → both; lying flat, the one and the other
+function mapLayerNext() {
+  const V = mapV; if (!mapLayerOK()) return;
+  const cur = V.layer === 'both' && !V.relief ? realm : V.layer, other = r => (r === 'over' ? 'under' : 'over');
+  V.layer = !V.relief ? other(cur) : cur === 'both' ? realm : cur === realm ? other(realm) : 'both';
+  try { localStorage.setItem('icarus.mapLayer', V.layer); } catch {}
+  audio.sfx.mapFlip?.(); mapLayerShow(); mapHint();
+}
+// what he is told when he points at the other world: there is no being carried there, only the ways down and up
+const mapWayHint = to => to === 'under' ? 'THAT IS BELOW · GO DOWN A THROAT IN THE EARTH, OR DIVE BURNING INTO THE SEA' : 'THAT IS ABOVE · FLY UP A SHAFT OF DAYLIGHT, OR UP INTO THE SEA OVERHEAD';
+$('mapLayer').addEventListener('click', e => { e.stopPropagation(); mapLayerNext(); $('mapLayer').blur(); });
 // (with the letters on, every name the map writes on itself is typed into the grid instead, where it would have been: see auiMapChrome)
 { const orig = mapX.fillText.bind(mapX);
   mapX.fillText = (t, x, y, w) => {
@@ -27015,7 +27174,7 @@ $('mapMode').textContent = mapV.relief ? 'FLAT' : '3D'; $('mapNorth').style.disp
   }; }
 $('mapMode').addEventListener('click', e => { e.stopPropagation(); mapMode(); $('mapMode').blur(); audio.sfx.ui?.(); });
 $('mapNorth').addEventListener('click', e => { e.stopPropagation(); mapNorth(); $('mapNorth').blur(); });
-for (const id of ['mapMode', 'mapNorth']) for (const ev of ['pointerdown', 'pointerup', 'touchstart']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
+for (const id of ['mapMode', 'mapNorth', 'mapLayer']) for (const ev of ['pointerdown', 'pointerup', 'touchstart']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
 function reliefContours(N) {
   const n = RELIEF.n, h = N.h, half = (n - 1) / 2, wxOf = i => N.gx + (i - half) * N.cell, wzOf = i => N.gz + (i - half) * N.cell, cells = mapCells[realm];
   let hi = WATER + 30; for (let i = 0; i < h.length; i++) if (h[i] > hi) hi = h[i];
@@ -27079,13 +27238,79 @@ function drawWeather(x, V, W, H) {
   }
   const G = { dust: ['%', '222,160,96'], squall: ['+', '236,242,255'], thunder: ['z', '210,225,255'], rain: ['/', '130,170,230'], gold: ['*', '255,196,106'], mist: ['·', '200,205,215'], waves: ['~', '120,190,255'], grey: ['-', '150,155,170'] };
   x.font = '11px Menlo, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  for (const c of R.wx) { const g = G[c.kind], X = mapSX(c.x, c.z, c.h), Y = mapSY(c.x, c.z, c.h); if (!(X >= -10 && X <= W + 10 && Y >= -10 && Y <= H + 10)) continue;
+  for (const c of R.wx) { if (mapV.both && !m3Vis('over', c.x, c.z)) continue; const g = G[c.kind], X = mapSX(c.x, c.z, c.h), Y = mapSY(c.x, c.z, c.h); if (!(X >= -10 && X <= W + 10 && Y >= -10 && Y <= H + 10)) continue;
     const fl = c.kind === 'thunder' && Math.sin(time * 9 + c.x * 0.01) > 0.9 ? 1 : 0; x.fillStyle = `rgba(${fl ? '255,255,255' : g[1]},${Math.min(0.9, 0.25 + c.k * 0.6 + fl * 0.3).toFixed(2)})`; x.fillText(g[0], X + (c.kind === 'rain' ? Math.sin(time * 2 + c.z) * 1.5 : 0), Y); }
-  for (const Tn of TW.list) { const g = Math.max(height(Tn.x, Tn.z), WATER), X = mapSX(Tn.x, Tn.z), Y0 = mapSY(Tn.x, Tn.z, g), Y1 = mapSY(Tn.x, Tn.z, g + Tn.H);   // a tornado: a funnel from the ground to the cloud
+  for (const Tn of TW.list) { if (mapV.both && !m3Vis('over', Tn.x, Tn.z)) continue; const g = Math.max(height(Tn.x, Tn.z), WATER), X = mapSX(Tn.x, Tn.z), Y0 = mapSY(Tn.x, Tn.z, g), Y1 = mapSY(Tn.x, Tn.z, g + Tn.H);   // a tornado: a funnel from the ground to the cloud
     x.strokeStyle = 'rgba(200,205,220,.8)'; x.beginPath(); x.moveTo(X, Y0); x.lineTo(X - Tn.R * V.s, Y1); x.moveTo(X, Y0); x.lineTo(X + Tn.R * V.s, Y1); x.stroke(); x.fillStyle = 'rgba(230,232,240,.9)'; x.fillText('TORNADO', X, Y1 - 9); }
   const seen = [...new Set(R.wx.map(c => c.kind))]; if (seen.length || TW.list.length) { x.textAlign = 'left'; x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = 'rgba(244,234,210,.6)';
     const it = seen.map(q => `${G[q][0]} ${WX_NAMES[q].toLowerCase()}`), rows = ['']; for (const t of it) { const l = rows.length - 1, w = rows[l] ? rows[l] + '   ' + t : t; if (rows[l] && x.measureText(w).width > W - 104) rows.push(t); else rows[l] = w; }   // (a narrow screen: the key takes two lines, and stays clear of the button)
     rows.forEach((r, i) => x.fillText(r, 18, H - 64 - (rows.length - 1 - i) * 13)); x.textAlign = 'center'; }
+}
+// The Underworld's own names, written on it as the map writes names: the house of Hades, the regions round it, the
+// rivers, the burning country; its mountains of blue fire as blue peaks, and the falls of fire out of its roof as threads
+// of blue from the roof to the pool (off: how far its ground is drawn from where it is, when it is the world below)
+function mapUnder(x, W, H, off, fits, flat) {
+  if (!UNDER.hades) return;
+  const gh = (wx, wz) => (flat ? WATER : reliefH(wx, wz) + off), seen = (wx, wz) => m3Vis('under', wx, wz) && mapKnown(wx, wz);
+  const on = (px, py, m = 40) => px > -m && py > -m && px < W + m && py < H + m;
+  const name = (wx, wz, id, glyph) => { if (!seen(wx, wz)) return;
+    const T = PLACE_T[id], y = gh(wx, wz), px = mapSX(wx, wz, y), py = mapSY(wx, wz, y); if (!on(px, py, 90)) return;
+    if (glyph) { x.fillStyle = T[2]; x.font = 'bold 14px Menlo, monospace'; x.fillText(glyph, px, py); }
+    const t = T[0].replace(/^THE /, '').split('').join(' '), ly = glyph ? py + 15 : py;
+    if (fits(px, ly, t.length)) { x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = T[2]; x.globalAlpha = 0.85; x.fillText(t, px, ly); x.globalAlpha = 1; } };
+  if (!HL.on) { name(UNDER.hades.x, UNDER.hades.z, 'palace', '◇'); return; }
+  name(HL.palace.x, HL.palace.z, 'palace', '◇');
+  for (const A of HL.areas) name(A.x, A.z, A.k, '');
+  if (HL.lethe) { const q = HL.lethe.P[HL.lethe.P.length >> 1]; name(q[0], q[1], 'lethe', ''); }
+  if (STYX.on) for (let k = 0; k < 6; k++) { const th = STYX.th0 + k * 1.047 + 0.52, r = STYX.R + styxBend(th), wx = STYX.x + Math.sin(th) * r, wz = STYX.z + Math.cos(th) * r; if (seen(wx, wz)) { name(wx, wz, 'styx', ''); break; } }   // (the river once, wherever it shows)
+  if (HL.phleg) { const F = HL.phleg, a = STYX.th0 + (F.p0 + F.p1) / 2, r = (F.r0 + F.r1) / 2; name(HL.x + Math.sin(a) * r, HL.z + Math.cos(a) * r, 'phlegethon', ''); }
+  x.font = 'bold 13px Menlo, monospace';
+  for (const v of UVOLC) { if (!seen(v.x, v.z)) continue; const y = flat ? WATER : v.top + off, px = mapSX(v.x, v.z, y), py = mapSY(v.x, v.z, y); if (!on(px, py)) continue;
+    x.fillStyle = '#62b6ff'; x.fillText('▲', px, py);
+    if (!flat && v.cone) { x.fillStyle = 'rgba(140,210,255,.8)'; x.fillText(Math.sin(time * 7 + v.x) > 0 ? '*' : "'", px, py - 13); } }   // (a cone, spewing)
+  if (!flat) { x.strokeStyle = 'rgba(98,182,255,.55)'; x.lineWidth = 1.2; x.beginPath();
+    for (const f of HL.falls) { if (!f.roof || !seen(f.x, f.z)) continue;
+      const a = mapSY(f.x, f.z, UNDER.ceil + off), pa = mapSX(f.x, f.z, UNDER.ceil + off), b = mapSY(f.x, f.z, f.foot + off), pb = mapSX(f.x, f.z, f.foot + off);
+      if (on(pb, b)) { x.moveTo(pa, a); x.lineTo(pb, b); } }
+    x.stroke(); x.lineWidth = 1; }
+}
+// With both worlds: the other one's names, the throats that go down from one to the other (a dashed line through the
+// rock, and a fainter one of daylight on down to the floor of the dark), the edges of the block, and what it is
+function mapBoth(x, W, H, fits) {
+  if (!M3.on) return;
+  const vr = realm, offO = vr === 'over' ? 0 : M3.offX, offU = vr === 'under' ? 0 : M3.offX, P3 = (wx, wz, h) => [mapSX(wx, wz, h), mapSY(wx, wz, h)];
+  const on = (q, m = 40) => q[0] > -m && q[1] > -m && q[0] < W + m && q[1] < H + m;
+  if (vr === 'over') asRealm('under', () => mapUnder(x, W, H, offU, fits, false));
+  else asRealm('over', () => {
+    for (const [wx, wz, g, t, c] of [[MOUNT.x, MOUNT.z, '▲', 'O L Y M P U S', '#eef2f8'], [CRETE.x, CRETE.z, '▦', 'C R E T E', '#e8c890']]) {
+      if (!m3Vis('over', wx, wz)) continue; const q = P3(wx, wz, reliefH(wx, wz) + offO); if (!on(q)) continue;
+      x.fillStyle = c; x.font = 'bold 15px Menlo, monospace'; x.fillText(g, q[0], q[1]);
+      if (fits(q[0], q[1] + 15, t.length)) { x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = 'rgba(244,234,210,.75)'; x.fillText(t, q[0], q[1] + 15); } } });
+  // the throats in the earth, wherever one has been seen: straight down, out of the hills and into the roof of the dark
+  { const B = M3.B, R = B * 1.42, C = CAVE.C, i0 = Math.floor((M3.bc[0] - R) / C), i1 = Math.floor((M3.bc[0] + R) / C), j0 = Math.floor((M3.bc[1] - R) / C), j1 = Math.floor((M3.bc[1] + R) / C);
+    if ((i1 - i0 + 1) * (j1 - j0 + 1) < 1200) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const S = caveSite(i, j); if (!S) continue;
+      const dx = S.x - M3.bc[0], dz = S.z - M3.bc[1]; if (Math.abs(dx * mapP.c - dz * mapP.s) > B || Math.abs(dx * M3.fh[0] + dz * M3.fh[1]) > B) continue;
+      const found = CAVE.found.has(S.id); if (!found && !asRealm('over', () => mapKnown(S.x, S.z))) continue;
+      const up = m3Vis('over', S.x, S.z), top = P3(S.x, S.z, S.g + offO), roof = P3(S.x, S.z, UNDER.ceil + offU), floor = P3(S.x, S.z, relOf('under', S.x, S.z) + offU);
+      x.lineWidth = 1.2;
+      if (up) { x.setLineDash([3, 4]); x.strokeStyle = 'rgba(170,190,255,.7)'; x.beginPath(); x.moveTo(top[0], top[1]); x.lineTo(roof[0], roof[1]); x.stroke(); }
+      x.setLineDash([1, 3]); x.strokeStyle = 'rgba(255,226,160,.5)'; x.beginPath(); x.moveTo(roof[0], roof[1]); x.lineTo(floor[0], floor[1]); x.stroke(); x.setLineDash([]); x.lineWidth = 1;
+      x.font = 'bold 12px Menlo, monospace'; x.fillStyle = '#b4c0e8';
+      if (up && on(top)) { x.fillText('◉', top[0], top[1]);
+        if (found && fits(top[0], top[1] - 14, 12)) { x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = 'rgba(200,210,255,.8)'; x.fillText('THE WAY DOWN', top[0], top[1] - 14); } }
+      if (!up && on(roof)) x.fillText('◉', roof[0], roof[1]);
+    } }
+  // the edges of the block, so its shape reads in letters as well as in light
+  const Q = M3.cutP; if (!Q) return;
+  const line = (A, c) => { x.strokeStyle = c; x.beginPath(); A.forEach((p, i) => { const X = mapSX(p[0], p[2], p[1]), Y = mapSY(p[0], p[2], p[1]); if (i) x.lineTo(X, Y); else x.moveTo(X, Y); }); x.stroke(); };
+  x.lineWidth = 1; line(Q.top, 'rgba(226,172,78,.6)'); line(Q.roof, 'rgba(120,160,255,.7)'); line(Q.fl, 'rgba(150,170,230,.55)'); line(Q.ft, 'rgba(150,170,230,.25)');
+  const n = Q.top.length - 1; for (const k of [0, n]) { line([Q.top[k], Q.roof[k]], 'rgba(226,172,78,.35)'); line([Q.fl[k], Q.ft[k]], 'rgba(150,170,230,.3)'); }
+  x.font = '9px "IBM Plex Mono", Menlo, monospace';
+  { const u = -0.62 * M3.B, w = M3.w0 - 0.14 * M3.B, wx = M3.bc[0] + mapP.c * u + M3.fh[0] * w, wz = M3.bc[1] - mapP.s * u + M3.fh[1] * w, q = P3(wx, wz, relOf('under', wx, wz) + offU);   // (its name, on the dark just in front of the cut)
+    if (on(q) && fits(q[0], q[1], 27)) { x.fillStyle = 'rgba(160,180,255,.85)'; x.fillText('T H E   U N D E R W O R L D', q[0], q[1]); } }
+  { const r = Q.roof[0], q = P3(r[0], r[2], WATER + offO), q2 = P3(r[0], r[2], r[1]), my = (q[1] + q2[1]) / 2;   // (how deep the roof of the dark is: as deep as he is carried through the sea)
+    if (on(q2) && fits(q2[0] - 70, my, 20)) { x.textAlign = 'right'; x.fillStyle = 'rgba(244,234,210,.6)'; x.fillText(`${SEA.col} M UNDER THE SEA`, q2[0] - 8, my); x.textAlign = 'center'; } }
 }
 function updateMap(dt) {
   const V = mapV;
@@ -27094,6 +27319,14 @@ function updateMap(dt) {
     if (l && (l[0] - P.pos.x) ** 2 + (l[2] - P.pos.z) ** 2 > 900 * 900) t.length = 0;   // (carried somewhere else: a new line)
     t.push([P.pos.x, P.pos.y, P.pos.z]); if (t.length > 60) t.shift(); } }
   if (!V.open) return;
+  // which world it shows: the one he is in, the other, or (standing) both, the one he is in nearest
+  { const ok = mapLayerOK(); V.real = realm; V.both = ok && !!V.relief && !XR.on && V.layer === 'both'; V.vr = !ok || V.layer === 'both' ? realm : V.layer;
+    const key = V.vr + V.both; if (key !== V.vrKey) { V.vrKey = key; mapTitle(V.vr, V.both); mapLayerShow(); mapHint(); } }
+  if (V.vr === 'under' || V.both) mapPrimeUnder();
+  asRealm(V.vr, () => mapPaint(dt));
+}
+function mapPaint(dt) {
+  const V = mapV, mine = realm === V.real, both = V.both, other = realm === 'over' ? 'under' : 'over';   // (mine: the world shown is the one he is in)
   const k = damp(9, dt), x = mapX, dpr = mapCv.width / innerWidth, W = innerWidth, H = innerHeight, R3 = !!V.relief;
   V.s = lerp(V.s, V.ts, damp(5, dt)); V.x = lerp(V.x, V.tx, k); V.z = lerp(V.z, V.tz, k);
   { const ty = R3 ? V.yaw3 : Math.round(V.yaw / TAU_) * TAU_, tT = R3 ? V.T3 : 1;
@@ -27101,7 +27334,7 @@ function updateMap(dt) {
   // what the middle of the view looks at: the ground there — or him, at the height he is flying, while the view is on him
   { let near = player.pos, nd = Math.hypot(V.tx - player.pos.x, V.tz - player.pos.z);   // (or another flier, when it is on them: whoever is nearest the middle)
     if (R3) for (const P of NET.peers.values()) if (P.s && P.realm === (realm === 'under' ? 1 : 0) && performance.now() - P.s.t < 15000) { const d = Math.hypot(V.tx - P.pos.x, V.tz - P.pos.z); if (d < nd) { nd = d; near = P.pos; } }
-    const th = lerp(reliefH(V.tx, V.tz), near.y, smoothstep(700, 150, nd)) + (V.hu || 0); V.h = V.h ? lerp(V.h, th, damp(6, dt)) : th; }
+    const th = lerp(reliefH(V.tx, V.tz), near.y, smoothstep(700, 150, nd)) + (V.hu || 0) + (both && M3.on ? M3.offX * 0.28 : 0); V.h = V.h ? lerp(V.h, th, damp(6, dt)) : th; }
   mapProj();
   x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
   const flat = !R3 && V.T > 0.985 && Math.abs(wrapAngle(V.yaw)) < 0.02;   // lying flat, and settled: the painted country
@@ -27114,7 +27347,7 @@ function updateMap(dt) {
   if (flat) { let budget = 6;   // new tiles are painted a few a frame, so opening the map never stalls
     const sxf = wx => (wx - V.x) * V.s + W / 2, syf = wz => (wz - V.z) * V.s * mapP.T + H * mapP.mid;
     for (let tz = Math.floor((V.z - H / 2 / V.s) / tw); tz <= Math.floor((V.z + H / 2 / V.s) / tw); tz++) for (let tx = Math.floor((V.x - W / 2 / V.s) / tw); tx <= Math.floor((V.x + W / 2 / V.s) / tw); tx++) {
-      let t = mapTiles.get(tx + ',' + tz);
+      let t = mapTileMap().get(tx + ',' + tz);
       if (!t || t.stale) { if (budget-- <= 0) continue; t = mapTile(tx, tz); }
       if (t.any) x.drawImage(t.cv, sxf(tx * tw), syf(tz * tw), tw * V.s + 0.5, tw * V.s + 0.5);
     } }
@@ -27124,13 +27357,14 @@ function updateMap(dt) {
   const C = crumbs[realm], c0 = flat ? 0 : Math.max(0, C.length - 260), cY = q => (flat ? gY(q[0], q[1]) : mapSY(q[0], q[1], q[2] ?? reliefH(q[0], q[1])));
   x.lineWidth = 1.2; x.lineJoin = 'round';
   for (let b = 0; b < 2; b++) { const i0 = b ? Math.max(c0, C.length - 90) : c0, i1 = b ? C.length : Math.max(c0, C.length - 90) + 1; x.strokeStyle = `rgba(255,150,70,${flat ? 0.5 : b ? 0.6 : 0.22})`; x.beginPath();
-    for (let i = i0; i < Math.min(i1, C.length); i++) { const far = i > i0 && (C[i][0] - C[i - 1][0]) ** 2 + (C[i][1] - C[i - 1][1]) ** 2 > 600 * 600; const cx = mapSX(C[i][0], C[i][1], flat ? undefined : C[i][2] ?? reliefH(C[i][0], C[i][1])); if (i === i0 || far) x.moveTo(cx, cY(C[i])); else x.lineTo(cx, cY(C[i])); }
+    for (let i = i0, cut = false; i < Math.min(i1, C.length); i++) { if (both && !m3Vis(realm, C[i][0], C[i][1])) { cut = true; continue; } const far = cut || i > i0 && (C[i][0] - C[i - 1][0]) ** 2 + (C[i][1] - C[i - 1][1]) ** 2 > 600 * 600; cut = false; const cx = mapSX(C[i][0], C[i][1], flat ? undefined : C[i][2] ?? reliefH(C[i][0], C[i][1])); if (i === i0 || far) x.moveTo(cx, cY(C[i])); else x.lineTo(cx, cY(C[i])); }
     x.stroke(); }
   // the few places that have names
   x.font = '10px "IBM Plex Mono", Menlo, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
   // a name is written only where no name has been written yet this frame: where a dozen things stand on one spot, one of them is named, and the rest are as the view goes in
   const used = [], fits = (px, py, n) => { const w = n * 2.9 + 4, x0 = px - w, x1 = px + w, y0 = py - 6, y1 = py + 6; for (const r of used) if (x0 < r[1] && x1 > r[0] && y0 < r[3] && y1 > r[2]) return false; used.push([x0, x1, y0, y1]); return true; };
   const mark = (wx, wz, glyph, label, col, size = 15) => {
+    if (both && !m3Vis(realm, wx, wz)) return;   // (with both: only what is on the part of the block that shows)
     const px = mapSX(wx, wz), py = gY(wx, wz);
     if (px < -40 || py < -40 || px > W + 40 || py > H + 40) return;
     x.fillStyle = col; x.font = `bold ${size}px Menlo, monospace`; x.fillText(glyph, px, py);
@@ -27138,67 +27372,73 @@ function updateMap(dt) {
   };
   // everyone who is flying, where they are in the air (found first: their names are the ones that must not be written over)
   const here = new Set(), me = realm === 'under' ? 1 : 0; V.hits.length = 0;
-  for (const P of NET.peers.values()) if (P.s && performance.now() - P.s.t < 15000 && P.realm === me) { here.add(P.name); if (SHUN.block.has(P.name)) continue;
-    const [bx, by] = P3(P.pos.x, P.pos.z, flat ? WATER : P.pos.y); V.hits.push({ P, x: bx, y: by }); fits(bx, by + 16, P.name.length + 2); }
-  { const [qx, qy] = P3(player.pos.x, player.pos.z, flat ? WATER : player.pos.y); fits(qx, qy, 4); }
+  for (const P of NET.peers.values()) if (P.s && performance.now() - P.s.t < 15000 && (P.realm === me || both)) { const pr = P.realm ? 'under' : 'over', off = pr === realm ? 0 : M3.offX;
+    if (pr === realm) here.add(P.name); if (SHUN.block.has(P.name) || !m3Vis(pr, P.pos.x, P.pos.z)) continue;
+    const [bx, by] = P3(P.pos.x, P.pos.z, flat ? WATER : P.pos.y + off); V.hits.push({ P, x: bx, y: by, off, gy: flat ? by : mapSY(P.pos.x, P.pos.z, relOf(pr, P.pos.x, P.pos.z) + off) }); fits(bx, by + 16, P.name.length + 2); }
+  if (mine) { const [qx, qy] = P3(player.pos.x, player.pos.z, flat ? WATER : player.pos.y); fits(qx, qy, 4); }
   // the countries he knows the names of, written faintly across them
   if (AREA.S * V.s > 64) { const rp = realm === 'under' ? 'under' : 'over'; x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = 'rgba(244,234,210,.46)';   // (from far off they would only crowd each other)
     for (const [k, a] of AREA.names) { const [r, i, j] = k.split(':'); if (r !== rp || !a || !a.name) continue; const cx = (+i + 0.5) * AREA.S, cz = (+j + 0.5) * AREA.S;
-      if (!AREA.seen.has(k) && !mapKnown(cx, cz)) continue; const px = mapSX(cx, cz), py = gY(cx, cz); if (px < -80 || py < -20 || px > W + 80 || py > H + 20) continue;
+      if (!AREA.seen.has(k) && !mapKnown(cx, cz) || both && !m3Vis(realm, cx, cz)) continue; const px = mapSX(cx, cz), py = gY(cx, cz); if (px < -80 || py < -20 || px > W + 80 || py > H + 20) continue;
       const t = a.name.toUpperCase().split('').join(' '); if (fits(px, py, t.length)) x.fillText(t, px, py); } }
   if (realm === 'over') {
     mark(MOUNT.x, MOUNT.z, '▲', 'O L Y M P U S', '#eef2f8'); mark(CRETE.x, CRETE.z, '▦', 'C R E T E', '#e8c890');
-    if (!flat) { const [mx, my] = P3(MOUNT.x, MOUNT.z, SUMMIT); x.strokeStyle = 'rgba(226,172,78,.7)'; x.beginPath(); x.moveTo(mx, my - 12); x.lineTo(mx, my - 58); x.stroke(); x.fillStyle = '#ffc46a'; x.beginPath(); x.arc(mx, my - 58, 2.2, 0, 6.3); x.fill();   // (the summit's height, on a pin)
+    if (!flat && m3Vis('over', MOUNT.x, MOUNT.z)) { const [mx, my] = P3(MOUNT.x, MOUNT.z, SUMMIT); x.strokeStyle = 'rgba(226,172,78,.7)'; x.beginPath(); x.moveTo(mx, my - 12); x.lineTo(mx, my - 58); x.stroke(); x.fillStyle = '#ffc46a'; x.beginPath(); x.arc(mx, my - 58, 2.2, 0, 6.3); x.fill();   // (the summit's height, on a pin)
       x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = 'rgba(244,234,210,.75)'; fits(mx, my - 68, 8); x.fillText(`${Math.round(SUMMIT - WATER).toLocaleString()} M`, mx, my - 68); }
     for (const b of BEACONS) if (mapKnown(b.x, b.z)) mark(b.x, b.z, b.lit ? '◆' : '◇', '', b.lit ? '#ffc46a' : '#bfe6ff');
     for (const g of gods) if (g.active && (g.marked || story.met.has(g.id))) mark(g.x, g.z, story.met.has(g.id) ? '·' : '◇', story.met.has(g.id) || g.place === 'HERMES' ? g.name.toUpperCase() : (g.place || g.disguise).toUpperCase(), story.met.has(g.id) ? '#ffe08a' : '#ffb070');
-  } else if (UNDER.hades) mark(UNDER.hades.x, UNDER.hades.z, '◇', 'H A D E S', '#7fa8ff');
+  } else mapUnder(x, W, H, 0, fits, flat);   // (the regions of the dead, their mountains of fire and their rivers)
+  if (both) mapBoth(x, W, H, fits);   // (and the other world, the throats between them, and the edges of the block)
   // what other people left: the shrines where they met a god, the places they fell, and where they were last seen
   const near = V.s > 0.06, close = V.s > 0.16;   // (names are written only once the view is close enough for them not to pile up)
-  for (const m of WORLD.marks) {
+  if (mine) for (const m of WORLD.marks) {
     if (m.k === 'met') mark(m.x, m.z, '⌂', close || m.mine && near ? `${(godById[m.g]?.name || m.g).toUpperCase()} · ${m.mine ? 'YOU' : m.n}` : '', m.mine ? '#ffc46a' : '#e8c890');
     else if (close) mark(m.x, m.z, '†', '', 'rgba(255,120,90,.38)', 10);   // (where someone fell: small, and only from close)
   }
   // everyone who is flying, where they are in the air: the line they have flown, a thread down to the ground under them and
   // their shadow on it, and the bird itself, which can be pointed at and gone to
   { const was = V.hot; V.hot = V.ptr && !V.down ? mapBirdAt(V.ptr.x, V.ptr.y, 20) : null; mapEl.style.cursor = V.hot ? 'pointer' : ''; if (V.hot && V.hot !== was) audio.sfx.mapHover?.(); }
-  for (const { P, x: bx, y: by } of V.hits) {
+  for (const { P, x: bx, y: by, off, gy } of V.hits) {
     const c = P.css || '#bfe6ff', t = P.mtrail;
     if (t && t.length > 1) { x.strokeStyle = c; x.lineWidth = 1.1;
       for (let b = 0; b < 3; b++) { const i0 = Math.floor(t.length * b / 3), i1 = Math.min(t.length - 1, Math.floor(t.length * (b + 1) / 3)); if (i1 <= i0) continue; x.globalAlpha = 0.12 + b * 0.2; x.beginPath();
-        for (let i = i0; i <= i1; i++) { const q = t[i], X = mapSX(q[0], q[2], flat ? WATER : q[1]), Y = mapSY(q[0], q[2], flat ? WATER : q[1]); if (i === i0) x.moveTo(X, Y); else x.lineTo(X, Y); }
+        for (let i = i0; i <= i1; i++) { const q = t[i], X = mapSX(q[0], q[2], flat ? WATER : q[1] + off), Y = mapSY(q[0], q[2], flat ? WATER : q[1] + off); if (i === i0) x.moveTo(X, Y); else x.lineTo(X, Y); }
         if (b === 2) x.lineTo(bx, by); x.stroke(); }
       x.globalAlpha = 1; x.lineWidth = 1; }
-    if (!flat) { const gy = gY(P.pos.x, P.pos.z); x.strokeStyle = 'rgba(191,230,255,.3)'; x.beginPath(); x.moveTo(bx, by); x.lineTo(bx, gy); x.stroke();
+    if (!flat) { x.strokeStyle = 'rgba(191,230,255,.3)'; x.beginPath(); x.moveTo(bx, by); x.lineTo(bx, gy); x.stroke();
       x.fillStyle = 'rgba(0,0,0,.35)'; x.beginPath(); x.ellipse(bx, gy, 5, 5 * mapP.T, 0, 0, TAU_); x.fill(); }
     mapBird(x, P, bx, by, W, H, P === V.hot || P.id === TRACK.id);   // (whoever is being tracked is ringed here too)
   }
-  for (const t of WORLD.trav) if (t.n !== heroName && !here.has(t.n)) mark(t.x, t.z, '✧', close ? `${t.n} · ${agoISO(t.seen)}` : '', 'rgba(191,230,255,.5)');
+  if (mine) for (const t of WORLD.trav) if (t.n !== heroName && !here.has(t.n)) mark(t.x, t.z, '✧', close ? `${t.n} · ${agoISO(t.seen)}` : '', 'rgba(191,230,255,.5)');
   // him
   drawWeather(x, V, W, H);
   const P = player.pos, [px, py] = P3(P.x, P.z, flat ? WATER : P.y), yaw = player.form === 'human' ? human.group.rotation.y : player.yaw, pulse = 5 + (Math.sin(time * 3) * 0.5 + 0.5) * 6;
-  if (!flat) { x.strokeStyle = 'rgba(255,138,58,.4)'; x.beginPath(); x.moveTo(px, py); x.lineTo(px, gY(P.x, P.z)); x.stroke(); }
+  if (!mine) { const gx = mapSX(P.x, P.z), gy = gY(P.x, P.z); if (gx > -20 && gy > -20 && gx < W + 20 && gy < H + 20) { x.fillStyle = 'rgba(255,138,58,.45)'; x.font = 'bold 13px Menlo, monospace'; x.fillText('✧', gx, gy); x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillText(V.real === 'over' ? 'YOU ARE ABOVE HERE' : 'YOU ARE BELOW HERE', gx, gy + 15); } }
+  else if (!both || m3Vis(realm, P.x, P.z)) { if (!flat) { x.strokeStyle = 'rgba(255,138,58,.4)'; x.beginPath(); x.moveTo(px, py); x.lineTo(px, gY(P.x, P.z)); x.stroke(); }
   x.strokeStyle = 'rgba(255,138,58,.7)'; x.lineWidth = 1; x.beginPath(); x.arc(px, py, pulse, 0, 6.283); x.stroke();
   { const fx = -Math.sin(yaw), fz = -Math.cos(yaw); x.beginPath(); x.moveTo(px, py); x.lineTo(px + (fx * mapP.c - fz * mapP.s) * 16, py + (fx * mapP.s + fz * mapP.c) * mapP.T * 16); x.stroke(); }
-  x.fillStyle = '#ff8a3a'; x.font = 'bold 15px Menlo, monospace'; x.fillText('✦', px, py);
+  x.fillStyle = '#ff8a3a'; x.font = 'bold 15px Menlo, monospace'; x.fillText('✦', px, py); }
   // a bird under the pointer: who it is, how far and how high, and that a click goes there
   { V.memHits = []; const me2 = realm === 'under' ? 1 : 0; x.textAlign = 'center'; x.font = '10px "IBM Plex Mono", Menlo, monospace';   // where his pictures were taken, and his films: a small frame each
-    for (const m of MEMO.idx) { if ((m.r || 0) !== me2) continue; const sx = mapSX(m.x, m.z, flat ? WATER : m.y), sy = mapSY(m.x, m.z, flat ? WATER : m.y); if (!(sx >= -10 && sy >= -10 && sx <= W + 10 && sy <= H + 10)) continue; x.fillStyle = m.k === 'v' ? 'rgba(255,150,130,.85)' : 'rgba(244,234,210,.6)'; x.fillText(m.k === 'v' ? '▶' : '▣', sx, sy + 3); V.memHits.push({ id: m.id, x: sx, y: sy }); } }
+    for (const m of MEMO.idx) { if ((m.r || 0) !== me2 || both && !m3Vis(realm, m.x, m.z)) continue; const sx = mapSX(m.x, m.z, flat ? WATER : m.y), sy = mapSY(m.x, m.z, flat ? WATER : m.y); if (!(sx >= -10 && sy >= -10 && sx <= W + 10 && sy <= H + 10)) continue; x.fillStyle = m.k === 'v' ? 'rgba(255,150,130,.85)' : 'rgba(244,234,210,.6)'; x.fillText(m.k === 'v' ? '▶' : '▣', sx, sy + 3); V.memHits.push({ id: m.id, x: sx, y: sy }); } }
   { V.wpHits = []; const L = wpAll();   // his marks: a star each, the chosen one brighter, each with its name
-    for (let i = 0; i < L.length; i++) { const w = L[i], sx = mapSX(w.x, w.z, flat ? WATER : w.y), sy = mapSY(w.x, w.z, flat ? WATER : w.y), on = i === WP.sel; if (!(sx >= -20 && sy >= -20 && sx <= W + 20 && sy <= H + 20)) continue;
+    for (let i = 0; i < L.length; i++) { const w = L[i], wr = w.home ? 'over' : realm, wo = wr === realm ? 0 : M3.offX; if (wr !== realm && !both || both && !m3Vis(wr, w.x, w.z)) continue;
+      const sx = mapSX(w.x, w.z, flat ? WATER : w.y + wo), sy = mapSY(w.x, w.z, flat ? WATER : w.y + wo), on = i === WP.sel; if (!(sx >= -20 && sy >= -20 && sx <= W + 20 && sy <= H + 20)) continue;
       x.textAlign = 'center'; x.fillStyle = on ? '#fff1c8' : w.home ? 'rgba(255,214,150,.85)' : 'rgba(244,234,210,.75)'; x.font = `${on ? 16 : 12}px "IBM Plex Mono", Menlo, monospace`; x.fillText(w.home ? '⌂' : '✦', sx, sy + 4);
       x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = on ? '#fff1c8' : 'rgba(244,234,210,.6)'; x.fillText(w.n, sx, sy - 10); V.wpHits.push({ i, x: sx, y: sy }); } }
-  if (V.hot) { const Q = V.hot, h = V.hits.find(q => q.P === Q), up = Math.max(0, Q.pos.y - reliefH(Q.pos.x, Q.pos.z));
+  if (V.hot) { const Q = V.hot, h = V.hits.find(q => q.P === Q), qr = Q.realm ? 'under' : 'over', up = Math.max(0, Q.pos.y - relOf(qr, Q.pos.x, Q.pos.z));
     x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = 'rgba(190,255,220,.95)';
-    x.fillText(`${fmtDist(Math.hypot(Q.pos.x - P.x, Q.pos.y - P.y, Q.pos.z - P.z))} away · ${Math.round(up).toLocaleString()} m up · ${flags.morphed ? 'click to be carried to them' : 'you have no wings yet'}`, clamp(h.x, 150, W - 150), h.y - 26); }
+    x.fillText(`${fmtDist(Math.hypot(Q.pos.x - P.x, Q.pos.y - P.y, Q.pos.z - P.z))} away · ${Math.round(up).toLocaleString()} m up · ${qr !== V.real ? (qr === 'under' ? 'in the world below' : 'in the world above') : flags.morphed ? 'click to be carried to them' : 'you have no wings yet'}`, clamp(h.x, 150, W - 150), h.y - 26); }
   // where the pointer is: a place he could be carried to, or not (the square lies on the ground, wherever the ground is)
-  else if (V.hover && flags.morphed && !TOUCH) {
-    const cx = Math.floor(V.hover[0] / MAPC), cz = Math.floor(V.hover[1] / MAPC), ok = mapCells[realm].has(packCell(cx, cz)), theirs = !ok && WORLD.cells[realm].has(packCell(cx, cz));
+  else if (V.hover && !V.hover.out && flags.morphed && !TOUCH && (V.hover.r !== realm || !mine)) {   // (a place in the other world: no being carried there)
+    x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillStyle = V.hover.r === 'under' ? 'rgba(170,190,255,.92)' : 'rgba(244,234,210,.85)'; x.fillText(mapWayHint(V.hover.r).toLowerCase(), clamp(V.ptr ? V.ptr.x : W / 2, 230, W - 230), (V.ptr ? V.ptr.y : H / 2) - 18); }
+  else if (V.hover && !V.hover.out && flags.morphed && !TOUCH) {
+    const cx = Math.floor(V.hover.x / MAPC), cz = Math.floor(V.hover.z / MAPC), ok = mapCells[realm].has(packCell(cx, cz)), theirs = !ok && WORLD.cells[realm].has(packCell(cx, cz));
     const cell = () => { x.beginPath(); for (let i = 0; i < 4; i++) { const wx = (cx + (i === 1 || i === 2 ? 1 : 0)) * MAPC, wz = (cz + (i > 1 ? 1 : 0)) * MAPC, X = mapSX(wx, wz), Y = gY(wx, wz); if (i) x.lineTo(X, Y); else x.moveTo(X, Y); } x.closePath(); x.stroke(); };
     x.strokeStyle = ok ? 'rgba(190,255,220,.9)' : theirs ? 'rgba(190,230,255,.75)' : 'rgba(244,234,210,.18)'; cell();
     if (ok || theirs) {
       const who = WORLD.names[WORLD.cells[realm].get(packCell(cx, cz))], mx = mapSX((cx + 0.5) * MAPC, (cz + 0.5) * MAPC), my = gY((cx + 0.5) * MAPC, (cz + 0.5) * MAPC), half = MAPC * V.s * 0.5 * Math.max(mapP.T, 0.5);
-      x.fillStyle = 'rgba(190,255,220,.9)'; x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillText(`${fmtDist(Math.hypot(V.hover[0] - P.x, V.hover[1] - P.z))}`, mx, my - half - 10);
+      x.fillStyle = 'rgba(190,255,220,.9)'; x.font = '9px "IBM Plex Mono", Menlo, monospace'; x.fillText(`${fmtDist(Math.hypot(V.hover.x - P.x, V.hover.z - P.z))}`, mx, my - half - 10);
       if (who) { x.fillStyle = 'rgba(244,234,210,.7)'; x.fillText(who === heroName ? 'you saw it first' : `first seen by ${who}`, mx, my + half + 11); }
     }
   }
@@ -30359,7 +30599,7 @@ addEventListener('keydown', e => {
     const V = mapV, st = innerHeight * 0.16 / V.ts, mv = (u, v) => { V.tx += (u * mapP.c + v * mapP.s) * st; V.tz += (-u * mapP.s + v * mapP.c) * st; audio.sfx.mapMove?.(); };
     if (M3.on && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyQ', 'KeyE', 'KeyZ', 'KeyX', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract', 'ShiftLeft', 'ShiftRight'].includes(e.code)) { e.preventDefault(); if (!M3.keys[e.code] && !e.code.startsWith('Shift')) audio.sfx.mapMove?.(); M3.keys[e.code] = true; return; }   // (standing: held, they fly it about)
     switch (e.code) {
-      case 'KeyM': case 'Escape': closeMap(); break; case 'KeyR': if (!e.repeat) mapMode(); break;
+      case 'KeyM': case 'Escape': closeMap(); break; case 'KeyR': if (!e.repeat) mapMode(); break; case 'KeyU': if (!e.repeat) mapLayerNext(); break;
       case 'KeyW': case 'ArrowUp': mv(0, -1); break; case 'KeyS': case 'ArrowDown': mv(0, 1); break; case 'KeyA': case 'ArrowLeft': mv(-1, 0); break; case 'KeyD': case 'ArrowRight': mv(1, 0); break;
       case 'KeyQ': mapTurn(0.2, 0); break; case 'KeyE': mapTurn(-0.2, 0); break; case 'KeyZ': mapTurn(0, -0.07); break; case 'KeyX': mapTurn(0, 0.07); break;
       case 'Equal': case 'NumpadAdd': mapZoom(1.25, innerWidth / 2, innerHeight * mapP.mid); break; case 'Minus': case 'NumpadSubtract': mapZoom(0.8, innerWidth / 2, innerHeight * mapP.mid); break;
