@@ -6285,7 +6285,7 @@ function pressSpace() {
   }
   if (act.kind === 'wings') return openWings(false);
   if (act.kind === 'perch') return perchGo(PERCH.spot || perchUnder());
-  if (act.kind === 'perchoff') { p.perchGo = null; p.speed = Math.max(p.speed, 46); p.climbOut = 1.5; audio.sfx.flap?.(0.8); WR.beat = 1; return; }   // (changed his mind: on he goes)
+  if (act.kind === 'perchoff') { p.perchGo = null; p.speed = Math.max(p.speed, 46); p.climbOut = 4; audio.sfx.flap?.(0.8); WR.beat = 1; return; }   // (changed his mind: on he goes)
   if (act.kind === 'takeoff') return perchUp();
   if (act.kind === 'swoop') return openWings(true);
   if (act.kind === 'talk') return startTalk(act.g);
@@ -12771,7 +12771,7 @@ function updateTakeoff(dt) {
     const lx = -Math.sin(p.yaw), lz = -Math.cos(p.yaw);
     p.pos.x += lx * p.speed * dt; p.pos.z += lz * p.speed * dt; p.pos.y += p.vy * dt;
     p.pos.y = Math.max(p.pos.y, groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * K);
-    if (u >= 1) { p.takeoff = null; p.speed = Math.max(p.speed, 30); p.vy = clamp(p.vy, 0, 8); p.climbOut = 2.5; }   // (and a few hard beats more, of themselves, to get up to speed: see FLY)
+    if (u >= 1) { p.takeoff = null; p.speed = Math.max(p.speed, 30); p.vy = clamp(p.vy, 0, 8); p.climbOut = 8; }   // (and a few hard beats more, of themselves, to get up to speed: see FLY)
     dir3.set(lx * Math.cos(p.pitch), Math.sin(p.pitch), lz * Math.cos(p.pitch)); p.fallTop = p.pos.y; p.glideT = 0; return;
   }
   const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), CR = 0.2;
@@ -12793,7 +12793,7 @@ function updateTakeoff(dt) {
     flyWings(dt, { boost: false, dive: 0, climb: 1 - u * 0.5 });
     p.pos.x += fx * p.speed * dt; p.pos.z += fz * p.speed * dt; p.pos.y += p.vy * dt;
     p.pos.y = Math.max(p.pos.y, groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * K);
-    if (u >= 1) { p.takeoff = null; p.speed = Math.max(p.speed, 34); p.vy = clamp(p.vy, 3, 10); p.climbOut = 2.5; }
+    if (u >= 1) { p.takeoff = null; p.speed = Math.max(p.speed, 34); p.vy = clamp(p.vy, 3, 10); p.climbOut = 8; }
   }
   dir3.set(fx * Math.cos(p.pitch), Math.sin(p.pitch), fz * Math.cos(p.pitch)); p.fallTop = p.pos.y; p.glideT = 0;
 }
@@ -13138,7 +13138,7 @@ function updatePhoenix(dt) {
   const K1 = birdK(), svK = SMALL.k < 1 ? smallV() : K1 > 1.01 ? 1 + 0.18 * (K1 - 1) : 1, BKf = 1 + (K1 - 1) * 0.3;
   const Vc = 64 * BKf * (1 + 0.12 * perks.swift + IS.swift) * MOD.speed * (GODM.spent ? 0.6 : 1), gN = FLY.g * (GODM.on ? 0.6 : 1) / svK, u = p.speed / Vc;
   const Kp = Math.cbrt(1 / K1) * (GODM.on ? 1.8 : 1), ride = p.rideK = Math.max(0, (p.rideK || 0) - dt * 1.5);
-  p.climbOut = Math.max(0, (p.climbOut || 0) - dt);
+  p.climbOut = Math.max(0, (u > 0.95 ? Math.min(p.climbOut || 0, 0.5) : p.climbOut || 0) - dt);   // (off the ground he beats until he is up to the cruise, or eight seconds)
   const th = FLY.th = GODM.spent ? 0 : PV ? Math.min(1, PILOT.thr / 0.86) : Math.max(clamp((pin - 0.05) / 0.45, 0, 1), ride, p.climbOut > 0 ? 1 : 0);
   const push = th * Math.min(FLY.tmax * Kp, FLY.pw * Kp / Math.max(u, 0.05)) + (boost ? FLY.fire * (GODM.on ? 1.5 : 1) * Math.max(0, 1 - u / FLY.fireTop) : 0);
   // (the nose a glide holds: as far down as the push is short of the drag, so the speed he keeps is what he has; and then
