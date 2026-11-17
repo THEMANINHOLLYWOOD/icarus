@@ -38427,64 +38427,266 @@ function cosmosFrame(dt) {
   if ((C.hudT -= dt) <= 0) { C.hudT = 0.25; czBar(true); }
   if (C.map.on) czLabels();
 }
-// the film camera out in the dark has its own few shots, cut between: the chase plane under his tail, the sun dead behind
-// him, the whole world round and small behind him, the nearest world filling the frame behind him, the slow way round him
-// that never cuts, and from ahead looking back. Sets _czv (where the eye is, from him); says the lens, its up, where it looks
-const CZ_CINE = { chase: [6, 9], sun: [6, 8], globe: [8, 11], world: [7, 10], round: [14, 18], ahead: [5, 7] };
-const CZ_CINE_N = { chase: 'CHASE PLANE', sun: 'AGAINST THE SUN', globe: 'THE WORLD BEHIND YOU', world: 'A WORLD BEHIND YOU', round: 'ONE LONG TAKE', ahead: 'HEAD-ON' };
-const _czr = new THREE.Vector3(), _czn = new THREE.Vector3();
-function czCine(dt, f, u, cd) {
-  const C = COSMOS, S = C.cs || (C.cs = { type: '', t: 0, dur: 0, side: 1, cut: false, a: 0, fov: 60, up: new THREE.Vector3(), lead: 0, rate: 2 });
-  const B = C.nearB, near = B && B.R && C.nearD < B.R * 7;
-  S.t += dt;
-  if (!S.type || S.t > S.dur || S.type === 'world' && !near) {
-    const pool = Object.keys(CZ_CINE).filter(k => k !== S.type && (k !== 'world' || near));
-    S.type = near && S.type !== 'world' && Math.random() < 0.5 ? 'world' : pool[Math.floor(Math.random() * pool.length)];
-    S.t = 0; S.dur = rr(CZ_CINE[S.type]); S.side = Math.random() < 0.5 ? -1 : 1; S.a = Math.random() * 6.28; S.cut = true;
-  }
-  const r = _czr.crossVectors(f, u).normalize(), n = _czn.copy(C.pos).normalize(), s = S.side;
-  S.up.copy(u); S.lead = 14 + C.rush * 20; S.rate = 1.5;
+// the film camera out in the dark has its shots, cut between, and every one of them is sized by how fast he is going (C.ck:
+// his speed on a scale by its log, from skimming a world at 0 to crossing the dark at 1). Slow and low over a world, the
+// ground going by under him with its horizon level in the frame; fast, further off on longer lenses against the stars, or
+// close in on a wide one, the eye falling back as he gathers speed and catching him up again (C.clag). A shot runs as long as
+// its speed lets it; it is cut short on a wingbeat, and on what happens out there: a world coming up, one going by, the
+// rings, the sun out from behind a world, the dive into one. No shot is cut to with the eye in a world or the sheet of a
+// ring, or a world between it and him. czShot sets _czv (where the eye is, from him) and says the lens, its up, where it looks
+const CZ_CINE = { chase: [6, 9], skim: [7, 10], pass: [3, 6], world: [6, 9], globe: [7, 10], sun: [5, 7], round: [12, 16], ahead: [4, 6], long: [6, 9], rush: [4, 6], rings: [5, 7], flyby: [3, 8], dive: [3, 9] };
+const CZ_CINE_N = { chase: 'CHASE PLANE', skim: 'SKIMMING THE GROUND', pass: 'THE GROUND GOING BY', world: 'A WORLD BEHIND YOU', globe: 'THE WORLD BEHIND YOU', sun: 'AGAINST THE SUN', round: 'ONE LONG TAKE', ahead: 'HEAD-ON', long: 'LONG LENS', rush: 'FULL TILT', rings: 'THROUGH THE RINGS', flyby: 'A WORLD GOING BY', dive: 'INTO ITS AIR' };
+const CZ_CINE_K = Object.keys(CZ_CINE), CZ_CINE_W = new Float64Array(CZ_CINE_K.length);
+const _czr = new THREE.Vector3(), _czs = new THREE.Vector3(), _czt = new THREE.Vector3(), _czk = new THREE.Vector3(), _czl = new THREE.Vector3(), _cze = new THREE.Vector3(), _czp = new THREE.Vector3(), _czh = new THREE.Vector3(), _czo = new THREE.Vector3(), _czq2 = new THREE.Quaternion();
+const V3 = () => new THREE.Vector3();
+function czCineState() {
+  return { type: '', prev: '', t: 0, dur: 0, side: 1, cut: false, cutN: 0, live: false, a: 0, fov: 60, lead: 0, rate: 2, qrate: 7, frate: 2, shake: 0, blk: 0,
+    upW: V3(), upS: V3(), c: V3(), n: V3(), nR: V3(), anc: V3(), dir: V3(), ry: 1, d0: 0, fbB: null, dove: false, nearId: '', wasNear: false, wasLit: true, sunAt: -99, hy: false, bt: 0, ringed: false, pend: '', pendT: 0,
+    x: { k: 0, lag: 0, R: 1, alt: 0, prox: 0, low: false, near: false, along: true, lit: true, gd: 0, ringT: 1e9, ringNear: false, fb: null, fbT: 1e9 } };
+}
+// the globe's ground under a direction, eased between the points of its picture (the eye must not jump where it steps)
+function czGlobeHs(n) {
+  const D = COSMOS.tex.data, x = (Math.atan2(n.x, n.z) / TAU_ + 0.5) * CZ_TW - 0.5, y = Math.acos(clamp(n.y, -1, 1)) / Math.PI * CZ_TH - 0.5;
+  const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, i0 = (i % CZ_TW + CZ_TW) % CZ_TW, i1 = (i0 + 1) % CZ_TW, j0 = clamp(j, 0, CZ_TH - 1), j1 = clamp(j + 1, 0, CZ_TH - 1);
+  return lerp(lerp(D[(j0 * CZ_TW + i0) * 4 + 3], D[(j0 * CZ_TW + i1) * 4 + 3], fx), lerp(D[(j1 * CZ_TW + i0) * 4 + 3], D[(j1 * CZ_TW + i1) * 4 + 3], fx), fy) / 255 * 2400;
+}
+// the eye kept out of the worlds: over the ground of any it has gone into, by a margin (pushed out along the way it is from
+// the middle, so it rides over the ground and never jumps)
+function czSafe(p, m) {
+  for (const B of COSMOS.bodies) { _czs.subVectors(p, B.pos); const d = _czs.length(), fl = B.R * (1 + CZ_AMP[B.kind] * 0.7) + m; if (d < fl && d > 1e-6) p.copy(B.pos).addScaledVector(_czs, fl / d); }
+  const g = p.length(); if (g < CZ_RG + 2400 + m && g > 1e-6) { _czs.copy(p).divideScalar(g); const fl = CZ_RG + czGlobeHs(_czs) + m; if (g < fl) p.multiplyScalar(fl / g); }
+  return p;
+}
+// whether the eye there would be in a world, or in the sheet of a ring (the globe's two, and the near world's)
+function czIn(p, m) {
+  const C = COSMOS;
+  for (const B of C.bodies) if (p.distanceTo(B.pos) < B.R * (1 + CZ_AMP[B.kind] * 0.7) + m) return true;
+  const g = p.length(); if (g < CZ_RG + 2400 + m) { _czs.copy(p).divideScalar(g || 1); if (g < CZ_RG + czGlobeHs(_czs) + m) return true; }
+  if (czRingIn(C.ringA, _cz0, CZ_RG, p) || czRingIn(C.ringB, _cz0, CZ_RG, p)) return true;
+  const B = C.nearB; return !!(B && B.ring && czRingIn(B.ring, B.pos, B.R, p));
+}
+function czRingIn(R, c, s, p) {
+  const U = R.material.uniforms; R.getWorldQuaternion(_czq2); _czk.subVectors(p, c).applyQuaternion(_czq2.invert());
+  const rr = Math.hypot(_czk.x, _czk.z) / s; return rr > U.uR0.value * 0.97 && rr < U.uR1.value * 1.03 && Math.abs(_czk.y) < 60;
+}
+// whether a world stands between two points
+function czHid(a, b) {
+  for (const B of COSMOS.bodies) if (czSeg(a, b, B.pos, B.R)) return true;
+  return czSeg(a, b, _cz0, CZ_RG + 200);
+}
+function czSeg(a, b, c, R) {
+  _czl.subVectors(b, a); const t = clamp(_cze.subVectors(c, a).dot(_czl) / (_czl.lengthSq() || 1), 0, 1);
+  return _cze.copy(a).addScaledVector(_czl, t).distanceToSquared(c) < R * R;
+}
+// an up for the eye looking along v: the one wanted, square to the look; where that is too near the look itself to say which
+// way it is, the one it had (so it never turns over when he goes straight up or down, or turns hard)
+function czUp(out, v, want, prev) {
+  out.copy(want).addScaledVector(v, -want.dot(v)); const a = out.length();
+  _czt.copy(prev).addScaledVector(v, -prev.dot(v)); const b = _czt.length();
+  const w = b > 1e-4 ? smoothstep(0.1, 0.35, a) : 1;
+  if (a > 1e-6) out.divideScalar(a); if (b > 1e-4) _czt.divideScalar(b);
+  out.multiplyScalar(w).addScaledVector(_czt, 1 - w);
+  if (out.lengthSq() < 1e-6) out.set(0, 1, 0).addScaledVector(v, -v.y);
+  if (out.lengthSq() < 1e-6) out.set(1, 0, 0).addScaledVector(v, -v.x);
+  return out.normalize();
+}
+// a direction turned toward another, by an easing share of the angle but never faster than a top rate (the eye's up: so when
+// he rolls himself level, or goes over the top, the frame comes round steadily and never spins; ax, the way round if they
+// are opposite)
+function czTurn(v, t, k, top, ax) {
+  const th = Math.acos(clamp(v.dot(t), -1, 1)), a = Math.min(th * k, top); if (th < 1e-5 || a >= th) return v.copy(t);
+  _czk.crossVectors(v, t); if (_czk.lengthSq() < 1e-10) _czk.copy(ax); return v.applyAxisAngle(_czk.normalize(), a).normalize();
+}
+// an offset eased toward another by k, the way round and the length apart (a straight lerp between two far apart would put
+// the eye through him on the way)
+function czEase(o, w, k, side) {
+  const l0 = o.length(), l1 = w.length(); if (l0 < 1e-6 || l1 < 1e-6) return o.lerp(w, k);
+  _czs.copy(w).divideScalar(l1); o.divideScalar(l0);
+  if (o.dot(_czs) < -0.9) o.addScaledVector(side, 0.25);   // (straight round the other way: over the top of him)
+  return o.lerp(_czs, k).normalize().multiplyScalar(lerp(l0, l1, k));
+}
+// a tremble in the eye at a great speed: smooth, sums of quick sines (never a new jolt each frame)
+function czShake(p, r, u, a) {
+  if (a <= 0) return; const t = time;
+  p.addScaledVector(r, a * (Math.sin(t * 13.1) * 0.6 + Math.sin(t * 21.7 + 1.3) * 0.4)).addScaledVector(u, a * (Math.sin(t * 15.3 + 0.7) * 0.6 + Math.sin(t * 25.9 + 2.1) * 0.4));
+}
+// what the shots need to know, every frame: the world he is near, how high over it, whether he is in the sun, the rings, a
+// world about to go by
+function czCtx(S, f) {
+  const C = COSMOS, X = S.x, B = C.nearB;
+  if (B) S.c.copy(B.pos); else S.c.set(0, 0, 0);
+  X.R = B ? B.R : CZ_RG; S.n.subVectors(C.pos, S.c); const dc = S.n.length() || 1; S.n.divideScalar(dc);
+  X.alt = dc - (B ? B.R * (1 + CZ_AMP[B.kind] * 0.7) : CZ_RG + czGlobeHs(S.n));
+  X.k = C.ck; X.lag = C.clag;
+  X.prox = smoothstep(X.R * 2.5, X.R * 0.2, X.alt);   // (how much of what he sees it is: as much its up is the eye's)
+  X.low = X.alt < Math.min(X.R * 0.3, 2200); X.near = X.alt < X.R * 4; X.along = Math.abs(f.dot(S.n)) < 0.5;   // (going along its face, not up off it or down at it)
+  { const b = S.n.dot(CZ_SUN) * dc, cc = dc * dc - X.R * X.R; X.lit = !(b < 0 && b * b > cc); }   // (out of its shadow)
+  X.gd = C.pos.length();
+  S.nR.set(0, 1, 0).applyQuaternion(C.rings.quaternion);
+  X.ringNear = C.ringR > 1.4 && C.ringR < 3.4 && Math.abs(C.ringY) < 3500; X.ringT = 1e9;
+  if (C.ringR > 1.5 && C.ringR < 3.25) { const vn = f.dot(S.nR) * C.v; if (vn * C.ringY < 0) X.ringT = -C.ringY / vn; }
+  X.fb = null; X.fbT = 1e9;
+  for (const W of C.bodies) { _czs.subVectors(W.pos, C.pos); const al = _czs.dot(f), t = al / Math.max(C.v, 1); if (al <= 0 || t > 4 || t > X.fbT) continue;
+    const pp = Math.sqrt(Math.max(0, _czs.lengthSq() - al * al)); if (pp < W.R * 1.2 || pp > W.R * 4 + 1500) continue; X.fb = W; X.fbT = t; }
+}
+// a shot begun: its side, its length, and whatever it holds still from the moment it starts
+function czStart(S, type, f, u, r, cd) {
+  const C = COSMOS, X = S.x, k = X.k;
+  S.type = type; S.t = 0; S.blk = 0; S.side = Math.random() < 0.5 ? -1 : 1; S.a = Math.random() * 6.28;
+  S.dur = rr(CZ_CINE[type]) * lerp(1.15, 0.72, k);   // (the faster, the shorter they run)
+  if (type === 'pass') {   // a mark on the ground ahead and to one side, that he comes past
+    const a = clamp(C.v * 1.5, cd * 3, 520); S.anc.copy(C.pos).addScaledVector(f, a).addScaledVector(r, S.side * cd * 1.3);
+    _czs.subVectors(S.anc, S.c); const d = _czs.length() || 1; _czs.divideScalar(d);
+    const fl = C.nearB ? X.R * (1 + CZ_AMP[C.nearB.kind] * 0.7) : CZ_RG + czGlobeHs(_czs);
+    S.anc.copy(S.c).addScaledVector(_czs, fl + clamp(X.alt - cd * 0.6, cd * 0.3, Math.max(cd * 0.3, X.alt * 0.8))); S.d0 = S.anc.distanceTo(C.pos);   // (a little under the height he is at)
+    S.dur = clamp(2 * a / Math.max(C.v, 1) + 0.8, 2.5, 7);
+  } else if (type === 'long') {
+    S.dir.copy(r).multiplyScalar(S.side * 0.85).addScaledVector(f, -0.4).addScaledVector(u, S.a > 3.14 ? 0.3 : -0.2).normalize();
+  } else if (type === 'flyby') {
+    const W = X.fb || C.nearB; _czs.subVectors(W.pos, C.pos); const al = _czs.dot(f); _czs.addScaledVector(f, -al).normalize();   // (toward it, square to his way)
+    S.dir.copy(_czs).multiplyScalar(-0.8).addScaledVector(f, -0.45).addScaledVector(u, 0.25).normalize();
+    S.dur = clamp(X.fbT + 2, 3, 8);
+  } else if (type === 'rings') S.ry = C.ringY < 0 ? -1 : 1;
+  else if (type === 'dive') S.dur = 9;
+}
+// where the eye is for the shot as it is now (_czv, from him), its lens, its up, how it looks ahead and how tightly it follows
+function czShot(S, dt, f, u, r, cd) {
+  const C = COSMOS, X = S.x, k = X.k, L = X.lag, s = S.side, n = S.n;
+  S.lead = 0; S.rate = 3; S.qrate = 7; S.frate = 2; S.shake = 0; S.upW.copy(u).addScaledVector(n, X.prox * 0.8);
   switch (S.type) {
-    case 'chase': _czv.copy(f).multiplyScalar(-cd * 1.5).addScaledVector(r, s * cd * 0.55).addScaledVector(u, -cd * 0.3); S.fov = 52; S.rate = 4; break;
-    case 'sun': _czv.copy(CZ_SUN).multiplyScalar(-cd * 7).addScaledVector(u, cd * 0.4); S.fov = 20; S.lead = 0; break;   // (him against the sun: the rays come round him)
-    case 'globe': _czv.copy(n).multiplyScalar(cd * 4.5).addScaledVector(r, s * cd * 2.5).addScaledVector(f, -cd * 1.5); S.fov = 46; S.lead = 0; S.up.copy(f); break;   // (from further out than he is, looking back down past him at the world)
-    case 'world': _czv.subVectors(C.pos, B.pos).normalize().multiplyScalar(cd * 3.6).addScaledVector(r, s * cd * 1.8).addScaledVector(u, cd * 0.5); S.fov = 44; S.lead = 0; break;
-    case 'round': { const a = S.a + S.t * 0.22 * s; _czv.copy(r).multiplyScalar(Math.cos(a) * cd * 2.1).addScaledVector(f, Math.sin(a) * cd * 2.1).addScaledVector(u, cd * (0.3 + 0.35 * Math.sin(S.t * 0.4))); S.fov = 60; S.rate = 3; break; }
-    default: _czv.copy(f).multiplyScalar(cd * 1.7).addScaledVector(u, cd * 0.15).addScaledVector(r, s * cd * 0.4); S.fov = 58;
+    case 'chase': { const d = cd * (1.5 + 2.2 * k) * (1 + 0.8 * L); _czv.copy(f).multiplyScalar(-d).addScaledVector(r, s * d * 0.35).addScaledVector(u, -d * 0.18); S.fov = lerp(50, 30, k); S.lead = d * 0.25; S.rate = lerp(3, 6, k); S.shake = smoothstep(0.6, 1, k) * 0.5; break; }   // (the longer the lens, the further off: he stays the same size)
+    case 'skim': { const d = cd * 1.7; _czv.copy(f).multiplyScalar(-d * 0.85).addScaledVector(r, s * d * 0.6).addScaledVector(n, -clamp(X.alt - clamp(X.alt * 0.35, cd * 0.25, d * 0.6), 0, d * 0.9));   // (down near the ground, his height over it a third of his)
+      S.fov = 50 + 8 * k; S.lead = d * 0.8; S.upW.copy(n); break; }
+    case 'pass': { if (dt > 0 && C.nearB && C.nearD < C.nearB.R * 3) S.anc.add(C.nearB.dp); _czv.subVectors(S.anc, C.pos);   // (a mark on the ground: he goes by it, and the lens turns and draws in to keep him)
+      S.fov = clamp(2 * Math.atan(cd * 0.8 / Math.max(1, _czv.length())) * 57.3, 14, 60); S.rate = 60; S.qrate = 12; S.frate = 6; _czs.subVectors(S.anc, S.c).normalize(); S.upW.copy(_czs); break; }
+    case 'world': { const d = cd * (3.2 + 2.4 * k); _czv.copy(n).multiplyScalar(d).addScaledVector(r, s * d * 0.5).addScaledVector(f, -d * 0.25); S.fov = lerp(44, 32, k); S.upW.copy(f).addScaledVector(n, 0.5); break; }
+    case 'globe': { const d = cd * (4.5 + 2 * k); _czs.copy(C.pos).normalize(); _czv.copy(_czs).multiplyScalar(d).addScaledVector(r, s * d * 0.55).addScaledVector(f, -d * 0.33); S.fov = lerp(46, 36, k); S.upW.copy(f); break; }
+    case 'sun': { const d = Math.min(cd * (6 + 4 * k), 640); _czv.copy(CZ_SUN).multiplyScalar(-d).addScaledVector(u, cd * 0.4); S.fov = lerp(22, 15, k); S.qrate = 14; break; }   // (him against the sun: the rays come round him)
+    case 'round': { const a = S.a + S.t * lerp(0.22, 0.14, k) * s, d = cd * (2.1 + 0.8 * k); _czv.copy(r).multiplyScalar(Math.cos(a) * d).addScaledVector(f, Math.sin(a) * d).addScaledVector(u, d * (0.15 + 0.17 * Math.sin(S.t * 0.4))); S.fov = lerp(60, 52, k); S.lead = cd * 0.3; break; }
+    case 'ahead': { const d = cd * (1.7 + 1.1 * k) * (1 - 0.45 * L); _czv.copy(f).multiplyScalar(d).addScaledVector(u, d * 0.1).addScaledVector(r, s * d * 0.24); S.fov = lerp(58, 44, k); S.rate = lerp(3, 5, k); break; }   // (gathering speed, he comes at the lens)
+    case 'long': { if (dt > 0) { _czs.copy(r).multiplyScalar(s * 0.85).addScaledVector(f, -0.4).addScaledVector(u, S.a > 3.14 ? 0.3 : -0.2).normalize(); S.dir.lerp(_czs, damp(0.35, dt)).normalize(); }   // (off to one side on a long lens, slow to come round when he turns, so the stars stand still behind him)
+      const d = Math.min(cd * (9 + 4 * k), 620); _czv.copy(S.dir).multiplyScalar(d); S.fov = clamp(2 * Math.atan(cd * 0.62 / d) * 57.3, 14, 30); S.rate = 8; S.qrate = 30; break; }
+    case 'rush': { const d = cd * 0.8 * (1 + 1.1 * L); _czv.copy(f).multiplyScalar(-d).addScaledVector(u, -d * 0.1).addScaledVector(r, s * d * 0.18); S.fov = Math.min(112, 90 + 14 * HY.k); S.lead = cd * 1.6; S.rate = 7; S.qrate = 10; S.shake = 1; break; }   // (close under his tail on a wide lens: the dark pouring past)
+    case 'rings': { const d = cd * (2.6 + 1.6 * k); _czv.copy(f).multiplyScalar(-d * 0.9).addScaledVector(S.nR, S.ry * d * 0.45).addScaledVector(r, s * d * 0.4); S.fov = lerp(54, 44, k); S.lead = d * 0.3; S.upW.copy(S.nR).multiplyScalar(S.ry); break; }   // (on his side of them, the sheet of them level: he goes through, and the eye after him)
+    case 'flyby': { const d = cd * (2.6 + 1.6 * k); _czv.copy(S.dir).multiplyScalar(d); S.fov = lerp(56, 44, k); break; }   // (from the far side of him, looking across him at it as it goes by)
+    case 'dive': { const e = C.entry ? smoothstep(0.2, 2.6, C.entry.t) : 1, d = cd * 2.2 * (1 - 0.3 * e); _czv.copy(n).multiplyScalar(d * 0.55).addScaledVector(f, -d * 0.9).addScaledVector(r, s * d * 0.2); S.fov = lerp(50, 66, e); S.lead = cd * (0.8 + 1.2 * e); S.frate = 3; S.upW.copy(u); break; }   // (over him and behind, looking down past him into it, drawn in as he goes)
   }
-  if (Math.abs(_czw.copy(_czv).normalize().dot(S.up)) > 0.97) S.up.copy(n).cross(r).normalize();   // (never looking straight along its own up)
+}
+// how much each shot is wanted now, by his speed and what is round him (none of the one on now, less of the one before)
+function czW(S, t) {
+  const X = S.x, k = X.k; let w = 0;
+    switch (t) {
+      case 'chase': w = 1; break;
+      case 'skim': w = X.low && X.along && k < 0.65 ? 2.2 : 0; break;
+      case 'pass': w = X.low && X.along && X.alt < 500 && COSMOS.v < 800 ? 1.6 : 0; break;
+      case 'world': w = X.near ? (X.low ? 0.7 : 1.3) : 0; break;
+      case 'globe': w = X.gd < CZ_RG * 30 && X.gd > CZ_RG * 1.2 ? (X.near && COSMOS.nearB ? 0.3 : 0.9) : 0; break;   // (less, by another world)
+      case 'sun': w = X.lit && time - S.sunAt > 20 ? 0.8 : 0; break;
+      case 'round': w = k < 0.8 ? 0.6 : 0; break;
+      case 'ahead': w = 0.7; break;
+      case 'long': w = 1.6 * smoothstep(0.25, 0.75, k); break;
+      case 'rush': w = 1.5 * smoothstep(0.45, 0.9, k) + (HY.on ? 1.5 : 0); break;
+      case 'rings': w = X.ringNear ? 1.5 : 0; break;
+      case 'flyby': w = X.fb ? 1.2 : 0; break;
+    }
+  return w;
+}
+function czWeigh(S) {
+  for (let i = 0; i < CZ_CINE_K.length; i++) { const t = CZ_CINE_K[i], w = czW(S, t); CZ_CINE_W[i] = t === S.type ? 0 : t === S.prev ? w * 0.5 : w; }
+}
+// the next shot: the one asked for if it can be had, or one drawn by how much each is wanted; never one with the eye in a
+// world or a ring or a world between it and him (the chase plane, if nothing else will do)
+function czTry(S, t, f, u, r, cd) {
+  const C = COSMOS; if (t === 'flyby' && !S.x.fb) return false;
+  czStart(S, t, f, u, r, cd); czShot(S, 0, f, u, r, cd); _czp.copy(C.pos).add(_czv); return !czIn(_czp, 8) && !czHid(_czp, C.pos);
+}
+function czPick(S, want, f, u, r, cd) {
+  const old = S.type; czWeigh(S);
+  let got = want && want !== '*' && CZ_CINE[want] && czTry(S, want, f, u, r, cd);
+  for (let tries = 0; !got && tries < 6; tries++) {
+    let sum = 0; for (let i = 0; i < CZ_CINE_W.length; i++) sum += CZ_CINE_W[i];
+    if (sum <= 0) break;
+    let x = Math.random() * sum, i = 0; for (; i < CZ_CINE_W.length - 1; i++) { x -= CZ_CINE_W[i]; if (x <= 0) break; }
+    if (CZ_CINE_W[i] <= 0) break;
+    got = czTry(S, CZ_CINE_K[i], f, u, r, cd); CZ_CINE_W[i] = 0;
+  }
+  if (!got) { czStart(S, 'chase', f, u, r, cd); czShot(S, 0, f, u, r, cd); }
+  if (S.type === 'sun') S.sunAt = time;
+  S.prev = old; S.cut = true; S.cutN++; S.live = true; S.pend = ''; S.pendT = 0;
+}
+const czEv = (S, t) => { if (t !== S.type) { S.pend = t; S.pendT = 1.5; } };   // (and never to the shot already on)
+function czCine(dt, f, u, r, cd) {
+  const C = COSMOS, S = C.cs || (C.cs = czCineState());
+  czCtx(S, f); const X = S.x, k = X.k;
+  S.t += dt;
+  // what has just happened out there (kept for a breath, so a shot only just begun still lets it be cut to)
+  const nid = C.nearB ? C.nearB.id : 'g';
+  if (X.near && (!S.wasNear || S.nearId !== nid)) czEv(S, X.low && X.along ? 'skim' : 'world');   // (a world coming up)
+  if (X.lit && !S.wasLit && time - S.sunAt > 12) czEv(S, 'sun');   // (out from behind a world, into the sun)
+  if (X.ringT < 3.5 && !S.ringed) { S.ringed = true; czEv(S, 'rings'); } else if (X.ringT > 8) S.ringed = false;
+  if (X.fb && X.fb !== S.fbB && X.fbT < lerp(3.2, 2, k)) { S.fbB = X.fb; czEv(S, 'flyby'); }   // (one about to go by him)
+  if (HY.on && !S.hy) czEv(S, 'rush');
+  if (C.beatT > S.bt + 0.05 && S.t > S.dur * 0.5) czEv(S, '*');   // (cut on the wingbeat)
+  S.wasNear = X.near; S.nearId = nid; S.wasLit = X.lit; S.hy = HY.on; S.bt = C.beatT; S.pendT -= dt; if (S.pendT <= 0) S.pend = '';
+  let want = '';
+  if (!S.live || !C.camOff || !S.type) want = '*';   // (the film camera just put on, or the eye just out into the dark)
+  else if (C.entry && !S.dove) want = 'dive';   // (going in: at once)
+  else if (!C.entry && S.type === 'dive') want = '*';   // (skipped off it)
+  else if (S.blk > 0.25) want = '*';   // (a world come between them)
+  else if ((S.type === 'skim' || S.type === 'pass') && !X.near) want = '*';   // (the world he was skimming left behind)
+  else if (S.type === 'pass' && S.t > 1 && _czs.subVectors(S.anc, C.pos).length() > S.d0 * 1.15) want = '*';   // (gone by the mark, or turned away from it)
+  else if (S.t > lerp(2.4, 1.5, k) && S.type !== 'dive' && S.type !== 'flyby' && S.type !== 'pass' && (S.type === 'sun' ? !X.lit : czW(S, S.type) <= 0)) want = '*';   // (the speed or the place it was for is gone)
+  else if (S.pend && S.pend !== S.type && S.t > lerp(2.4, 1.5, k) && S.type !== 'dive') want = S.pend;
+  else if (S.t > S.dur) want = '*';
+  S.dove = !!C.entry && (S.dove || want === 'dive');
+  if (want) czPick(S, want, f, u, r, cd); else czShot(S, dt, f, u, r, cd);
   return S;
 }
-// the eye: behind him and a little above, along his own up (in the director's hands, wider shots that go round him; on the
-// map, wherever it has been turned to)
+// the eye: behind him and a little above, along his own up, further off and wider the faster he goes, falling back as he
+// gathers speed (in the director's hands, the shots above; on the map, wherever it has been turned to)
 function cosmosCam(dt) {
-  const C = COSMOS, cam = C.cam, f = _czf.set(0, 0, -1).applyQuaternion(C.q), u = _czu.set(0, 1, 0).applyQuaternion(C.q);
+  const C = COSMOS, cam = C.cam, f = _czf.set(0, 0, -1).applyQuaternion(C.q), u = _czu.set(0, 1, 0).applyQuaternion(C.q), r = _czr.crossVectors(f, u);
   cam.aspect = innerWidth / innerHeight;
+  // how fast he is going, for the eye: by the log of it, from skimming a world (0, a few hundred) to crossing the dark (1, forty
+  // thousand), eased so a change of speed never jumps the framing; and how far the eye has fallen back as he gathers speed
+  { const v = Math.max(C.v, 1), kw = clamp((Math.log(v) - 5.7) / 4.9, 0, 1); C.ck = C.ck == null ? kw : lerp(C.ck, kw, damp(1.2, dt));
+    C.cvs = C.cvs == null ? v : lerp(C.cvs, v, damp(1.4, dt)); C.clag = lerp(C.clag || 0, clamp((v - C.cvs) / (C.cvs + 400), -0.35, 1.5), damp(4, dt)); }
   if (C.map.on) { const M = C.map;
     czMapKeys(dt);
     const T = M.pid === 'me' ? C.pos : M.pid === 'globe' ? _cz0 : (C.bodies.find(B => B.id === M.pid) || {}).pos || C.pos;
     M.piv.lerp(T, damp(4, dt)); M.d = Math.exp(lerp(Math.log(M.d), Math.log(M.td), damp(5, dt)));
     C.camPos.set(0, 0, M.d).applyQuaternion(M.q).add(M.piv); C.camQ.copy(M.q); cam.fov = 50;
   } else {
-    const K = 1 + (birdK() - 1) * 0.6, cd = phxDist * K * (1 - 0.25 * C.rush);
-    if (C.revealT > 0) {   // just out of the air: the eye stands back over him and looks down past him at the world falling away
-      C.revealT -= dt; const e = smoothstep(4, 1.5, C.revealT); _czw.copy(C.pos).normalize(); _czv.copy(_czw).multiplyScalar(1.25).addScaledVector(f, -1).normalize().multiplyScalar(cd * (1.3 + 2.2 * e)); u.copy(_czw);
-      cam.fov = lerp(cam.fov, 70 * fovK(), damp(2, dt));
-    } else if (cinema.on) {
-      const S = czCine(dt, f, u, cd), cut = S.cut || !C.camOff; S.cut = false;
-      if (cut) { C.camOff = (C.camOff || new THREE.Vector3()).copy(_czv); cam.fov = S.fov * fovK(); } else { C.camOff.lerp(_czv, damp(S.rate, dt)); cam.fov = lerp(cam.fov, S.fov * fovK(), damp(2, dt)); }
-      C.camPos.copy(C.pos).add(C.camOff);
-      _czw.copy(f).multiplyScalar(S.lead).add(C.pos).sub(C.camPos); czLook(_czq, _czw.normalize(), S.up); C.camQ.slerp(_czq, cut ? 1 : damp(6, dt));
+    const K = 1 + (birdK() - 1) * 0.6, cd = phxDist * K, k = C.ck, L = C.clag, up = _czh, prev = _czo.set(0, 1, 0).applyQuaternion(C.camQ);
+    let lead, pr, qr, shake, first = !C.camOff || !cinema.on && !!C.cs?.live && !(C.revealT > 0);   // (the film camera put away: straight back behind him, a cut)
+    if (cinema.on && !(C.revealT > 0)) {
+      const S = czCine(dt, f, u, r, cd), cut = S.cut || first; S.cut = false;
+      S.upW.normalize(); if (cut) { if (first) C.camN = (C.camN || 0) + 1; C.camOff = (C.camOff || V3()).copy(_czv); cam.fov = S.fov * fovK(); S.upS.copy(S.upW); } else { C.camOff.lerp(_czv, damp(S.rate, dt)); cam.fov = lerp(cam.fov, S.fov * fovK(), damp(S.frate, dt)); czTurn(S.upS, S.upW, damp(4, dt), 1.6 * dt, f); }
+      C.camPos.copy(C.pos).add(C.camOff); czSafe(C.camPos, 6 * K); czShake(C.camPos, r, u, S.shake * cd * 0.006 * (1 + HY.k));
+      S.blk = czHid(C.camPos, C.pos) ? S.blk + dt : 0;
+      _czw.subVectors(C.pos, C.camPos).addScaledVector(f, S.lead).normalize(); czUp(up, _czw, S.upS, cut ? S.upS : prev);
+      if (!cut) { czTurn(prev, up, damp(8, dt), 2 * dt, _czw); czUp(up, _czw, prev, prev); }   // (the frame never rolls faster than that, whatever he does)
+      czLook(_czq, _czw, up); C.camQ.slerp(_czq, cut ? 1 : damp(S.qrate, dt));
       cam.quaternion.copy(C.camQ); cam.position.set(0, 0, 0); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
       return;
-    } else {
-      _czv.copy(f).multiplyScalar(-cd).addScaledVector(u, cd * 0.3).applyAxisAngle(u, camYawOff);
-      cam.fov = lerp(cam.fov, Math.min(118, (68 + C.rush * 34 + HY.k * 14) * fovK()), damp(2.4, dt));
     }
-    const first = !C.camOff; if (first) C.camOff = _czv.clone(); else C.camOff.lerp(_czv, damp(5, dt));
-    C.camPos.copy(C.pos).add(C.camOff);
-    _czw.copy(f).multiplyScalar(14 + C.rush * 20).sub(C.camOff); czLook(_czq, _czw.normalize(), u); C.camQ.slerp(_czq, first ? 1 : damp(8, dt));
-    if (C.rush > 0.5) { const k = (C.rush - 0.5) * 0.1; C.camPos.x += rnd(k); C.camPos.y += rnd(k); }
+    // the chase: further off and on a wider lens the faster he goes (the dark rushing at the edges), followed tighter
+    const d = cd * (1 + 0.3 * k) * (1 + 0.7 * L);
+    _czv.copy(f).multiplyScalar(-d).addScaledVector(u, d * lerp(0.3, 0.2, k)).applyAxisAngle(u, camYawOff);
+    let fov = Math.min(118, (68 + 24 * k + 6 * C.rush + HY.k * 14 + (C.entryK || 0) * 8) * fovK()), fr = 2.4;
+    up.copy(u); lead = cd * (0.33 + 0.5 * k); pr = lerp(3.5, 6.5, k); qr = lerp(6, 10, k); shake = (smoothstep(0.6, 1, k) * 0.5 + HY.k) * cd * 0.004;
+    if (C.revealT > 0) {   // just out of the air: the eye stands back over him and looks down past him at the world falling away (and in its last breath comes round behind him, so the chase takes over from it without a swing)
+      C.revealT -= dt; const e = smoothstep(4, 1.5, C.revealT), b = smoothstep(0, 1.4, C.revealT); _czw.copy(C.pos).normalize();
+      _czs.copy(_czw).multiplyScalar(1.25).addScaledVector(f, -1).normalize().multiplyScalar(cd * (1.3 + 2.2 * e)); _czv.lerp(_czs, b);
+      _czt.copy(f).addScaledVector(_czw, 0.35); up.lerp(_czt, b);   // (the top of the frame the way he is going: looking down, the world's own up is the way it looks)
+      fov = lerp(fov, 70 * fovK(), b); fr = 2; lead = lerp(lead, 14 + C.rush * 20, b); shake *= 1 - b; pr = 5; qr = 8;
+    }
+    cam.fov = lerp(cam.fov, fov, damp(fr, dt));
+    if (C.cs) C.cs.live = false;
+    up.normalize(); const cu = C.cup || (C.cup = V3().copy(up)); if (first) cu.copy(up); else czTurn(cu, up, damp(5, dt), 1.6 * dt, f); up.copy(cu);
+    if (first) { C.camOff = _czv.clone(); C.camN = (C.camN || 0) + 1; } else czEase(C.camOff, _czv, damp(pr, dt), u);
+    C.camPos.copy(C.pos).add(C.camOff); czSafe(C.camPos, 5 * K); czShake(C.camPos, r, u, shake);
+    _czw.copy(f).multiplyScalar(lead).add(C.pos).sub(C.camPos).normalize(); czLook(_czq, _czw, czUp(up, _czw, up, first ? up : prev)); C.camQ.slerp(_czq, first ? 1 : damp(qr, dt));
   }
   cam.quaternion.copy(C.camQ); cam.position.set(0, 0, 0); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
 }
