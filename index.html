@@ -6228,6 +6228,7 @@ function spaceAction() {
   }
   if (p.grounded && !p.sliding) {
     if (udNear(9)) return { kind: 'nova', label: 'burn them back' };
+    { const m = realm === 'over' && meatNear(2.4); if (m) return { kind: 'eat', m, label: 'eat the roast bird' }; }
     if (realm === 'over') { const S = seatNear(p.pos); if (S) return PATRON.id ? { kind: 'audience', id: S.id, seat: S, label: `kneel · speak with ${godById[S.id]?.name || cap(S.id)}${heldBy(S.id) ? ` · holds ${heldBy(S.id)} ring course${heldBy(S.id) > 1 ? 's' : ''}` : ''}` } : { kind: 'pray', id: S.id, seat: S, label: `pray to ${godById[S.id]?.name || cap(S.id)}` }; }
     const c = otherById.charon;
     if (STYX.on && UNDER.crossed && UNDER.side > 0 && c?.active && !ferryOut() && Math.hypot(p.pos.x - c.x, p.pos.z - c.z) < 13) return { kind: 'ferry', label: 'cross with the ferryman' };
@@ -6293,6 +6294,7 @@ function pressSpace() {
   if (act.kind === 'pray') return startPrayer(act.id, act.seat);
   if (act.kind === 'audience') return startPrayer(act.id, act.seat, 'audience');
   if (act.kind === 'ferry') return startFerry();
+  if (act.kind === 'eat') return meatEat(act.m);
   if (act.kind === 'kindle') return kindle();
   if (act.kind === 'shrink') return keeperSize(1);
   if (act.kind === 'fold') { p.wings = false; setManWings(0, 0, 0, 0, 0); audio.sfx.whoosh?.(false); return; }
@@ -14290,6 +14292,11 @@ function birdRigDrive(R, b, dt) {
   const T = R.W.tail; R.tail.scale.x = T[0]; R.tail.rotation.z = T[1]; R.tail.rotation.x = T[2] * 0.6;
   R.legs.visible = b.st === 2 || b.flare > 0.35 || (b.st === 3 && b.tkT < 0.3);
   R.head.rotation.y = b.hy; R.head.rotation.x = b.st === 2 ? -0.05 : clamp(-b.pitch * 0.6, -0.5, 0.6);   // (in the air it keeps its head level)
+  const ch = b.burn > 0 ? Math.min(1, b.burn / 2.5) : 0;   // (on fire: going black, and glowing through it)
+  if (ch !== R.ch) { R.ch = ch; const k = 1 - ch * 0.93; R.mat.color.setRGB(k, k * (1 - ch * 0.04), k * (1 - ch * 0.08)); }
+  if (b.burn > 0) { const hot = b.down ? 1 - smoothstep(2, 7, b.downT) : 1, fl = (0.7 + 0.3 * Math.sin(time * 23 + b.j)) * (0.2 + 0.8 * hot); R.mat.emissive.setRGB(0.3 * fl, 0.06 * fl, 0.01 * fl); R.em = true; }
+  else if (R.em) { R.em = false; R.mat.emissive.setRGB(0, 0, 0); }
+  if (b.down) R.legs.visible = false;
 }
 // A LITTLE WAY OFF, and FAR: the kind drawn many times over in one go, its wings bent on the card itself. Each one is given four
 // numbers: the lift at the shoulder, at the elbow and at the wrist, and how far the wing is folded back along the body.
@@ -14363,6 +14370,7 @@ function birdCount(M, n) { M.count = n; if (n) { M.instanceMatrix.needsUpdate = 
 function birdsShow(on) {
   for (const S of BSPL) if (S.mid) { S.mid.visible = S.far.visible = on; if (!on) S.mid.count = S.far.count = 0; }
   if (!on) { BLOD.nk = 0; BLOD.n = 0; BIRDS.fr++; birdDraw(0); }
+  MEAT.mesh.visible = on;
 }
 // ── The flocks. (sp: how fast they go about; max: as fast as they will go; sep: how close they will let each other come;
 //    perch: they come down to rest, on a roof, in the trees, on the sea; night: only out after dark)
@@ -14502,15 +14510,19 @@ function eagleFly(f, dt) {
 function updateBirds(dt) {
   dt = Math.min(dt, 0.05); const P = player.pos, L = birdFliers(dt), fr = ++BIRDS.fr, cam = camera.position, night = dayName() === 'night';
   const foot = player.form !== 'phoenix' && state === 'play' && !player.gone;   // (a man walking up to a flock on the ground puts it up too)
+  const heat = birdHeatR(), hot = (b, S) => heat > 0 && (b.x - P.x) ** 2 + (b.y - P.y) ** 2 + (b.z - P.z) ** 2 < (heat + S.s * 0.4) ** 2;   // (near enough to the phoenix to catch fire)
   BLOD.nk = 0; BLOD.n = 0;
   for (let fi = 0; fi < flocks.length; fi++) { const f = flocks[fi];
-    if (f.eagle) { if (!f.birds[0].gone) { eagleFly(f, dt); birdSee(f.birds[0], cam); } continue; }
+    if (f.eagle) { const b = f.birds[0];
+      if (b.gone) { if ((b.goneT -= dt) <= 0) { b.gone = false; b.y = -9999; f.mode = 0; } continue; }   // (another eagle, in time)
+      if (b.burn > 0) birdBurn(b, dt); else { eagleFly(f, dt); if (birdHot(b, f.sp, heat)) birdIgnite(b); }
+      birdSee(b, cam); continue; }
     const K = f.K, S = f.sp, B = f.birds;
     if (K.night && !night) { f.placed = false; continue; }   // (the owl is only out at night)
     if (!f.placed || (f.cx - P.x) ** 2 + (f.cz - P.z) ** 2 > 1750 * 1750) { if ((f.tryT -= dt) <= 0) { f.tryT = 1.5; if (!birdPlace(f) && (f.cx - P.x) ** 2 + (f.cz - P.z) ** 2 > 2600 * 2600) f.placed = false; } }
     if (!f.placed) continue;
     // the flock as one thing
-    let cx = 0, cy = 0, cz = 0, mvx = 0, mvy = 0, mvz = 0, nb = 0; for (const b of B) { if (b.gone) continue; cx += b.x; cy += b.y; cz += b.z; mvx += b.vx; mvy += b.vy; mvz += b.vz; nb++; }
+    let cx = 0, cy = 0, cz = 0, mvx = 0, mvy = 0, mvz = 0, nb = 0; for (const b of B) { if (b.gone || b.burn > 0) continue; cx += b.x; cy += b.y; cz += b.z; mvx += b.vx; mvy += b.vy; mvz += b.vz; nb++; }
     if (!nb) continue;
     const inv = 1 / nb; cx *= inv; cy *= inv; cz *= inv; mvx *= inv; mvy *= inv; mvz *= inv; f.cx = cx; f.cy = cy; f.cz = cz;
     // who is in the air with them, and how they are flying
@@ -14553,7 +14565,8 @@ function updateBirds(dt) {
     if (f.kind === 'star' && !lead) { const a = f.a, R = f.r; mcx = f.hx + Math.cos(a) * R * 0.7 + Math.cos(a * 2.7 + 1) * R * 0.3; mcz = f.hz + Math.sin(a) * R * 0.7 + Math.sin(a * 2.3) * R * 0.3; mcy = f.hy + Math.sin(a * 1.9) * 22;
       mrx = R * 0.5 * (1 + 0.4 * Math.sin(time * 0.37 + fi)); mry = R * 0.16 * (1 + 0.6 * Math.sin(time * 0.53 + fi * 2)); mrz = R * 0.36 * (1 + 0.4 * Math.cos(time * 0.29 + fi)); mth = time * 0.23 + Math.sin(time * 0.11 + fi) * 1.6; mph = Math.sin(time * 0.17 + fi) * 0.7; }
     for (let j = 0; j < B.length; j++) { const b = B[j];
-      if (b.gone) continue;
+      if (b.gone) { if ((b.goneT -= dt) <= 0 && (cx - cam.x) ** 2 + (cz - cam.z) ** 2 > 350 * 350) { b.gone = false; b.st = 0; b.x = cx + rnd(f.r * 0.5); b.y = cy; b.z = cz + rnd(f.r * 0.5); b.vx = mvx; b.vy = 0; b.vz = mvz; } continue; }   // (one more comes to join them, while nobody is looking)
+      if (b.burn > 0) { birdBurn(b, dt); birdSee(b, cam); continue; }
       if ((b.st === 1 || b.st === 2) && f.mode !== 2) { b.st = 3; b.tkT = -Math.random() * 0.25; }
       if (b.st === 0 && f.mode === 2 && j < f.ns && !b.dive) b.st = 1;
       if (b.st === 2 || (b.st === 3 && b.tkT < 0)) { if (b.st === 3) b.tkT += dt; birdPerched(b, f, dt); birdSee(b, cam); continue; }
@@ -14601,10 +14614,89 @@ function updateBirds(dt) {
       const floor = b.g + (b.dive === 1 || b.st === 1 ? 0.6 : f.kind === 'swallow' || f.kind === 'finch' || f.kind === 'owl' ? 2.5 : 7); if (b.y < floor) { b.y = floor; if (b.vy < 0) b.vy *= -0.3; }
       birdAim(b, dt);
       birdFlap(b, S, dt, clamp(b.vy / (K.sp * 0.5), 0, 1), 1 - smoothstep(K.sp * 0.5, K.sp * 0.9, sp), al > 0 || b.dive === 2);
+      if (f.kind !== 'dove' && birdHot(b, S, heat)) birdIgnite(b);   // (not the temple doves)
       birdSee(b, cam);
     }
   }
-  birdDraw(dt);
+  birdDraw(dt); updateMeat(dt);
+}
+
+// ── Too near the fire. A bird the phoenix goes by close enough to scorch (closer the slower he goes; a bigger bird of fire, or a god,
+//    burns from further off) catches. It beats as hard as it ever has, trailing flame and smoke, and it cannot stay up: it
+//    loses height, the beat goes out of it, it tumbles, its wings gone limp, and comes down. On the ground it burns on to a
+//    crisp, black and smoking, embers in it, a scorch round it; and what is left when it has done is a roast bird lying there,
+//    golden and done, for whoever comes by. (The flocks are each player's own, not shared, so nobody else is told: in their sky
+//    the same bird is still flying.) Not the temple doves, nor any god's own bird.
+const BBURN = { n: 0, max: TOUCH ? 4 : 8, kills: 0 };
+const BURN_FIRE = [[2.4, 1.1, 0.25], [2.1, 0.7, 0.12], [1.7, 0.36, 0.06], [2.6, 1.6, 0.6]], BURN_SMOKE = [[0.12, 0.11, 0.1], [0.2, 0.19, 0.18], [0.07, 0.06, 0.06]];
+function birdHeatR() {   // (how near a bird has to be to catch, or nothing: the scorch trail and the fanned fires judge his heat the same way)
+  const p = player; if (realm !== 'over' || state !== 'play' || p.form !== 'phoenix' || p.perch || p.sub || p.cine || p.gone || SH.def || p.flame < 0.05) return 0;
+  return birdK() * (4.5 + clamp((p.speed || 0) / 28, 0, 5.5)) * (GODM.on || HY.on ? 1.7 : 1);
+}
+const birdHot = (b, S, h) => h > 0 && (b.x - player.pos.x) ** 2 + (b.y - player.pos.y) ** 2 + (b.z - player.pos.z) ** 2 < (h + S.s * 0.4) ** 2;
+function birdIgnite(b) {
+  if (BBURN.n >= BBURN.max || b.burn > 0 || b.gone) return;
+  BBURN.n++; b.burn = 0.001; b.down = false; b.downT = 0; b.st = 0; b.dive = 0; b.spin = rnd(5) + Math.sign(rnd(1)) * 2; b.lie = Math.sign(rnd(1)) * (1.1 + Math.random() * 0.4);
+  const sp = player.speed || 0; b.vx += dir3.x * sp * 0.15; b.vz += dir3.z * sp * 0.15; b.vy += 4;   // (thrown by the heat and the air he drags)
+  for (let i = 0; i < 26; i++) emit(b.x + rnd(b.S.s * 0.3), b.y + rnd(b.S.s * 0.2), b.z + rnd(b.S.s * 0.3), rnd(5), rnd(4) + 2, rnd(5), 0.4 + Math.random() * 0.4, pick(BURN_FIRE), 3, 0.5 + b.S.s * 0.15);
+  if (++BBURN.kills === 1) witness('flew so close to a bird that it caught fire, and came down roasted');
+  audio.at3?.(b.x, b.y, b.z, () => audio.sfx.crackle?.(0.8), { vol: 0.8, ref: 30, max: 400 });
+}
+// a burning bird, every frame: in the air, then on the ground, then gone, and a roast bird where it lay
+function birdBurn(b, dt) {
+  const S = b.S, t = (b.burn += dt), s = S.s, cam = camera.position, seen = (b.x - cam.x) ** 2 + (b.z - cam.z) ** 2 < 700 * 700;
+  if (!b.down) {
+    const limp = smoothstep(1.1, 2.4, t);
+    b.vy -= 9.8 * dt * (0.45 + 0.9 * limp); const drag = 1 - dt * 0.5; b.vx *= drag; b.vz *= drag; b.vy *= 1 - dt * 0.15;
+    if (t < 1.8) { b.vx += rnd(40) * dt; b.vz += rnd(40) * dt; b.vy += rnd(14) * dt; }   // (thrashing)
+    b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+    const hv = Math.hypot(b.vx, b.vz); if (hv > 0.5 && limp < 0.5) b.yaw = Math.atan2(-b.vx, -b.vz) + Math.sin(t * 11) * 0.3;
+    b.yaw += b.spin * dt * limp; b.roll += b.spin * 0.8 * dt * limp + Math.sin(t * 13) * 0.04 * (1 - limp); b.pitch = lerp(b.pitch, lerp(Math.sin(t * 7) * 0.3, -1.1, limp), damp(4, dt));
+    b.A = 1 - limp; b.fold = limp * (0.3 + Math.sin(t * 15) * 0.08); b.flare = 0; b.tk = b.dv = b.pl = 0; b.ph += dt * Math.PI * 2 * S.hz * 1.6; b.sp = Math.hypot(hv, b.vy);
+    if (seen) { for (let i = 0, n = 3 + (Math.random() < 0.5 ? 1 : 0); i < n; i++) { const w = i ? 0.45 : 0.1; emit(b.x + rnd(s * w), b.y + rnd(s * 0.15), b.z + rnd(s * w), b.vx * 0.25 + rnd(2), 1.5 + Math.random() * 2.5, b.vz * 0.25 + rnd(2), 0.4 + Math.random() * 0.5, pick(BURN_FIRE), 4, (i ? 0.45 : 0.8) + s * 0.2); }   // (the body alight, and the wings)
+      if (Math.random() < 0.5) emit(b.x + rnd(s * 0.2), b.y + s * 0.15, b.z + rnd(s * 0.2), b.vx * 0.1 + rnd(1), 2 + Math.random() * 2, b.vz * 0.1 + rnd(1), 1.4 + Math.random(), pick(BURN_SMOKE), 3, 0.6 + s * 0.2); }
+    const g = groundAt(b.x, b.z, b.y + 2);
+    if (b.y <= g + S.body[1] * s * 0.6) {
+      if (terrainAt(b.x, b.z) < WATER - 0.3 && g <= WATER + 0.2) { ripple(b.x, b.z, 1.2); if (seen) for (let i = 0; i < 18; i++) emit(b.x + rnd(1), WATER + 0.3, b.z + rnd(1), rnd(2), 3 + Math.random() * 4, rnd(2), 1 + Math.random(), [0.8, 0.85, 0.9], 4, 0.8); birdBurnt(b); return; }   // (into the sea: a hiss of steam, and nothing left)
+      b.down = true; b.downT = 0; b.y = g + S.body[1] * s * 0.55; b.vx = b.vy = b.vz = 0; scorch(b.x, b.z, s * 0.7, g); }
+  } else {
+    const dT = (b.downT += dt), hot = 1 - smoothstep(2, 6, dT);
+    b.A = 0; b.fold = 0.25; b.pitch = lerp(b.pitch, -0.05, damp(6, dt)); b.roll = lerp(b.roll, b.lie, damp(6, dt)); b.sp = 0;
+    if (seen) { if (Math.random() < 0.3 + hot) emit(b.x + rnd(s * 0.3), b.y, b.z + rnd(s * 0.3), rnd(0.8), 0.8 + Math.random() * 1.5, rnd(0.8), 0.3 + Math.random() * 0.3, hot > 0.4 ? pick(BURN_FIRE) : pick(EMBER), 2, 0.25 + s * 0.08);
+      if (Math.random() < 0.35) emit(b.x + rnd(s * 0.2), b.y + s * 0.1, b.z + rnd(s * 0.2), rnd(0.6), 1.2 + Math.random(), rnd(0.6), 2 + Math.random() * 1.5, pick(BURN_SMOKE), 3, 0.8 + s * 0.2); }
+    if (dT > 7) { meatDrop(b.x, b.y - S.body[1] * s * 0.55, b.z, s, b.yaw); birdBurnt(b); }
+  }
+}
+function birdBurnt(b) { b.gone = true; b.burn = 0; b.down = false; b.goneT = 90 + Math.random() * 60; BBURN.n = Math.max(0, BBURN.n - 1); }
+// ── The roast: a plump golden body, crisped darker on top, two drumsticks with the bone showing. A few at a time; each keeps for a
+//    few minutes; walking or flying over one (or Space beside it) eats it, and the fire in him burns up a little for it.
+const MEAT = { max: TOUCH ? 6 : 12, list: [], eaten: 0, mesh: null };
+{ const a = newAcc(), gold = col('#c8802c'), crisp = col('#8a4818'), done = col('#e0a048'), bone = col('#f2ead8');
+  blob(a, 0.42, 0.3, 0.55, 0, 0.3, 0, gold); blob(a, 0.36, 0.16, 0.44, 0, 0.5, -0.02, crisp); blob(a, 0.3, 0.22, 0.2, 0, 0.28, -0.46, done);
+  for (const sd of [-1, 1]) { seg(a, sd * 0.3, 0.26, 0.2, sd * 0.42, 0.22, 0.62, 0.14, done, 0.16); blob(a, 0.17, 0.15, 0.2, sd * 0.38, 0.24, 0.42, gold); seg(a, sd * 0.42, 0.22, 0.62, sd * 0.45, 0.22, 0.84, 0.04, bone); blob(a, 0.06, 0.06, 0.06, sd * 0.45, 0.22, 0.86, bone); }
+  MEAT.mesh = new THREE.InstancedMesh(accToGeo(a), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), MEAT.max);
+  MEAT.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); MEAT.mesh.frustumCulled = false; MEAT.mesh.count = 0; scene.add(MEAT.mesh);
+  for (let i = 0; i < MEAT.max; i++) MEAT.list.push({ on: false, x: 0, y: 0, z: 0, yaw: 0, s: 1, t: 0 }); }
+function meatDrop(x, y, z, s, yaw) {
+  let m = MEAT.list.find(m => !m.on); if (!m) { m = MEAT.list[0]; for (const q of MEAT.list) if (q.t > m.t) m = q; }   // (too many: the oldest goes)
+  Object.assign(m, { on: true, x, y, z, yaw, s: clamp(s * 0.3, 0.5, 2.2), t: 0 });
+}
+const meatNear = r => { const P = player.pos; for (const m of MEAT.list) if (m.on && (m.x - P.x) ** 2 + (m.z - P.z) ** 2 < (r + m.s) ** 2 && Math.abs(m.y - P.y) < 3) return m; return null; };
+function meatEat(m) {
+  if (!m || !m.on) return; m.on = false; MEAT.eaten++;
+  const p = player; p.flame = Math.min(1, p.flame + 0.12);
+  for (let i = 0; i < 16; i++) emit(m.x + rnd(m.s * 0.5), m.y + m.s * 0.4, m.z + rnd(m.s * 0.5), rnd(2), 1 + Math.random() * 3, rnd(2), 0.5 + Math.random() * 0.4, pick(EMBER), 2, 0.4);
+  toast(MEAT.eaten === 1 ? 'ROAST BIRD · YOUR FIRE BURNS HIGHER FOR IT' : `ROAST BIRD · ${MEAT.eaten} EATEN · YOUR FIRE BURNS HIGHER`); audio.sfx.halo?.();
+}
+function updateMeat(dt) {
+  const p = player, M = MEAT.mesh, A = M.instanceMatrix.array, play = state === 'play' && realm === 'over' && !p.cine && !p.gone, fly = p.form === 'phoenix', K = birdK(); let n = 0;
+  for (const m of MEAT.list) { if (!m.on) continue;
+    m.t += dt; if (m.t > 240) { m.on = false; continue; }
+    if (play && m.t > 0.6) { const r = fly ? 3.5 * K + m.s : 1.3 + m.s, dy = p.pos.y - m.y; if ((p.pos.x - m.x) ** 2 + (p.pos.z - m.z) ** 2 < r * r && dy > -2 && dy < (fly ? 5 * K : 2.6)) { meatEat(m); continue; } }
+    if (m.t < 40 && Math.random() < dt * 3 && (m.x - camera.position.x) ** 2 + (m.z - camera.position.z) ** 2 < 200 * 200) emit(m.x + rnd(m.s * 0.3), m.y + m.s * 0.5, m.z + rnd(m.s * 0.3), rnd(0.3), 0.8 + Math.random() * 0.6, rnd(0.3), 1.2, [0.7, 0.7, 0.72], 2, 0.3 + m.s * 0.2);   // (still steaming)
+    const k = m.s * Math.min(1, m.t / 0.4) * Math.min(1, (240 - m.t) / 5);
+    BB.m.compose(BB.p.set(m.x, m.y, m.z), BB.q.setFromEuler(BB.e.set(0, m.yaw, 0)), BB.s.set(k, k, k)); BB.m.toArray(A, n * 16); n++; }
+  M.count = n; if (n) M.instanceMatrix.needsUpdate = true; M.visible = realm === 'over';
 }
 
 // ───────────────────────── the Twelve ─────────────────────────
@@ -37961,7 +38053,7 @@ setTimeout(() => {
   if (window.__icarus) Object.assign(window.__icarus, { FAR, TIERS, sightFar, farStep, xrLeave, tick, get dir3() { return dir3; } });   // (tests: the far country)
   if (window.__icarus) Object.assign(window.__icarus, { PILOT, PAD, pilotSet, pilotHold, pilotMouse, pilotFly, pilotView, pilotAxes, pilotThr, xrYoke, voiceRun, UIL, menuItems, get camYawOff() { return camYawOff; } });   // (tests: pilot view)
   if (window.__icarus) Object.assign(window.__icarus, { DIVE, SPF, STOOP, BIG, fovFromSpeed, xrVig });
-  if (window.__icarus) Object.assign(window.__icarus, { updateBirds, BSP, BSPL, BLOD, BIRD_KINDS, birdRig, birdRigDrive, birdSpots, birdsUp, perchLook, birdFlap, eagleFly, VULT });   // (tests: the birds)
+  if (window.__icarus) Object.assign(window.__icarus, { updateBirds, BSP, BSPL, BLOD, BIRD_KINDS, birdRig, birdRigDrive, birdSpots, birdsUp, perchLook, birdFlap, eagleFly, VULT, BBURN, MEAT, birdIgnite, birdHeatR, birdBurn, meatDrop, meatEat, meatNear });   // (tests: the birds)
   if (window.__icarus) Object.assign(window.__icarus, { HY, HY_MUL, hyperTick, hyperGo, hyperOff, hyperPeers, PEER_COLS, auiHyper, FAN, FAN_Q, get flash() { return flash; } });   // (tests: hyper)   // (tests: the dive bomb, and the lens opened for speed)
   frame();
 }, 30);
