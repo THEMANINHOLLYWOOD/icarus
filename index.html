@@ -4992,12 +4992,12 @@ const postMat = new THREE.ShaderMaterial({
     tPrev: { value: null }, uPersist: { value: 0 }, tTitle: { value: null }, uTitleT: { value: -1 }, uSunUV: { value: new THREE.Vector2(0.5, 0.8) }, uRays: { value: 0 },
     tName: { value: null }, uNameNs: { value: new Float32Array(9).fill(7) }, uNameW: { value: 2 },
     uNear: { value: 0.3 }, uFar: { value: 14000 }, uEdge: { value: 1 }, uLineFar: { value: 1e5 }, uFlash: { value: 0 }, uFlashCol: { value: new THREE.Color(1, 0.75, 0.45) }, uHeat: { value: 0 }, uGlow: { value: 0 },
-    uTint: { value: new THREE.Color(1, 1, 1) }, uFade: { value: 1 }, uWarp: { value: 0 }, uLight: { value: 0 }, uSpeed: { value: 0 }, uDanger: { value: 0 }, uDof: { value: 0 }, uSea: { value: 0 }, uSeaNear: { value: 0 }, uSeaLo: { value: new THREE.Color(0.02, 0.17, 0.4) }, uSeaHi: { value: new THREE.Color(0.22, 0.8, 0.98) }, uSeaMul: { value: new THREE.Color(0.4, 0.86, 1.22) }, uVib: { value: 1 }, tBlur: { value: null }, uTime: worldFx.uTime,
+    uTint: { value: new THREE.Color(1, 1, 1) }, uFade: { value: 1 }, uVeil: { value: 0 }, uVeilCol: { value: new THREE.Color(0, 0, 0) }, uWarp: { value: 0 }, uLight: { value: 0 }, uSpeed: { value: 0 }, uDanger: { value: 0 }, uDof: { value: 0 }, uSea: { value: 0 }, uSeaNear: { value: 0 }, uSeaLo: { value: new THREE.Color(0.02, 0.17, 0.4) }, uSeaHi: { value: new THREE.Color(0.22, 0.8, 0.98) }, uSeaMul: { value: new THREE.Color(0.4, 0.86, 1.22) }, uVib: { value: 1 }, tBlur: { value: null }, uTime: worldFx.uTime,
     tCells: { value: null }, tCells2: { value: null }, uCells: { value: new THREE.Vector2(1, 1) }, uRelief: { value: 6 },
     uGlitch: { value: 0 }, uStTint: { value: new THREE.Color(1, 1, 1) }, uStA: { value: new THREE.Vector4(0, 1, 1, 1) }, uStB: { value: new THREE.Vector4(1, 1, 0, 0) }, tUI: { value: null }, tChars: { value: null }, uUiOn: { value: 0 }, uUiK: { value: 1 }, uUiN: { value: new THREE.Vector2(1, 1) }, tUI2: { value: null }, uUi2On: { value: 0 }, uUi2N: { value: new THREE.Vector2(1, 1) }, uWt: { value: [new THREE.Color(1, 0.9, 0.7), new THREE.Color(1, 0.7, 0.35), new THREE.Color(0.4, 0.2, 0.08)] }, uSayCol: { value: new THREE.Color(1, 0.7, 0.35) }, uUiCol: { value: [new THREE.Color(1, 0.54, 0.23), new THREE.Color(1, 0.85, 0.66), new THREE.Color(0.42, 0.15, 0.03)] }, uMk: { value: Array.from({ length: 6 }, () => new THREE.Color(0.75, 0.9, 1)) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tScene, tDepth, tGlyph, tName, tPrev; uniform vec2 uRes, uCell; uniform vec3 uTint, uFlashCol; uniform float uNameNs[9]; uniform float uNameW;
+    uniform sampler2D tScene, tDepth, tGlyph, tName, tPrev; uniform vec2 uRes, uCell; uniform vec3 uTint, uFlashCol, uVeilCol; uniform float uVeil; uniform float uNameNs[9]; uniform float uNameW;
     uniform float uAscii, uTotal, uNear, uFar, uEdge, uFlash, uHeat, uGlow, uFade, uWarp, uLight, uSpeed, uDanger, uTime, uPersist, uTitleT, uRays; uniform vec2 uSunUV; uniform sampler2D tTitle;
     uniform sampler2D tCells, tCells2, tBlur; uniform vec2 uCells; uniform float uDof, uSea, uVib, uSeaNear; uniform vec3 uSeaLo, uSeaHi, uSeaMul;
     uniform vec3 uStTint; uniform vec4 uStA, uStB; uniform sampler2D tUI, tUI2, tChars; uniform float uUiOn, uUi2On, uGlitch, uUiK; uniform vec2 uUi2N; uniform vec3 uWt[3], uSayCol; uniform vec2 uUiN; uniform vec3 uUiCol[3]; uniform vec3 uMk[6];
@@ -5171,6 +5171,7 @@ const postMat = new THREE.ShaderMaterial({
         float er = length((vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0)), ed = smoothstep(0.34 - uDanger * 0.16, 1.0, er);
         col = mix(col, vec3(0.42, 0.03, 0.015), ed * uDanger * (0.55 + 0.45 * beat));
       }
+      col = mix(col, uVeilCol, uVeil);   // (between a world and space: the picture goes into the colour of the air, and comes out of it)
       vec2 q = vUv - 0.5;
       col *= 1.0 - 0.4 * pow(length(q) * 1.35, 2.6);
       col *= uFade;
@@ -38357,7 +38358,7 @@ function cosmosLeave(quiet = false) {
   p.pos.set(E.x, cosmosOpen() ? CZ_TOP - 80 : SKY_LIMIT - 160, E.z); p.yaw = yaw; p.pitch = -0.8; p.speed = 240; p.vy = 0; p.turn = 0; p.bank = 0; p.flame = 1; p.skyT = 0; p.fallTop = p.pos.y;
   dir3.set(-Math.sin(yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(yaw) * Math.cos(p.pitch));
   camera.position.set(p.pos.x + Math.sin(yaw) * phxDist, p.pos.y + phxDist * 0.5, p.pos.z + Math.cos(yaw) * phxDist); camYawOff = 0;
-  C.cool = 6; C.fadeT = CZ_FADE; C.up = 1;
+  C.cool = 6; C.fadeT = CZ_FADE; C.up = 1; C.veil = 0; postMat.uniforms.uVeil.value = 0;
   toast('THE WORLD AGAIN'); audio.sfx.whoosh?.(false);
 }
 // flying in space (in place of updatePhoenix): he turns and climbs about himself, his wings come level with whatever world
@@ -38411,7 +38412,7 @@ function cosmosFrame(dt) {
   { _czv.copy(C.pos).applyQuaternion(_czq.copy(C.rings.quaternion).invert()); const rr = Math.hypot(_czv.x, _czv.z) / CZ_RG; C.ringY = _czv.y; C.ringR = rr; C.ringL.copy(_czv);
     C.dNear = Math.min(nd, rr > 1.45 && rr < 3.32 ? Math.abs(_czv.y) + 30 : 1e12); }
   C.rush = lerp(C.rush, smoothstep(300, 30000, C.v), damp(3, dt));
-  C.entryK = czEntryLook();
+  C.entryK = czEntryLook(); czVeil(dt);
   cosmosCam(dt);
   cosmosPlace(dt);
   if ((C.hudT -= dt) <= 0) { C.hudT = 0.25; czBar(true); }
@@ -39047,7 +39048,7 @@ function plEnter(B) {
   _czf.set(0, 0, -1).applyQuaternion(C.q); _czw.set(0, 1, 0).cross(n); if (_czw.lengthSq() < 1e-4) _czw.set(1, 0, 0); _czw.normalize(); _czu.crossVectors(n, _czw);
   const yaw = Math.atan2(-_czf.dot(_czw), -_czf.dot(_czu)) || 0;
   cosmosLeave(true); C.entry = null;
-  Object.assign(PL, { on: true, B, kind: B.kind, name: B.name, net: 'p:' + B.id, fadeT: 1.1, heat: 1, told: {}, nc: null, burnT: 0, sickT: 0, boltT: 2 + Math.random() * 3 });
+  Object.assign(PL, { on: true, B, kind: B.kind, name: B.name, net: 'p:' + B.id, fadeT: 0, heat: 0.4, veil: 1, mist: 1, told: {}, nc: null, burnT: 0, sickT: 0, boltT: 2 + Math.random() * 3 });
   PL.ck.copy(checkpoint); PL.fillAt.set(1e9, 0, 0);
   plDress(B); PL.grp.visible = true; camera.layers.set(1);
   PL.fog0 = [scene.fog.color.clone(), scene.fog.near, scene.fog.far]; scene.fog.color.copy(PL.tU.uFog.value); scene.fog.near = PL_FOG[B.kind][0]; scene.fog.far = PL_FOG[B.kind][1];
@@ -39056,10 +39057,9 @@ function plEnter(B) {
   dir3.set(-Math.sin(yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(yaw) * Math.cos(p.pitch));
   camera.position.set(p.pos.x + Math.sin(yaw) * phxDist, p.pos.y + phxDist * 0.5, p.pos.z + Math.cos(yaw) * phxDist); camYawOff = 0;
   trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
-  document.body.classList.add('planet'); flash = Math.max(flash, 0.45); NET.sendT = 0;
+  document.body.classList.add('planet'); NET.sendT = 0; postMat.uniforms.uVeilCol.value.copy(PL.tU.uFog.value); postMat.uniforms.uVeil.value = 1;
   if (!PL.found) try { PL.found = new Set(JSON.parse(localStorage.getItem('icarus.planets.found') || '[]')); } catch { PL.found = new Set(); }
-  toast(`${B.name} · ${CZ_SAY[B.kind]}`); audio.sfx.whoosh?.(false);
-  plStep(0);
+  PL.barT = 0; plStep(0);
 }
 // out of it: up into space beside it, home (a warp, or the menu's way home), or the death that wakes on Olympus
 function plOff(how) {
@@ -39069,6 +39069,7 @@ function plOff(how) {
   if (PL.fog0) { scene.fog.color.copy(PL.fog0[0]); scene.fog.near = PL.fog0[1]; scene.fog.far = PL.fog0[2]; }
   checkpoint.copy(PL.ck); document.body.classList.remove('planet'); czBar(false); PL.boltL.intensity = 0; ROOST.on = false;
   postMat.uniforms.uFlashCol.value.setRGB(1, 0.75, 0.45); trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
+  postMat.uniforms.uVeil.value = 0; C.veil = 0;
   if (how === 'death') return;
   const E = C.exit; if (E) p.pos.set(E.x, E.y, E.z);
   if (how === 'up' && B) return cosmosResume(B);
@@ -39080,10 +39081,10 @@ function cosmosResume(B) {
   _czv.copy(PL.n); _czw.set(0, 1, 0).cross(_czv); if (_czw.lengthSq() < 1e-4) _czw.set(1, 0, 0); _czw.normalize();
   C.pos.copy(B.pos).addScaledVector(_czv, B.R * 1.12 + 500);
   _czf.copy(_czv).multiplyScalar(0.75).addScaledVector(_czw, 0.66).normalize(); czLook(C.q, _czf, _czv);
-  C.revealT = 0; C.v = 320; C.pv = 0; C.camOff = null; C.on = true; C.hy = true; C.fadeT = CZ_FADE; C.nearB = B; C.entry = null; C.cool = 0;
+  C.revealT = 0; C.v = 320; C.pv = 0; C.camOff = null; C.on = true; C.hy = true; C.fadeT = 0; C.veil = 1; postMat.uniforms.uVeilCol.value.setRGB(0.004, 0.006, 0.016); postMat.uniforms.uVeil.value = 1; C.nearB = B; C.entry = null; C.cool = 0;
   C.home = phoenix.group.parent; C.scene.add(phoenix.group); phoenix.group.visible = true; for (const T of C.trail.at) T.age = 9;
   p.form = 'phoenix'; p.perch = false; p.sub = null;
-  document.body.classList.add('cosmos'); czBar(true); toast(`OUT OF THE AIR OF ${B.name} · SPACE`); audio.sfx.whoosh?.(true); flash = Math.max(flash, 0.25);
+  document.body.classList.add('cosmos'); czBar(true); audio.sfx.whoosh?.(true);
 }
 // (the menu's way off a world: up out of its air at once, as the bird)
 function plUp() { if (!PL.on || state !== 'play') return; const p = player; if (p.form !== 'phoenix') toBird(); p.perch = false; p.takeoff = null; p.perchGo = null; plOff('up'); }
@@ -39093,15 +39094,23 @@ function czEntry(dt, f) {
   if (!C.entry) {
     if (HY.on || XR.on) return;
     for (const B of C.bodies) { _czv.subVectors(B.pos, P); const d = _czv.length(), alt = d - B.R; if (d < 1 || alt > Math.max(320, B.R * 0.1)) continue;
-      if (f.dot(_czv.divideScalar(d)) > 0.4) { C.entry = { B, t: 0 }; plGenStart(B); toast(`INTO THE AIR OF ${B.name}`); audio.sfx.whoosh?.(true); break; } }
+      if (f.dot(_czv.divideScalar(d)) > 0.4) { C.entry = { B, t: 0 }; plGenStart(B); audio.sfx.whoosh?.(true); break; } }
     return;
   }
   const E = C.entry, B = E.B; _czv.subVectors(B.pos, P); const d = _czv.length() || 1; _czv.divideScalar(d);
-  if (f.dot(_czv) < -0.25 || !C.bodies.includes(B)) { C.entry = null; toast('OUT OF ITS AIR AGAIN'); return; }
+  if (f.dot(_czv) < -0.25 || !C.bodies.includes(B)) { C.entry = null; return; }
   E.t += dt; plGenStep(TOUCH ? 5 : 9);
   C.v = lerp(C.v, 240, damp(1.5, dt));
   _czw.copy(f).lerp(_czv, damp(0.7, dt)).normalize(); C.q.premultiply(_czq.setFromUnitVectors(f, _czw));   // (the nose drawn down into it)
   if (E.t > 2.6 && !PL.pend) PL.pend = B;   // (taken down at the start of the next frame, before the world moves on)
+}
+// the veil out in space: rising into the colour of the world he is diving at, or lifting off the dark after he left one
+const veilK = v => { v = clamp(v, 0, 1); return v * v * (3 - 2 * v); };
+function czVeil(dt) {
+  const C = COSMOS, E = C.entry, U = postMat.uniforms;
+  if (E) { U.uVeilCol.value.set(PL_SKY[E.B.kind][1]); C.veil = Math.max(C.veil || 0, smoothstep(1.2, 2.6, E.t)); }
+  else C.veil = Math.max(0, (C.veil || 0) - dt / 1.6);
+  U.uVeil.value = veilK(C.veil);
 }
 // the bird coming in: the heat round him, the stars going out, the black filling with the colour of its sky
 function czEntryLook() {
@@ -39156,7 +39165,13 @@ function plTick(dt) {
 function plStep(dt) {
   const p = player, k = PL.kind, cp = camera.position, T = PL.tU;
   if (XR.on) { plOff('home'); return; }   // (the headset cannot be out there: home)
-  PL.fadeT = Math.max(0, PL.fadeT - dt); PL.heat = Math.max(0, PL.heat - dt * 0.35); T.uTime.value = time; PL.sky.material.uniforms.uTime.value = time;
+  PL.fadeT = Math.max(0, PL.fadeT - dt); PL.heat = Math.max(0, PL.heat - dt * 0.35);
+  { PL.veil = Math.max(0, PL.veil - dt / 1.5); PL.mist = Math.max(0, PL.mist - dt / 3.2); const m = veilK(PL.mist), F = PL_FOG[k], U = postMat.uniforms;
+    T.uFogN.value = scene.fog.near = lerp(F[0], 0, m); T.uFogF.value = scene.fog.far = lerp(F[1], 260, m);   // (the mist he came down through, thinning)
+    // and going up out of it: near the top the picture goes into the dark it is about to be
+    const out = player.form === 'phoenix' && !player.perch && player.pitch > 0.1 ? smoothstep(PL_TOP - 120, PL_TOP + 150, player.pos.y) : 0;
+    if (out > PL.veil) { U.uVeilCol.value.setRGB(0.004, 0.006, 0.016); U.uVeil.value = veilK(out); }
+    else { U.uVeilCol.value.copy(T.uFog.value); U.uVeil.value = veilK(PL.veil); } } T.uTime.value = time; PL.sky.material.uniforms.uTime.value = time;
   if (PL.H) { const cx = Math.round((p.pos.x - PL_O) / STEP / 16) * 16, cz = Math.round((p.pos.z - PL_O) / STEP / 16) * 16;
     if (!PL.nc || cx !== PL.nc[0] || cz !== PL.nc[1]) { PL.nc = [cx, cz]; plGround3(PL.near, 1, cx, cz, false); plGround3(PL.far, PL_FS, cx, cz, true); T.uOff.value.set(PL.near.position.x - PL_O, PL.near.position.z - PL_O); } }
   if (p.pos.distanceTo(PL.fillAt) > 160) plFill();
@@ -39179,8 +39194,8 @@ function plStep(dt) {
   const bird = p.form === 'phoenix', fly = bird && !p.perch && !p.sub && !p.takeoff;
   // the top of its air: the air lets go of him, and above it he is in space again
   if (fly && p.pos.y > PL_TOP - 300 && p.pitch > 0.25) { const kk = smoothstep(PL_TOP - 300, PL_TOP + 150, p.pos.y); p.pos.y += (25 + 300 * kk * kk) * Math.max(0.45, Math.sin(p.pitch)) * dt;
-    if (!PL.told.up) { PL.told.up = true; toast(`THE AIR THINS · KEEP CLIMBING TO LEAVE ${PL.name}`); } }
-  if (fly && p.pos.y > PL_TOP + 150) { plOff('up'); return; }
+    if (!PL.told.up) { PL.told.up = true; toast(`KEEP CLIMBING TO LEAVE ${PL.name}`); } }
+  if (fly && p.pos.y > PL_TOP + 150) { postMat.uniforms.uVeil.value = 1; plOff('up'); return; }
   if (p.pos.y > PL_TOP + 120 && !(fly && p.pitch > 0.1)) p.pos.y = lerp(p.pos.y, PL_TOP + 100, damp(2, dt));
   // a giant of gas: too deep, and the weight of its air throws him back up
   if (k === 3) { const d = smoothstep(PL_DEEP, PL_DEEP - 260, p.pos.y);
