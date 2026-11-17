@@ -1231,6 +1231,12 @@ function styxBend(th) {   // the long bends of it; straight where the ferry cros
 const MOUNT = { x: 0, z: 2400, H: 1850, R: 1750 };
 const STEEP = 1.25;          // slope (rise/run) the man can't stand on
 const DEATH_DROP = 16;       // metres of fall that kill
+// A man falls as a man does: the Earth's pull, 9.81 m/s² (the bird's is the same: see FLY), until the air holds him at the
+// speed his body lets it — about 55 m/s lying on it, 40 spread right out, 85 head down, a hundred driving at it (a
+// skydiver's numbers). The air's push grows with the square of his speed, so he gathers speed quickly at first and then
+// more and more slowly. His jumps keep the heights they always had, so they are slower in the air now: a real jump that high.
+const GRAV = 9.81, MAN_VT = 55, HOP = Math.sqrt(GRAV / 30);   // (HOP: what a jump's push is now, for the same height as under the old, three-times pull)
+const manFall = (vy, vT, dt) => { const k = (vy / vT) ** 2; return vy > 0 ? vy - GRAV * (1 + k) * dt : vy - GRAV * clamp(1 - k, -2.5, 1) * dt; };   // (vy after dt, falling at terminal speed vT; going up, the air and his weight both slow him)
 
 // `say` is what the voice actor is given (with stage cues); `text` is what the screen shows.
 // (the storyteller's lines and the thunder's were recorded once, like his own, and ship with the game)
@@ -7042,31 +7048,34 @@ function updateHuman(dt) {
     let hs = Math.hypot(p.vel.x, p.vel.z);
     const dx = hs > 0.01 ? p.vel.x / hs : -Math.sin(yaw), dz = hs > 0.01 ? p.vel.z / hs : -Math.cos(yaw);
     const alt = p.pos.y - Math.max(gHere, WATER);
-    hs = p.quick ? lerp(hs, 15, damp(3.2, dt)) : lerp(hs, 15 - flare * 9 + tuck * 24, damp(1.15 + flare * 0.9, dt));
+    const hsW = 15 - flare * 9 + tuck * 24, qW = hsW / 13, sinkW = hsW * (qW * qW + 1 / (qW * qW)) / 13;   // (the wings are a glider's, a poor one: six and a half metres on for each one down at their best, about 13 m/s; flared, hardly going on; tucked, steeply down)
+    hs = p.quick ? lerp(hs, 15, damp(3.2, dt)) : lerp(hs, hsW, damp(1.15 + flare * 0.9, dt));
     const k = damp(2.2, dt), nx = lerp(dx, -Math.sin(yaw), k), nz = lerp(dz, -Math.cos(yaw), k), nl = Math.hypot(nx, nz) || 1;
     p.vel.x = nx / nl * hs; p.vel.z = nz / nl * hs;
     if (p.wjump && (p.wjump.t += dt) < p.wjump.T) { p.vel.y -= 13 * dt; hs = Math.min(hs, 4 + p.wjump.t * 10); p.vel.x = p.vel.x / (Math.hypot(p.vel.x, p.vel.z) || 1) * hs; p.vel.z = p.vel.z / (Math.hypot(p.vel.x, p.vel.z) || 1) * hs; }   // (a wing leap: it rises before it glides)
     else p.vel.y = p.quick ? lerp(p.vel.y, -(7 + alt * 1.7), damp(7, dt))   // a swoop: steep at first, flattening as the ground arrives
-      : lerp(p.vel.y, -5.5 * (1 - IS.glide * 0.7) + flare * 3 - tuck * 18, damp(1.7 + flare, dt));
+      : lerp(p.vel.y, -sinkW * (1 - IS.glide * 0.7), damp(1.7 + flare, dt));
+    if (!p.quick) { FLY.air = lerp(FLY.air, airLift(p.pos.x, p.pos.y, p.pos.z), damp(1.5, dt)); p.pos.y += FLY.air * dt; }   // (and the air going up takes him up with it)
     p.wingOpen = Math.min(1, p.wingOpen + dt / 0.4);
     p.flame -= dt / 100 * (realm === 'under' ? UNDER_BURN : 1) / (1 + 0.4 * perks.ember);
     if (p.flame <= 0) { p.flame = 0; loseWings(); }
     if (!dragging) camYaw += wrapAngle(yaw - camYaw) * damp(2.5, dt);
   } else if (p.tumble && !p.grounded) {
     // Freefall, the way a skydiver flies it. Belly to the earth, arms and legs out, the air holds him to a fall of about
-    // 50 m/s and a slow slide forward. Spread right out (W) and it slows to 30 and he glides further; tuck in and point
-    // his head at the ground (S, faster still with SHIFT) and he drops at nearly 80 and shoots forward. A or D drops a
-    // shoulder and he turns. Control comes back as the tumble settles into the arch.
+    // 55 m/s and a slow slide forward. Spread right out (W) and it slows to 40 and he glides further; tuck in and point
+    // his head at the ground (S, faster still with SHIFT) and he drops at 85 (a hundred) and shoots forward. A or D drops a
+    // shoulder and he turns. Control comes back as the tumble settles into the arch. (He gets there under his weight and
+    // the air's push, see manFall: spread out from head down, the air brakes him hard, but no harder than two and a half g)
     const k = smoothstep(0.25, 0.7, p.skyK || 0), wantPull = locked ? 0 : clamp(iz - (boosting() ? 0.6 : 0), -1, 1) * k;
     p.ffTurn = lerp(p.ffTurn || 0, locked ? 0 : ix * k, damp(4, dt));
     p.ffPull = lerp(p.ffPull || 0, wantPull, damp(2.5, dt));
     human.group.rotation.y -= p.ffTurn * 1.7 * dt;
     const yaw = human.group.rotation.y, spread = Math.max(0, p.ffPull), dive = Math.max(0, -p.ffPull);
-    const vT = -(50 - spread * 20 + dive * 28 + (boosting() ? dive * 20 : 0)), hT = 7 + spread * 9 + dive * 17;   // (30 spread out, 50 as he falls, 78 head down, 98 head down and driving)
+    const vT = MAN_VT - spread * 15 + dive * 30 + (boosting() ? dive * 15 : 0), hT = 7 + spread * 9 + dive * 17;   // (40 spread out, 55 as he falls, 85 head down, 100 head down and driving)
     // water coming up under him: in the last second he stops being a man falling and becomes a man diving
     { const wet = realm === 'over' && terrainAt(p.pos.x + p.vel.x * 0.4, p.pos.z + p.vel.z * 0.4) < WATER - 2.5, tW = wet && p.vel.y < -8 ? (p.pos.y - WATER) / -p.vel.y : 9;
       p.diveK = lerp(p.diveK || 0, smoothstep(1.3, 0.3, tW), damp(9, dt)); }
-    p.vel.y = p.vel.y > vT ? Math.max(vT, p.vel.y - 30 * dt) : lerp(p.vel.y, vT, damp(1.3, dt));
+    p.vel.y = manFall(p.vel.y, vT, dt);
     const kh = damp(0.15 + 0.85 * k, dt);
     p.vel.x = lerp(p.vel.x, -Math.sin(yaw) * hT, kh); p.vel.z = lerp(p.vel.z, -Math.cos(yaw) * hT, kh);
     if (!dragging) camYaw += wrapAngle(yaw - camYaw) * damp(2.2, dt);
@@ -7143,7 +7152,7 @@ function updateHuman(dt) {
     else p.pos.y = floor2;
   }
   if (!p.grounded) {
-    if (!p.wings && !p.tumble) p.vel.y = Math.max(p.vel.y - 30 * dt, -60);   // (in freefall the air sets the speed: above)
+    if (!p.wings && !p.tumble) p.vel.y = manFall(p.vel.y, MAN_VT, dt);   // (falling: his weight, and the air; in a long fall, above)
     if (!p.wings && !p.tumble && p.vel.y < -22 && state === 'play') { p.tumble = true; p.spin.set(1.4, 0, rnd(0.5)); p.ffPull = p.ffTurn = 0; }   // a long drop: he stops stepping and starts falling
     p.pos.y += p.vel.y * dt;
     if (p.pos.y <= floor2 && inWater && !p.wings && p.vel.y < -15 && state === 'play' && realm === 'over') { if (MATCH.phase === 'live' && MATCH.me.alive) { matchOut('the sea'); return; } startPlunge(); return; }   // (into the sea with speed on him: under he goes)
@@ -7771,7 +7780,7 @@ function bodyLanguage(dt, hs, swimming) {
 // ── things he does
 function jump() {
   const p = player, hs = Math.hypot(p.vel.x, p.vel.z), sprint = boosting() && hs > 9;
-  p.grounded = false; p.vel.y = sprint ? 10.4 : hs > 3 ? 9.2 : 8.6; p.land = null;
+  p.grounded = false; p.vel.y = (sprint ? 10.4 : hs > 3 ? 9.2 : 8.6) * HOP; p.land = null;
   if (sprint) { p.vel.x *= 1.14; p.vel.z *= 1.14; }
   p.jumpKind = sprint ? 'sprint' : hs > 3 ? 'run' : 'stand'; p.jumpLead = Math.sin(body.ph) > 0 ? 1 : -1;
   body.exert = Math.min(1, body.exert + 0.04);
@@ -7782,7 +7791,7 @@ function jump() {
 // the leap, with the sea still running off him, he catches: a burst of steam where the fire meets the water, and the bird.
 function leapFromWater() {
   const p = player, hs = Math.hypot(p.vel.x, p.vel.z);
-  p.grounded = false; p.swim = false; p.land = null; p.vel.y = 21.5; p.vel.x *= 0.5; p.vel.z *= 0.5; p.jumpKind = 'stand';
+  p.grounded = false; p.swim = false; p.land = null; p.vel.y = 21.5 * HOP; p.vel.x *= 0.5; p.vel.z *= 0.5; p.jumpKind = 'stand';
   p.autoBurn = time; timeK = 0.55;
   audio.sfx.splash?.(true); audio.sfx.jump(); netFx('jump');
   ripple(p.pos.x, p.pos.z, 2.2); shock(p.pos.x, WATER + 0.3, p.pos.z, 0xcfe6ff, 16, 0.9);
@@ -7812,7 +7821,7 @@ function dropClimb(push, slipped) {
 }
 function jumpOff() {
   const p = player, C = p.climb;
-  p.climb = null; p.grounded = false; p.vel.set(-C.dx * 6, 7.5, -C.dz * 6); p.jumpKind = 'run'; p.jumpLead = 1;
+  p.climb = null; p.grounded = false; p.vel.set(-C.dx * 6, 7.5 * HOP, -C.dz * 6); p.jumpKind = 'run'; p.jumpLead = 1;
   human.group.rotation.y = Math.atan2(C.dx, C.dz);
   audio.sfx.whoosh(false);
 }
@@ -19219,7 +19228,7 @@ function updateTwisters(dt) {
       p.yaw += 1.6 * pull * dt; p.bank = lerp(p.bank, 1.1, Math.min(1, pull * dt * 3));
       if (pull > 0.45 && !T.told) { T.told = true; toast('THE TORNADO HAS YOU'); witness('flew into a tornado a kilometre tall and was carried round it and thrown out of the side'); }
     } else if (p.form === 'human' && p.grounded && !p.swim && !p.cine && d < core + 40 && pull > 0.3) {
-      p.grounded = false; p.tumble = true; p.vel.set(tx * 22, 27, tz * 22); p.fallTop = p.pos.y; toast('THE WIND TAKES YOU'); witness('was picked up off the ground by a tornado');
+      p.grounded = false; p.tumble = true; p.vel.set(tx * 22, 27 * HOP, tz * 22); p.fallTop = p.pos.y; toast('THE WIND TAKES YOU'); witness('was picked up off the ground by a tornado');
     }
   }
   // the wreckage: low and wide most of it, a few pieces carried high up the funnel
