@@ -1241,6 +1241,12 @@ function styxBend(th) {   // the long bends of it; straight where the ferry cros
 const MOUNT = { x: 0, z: 2400, H: 1850, R: 1750 };
 const STEEP = 1.25;          // slope (rise/run) the man can't stand on
 const DEATH_DROP = 16;       // metres of fall that kill
+// A man falls as a man does: the Earth's pull, 9.81 m/s² (the bird's is the same: see FLY), until the air holds him at the
+// speed his body lets it — about 55 m/s lying on it, 40 spread right out, 85 head down, a hundred driving at it (a
+// skydiver's numbers). The air's push grows with the square of his speed, so he gathers speed quickly at first and then
+// more and more slowly. His jumps keep the heights they always had, so they are slower in the air now: a real jump that high.
+const GRAV = 9.81, MAN_VT = 55, HOP = Math.sqrt(GRAV / 30);   // (HOP: what a jump's push is now, for the same height as under the old, three-times pull)
+const manFall = (vy, vT, dt) => { const k = (vy / vT) ** 2; return vy > 0 ? vy - GRAV * (1 + k) * dt : vy - GRAV * clamp(1 - k, -2.5, 1) * dt; };   // (vy after dt, falling at terminal speed vT; going up, the air and his weight both slow him)
 
 // `say` is what the voice actor is given (with stage cues); `text` is what the screen shows.
 // (the storyteller's lines and the thunder's were recorded once, like his own, and ship with the game)
@@ -6288,7 +6294,7 @@ function pressSpace() {
   }
   if (act.kind === 'wings') return openWings(false);
   if (act.kind === 'perch') return perchGo(PERCH.spot || perchUnder());
-  if (act.kind === 'perchoff') { p.perchGo = null; p.speed = Math.max(p.speed, 46); audio.sfx.flap?.(0.8); WR.beat = 1; return; }   // (changed his mind: on he goes)
+  if (act.kind === 'perchoff') { p.perchGo = null; p.speed = Math.max(p.speed, 46); p.climbOut = 4; audio.sfx.flap?.(0.8); WR.beat = 1; return; }   // (changed his mind: on he goes)
   if (act.kind === 'takeoff') return perchUp();
   if (act.kind === 'swoop') return openWings(true);
   if (act.kind === 'talk') return startTalk(act.g);
@@ -7053,31 +7059,34 @@ function updateHuman(dt) {
     let hs = Math.hypot(p.vel.x, p.vel.z);
     const dx = hs > 0.01 ? p.vel.x / hs : -Math.sin(yaw), dz = hs > 0.01 ? p.vel.z / hs : -Math.cos(yaw);
     const alt = p.pos.y - Math.max(gHere, WATER);
-    hs = p.quick ? lerp(hs, 15, damp(3.2, dt)) : lerp(hs, 15 - flare * 9 + tuck * 24, damp(1.15 + flare * 0.9, dt));
+    const hsW = 15 - flare * 9 + tuck * 24, qW = hsW / 13, sinkW = hsW * (qW * qW + 1 / (qW * qW)) / 13;   // (the wings are a glider's, a poor one: six and a half metres on for each one down at their best, about 13 m/s; flared, hardly going on; tucked, steeply down)
+    hs = p.quick ? lerp(hs, 15, damp(3.2, dt)) : lerp(hs, hsW, damp(1.15 + flare * 0.9, dt));
     const k = damp(2.2, dt), nx = lerp(dx, -Math.sin(yaw), k), nz = lerp(dz, -Math.cos(yaw), k), nl = Math.hypot(nx, nz) || 1;
     p.vel.x = nx / nl * hs; p.vel.z = nz / nl * hs;
     if (p.wjump && (p.wjump.t += dt) < p.wjump.T) { p.vel.y -= 13 * dt; hs = Math.min(hs, 4 + p.wjump.t * 10); p.vel.x = p.vel.x / (Math.hypot(p.vel.x, p.vel.z) || 1) * hs; p.vel.z = p.vel.z / (Math.hypot(p.vel.x, p.vel.z) || 1) * hs; }   // (a wing leap: it rises before it glides)
     else p.vel.y = p.quick ? lerp(p.vel.y, -(7 + alt * 1.7), damp(7, dt))   // a swoop: steep at first, flattening as the ground arrives
-      : lerp(p.vel.y, -5.5 * (1 - IS.glide * 0.7) + flare * 3 - tuck * 18, damp(1.7 + flare, dt));
+      : lerp(p.vel.y, -sinkW * (1 - IS.glide * 0.7), damp(1.7 + flare, dt));
+    if (!p.quick) { FLY.air = lerp(FLY.air, airLift(p.pos.x, p.pos.y, p.pos.z), damp(1.5, dt)); p.pos.y += FLY.air * dt; }   // (and the air going up takes him up with it)
     p.wingOpen = Math.min(1, p.wingOpen + dt / 0.4);
     p.flame -= dt / 100 * (realm === 'under' ? UNDER_BURN : 1) / (1 + 0.4 * perks.ember);
     if (p.flame <= 0) { p.flame = 0; loseWings(); }
     if (!dragging) camYaw += wrapAngle(yaw - camYaw) * damp(2.5, dt);
   } else if (p.tumble && !p.grounded) {
     // Freefall, the way a skydiver flies it. Belly to the earth, arms and legs out, the air holds him to a fall of about
-    // 50 m/s and a slow slide forward. Spread right out (W) and it slows to 30 and he glides further; tuck in and point
-    // his head at the ground (S, faster still with SHIFT) and he drops at nearly 80 and shoots forward. A or D drops a
-    // shoulder and he turns. Control comes back as the tumble settles into the arch.
+    // 55 m/s and a slow slide forward. Spread right out (W) and it slows to 40 and he glides further; tuck in and point
+    // his head at the ground (S, faster still with SHIFT) and he drops at 85 (a hundred) and shoots forward. A or D drops a
+    // shoulder and he turns. Control comes back as the tumble settles into the arch. (He gets there under his weight and
+    // the air's push, see manFall: spread out from head down, the air brakes him hard, but no harder than two and a half g)
     const k = smoothstep(0.25, 0.7, p.skyK || 0), wantPull = locked ? 0 : clamp(iz - (boosting() ? 0.6 : 0), -1, 1) * k;
     p.ffTurn = lerp(p.ffTurn || 0, locked ? 0 : ix * k, damp(4, dt));
     p.ffPull = lerp(p.ffPull || 0, wantPull, damp(2.5, dt));
     human.group.rotation.y -= p.ffTurn * 1.7 * dt;
     const yaw = human.group.rotation.y, spread = Math.max(0, p.ffPull), dive = Math.max(0, -p.ffPull);
-    const vT = -(50 - spread * 20 + dive * 28 + (boosting() ? dive * 20 : 0)), hT = 7 + spread * 9 + dive * 17;   // (30 spread out, 50 as he falls, 78 head down, 98 head down and driving)
+    const vT = MAN_VT - spread * 15 + dive * 30 + (boosting() ? dive * 15 : 0), hT = 7 + spread * 9 + dive * 17;   // (40 spread out, 55 as he falls, 85 head down, 100 head down and driving)
     // water coming up under him: in the last second he stops being a man falling and becomes a man diving
     { const wet = realm === 'over' && terrainAt(p.pos.x + p.vel.x * 0.4, p.pos.z + p.vel.z * 0.4) < WATER - 2.5, tW = wet && p.vel.y < -8 ? (p.pos.y - WATER) / -p.vel.y : 9;
       p.diveK = lerp(p.diveK || 0, smoothstep(1.3, 0.3, tW), damp(9, dt)); }
-    p.vel.y = p.vel.y > vT ? Math.max(vT, p.vel.y - 30 * dt) : lerp(p.vel.y, vT, damp(1.3, dt));
+    p.vel.y = manFall(p.vel.y, vT, dt);
     const kh = damp(0.15 + 0.85 * k, dt);
     p.vel.x = lerp(p.vel.x, -Math.sin(yaw) * hT, kh); p.vel.z = lerp(p.vel.z, -Math.cos(yaw) * hT, kh);
     if (!dragging) camYaw += wrapAngle(yaw - camYaw) * damp(2.2, dt);
@@ -7154,7 +7163,7 @@ function updateHuman(dt) {
     else p.pos.y = floor2;
   }
   if (!p.grounded) {
-    if (!p.wings && !p.tumble) p.vel.y = Math.max(p.vel.y - 30 * dt, -60);   // (in freefall the air sets the speed: above)
+    if (!p.wings && !p.tumble) p.vel.y = manFall(p.vel.y, MAN_VT, dt);   // (falling: his weight, and the air; in a long fall, above)
     if (!p.wings && !p.tumble && p.vel.y < -22 && state === 'play') { p.tumble = true; p.spin.set(1.4, 0, rnd(0.5)); p.ffPull = p.ffTurn = 0; }   // a long drop: he stops stepping and starts falling
     p.pos.y += p.vel.y * dt;
     if (p.pos.y <= floor2 && inWater && !p.wings && p.vel.y < -15 && state === 'play' && realm === 'over') { if (MATCH.phase === 'live' && MATCH.me.alive) { matchOut('the sea'); return; } startPlunge(); return; }   // (into the sea with speed on him: under he goes)
@@ -7782,7 +7791,7 @@ function bodyLanguage(dt, hs, swimming) {
 // ── things he does
 function jump() {
   const p = player, hs = Math.hypot(p.vel.x, p.vel.z), sprint = boosting() && hs > 9;
-  p.grounded = false; p.vel.y = sprint ? 10.4 : hs > 3 ? 9.2 : 8.6; p.land = null;
+  p.grounded = false; p.vel.y = (sprint ? 10.4 : hs > 3 ? 9.2 : 8.6) * HOP; p.land = null;
   if (sprint) { p.vel.x *= 1.14; p.vel.z *= 1.14; }
   p.jumpKind = sprint ? 'sprint' : hs > 3 ? 'run' : 'stand'; p.jumpLead = Math.sin(body.ph) > 0 ? 1 : -1;
   body.exert = Math.min(1, body.exert + 0.04);
@@ -7793,7 +7802,7 @@ function jump() {
 // the leap, with the sea still running off him, he catches: a burst of steam where the fire meets the water, and the bird.
 function leapFromWater() {
   const p = player, hs = Math.hypot(p.vel.x, p.vel.z);
-  p.grounded = false; p.swim = false; p.land = null; p.vel.y = 21.5; p.vel.x *= 0.5; p.vel.z *= 0.5; p.jumpKind = 'stand';
+  p.grounded = false; p.swim = false; p.land = null; p.vel.y = 21.5 * HOP; p.vel.x *= 0.5; p.vel.z *= 0.5; p.jumpKind = 'stand';
   p.autoBurn = time; timeK = 0.55;
   audio.sfx.splash?.(true); audio.sfx.jump(); netFx('jump');
   ripple(p.pos.x, p.pos.z, 2.2); shock(p.pos.x, WATER + 0.3, p.pos.z, 0xcfe6ff, 16, 0.9);
@@ -7823,7 +7832,7 @@ function dropClimb(push, slipped) {
 }
 function jumpOff() {
   const p = player, C = p.climb;
-  p.climb = null; p.grounded = false; p.vel.set(-C.dx * 6, 7.5, -C.dz * 6); p.jumpKind = 'run'; p.jumpLead = 1;
+  p.climb = null; p.grounded = false; p.vel.set(-C.dx * 6, 7.5 * HOP, -C.dz * 6); p.jumpKind = 'run'; p.jumpLead = 1;
   human.group.rotation.y = Math.atan2(C.dx, C.dz);
   audio.sfx.whoosh(false);
 }
@@ -9333,7 +9342,10 @@ function auiPilot() {
     if (big) { const br = yc >> 1; uibPlate(((cl - 2 * s.length) >> 1) - 1, br, cl >> 1, br, B(110)); uibText((cl >> 1) - s.length + 1, br, s, hot ? 2 : 0, B(255)); uibPlate((cr >> 1), br, (cr >> 1) + a.length, br, B(110)); uibText(cr >> 1, br, a, 0, B(255));
       uilText(cl - 3, 2 * br - 1, 'KM/H', 1, B(170)); uilText(cr, 2 * br - 1, 'M', 1, B(170)); if (Math.abs(vs) > 2.5) uilText(cr + 2, 2 * br - 1, (vs > 0 ? '^' : 'v') + Math.round(Math.abs(vs)), vs > 0 ? 1 : 2, B(210)); }
     else { uilPlate(cl - s.length, yc - 1, cl, yc, B(120)); uilText(cl - s.length + 1, yc, s, hot ? 2 : 0, B(255)); uilText(cl - 3, yc - 1, 'KM/H', 1, B(170)); uilPlate(cr, yc - 1, cr + a.length, yc, B(120)); uilText(cr, yc, a, 0, B(255)); uilText(cr, yc - 1, 'M', 1, B(170)); if (Math.abs(vs) > 2.5) uilPut(cr + 2, yc - 1, vs > 0 ? 94 : 118, vs > 0 ? 1 : 2, B(210)); }
-    if (P.hold) uilText(cr, yc - (big ? 3 : 2), P.holdY !== null ? 'HELD' : 'HOLD', 1, B(P.holdY !== null ? 230 : 140)); }
+    if (P.hold) uilText(cr, yc - (big ? 3 : 2), P.holdY !== null ? 'HELD' : 'HOLD', 1, B(P.holdY !== null ? 230 : 140));
+    // (and what his weight is doing with it: the speed being gained or lost, under the speed; the stall coming, flashing)
+    if (Math.abs(FLY.a) > 1.5 && !HY.on) uilText(cl - 4, yc + 1, FLY.a > 0 ? 'SPD +' : 'SPD -', FLY.a > 0 ? 1 : 2, B(165));
+    if (FLY.stallK > 0.5) uilText(cl - 4, yc + 2, 'STALL', 2, B(150 + 100 * (0.5 + 0.5 * Math.sin(time * 12)))); }
   // the pitch ladder: a rung every ten degrees, the level one longest, sliding past his own mark
   { const deg = Math.asin(clamp(Math.sin(p.pitch), -1, 1)) * 180 / Math.PI, per = tall ? 0.34 : 0.3, span = Math.max(3, Math.min(6, yc - base - 8));
     for (let g = -60; g <= 60; g += 10) { const dr = Math.round((g - deg) * per); if (Math.abs(dr) > span) continue; const r = yc + dr, f = 1 - Math.abs(dr) / (span + 2), n = g === 0 ? 4 : 2;
@@ -13095,7 +13107,7 @@ function updateTakeoff(dt) {
     const lx = -Math.sin(p.yaw), lz = -Math.cos(p.yaw);
     p.pos.x += lx * p.speed * dt; p.pos.z += lz * p.speed * dt; p.pos.y += p.vy * dt;
     p.pos.y = Math.max(p.pos.y, groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * K);
-    if (u >= 1) { p.takeoff = null; p.speed = Math.max(p.speed, 30); p.vy = clamp(p.vy, 0, 8); }
+    if (u >= 1) { p.takeoff = null; p.speed = Math.max(p.speed, 30); p.vy = clamp(p.vy, 0, 8); p.climbOut = 8; }   // (and a few hard beats more, of themselves, to get up to speed: see FLY)
     dir3.set(lx * Math.cos(p.pitch), Math.sin(p.pitch), lz * Math.cos(p.pitch)); p.fallTop = p.pos.y; p.glideT = 0; return;
   }
   const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), CR = 0.2;
@@ -13117,7 +13129,7 @@ function updateTakeoff(dt) {
     flyWings(dt, { boost: false, dive: 0, climb: 1 - u * 0.5 });
     p.pos.x += fx * p.speed * dt; p.pos.z += fz * p.speed * dt; p.pos.y += p.vy * dt;
     p.pos.y = Math.max(p.pos.y, groundAt(p.pos.x, p.pos.z, p.pos.y + 2) + 0.9 * K);
-    if (u >= 1) { p.takeoff = null; p.speed = Math.max(p.speed, 34); p.vy = clamp(p.vy, 3, 10); }
+    if (u >= 1) { p.takeoff = null; p.speed = Math.max(p.speed, 34); p.vy = clamp(p.vy, 3, 10); p.climbOut = 8; }
   }
   dir3.set(fx * Math.cos(p.pitch), Math.sin(p.pitch), fz * Math.cos(p.pitch)); p.fallTop = p.pos.y; p.glideT = 0;
 }
@@ -13211,6 +13223,57 @@ function stoopPull(peak) {
 //    (t: how long, weighted by how steep; k: how far into it he is, eased; pull: the pull-out, 1 just let go)
 const DIVE = { t: 0, k: 0, pull: 0, was: false };
 const diveMul = t => 1 + 2.3 * (1 - Math.exp(-t / 3.5)) + 0.04 * t;   // (how many times a plain dive's speed: about 2.7 at four seconds, 3.4 at ten)
+// ── Weight. The bird is a body in the air, not a speed it is set to. Along the line it flies three things act on it: its
+//    weight (all of it along the line straight up or straight down, none of it level), the drag of the air, and whatever
+//    it pushes with (the beat of its wings; the fire behind it). So a climb is paid for out of its speed and a dive pays it
+//    back, and what a loop gains coming down it gives up again going over the top:
+//        dv/dt = g · (push − drag − sin(nose))        (push and drag as parts of its weight; g the Earth's, 9.81)
+//    The drag is a bird's own curve, and a glider's: the drag of the body and feathers rising with the square of the speed,
+//    the drag of holding itself up falling away with it, least at three quarters of the cruise, where it goes fifteen
+//    metres on for every one down (about a vulture's). Straight down the two meet its weight at about four times the cruise:
+//    the most a plain dive gives; folded (STOOP, DIVE) it goes on past that. The beat is power, so it pushes hardest slow
+//    and least fast: enough to hold a climb of about sixteen degrees at the cruise, never enough to hold one straight up.
+//    The fire is a push that dies away toward its own top speed. Let everything go and he glides: the nose eases down to
+//    where the speed he keeps is the cruise, sinking about five metres a second; come out of a dive fast and the same nose
+//    comes up and turns the speed back into height, until he floats over the top of it.
+//    Size is weight: a bird twice as long is eight times as heavy on four times the wing, so it is quicker for the same
+//    shape of flight and everything it does takes longer (the time it all happens in is its cruise over g). It dives faster,
+//    carries its speed further, climbs less steeply (the power a body has grows more slowly than its weight); a small one
+//    is quick and light and goes up steeply. A god weighs less and pushes harder.
+//    (The bird's numbers are its own: a small bird's metres a second cover fewer metres than they say, a big one's more —
+//    see smallV — so g is put into its own numbers, and the climb and the fall are the Earth's in the world's metres.)
+//    (u: the speed as a part of the cruise; md: where the drag is least; stall: where the wings stop holding him up;
+//     pw: the beat's power, tmax: its push at the slowest; fire, fireTop: the fire's push from still, and where it dies;
+//     trimT: how many seconds a glide takes to come back to the cruise; th, a, air, stallK, turn: this frame's beat, the
+//     speed gained a second, the air rising under him, how near the stall he is, what pulling round is costing him;
+//     wp, wy, p0, y0: how fast the nose is coming round, and where it was; told: whether the stall has been explained)
+const FLY = { g: 9.81, ld: 15, md: 0.75, stall: 30 / 64, pw: 0.35, tmax: 0.8, fire: 0.71, fireTop: 2.8, trimT: 5, th: 0, a: 0, air: 0, airT: 0, stallK: 0, told: 0, turn: 0, wp: 0, wy: 0, p0: null, y0: null };
+const flyDrag = (u, tuck = 0) => { const q = Math.max(u, 0.25) / FLY.md; return (q * q * (1 - tuck) + Math.min(1 / (q * q), 6)) / (2 * FLY.ld); };   // (as a part of his weight; tuck: how much of the body's drag folding takes away)
+// The air going up. Three kinds, where they would be: a thermal off land the sun is on (a column a couple of hundred metres
+// across, here a while and gone, drifting downwind, with the air coming down round its edge); the wind thrown up the face
+// of a slope that stands across it (only near the slope); and the hot air over a fire. In world metres a second.
+function airLift(x, y, z) {
+  if (realm !== 'over') return 0;
+  const g = terrainAt(x, z), alt = y - Math.max(g, WATER); if (alt > 1800 || alt < -2) return 0;
+  let w = 0;
+  // thermals: one maybe in each square of 900 m, by day, over land (weaker in a storm, gone in rain)
+  const sun = smoothstep(0.08, 0.4, sunDir.y) * (1 - clamp(storm, 0, 1) * 0.8) * (1 - clamp(rainAmt, 0, 1) * 0.9);
+  if (sun > 0.02 && g > WATER + 4) {
+    const t = Date.now() / 1000, X = x - WIND.x * 5 * t, Z = z - WIND.z * 5 * t, S = 900, tx = Math.floor(X / S), tz = Math.floor(Z / S);
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const a = tx + dx, b = tz + dz, h1 = wxHash(a, b, 201), h2 = wxHash(a, b, 202), h3 = wxHash(a, b, 203);
+      if (h3 < 0.35) continue;   // (not every square has one)
+      const life = Math.sin(t / (240 + h1 * 300) + h2 * 30); if (life <= 0) continue;   // (it grows, holds, dies away, and comes again)
+      const R = 140 + h1 * 160, r = Math.hypot(X - (a + 0.2 + h1 * 0.6) * S, Z - (b + 0.2 + h2 * 0.6) * S); if (r > R * 1.5) continue;
+      const W = (2.5 + h3 * 4.5) * sun * smoothstep(0, 0.3, life) * smoothstep(1500, 900, alt) * smoothstep(0, 60, alt);
+      w += r < R ? W * (1 - (r / R) ** 2) : -0.18 * W * Math.sin((r - R) / (R * 0.5) * Math.PI); }
+  }
+  // the wind up a slope: as much of it as the ground rises into it, near the ground
+  if (g > WATER && alt < 260) { const e = 45, up = (terrainAt(x + WIND.x * e, z + WIND.z * e) - terrainAt(x - WIND.x * e, z - WIND.z * e)) / (2 * e);
+    if (up > 0.1) w += Math.min(6, 7 * (1 + clamp(storm, 0, 1)) * Math.min(up, 0.8)) * smoothstep(260, 120, alt); }   // (the wind's own 7 m/s, turned up the slope)
+  // fire: the air over burning trees
+  if (BLAZE.list.length && alt < 420) for (const B of BLAZE.list) { if (B.t > F_BLACK) continue; const d = Math.hypot(x - B.x, z - B.z); if (d < 70) w += 4 * (1 - d / 70) * smoothstep(420, 150, alt); }
+  return Math.min(w, 12);
+}
 // How much wider the lens opens for sheer speed, 0..1: one place for it, so the dive, the fire and hyper all agree. It is
 // eased slowly both ways (seconds, not frames), so it never pumps with the speed; and in a headset it is never the lens
 // that changes — the edges of sight darken instead (see xrVig). SPF_DEG: how many degrees wider at the most.
@@ -13405,6 +13468,20 @@ function updatePhoenix(dt) {
   const stag = p.stagger = Math.max(0, (p.stagger || 0) - dt);   // just hit something: half in control, rolling
   p.turn = lerp(p.turn, turn * (stag > 0 ? 0.35 : 1) * (FLIP.cu.y < -0.25 ? -1 : 1), damp(PV ? 8 : 4, dt));   // (the lens upside down with him, over the top: left is still the left of the picture)
   const elev = Math.asin(clamp(Math.sin(p.pitch), -1, 1)), brk = FLIP.brake;   // (how steeply he is going, however the pitch is written)
+  // his weight (see FLY): what he is pushing with this frame, and the nose a glide would hold
+  // (th: how hard the wings are working, 0..1 — the stick held up, or the pilot's lever; and of themselves for a moment
+  //  after he takes off, and while he climbs over rising ground)
+  const K1 = birdK(), svK = SMALL.k < 1 ? smallV() : K1 > 1.01 ? 1 + 0.18 * (K1 - 1) : 1, BKf = 1 + (K1 - 1) * 0.3;
+  const Vc = 64 * BKf * (1 + 0.12 * perks.swift + IS.swift) * MOD.speed * (GODM.spent ? 0.6 : 1), gN = FLY.g * (GODM.on ? 0.6 : 1) / svK, u = p.speed / Vc;
+  const Kp = Math.cbrt(1 / K1) * (GODM.on ? 1.8 : 1), ride = p.rideK = Math.max(0, (p.rideK || 0) - dt * 1.5);
+  p.climbOut = Math.max(0, (u > 0.95 ? Math.min(p.climbOut || 0, 0.5) : p.climbOut || 0) - dt);   // (off the ground he beats until he is up to the cruise, or eight seconds)
+  const th = FLY.th = GODM.spent ? 0 : PV ? Math.min(1, PILOT.thr / 0.86) : Math.max(clamp((pin - 0.05) / 0.45, 0, 1), ride, p.climbOut > 0 ? 1 : 0);
+  const push = th * Math.min(FLY.tmax * Kp, FLY.pw * Kp / Math.max(u, 0.05)) + (boost ? FLY.fire * (GODM.on ? 1.5 : 1) * Math.max(0, 1 - u / FLY.fireTop) : 0);
+  // (the nose a glide holds: as far down as the push is short of the drag, so the speed he keeps is what he has; and then
+  //  down further while he is slower than the cruise with nothing to push him up to it, or up, coming out of a dive faster,
+  //  until he is back to it. With the fire on he wants the speed: it is spent going on, not up)
+  const short = push - flyDrag(u) - FLY.turn, trim = PV || brk > 0.2 ? 0 : Math.asin(clamp(Math.min(0, short) + (u > 1 ? (boost ? 0 : 1) : short < 0 ? 1 : 0) * Vc / (gN * FLY.trimT) * (u - 1), -0.3, 0.22));
+  FLY.stallK = lerp(FLY.stallK, diving || FLIP.over || brk > 0.2 || HY.on ? 0 : smoothstep(1.3, 1, u / FLY.stall), damp(6, dt));
   hyperTick(dt, state === 'play' && (boosting() || PV && PILOT.thr > 0.86), ax, pin, state === 'play' && !MATCH.phase && !GODM.spent && p.flame > 0.05 && !FLIP.over && !p.riding && brk < 0.2 && realm === 'over');   // (see HY)
   const pivot = FLIP.over ? 0 : FLIP.hangT > 0 ? 1 : smoothstep(0.75, 1.25, elev) * smoothstep(55, 28, p.speed);   // straight up and slowing: a turn swings him round where he hangs (the stall turn)
   p.yaw += p.turn * (diving ? 0.85 : 1.25) * (1 + 2.6 * pivot) * (1 + 0.6 * brk) * dt;
@@ -13425,8 +13502,8 @@ function updatePhoenix(dt) {
     // let go nearly straight up: he hangs there a moment, slowing — turn then, and he swings round on a wingtip before the nose falls
     if (pin < 0.2 && p.pitch > 1.15 && !FLIP.hung && brk < 0.2 && state === 'play') { FLIP.hung = true; FLIP.hangT = 1.1; }
     if (FLIP.hangT > 0) FLIP.hangT = pin > 0.2 || pin < -0.2 ? 0 : FLIP.hangT - dt; else if (p.pitch < 0.6) FLIP.hung = false;
-    p.pitch = lerp(p.pitch, lerp(pin > 0 || FLIP.vert > 0 ? lerp(Math.max(0, pin) * 0.6, 1.45, Math.min(1, up)) : pin * (PV ? 1.05 : 1.38), 0, brk), damp(FLIP.hangT > 0 ? 0.25 : p.pitch > 1.0 && pin < 0.2 && brk < 0.2 ? 0.6 : diving ? 4.5 : DIVE.pull > 0.05 ? lerp(PV ? 3.2 : 1.8, 3.6, DIVE.pull) : PV ? 3.2 : up > 0.2 ? 2.4 : 1.8, dt));   // (let go straight up and he carries on up a while, slowing)   // (out of a dive bomb: a hard pull-out, eased)
-    if (p.speed < 30 && !diving && brk < 0.2 && !(FLIP.hangT > 0)) p.pitch = lerp(p.pitch, -0.45, damp(2.5, dt));  // stall: the nose drops
+    p.pitch = lerp(p.pitch, lerp((pin > 0 || FLIP.vert > 0 ? lerp(Math.max(0, pin) * 0.6, 1.45, Math.min(1, up)) : pin * (PV ? 1.05 : 1.38)) + trim * smoothstep(0.3, 0.05, Math.abs(pin)) * (1 - Math.min(1, up)), 0, brk), damp(FLIP.hangT > 0 ? 0.25 : p.pitch > 1.0 && pin < 0.2 && brk < 0.2 ? 0.6 : diving ? 4.5 : DIVE.pull > 0.05 ? lerp(PV ? 3.2 : 1.8, 3.6, DIVE.pull) : PV ? 3.2 : up > 0.2 ? 2.4 : 1.8, dt));   // (let go straight up and he carries on up a while, slowing)   // (out of a dive bomb: a hard pull-out, eased)
+    if (u < FLY.stall && !diving && brk < 0.2 && !(FLIP.hangT > 0)) p.pitch = lerp(p.pitch, -0.45, damp(2.5, dt));  // stall: the nose drops (where, goes with his size: see FLY)
     if (GODM.spent) p.pitch = Math.min(p.pitch, -0.06);   // spent: the wings are heavy, and will not take him up
   }
   // a jetstream takes him if he flies into one: carried down its line, very fast, and it costs him nothing
@@ -13472,11 +13549,25 @@ function updatePhoenix(dt) {
     if (!bomb && DIVE.was && p.speed > 180) DIVE.pull = 1;
     DIVE.was = bomb; DIVE.pull = Math.max(0, DIVE.pull - dt / 1.4); p.overT = DIVE.t; }
   const target = HY.on ? 125 * HY_MUL * (1 + 0.12 * perks.swift + IS.swift) * BK : lerp(((boost ? 125 : PV ? lerp(40, 112, Math.min(1, PILOT.thr / 0.86)) : 64) - (sp > 0 ? sp * (GODM.on ? 30 : boost ? 55 : PV ? 34 : 75) : sp * 240)) * (1 + 0.12 * perks.swift + IS.swift) * BK * diveMul(DIVE.t) * (GODM.spent ? 0.6 : 1), 3, brk);   // nose down: ~300 m/s; held on S, far past it   // (braking: down to a hover)   // (in hyper: six times a plain flight, climbing or not)
-  p.speed = Math.max(lerp(18, 1.5, brk), lerp(p.speed, target * MOD.speed, damp(HY.on ? 0.9 : lerp(sp < -0.3 ? 1.7 + 1.6 * DIVE.k : boost ? 1.1 : PV ? 0.95 : 0.55 * (1 - 0.6 * DIVE.pull), 1.5, brk), dt)));   // (just out of a dive bomb he carries the speed a while)
-  if (FLIP.over || sp > 0.8 && pin < 0.2) p.speed = Math.max(14, p.speed - sp * 24 * dt);   // going round (or hanging straight up, the wings still): the way up costs him speed and the way down gives it back
+  // the speed: his weight, the air and his push (see FLY). In a dive bomb the fire drives him on toward target as well, his
+  // wings folded out of the air; just out of one they are still half folded, and he carries the speed a while. Only hyper
+  // (which has its own law) and the brake's hover are still a speed he is brought to.
+  const tuck = Math.max(STOOP.tuck * 0.5, DIVE.k * 0.9, DIVE.pull * 0.6), gov = Math.max(HY.on ? 1 : 0, brk);
+  // (and pulling round costs: the harder the wings are pulled through a turn or a loop, the more they drag — a little of
+  //  what it would cost a real bird, or a turn would stop him dead. n: how many times his weight the wings are holding)
+  { const wp = wrapAngle(p.pitch - (FLY.p0 ?? p.pitch)) / Math.max(dt, 1e-3), wy = wrapAngle(p.yaw - (FLY.y0 ?? p.yaw)) / Math.max(dt, 1e-3), vr = p.speed * svK;
+    FLY.p0 = p.pitch; FLY.y0 = p.yaw; FLY.wp = lerp(FLY.wp || 0, clamp(wp, -4, 4), damp(8, dt)); FLY.wy = lerp(FLY.wy || 0, clamp(wy, -4, 4), damp(8, dt));
+    const nv = Math.cos(elev) + vr * FLY.wp / FLY.g, nl = vr * FLY.wy * Math.cos(elev) / FLY.g;
+    FLY.turn = HY.on || p.riding ? 0 : Math.min(0.25, 0.0025 * Math.max(0, nv * nv + nl * nl - 1)) * (GODM.on ? 0.6 : 1); }
+  FLY.a = gN * (push - flyDrag(u, tuck) - FLY.turn - sp) + DIVE.k * Math.max(0, target * MOD.speed - p.speed) * (1.7 + 1.6 * DIVE.k);
+  const vPhys = Math.min(2400, Math.max(8 * BKf, p.speed + FLY.a * dt));
+  p.speed = gov > 0 ? lerp(vPhys, Math.max(lerp(18, 1.5, brk), lerp(p.speed, target * MOD.speed, damp(HY.on ? 0.9 : lerp(boost ? 1.1 : PV ? 0.95 : 0.55, 1.5, brk), dt))), gov) : vPhys;
   if (p.riding) p.speed = lerp(p.speed, 310 * RK, damp(1.6 * RK, dt));
   const knife = FLIP.over ? 0 : smoothstep(0.8, 0.98, Math.abs(Math.sin(FLIP.a)));   // (on his side the wings hold nothing up: he sinks)
-  p.vy = lerp(p.vy, diving ? 0 : lerp(lerp(-3.5, -1.1, glide) - 9 * knife, 0.4, brk), damp(lerp(0.85, 2.5, brk), dt));
+  // (the wings hold him up only as far as he is fast enough: under the stall he mushes, sinking. The glide's own sink is
+  //  in the nose, above, not here)
+  const mush = (1 - clamp((u / FLY.stall) ** 2, 0, 1)) * 12 * BKf;
+  p.vy = lerp(p.vy, diving ? 0 : lerp(-mush - 9 * knife, 0.4, brk), damp(lerp(0.85, 2.5, brk), dt));
   if (GODM.spent) p.vy = Math.min(p.vy, -4);   // (and they sink: he is coming down, whatever he does)
   dir3.set(-Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(p.yaw) * Math.cos(p.pitch));
   // pull out before the ground does it for him
@@ -13492,6 +13583,7 @@ function updatePhoenix(dt) {
   // left alone he rides up over rising ground, as far as a bird can; folding his wings and diving, the ground is his to judge
   if (!MOD.noclip && !plunge && !diving && ahead + 10 * birdK() + (HY.on ? 14 : p.speed * 0.12) > p.pos.y + dir3.y * look) {   // (in hyper he is let down low, to skim)   // (a bigger bird keeps further off the ground: its wings reach further down)
     const need = clamp(Math.atan2(ahead + 14 - p.pos.y, look) + 0.12, 0.4, 0.85);
+    if (!HY.on) p.rideK = 1;   // (and he works his wings for it: a climb has to be paid for — see FLY)
     if (p.pitch < need - 0.05 && !FLIP.over) p.pitch = lerp(p.pitch, need, damp(HY.on ? 8 : 3, dt));   // (in hyper the ground comes quicker: he answers it quicker)
     if (need > 0.6 && Math.abs(ax) < 0.2) {   // too steep to climb: he leans away along the slope, toward whichever side is lower
       const gl = terrainAt(p.pos.x + (dir3.x * 0.7 + dir3.z * 0.7) * look, p.pos.z + (dir3.z * 0.7 - dir3.x * 0.7) * look), gr = terrainAt(p.pos.x + (dir3.x * 0.7 - dir3.z * 0.7) * look, p.pos.z + (dir3.z * 0.7 + dir3.x * 0.7) * look);
@@ -13510,10 +13602,16 @@ function updatePhoenix(dt) {
   const p0x = p.pos.x, p0y = p.pos.y, p0z = p.pos.z, K0 = birdK(), sv = SMALL.k < 1 ? smallV() : K0 > 1.01 ? 1 + 0.18 * (K0 - 1) : 1;   // (and a big one covers more: the keeper's bird is a third as fast again for its size)   // (a small bird covers less ground: its own lengths a second are what they were)
   p.pos.addScaledVector(dir3, p.speed * sv * dt);
   p.pos.y += p.vy * sv * dt;
+  // the air going up under him (see airLift): it carries him up as it goes, for nothing
+  FLY.air = lerp(FLY.air, HY.on || p.riding || brk > 0.5 ? 0 : airLift(p.pos.x, p.pos.y, p.pos.z), damp(1.5, dt)); p.pos.y += FLY.air * dt;
+  FLY.airT = FLY.air > 2 ? FLY.airT + dt : 0;
+  if (FLY.airT > 1.5 && !SESSION.airTold && state === 'play' && !MATCH.phase) { SESSION.airTold = true; toast('RISING AIR · CIRCLE IN IT AND IT TAKES YOU UP'); }
   const gHere = groundAt(p.pos.x, p.pos.z, p.pos.y);
   hyperTrail(p0x, p0y, p0z);
-  // (pointed up in hyper, near the top of the sky: the way out is open to him, until he is back down under it — see COSMOS)
-  if (HY.on && p.pitch > 0.2 && p.pos.y > SKY_LIMIT - 900 && !XR.on) COSMOS.hy = true; else if (COSMOS.hy && !HY.on && !COSMOS.on && p.pos.y < SKY_LIMIT - 300) COSMOS.hy = false;
+  // (the way out is open to anyone: pointed up in hyper near the top of the sky, or simply climbing steeply up into it; it stays open
+  //  until he is back down under it, see COSMOS. Level off up there instead and the sun still has him. Never in a fight.)
+  if (!XR.on && !MATCH.phase && (HY.on && p.pitch > 0.2 && p.pos.y > SKY_LIMIT - 900 || p.pitch > 0.12 && p.pos.y > SKY_LIMIT - 300)) COSMOS.hy = true; else if (COSMOS.hy && !HY.on && !COSMOS.on && (p.pos.y < SKY_LIMIT - 300 || MATCH.phase)) COSMOS.hy = false;
+  if (heat > 0.25 && !COSMOS.hy && !SESSION.spaceTold && state === 'play' && !MATCH.phase && !XR.on) { SESSION.spaceTold = true; toast('THE SUN · CLIMB STEEP TO BREAK THROUGH INTO SPACE'); }
   if (plunge && gHere < WATER - 3 && p.pos.y < WATER + 5.1 * birdK() && state === 'play') { enterSea(-1); return; }
   // the sea overhead is the way back: climb into it and he goes through; graze it and it holds him under
   if (realm === 'under') { const rf = underRoof(p.pos.x, p.pos.z); if (rf < UNDER.ceil - 2 && p.pos.y > rf - 7) {   // (rock overhead, not water: it does not give)
@@ -13553,16 +13651,16 @@ function updatePhoenix(dt) {
   }
   p.bank = lerp(p.bank, p.turn * 0.75 + (stag > 0 ? Math.sin(time * 26) * stag * 0.9 : 0) + Math.sin(time * 0.8) * 0.035 * glide, damp(stag > 0 ? 9 : 3, dt));   // (gliding, he rocks a little on the air)
   p.flapCD -= dt;
-  if ((pin > 0.2 || brk > 0.5) && p.flapCD <= 0) {   // (braking, he beats on the spot to hang there)
+  if ((pin > 0.2 || brk > 0.5 || th > 0.35 && !PV) && p.flapCD <= 0) {   // (braking, he beats on the spot to hang there)
     p.flapCD = brk > 0.5 ? 0.42 : boost ? 0.5 : 0.72; p.flapPhase = 0;
     if (WR.A < 0.25) WR.th = 0; WR.beat = 1;   // (a beat from still air starts at the top of the stroke)
-    p.speed += 12 * (1 - brk); p.vy = Math.min(p.vy + 8 * (1 - 0.75 * brk), 16); p.flame -= 0.005;
+    p.vy = Math.min(p.vy + lerp(1.2, 2, brk), 16); p.flame -= 0.005;   // (the push itself is in the speed, beat by beat: see FLY. A stroke only lifts him a little, and the lift goes again)
     audio.sfx.flap(boost ? 1 : 0.75); netFx('flap'); fanFlap(boost ? 1 : 0.6);
     for (const side of [-1, 1]) {
       _v.set(side * 7.5, 0, 0.8).multiplyScalar(birdK()).applyEuler(phoenix.group.rotation).add(p.pos);
       for (let i = 0; i < 8; i++) emit(_v.x, _v.y, _v.z, rnd(5), -4 - Math.random() * 6, rnd(5), 0.5 + Math.random() * 0.4, pick(EMBER));
     }
-  } else if (p.flapCD < -(2.4 + glide * 3.4) && !diving) { p.flapCD = 0; p.flapPhase = 0; p.vy += 4; audio.sfx.flap(0.4); fanFlap(0.2); if (WR.A < 0.25) WR.th = 0; WR.beat = Math.max(WR.beat, 0.55); }   // one lazy beat to hold the glide
+  } else if (p.flapCD < -(2.4 + glide * 3.4) && !diving) { p.flapCD = 0; p.flapPhase = 0; p.vy += 1; p.speed += 0.4 * BKf; audio.sfx.flap(0.4); fanFlap(0.2); if (WR.A < 0.25) WR.th = 0; WR.beat = Math.max(WR.beat, 0.55); }   // one lazy beat to hold the glide
 
   // the sky limit: linger above it and the sun takes your wings
   const roof = SKY_LIMIT + perks.sun * 320 + (cosmosOpen() ? 1e7 : 0);   // (the keeper, with the god in him: no roof at all, see COSMOS)
@@ -13582,7 +13680,9 @@ function updatePhoenix(dt) {
   p.flapPhase = Math.min(1, p.flapPhase + dt / 0.55);
   const dive = smoothstep(-0.2, -0.8, Math.asin(clamp(dir3.y, -1, 1))) * (1 - brk);
   stoopStep(dt, diving, dive);
-  flyWings(dt, { boost, dive: dive * (1 - STOOP.pull), climb: Math.max(clamp(pin, 0, 1), brk), tuck: STOOP.tuck * (1 - STOOP.pull), flutter: Math.max(STOOP.fast, smoothstep(4, 22, SONIC.g) * 0.7, smoothstep(250, 333, p.speed) * smoothstep(372, SOUND, p.speed) * 0.8), pull: STOOP.pull });   // (the feathers shaken by a hard pull, and by the air piling up in front of him near the speed of sound)
+  // near the stall the wings work hard and shake, the lens with them, a little (and once, he is told what it is)
+  if (FLY.stallK > 0.3 && state === 'play') { camShake = Math.max(camShake, 0.05 * FLY.stallK); if (FLY.stallK > 0.7 && FLY.told < 1 && flags.morphed && !MATCH.phase) { FLY.told = 1; toast('TOO SLOW · PUT THE NOSE DOWN FOR SPEED'); } }
+  flyWings(dt, { boost, dive: dive * (1 - STOOP.pull), climb: Math.max(clamp(pin, 0, 1), th, brk, FLY.stallK), tuck: STOOP.tuck * (1 - STOOP.pull), flutter: Math.max(STOOP.fast, smoothstep(4, 22, SONIC.g) * 0.7, smoothstep(250, 333, p.speed) * smoothstep(372, SOUND, p.speed) * 0.8, FLY.stallK * 0.5), pull: STOOP.pull });   // (the feathers shaken by a hard pull, and by the air piling up in front of him near the speed of sound)
 
   const n = SH.def ? 0 : boost || dive > 0.5 ? 4 : 2;
   for (let i = 0; i < n; i++) {
@@ -20043,7 +20143,7 @@ function updateTwisters(dt) {
       p.yaw += 1.6 * pull * dt; p.bank = lerp(p.bank, 1.1, Math.min(1, pull * dt * 3));
       if (pull > 0.45 && !T.told) { T.told = true; toast('THE TORNADO HAS YOU'); witness('flew into a tornado a kilometre tall and was carried round it and thrown out of the side'); }
     } else if (p.form === 'human' && p.grounded && !p.swim && !p.cine && d < core + 40 && pull > 0.3) {
-      p.grounded = false; p.tumble = true; p.vel.set(tx * 22, 27, tz * 22); p.fallTop = p.pos.y; toast('THE WIND TAKES YOU'); witness('was picked up off the ground by a tornado');
+      p.grounded = false; p.tumble = true; p.vel.set(tx * 22, 27 * HOP, tz * 22); p.fallTop = p.pos.y; toast('THE WIND TAKES YOU'); witness('was picked up off the ground by a tornado');
     }
   }
   // the wreckage: low and wide most of it, a few pieces carried high up the funnel
@@ -35687,7 +35787,10 @@ function cpuFly(C, dt) {
       if (!l || !r) C.turn = (!l && (r || want > 0) ? 1 : -1) * 1.9; else if (!blocked(0, 0.5)) { C.climb = 1.3; C.turn *= 0.3; } else if (!blocked(0, -0.5)) { C.climb = -1.3; C.turn *= 0.3; } else C.turn = (Math.random() < 0.5 ? 1 : -1) * 2.2;
       C.tgtT = Math.min(C.tgtT, 0.6); } }
   C.yaw += C.turn * dt; C.pitch = clamp(C.pitch + C.climb * dt, -0.7, 0.7); C.bank = lerp(C.bank, clamp(C.turn * 0.55, -1.1, 1.1), damp(4, dt));
-  C.prev.copy(C.pos); const cp = Math.cos(C.pitch), sp = C.speed * (C.spK || 1); C.pos.x -= Math.sin(C.yaw) * cp * sp * dt; C.pos.y += Math.sin(C.pitch) * sp * dt; C.pos.z -= Math.cos(C.yaw) * cp * sp * dt;   // (spK: a game making it quicker or slower)
+  // (its weight, as a god's — a fight is flown as gods, see FLY: slower going up, quicker coming down, the difference
+  //  gathering over a few seconds and going again when it flies level. On top of whatever speed its game gives it)
+  C.ev = (C.ev || 0) + (-FLY.g * 0.6 * Math.sin(C.pitch) - (C.ev || 0) * 0.35) * dt;
+  C.prev.copy(C.pos); const cp = Math.cos(C.pitch), sp = Math.max(30, C.speed * (C.spK || 1) + C.ev); C.pos.x -= Math.sin(C.yaw) * cp * sp * dt; C.pos.y += Math.sin(C.pitch) * sp * dt; C.pos.z -= Math.cos(C.yaw) * cp * sp * dt;   // (spK: a game making it quicker or slower)
   const T = tronTrail(C.id, C.name, moH('col', C.id) || (teamOf(C.id) >= 0 ? teamCol(teamOf(C.id)) : PATRONS[C.pat][0])); T.match = M.id; T.h = tronH(C.name); if (moF('walls', true)) tronLay(T, C.pos.x, C.pos.y, C.pos.z);
   // and what it has flown into
   let hit = moF('walls', true) && !(C.imm > time) ? tronHit(C.prev.x, C.prev.y, C.prev.z, C.pos.x, C.pos.y, C.pos.z, C.id, M.id, moK(C.id) || 1) : null;   // (the house's birds are all of the usual size, unless a game makes one bigger)
@@ -35708,7 +35811,7 @@ function cpuPractice(C, nb = false) {
   const M = MATCH; if (!nb) matchBoom(C.pos.x, C.pos.y, C.pos.z, matchCol(C.id), 0.8, C.speed, true, C.pat || ''); matchSend({ k: 're', id: M.id, who: C.id, v: Math.round(C.speed), l: M.warm ? undefined : C.lives || 0, q: nb ? 1 : undefined });
   const T = TRON.trails.get(C.id); if (T) tronClear(T); C.reAt = time + 1.4; cpuShow(C, false);
 }
-function cpuBack(C) { const S = moH('spawn', C.id) || matchSlotIn(C.slot || matchSlot(C.id)); C.reAt = 0; C.pos.set(S.x, S.y, S.z); C.prev.copy(C.pos); C.yaw = S.yaw; C.pitch = 0; C.bank = 0; C.tgtT = 0; C.immune = time + 2.5; }
+function cpuBack(C) { const S = moH('spawn', C.id) || matchSlotIn(C.slot || matchSlot(C.id)); C.reAt = 0; C.ev = 0; C.pos.set(S.x, S.y, S.z); C.prev.copy(C.pos); C.yaw = S.yaw; C.pitch = 0; C.bank = 0; C.tgtT = 0; C.immune = time + 2.5; }
 function updateMatch(dt) {
   const M = MATCH, p = player, now = Date.now(); lzStep(dt); updateBooms(dt); updateBlasts(dt); updatePylonBlaze(dt); updateAim(dt); teamPaintMe();
   if (M.againUntil && performance.now() > M.againUntil) { M.againUntil = 0; if (!M.inv) $('matchAsk').classList.remove('on'); }
@@ -37726,8 +37829,8 @@ function cosmosStep(dt) {
     C.up = lerp(C.up, want, damp(want > C.up ? 3 : 1.2, dt)); if (C.cool > 0) C.cool -= dt;
     if (!can && C.up < 0.002) return;
     if (can && p.pos.y > SKY_LIMIT - 400) { cosmosInit(); if (!C.tex.job && C.tex.at < 0) czGlobeStart(); czGlobeStep(TOUCH ? 1.5 : 2.5); }
-    if (can && p.pos.y > SKY_LIMIT - 200 && p.pitch > 0.25 && C.cool <= 0) {   // the air lets go of him: the higher, the faster he goes up
-      const k = smoothstep(SKY_LIMIT - 200, CZ_TOP, p.pos.y); p.pos.y += (30 + 950 * k * k) * Math.sin(p.pitch) * dt;
+    if (can && p.pos.y > SKY_LIMIT - 200 && p.pitch > 0.1 && C.cool <= 0) {   // the air lets go of him: the higher, the faster he goes up (any climb will do: a shallow one is lifted as if it were steep)
+      const k = smoothstep(SKY_LIMIT - 200, CZ_TOP, p.pos.y); p.pos.y += (30 + 950 * k * k) * Math.max(0.45, Math.sin(p.pitch)) * dt;
       postMat.uniforms.uSpeed.value = Math.max(postMat.uniforms.uSpeed.value, k * 0.8);
       if (!C.told && p.pos.y > SKY_LIMIT) { C.told = true; toast('THE SKY THINS · KEEP CLIMBING'); }
     }
@@ -38624,6 +38727,7 @@ setTimeout(() => {
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { perchLook, ROCK, ROCKK, rockSpot, rockFixed, rockFront, rockMake, rockBreak, mineSwing, gotMine, DROP, dropAdd, GATHER, gatherAct, errandNear, axeCheck, axeHeph, atForge, RECIPES, CRAFT, craftRows, craftRowDo, craftMake, bldList, invHas, DREAM, dreamSkip, topAt, surfAt, structHit, roostFind, camera, dir3, MOUSE, turnForm, turnMan, turnBird, wingsOut, armsOut, TURNC, MOUNT, updatePerch, get camYaw() { return camYaw; }, get time() { return time; }, agBuild, agWeb, agReach, agSpans, agWool, agStill, agNear, FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, RR, rrJoin, rrMine, rrFetch, rrPlace, rrLayout, gotRjoin, get RING_DONE() { return RING_DONE; }, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { cpusCmd, MOD, die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AG, agTake, AGX, agxPoll, agxSend, agxDraw, agxTab, agxAt, agxHear, agxCommand, CH, chShow, sendChat, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
+  if (window.__icarus) Object.assign(window.__icarus, { FLY, flyDrag, airLift });
   if (window.__icarus) Object.assign(window.__icarus, { MINI, miniSet, miniCycle, miniWhoShow, miniShown, BINDS, BIND, bindTxt, devNow, CTL, ctlShow, ctlDraw, PG, PG_LESSONS, pgStart, pgEnd, pgSkip, pgTopic, pgFire, pgCardDraw, hmSummon, hmParse, hmHeard, pgHeard, CMD_HELP, sendChat });
   if (window.__icarus) Object.assign(window.__icarus, { NEWB, newbHear, newbHeard, newbTyped, newbTalk, newbFallback, newbArrive });
   if (window.__icarus) Object.assign(window.__icarus, { WS, wingSolve, wingState, wingSet, wingRead, birdWings, airRough, WPOSE: { M: POSE_M, CUP: POSE_CUP, TEAR: POSE_TEAR, LOAD: POSE_LOAD, WIDE: POSE_WIDE, BRAKE: POSE_BRAKE, FOLD: FOLDW }, fireMat, featherFx, updateTails, updatePeers, body, PC, PT, SWIM, SWW, swimPose, swimUnderPose, poseOn });   // (tests: the wings, and the swimmer)
