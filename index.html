@@ -283,6 +283,8 @@
     padding:8px 16px; border-radius:20px; background:rgba(6,7,12,.7); border:1px solid rgba(244,234,210,.1);
     font-size:13px; letter-spacing:.02em; color:var(--ink); opacity:0; transition:opacity .5s, transform .5s cubic-bezier(.16,1,.3,1), border-color .4s; white-space:nowrap; }
   #tut.on { opacity:1; transform:translate(-50%, 0); }
+  /* out on a world in space (see PL): home's errands and lessons wait */
+  body.planet #areaBar, body.planet #status { visibility:hidden; } body.planet #tut, body.planet #keyCard, body.planet #czBar button { display:none !important; }
   #tut b { font-weight:500; color:#fff4e2; }
   #tut .how { display:inline-flex; align-items:center; gap:4px; color:#ffd8a8; font-size:12px; }
   #tut kbd { font:inherit; font-size:11px; min-width:12px; text-align:center; padding:2px 7px; border:1px solid rgba(255,200,150,.42); border-bottom-width:2px; border-radius:6px;
@@ -7194,7 +7196,7 @@ function updateHuman(dt) {
   const safe = p.grounded && !p.sliding;
   if (safe) {
     const drop = p.fallTop - p.pos.y;
-    if (!inWater && drop > DEATH_DROP * (1 + 1.5 * perks.feather)) { die('fall'); return; }   // (no fall that ends in water kills him)
+    if (!inWater && drop > DEATH_DROP * (1 + 1.5 * perks.feather) / (PL.on ? PL_G[PL.kind] : 1)) { die('fall'); return; }   // (no fall that ends in water kills him)
     p.fallTop = p.pos.y; p.burnout = false; p.fallCause = '';
     if (p.tumble) { p.tumble = false; resetPose(); }
     p.safeT += dt;
@@ -9318,7 +9320,7 @@ function auiQuest() {
   QL.rows = top + MINI.drop + 2 - row;   // (counted from the top of the screen, small map and all)
 }
 function auiSay() {
-  if ((state === 'play' || state === 'map' && !M3.on) && !MENU.open && !who.open && !QL.open && !GUIDE.open && !MINI.who && !CTL.open) auiQuest(); else QL.rows = 0;   // (not over the standing map: it has its own heading; nor over the strip)
+  if ((state === 'play' || state === 'map' && !M3.on) && !PL.on && !MENU.open && !who.open && !QL.open && !GUIDE.open && !MINI.who && !CTL.open) auiQuest(); else QL.rows = 0;   // (out on a world in space, home's errands wait)   // (not over the standing map: it has its own heading; nor over the strip)
   const D = $('dialog'), sayH = h => { if (UIB.h !== h) { UIB.h = h; document.body.style.setProperty('--sayH', h + 'px'); } };
   if (!D || D.classList.contains('hidden')) return sayH(0);
   const text = ($('dlgText').textContent || '').trim(), title = ($('dlgTitle').textContent || '').trim(); if (!text) return sayH(0);
@@ -38220,8 +38222,8 @@ setTimeout(() => { if (window.__icarus) Object.assign(window.__icarus, { COSMOS,
 //    five kilometres a side that repeats, worked out once as he comes in, and it lies a long way out from home (PL_O), so
 //    nothing of home is ever under him. Gravity is the world's own: FLY.g for the bird, manFall for the man.)
 const PL_W = PL_N * STEP, PL_BW = 32 * STEP, PL_NB = PL_N / 32, PL_NH = 48, PL_FS = 8;   // (the square; its squares of things, 320 m; the near ground 48 steps each way, the far ground in steps of 8)
-const PL_SKY = [['#030407', '#26272c'], ['#4a7fc0', '#d6ecff'], ['#2a0804', '#e0703a'], ['#6a4a2e', '#f0d4a4'], ['#2462c8', '#c4e2ff'], ['#7a4c22', '#f6d6a2'], ['#185a80', '#bcefe0'], ['#24104e', '#dcb4ff'], ['#23320a', '#b8d460']];   // (each kind's sky: overhead, and at the horizon)
-const PL_FOG = [[900, 9000], [300, 4300], [160, 2900], [150, 2600], [300, 5200], [240, 3600], [180, 2800], [300, 4600], [40, 1250]];
+const PL_SKY = [['#030407', '#26272c'], ['#4a7fc0', '#d6ecff'], ['#140403', '#7a2a14'], ['#6a4a2e', '#f0d4a4'], ['#2462c8', '#c4e2ff'], ['#7a4c22', '#f6d6a2'], ['#185a80', '#bcefe0'], ['#24104e', '#dcb4ff'], ['#1c2806', '#86a63a']];   // (each kind's sky: overhead, and at the horizon)
+const PL_FOG = [[1500, 14000], [600, 9000], [400, 6500], [300, 5200], [800, 11000], [500, 8000], [400, 7000], [700, 9500], [200, 4200]];
 const PL_GLOW = ['#000000', '#3a8cff', '#ff6a14', '#000000', '#000000', '#000000', '#000000', '#3affe8', '#a8ff30'];
 const PL_THING = ['A RUIN', 'A MONOLITH', 'A BEACON', 'AN ARTEFACT'];
 const PL_TREE = ['#ff4fd8', '#7a3cff', '#19e6c8', '#ffb020', '#3affa0', '#ff5a3a', '#4ab0ff'];
@@ -38257,7 +38259,7 @@ function plLand(k, x, z, s) {
   plMat = 0; plGlow = 0; let h;
   switch (k) {
     case 0: { const r = 1 - Math.abs(plF(x, z, s + 3, 128, 4)); h = 70 + 120 * plF(x, z, s, 256, 5) + 260 * r ** 4 + plCrater(x, z, s); if (h < 60) plMat = 3; break; }
-    case 1: { h = 70 + 70 * plF(x, z, s, 256, 5) + 14 * plF(x, z, s + 9, 16, 2); const c = Math.abs(plF(x, z, s + 5, 64, 3)); if (c < 0.045) { const e = 1 - c / 0.045; h -= 70 * Math.sqrt(e); plMat = 2; plGlow = e * 0.25; } break; }
+    case 1: { h = 70 + 70 * plF(x, z, s, 256, 5) + 14 * plF(x, z, s + 9, 16, 2); const c = Math.abs(plF(x, z, s + 5, 64, 3)); if (c < 0.045) { const e = 1 - c / 0.045; h -= 20 * Math.sqrt(e); plMat = 2; plGlow = e * 0.25; } break; }
     case 2: { const r = 1 - Math.abs(plF(x, z, s + 3, 128, 4)); h = 60 + 110 * plF(x, z, s, 256, 5) + 150 * r ** 3; const c = Math.abs(plF(x, z, s + 9, 128, 3));
       if (c < 0.04) { const e = 1 - c / 0.04; h -= 10 * Math.sqrt(e); plMat = 1; plGlow = Math.min(1, e * 1.4); }
       if (h < 25) { plMat = 1; plGlow = Math.max(plGlow, smoothstep(25, 5, h)); h = Math.max(h, 8); } break; }
@@ -38483,14 +38485,13 @@ function plMake() {
   plLay(G);
   // his own body, his fire and what comes off it: seen on both layers
   [particles, phoenix.group, human.group, phoenix.light, shadow, fireLight, morphLight, pillar, trailRib.mesh, boltRib.mesh, ...rings.map(r => r.m), ...SONIC.cones.map(c => c.m)].forEach(plKeep);
-  const st = document.createElement('style'); st.textContent = 'body.planet #areaBar { visibility:hidden; } body.planet #czBar button { display:none !important; }'; document.head.appendChild(st);
 }
 // a world's own look: its sky, its air, its light, its sea, its ground and the thing on it
 function plDress(B) {
   const k = B.kind, P = PL.pal, S = PL_SKY[k], U = PL.sky.material.uniforms, r = mulberry32(B.seed + 17);
   PL.sun = new THREE.Vector3(Math.cos(r() * TAU_), 0, Math.sin(r() * TAU_)).multiplyScalar(0.75).setY(0.45 + r() * 0.4).normalize();
   U.uZen.value.set(S[0]); U.uHor.value.set(S[1]); U.uLow.value.set(S[1]).lerp(P[k === 3 ? 1 : 2], 0.5).multiplyScalar(k === 3 ? 0.55 : 0.8); U.uSun.value.copy(PL.sun);
-  U.uSunC.value.set(k === 2 ? '#ffb070' : k === 1 ? '#e8f4ff' : '#fff0d8'); U.uBand.value = k === 3 ? 1 : 0;
+  U.uSunC.value.set(k === 2 ? '#ffb070' : k === 1 ? '#e8f4ff' : k === 0 ? '#f4f6ff' : '#fff0d8'); U.uBand.value = k === 3 ? 1 : 0;
   U.uRing.value = B.rings || B.ring ? 1 : 0; U.uRingN.value.set(r() - 0.5, 1.6, r() - 0.5).normalize();
   const T = PL.tU; T.uSun.value.copy(PL.sun); T.uSunC.value.copy(U.uSunC.value).multiplyScalar(k === 0 ? 1.25 : 1.0); T.uAmb.value.set(S[1]).multiplyScalar(k === 0 ? 0.12 : 0.36);
   T.uFog.value.set(S[1]); T.uFogN.value = PL_FOG[k][0]; T.uFogF.value = PL_FOG[k][1]; T.uGlowC.value.set(PL_GLOW[k]);
@@ -38695,6 +38696,7 @@ function plTick(dt) {
 // the world itself, every frame: its ground and things kept round him, its weather, its weight and heat, the way out
 function plStep(dt) {
   const p = player, k = PL.kind, cp = camera.position, T = PL.tU;
+  if (XR.on) { plOff('home'); return; }   // (the headset cannot be out there: home)
   PL.fadeT = Math.max(0, PL.fadeT - dt); PL.heat = Math.max(0, PL.heat - dt * 0.35); T.uTime.value = time; PL.sky.material.uniforms.uTime.value = time;
   if (PL.H) { const cx = Math.round((p.pos.x - PL_O) / STEP / 16) * 16, cz = Math.round((p.pos.z - PL_O) / STEP / 16) * 16;
     if (!PL.nc || cx !== PL.nc[0] || cz !== PL.nc[1]) { PL.nc = [cx, cz]; plGround3(PL.near, 1, cx, cz, false); plGround3(PL.far, PL_FS, cx, cz, true); T.uOff.value.set(PL.near.position.x - PL_O, PL.near.position.z - PL_O); } }
