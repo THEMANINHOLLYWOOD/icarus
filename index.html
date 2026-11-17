@@ -14036,7 +14036,7 @@ const BSP = {
     c: { back: '#7a6248', belly: '#d8ccb4', head: '#7a6248', face: '#cfc2a8', brow: '#f6f2e6', cov: '#7e664c', covU: '#e0d6c2', sec: '#6e5840', secTip: '#e8e0d0', secU: '#d8ccb6', prim: '#6a5440', primTip: '#e8e0d0', primU: '#cfc2aa', tail: '#6e5840', tailTip: '#e8e0d0', beak: '#d8c890', leg: '#e8dcc0', eye: '#f2d040', spot: '#efe8d8' },
     hz: 3, amp: 0.85, style: 'soft', cruise: 9, dih: 0.05, perchUp: 0.65, hold: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0.4] },
   swan: { s: 1.8, span: 1.7, arm: 0.22, fore: 0.28, hand: 0.17, chord: 0.24, taper: 0.75, prim: 10, tip: 'point', o1: 1.15,
-    body: [0.17, 0.13, 0.27], head: [0.06, 0.62, -0.36], beak: [0.11, 0.035, 0], neck: 0.055, neckS: true, knob: true, tail: [0.1, 0.14, 'round', 10], leg: 0.08,
+    body: [0.17, 0.13, 0.27], head: [0.06, 0.52, -0.33], beak: [0.11, 0.035, 0], neck: 0.05, neckS: true, knob: true, tail: [0.1, 0.14, 'round', 10], leg: 0.08,
     c: { back: '#f6f4f0', belly: '#f8f6f2', head: '#f8f6f2', cov: '#f6f4f0', covU: '#fbfaf8', sec: '#eeece6', secTip: '#e4e2dc', secU: '#f6f4f0', prim: '#ecEAE4', primTip: '#e0ded8', primU: '#f4f2ee', tail: '#f2f0ea', beak: '#ec7a2a', knob: '#141414', leg: '#2a2a2a', eye: '#141010' },
     hz: 3, amp: 0.8, style: 'steady', cruise: 18, dih: 0.04, perchUp: 0, hold: [0, 0, 0, 0.08, 0, 0, 0, 0, 0.1, 0] },
   peacock: { s: 1.0, span: 1.5, arm: 0.22, fore: 0.27, hand: 0.17, chord: 0.28, taper: 0.85, prim: 9, tip: 'round', o1: 1.1,
@@ -14165,10 +14165,12 @@ function bTail(A, D, S) {
 function bHead(A, D, S) {
   const C = S.cc, [r, hy, hz] = S.head, NK = S.J.NK, Y = hy - NK[1], Z = hz - NK[2], [bl, bd, hook] = S.beak, nc = C.neck || C.head;
   if (S.neckS) {   // (a swan's: an S, standing up off the breast)
-    let px = 0, py = 0, pz = 0; const n = D > 1 ? 7 : 3;
-    for (let k = 1; k <= n; k++) { const t = k / n, x = 0, y = Y * t, z = Z * t + Math.sin(t * Math.PI) * 0.11 - Math.sin(t * Math.PI * 2) * 0.03; bLimb(A, D, px, py, pz, x, y, z, S.neck * (1.5 - t * 0.6), S.neck * (1.5 - t * 0.6 - 0.6 / n), nc); px = x; py = y; pz = z; }
+    const K = [[0, 0], [0.22, -0.13], [0.5, -0.07], [0.78, 0.05], [1, 0]], at = t => { const u = Math.min(3.999, t * 4), i = Math.floor(u), f = u - i, a = K[i], b = K[i + 1], e = f * f * (3 - 2 * f); return [Y * lerp(a[0], b[0], e), lerp(a[1], b[1], e) + Z * t]; };   // (forward off the breast, back, and over again to the head)
+    let py = 0, pz = 0; const n = D > 1 ? 9 : 4;
+    for (let k = 1; k <= n; k++) { const t = k / n, [y, z] = at(t); bLimb(A, D, 0, py, pz, 0, y, z, S.neck * (1.35 - (t - 1 / n) * 0.55), S.neck * (1.35 - t * 0.55), nc); py = y; pz = z; }
   } else bLimb(A, D, 0, -0.01, 0.02, 0, Y * 0.8, Z * 0.8 + r * 0.25, S.neck * 1.25, S.neck, nc);
   bBlob(A, D, r * 0.92, r * 0.86, r * 1.1, 0, Y, Z, C.head);
+  if (D === 0) { bLimb(A, 0, 0, Y - r * 0.12, Z - r * 0.8, 0, Y - r * 0.2, Z - r * 0.92 - S.beak[0], S.beak[1] * 0.6, 0.003, C.beak); return; }   // (far off: a head and a beak, no more)
   if (S.disc) {   // an owl's face: a flat dish round two eyes that look straight ahead
     const little = S.disc === 'little';
     bBlob(A, D, r * 0.86, r * 0.82, r * 0.34, 0, Y - r * 0.05, Z - r * 0.72, C.face);
@@ -14191,7 +14193,7 @@ function bHead(A, D, S) {
   if (S.knob) bBlob(A, 1, bd * 0.55, bd * 0.75, bd * 0.6, 0, by + bd * 0.55, bx - r * 0.02, C.knob);
   for (const sd of [-1, 1]) {
     bBlob(A, 1, r * 0.17, r * 0.17, r * 0.13, sd * r * 0.66, Y + r * 0.16, Z - r * 0.42, C.eye);
-    bBlob(A, 1, r * 0.06, r * 0.06, r * 0.04, sd * r * 0.8, Y + r * 0.22, Z - r * 0.5, [1.8, 1.8, 1.7]);
+    if (D > 1) bBlob(A, 1, r * 0.06, r * 0.06, r * 0.04, sd * r * 0.8, Y + r * 0.22, Z - r * 0.5, [1.8, 1.8, 1.7]);
     if (S.brow) bBlob(A, 1, r * 0.22, r * 0.09, r * 0.34, sd * r * 0.6, Y + r * 0.36, Z - r * 0.42, C.head, 0.15, 0, -sd * 0.25);   // (an eagle's frown)
   }
   if (S.nape) bBlob(A, D, r * 0.78, r * 0.62, r * 0.72, 0, Y + r * 0.22, Z + r * 0.55, C.nape);
@@ -14204,6 +14206,7 @@ function bHead(A, D, S) {
 function bBody(A, D, S) {
   const C = S.cc, [w, h, l] = S.body;
   bBlob(A, D, w, h * 0.92, l, 0, 0.012, 0.02, C.back);
+  if (D === 0) return;
   bBlob(A, D, w * 0.94, h * 0.84, l * 0.8, 0, -h * 0.2, -l * 0.08, C.belly);
   bBlob(A, D, w * 0.74, h * 0.66, l * 0.42, 0, h * 0.14, -l * 0.6, S.neckUp ? C.neck : C.back);   // (the shoulders, where the neck leaves them)
   if (S.neckUp) bBlob(A, D, w * 0.7, h * 0.7, l * 0.42, 0, -h * 0.12, -l * 0.62, C.neck);
@@ -14497,7 +14500,8 @@ function eagleFly(f, dt) {
   if (f.mode === 0) { tx = f.cx + Math.cos(ang + 0.3) * R; tz = f.cz + Math.sin(ang + 0.3) * R; ty = alt + Math.sin(time * 0.25 + k) * 12;
     if (f.t > f.next && b.burn <= 0) { f.mode = 1; f.t = 0; const a2 = ang + 0.45; f.tx = f.cx + Math.cos(a2) * R * 0.85; f.tz = f.cz + Math.sin(a2) * R * 0.85; f.ty = Math.max(terrainAt(f.tx, f.tz) + 70, alt - 170 - Math.random() * 120); } }
   else if (f.mode === 1) { tx = f.tx; ty = f.ty; tz = f.tz; top = 95; turn = 2.4; if (b.y < f.ty + 14 || f.t > 9) { f.mode = 2; f.t = 0; b.pl = 1; } }
-  else { tx = f.cx + Math.cos(ang + 0.4) * R; tz = f.cz + Math.sin(ang + 0.4) * R; ty = alt; top = 26; turn = 1.3; if (b.y > alt - 25 || f.t > 25) { f.mode = 0; f.t = 0; f.next = 25 + Math.random() * 40; } }
+  else { tx = f.cx + Math.cos(ang + 0.4) * R; tz = f.cz + Math.sin(ang + 0.4) * R; ty = alt; top = Math.max(26, 85 - f.t * 30); turn = 1.3;   // (out of the stoop it carries its speed a while, swinging up)
+    if (b.y > alt - 25 || f.t > 25) { f.mode = 0; f.t = 0; f.next = 25 + Math.random() * 40; } }
   const ex = tx - b.x, ey = ty - b.y, ez = tz - b.z, el = Math.hypot(ex, ey, ez) || 1, kk = damp(turn, dt);
   b.vx = lerp(b.vx, ex / el * top, kk); b.vy = lerp(b.vy, ey / el * top, kk); b.vz = lerp(b.vz, ez / el * top, kk);
   b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
