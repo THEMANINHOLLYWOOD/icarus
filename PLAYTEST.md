@@ -31,7 +31,10 @@
 - [ ] **Birds:** eleven kinds. Flocks land and take off. Fly close and they catch fire, fall, and you can eat the roast.
 
 ## Space and the planets
-- [ ] Climb steeply out of the top of the sky. The world becomes a globe below you, with rings and moons.
+- [ ] Climb steeply out of the top of the sky, holding W. Near the top the sky holds you in the climb and you are in space in under 10 s. The world becomes a globe below you, with rings and moons.
+- [ ] **New, first trip only:** your chosen god comes up beside you as a bird and leads you past a moon to a world you could dive into. It talks about what you did on Olympus. Type or speak to it. Steer away and it waits.
+- [ ] **New:** press **C** in space for the film camera. Slow, it skims a world's surface; fast, it pulls out to long lenses against the stars. It cuts when a world comes up or goes by, when you cross the rings, and when you dive into a world.
+- [ ] Hold **S** to dive back at the home globe. You fade back into the sky.
 - [ ] In space, **M** opens the map of the heavens: drag it, pinch it, pick a world.
 - [ ] Dive at any world. **New:** the screen fills with the colour of its sky, and the world comes up out of the mist.
 - [ ] Try all nine:
@@ -46,7 +49,6 @@
   - poison
 - [ ] On each world, follow the thread of light to the thing to find there.
 - [ ] Climb straight up to leave. **New:** the sky goes dark and space fades in around you, with no flash.
-- [ ] Dive back into the home sky to go home.
 
 ## Meteora (your agents)
 - [ ] Tiny monks on the sandstone rocks build monasteries with winches, cranes and levers.
