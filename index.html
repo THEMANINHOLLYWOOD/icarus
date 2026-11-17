@@ -8846,7 +8846,7 @@ function menuItems() {
     { g: 'I', ic: 'name', label: 'name', f: () => openChat('/name ') },
     ...(flags.morphed ? [{ g: 'I', ic: 'acct', label: AUTH.s ? 'account' : 'sign in', on: !!AUTH.s, f: () => authShow(true) }] : []),
     { g: 'I', ic: 'bag', label: 'bag', key: 'I', badge: INV.log ? String(INV.log) : '', on: INV.open, f: () => bagShow(!INV.open) },
-    ...(INV.log || BLD.mine.length ? [{ g: 'I', ic: 'build', label: 'build', on: BLD.on, f: () => bldMode(!BLD.on) }] : []),
+    ...(INV.log || INV.stone || INV.torch || INV.lantern || BLD.mine.length ? [{ g: 'I', ic: 'build', label: 'build', on: BLD.on, f: () => bldMode(!BLD.on) }] : []),
     { g: 'I', ic: 'stats', label: 'stats', key: 'Z', f: () => statsOpen() },
     { g: 'C', ic: 'cam', label: 'camera', key: 'F', f: () => { if (state === 'play') openPhoto(true); } },
     // (the film of his flight is already running while the strip is down: this says whether it stays when the strip goes)
@@ -10037,6 +10037,7 @@ const CMD_HELP = [
   ['AGENTS', '@NAME and what you want to say (one of your own agents: it reads it at its next step, and what it answers comes back here, under the agents tab) · /agent NAME (stay with it: then just type, and /goal /todo /plan /mode /effort /model /compact /review /test /commit /stop /status /skills are requests to it; /help there lists them all) · /agent all · /agent off · /agent go NAME · with the god in you they are marked wherever they are, and a panel says what each is at (/agent panel keeps it up)'],
   ['GAMES', '/fly modes (every game, a line each) · /fly hunger · /fly snd · /fly ctf · /fly zombies · /fly possess · /fly speed · /fly king · /fly tag (/fly tag once: one round) · /fly jugg · /fly survive · /race long · any of them with a number for that many of the house’s birds (they fill the empty places anyway)'],
   ['FIGHT', '/fly · /fly party · /fly NAME (or cpu) · /fly teams · /fly 2v2 · /fly A B vs C D · F fire · R wind · C changes your shape: bird, falling, gliding (1 BIRD · 2 FALL · 3 GLIDE · SPACE as a man is the bird again · Y on a pad · the SHAPE key on a touch screen · or say fall, glide, bird) · /accept · /decline · /cpu N (birds that fly themselves) · /cpus off (none) · /cpus on (the usual ones back) · /warsim N (watch N of them) · /fly watch · /leave · /forfeit · /fly end · /fly restart · /fly skip (if you called it)'],
+  ['MAKE', 'on foot, Space (tap, A on a pad) at a tree chops it, at a rock mines it: hold it to keep going · what comes out flies to you · I (or /craft, the MAKE button on a touch screen, Y on a pad) your bag: what you can make, 1-5 to make it · a pickaxe (1 log 2 stone 1 flint: faster, and bronze) · 2 torches (1 log 1 flint) · a lantern (1 bronze 1 torch) · /craft torch · /build (floors, walls, stone walls, torches, lanterns) · or say chop, mine, craft, build'],
   ['SET', '/sound on|off · /mic on|off · /hands on|off · /quality up|down · /letters up|down · /text bigger|smaller (the size of the words) · /clear'],
   ['RECORD', '/stats (your numbers, written in the sky · Z)'],
   ['ASK', '/ask ANYTHING: she answers, and does it if she can'],
@@ -10095,6 +10096,10 @@ function chatCommand(text) {
   if (c === 'watch' && (MATCH.phase || MATCH.seen && Date.now() < MATCH.seen.until)) { matchGhost(); return true; }   // (while a fight is on, /watch is the fight; otherwise Crete)
   switch (c) {
     case 'stats': if (state === 'stats') statsClose(); else statsOpen(); return true;   // (/record is the camera's: see below)
+    case 'craft': case 'make': case 'bag': case 'inventory': case 'inv': { const k = recipeNamed(low);   // (the bag, and what can be made; /craft torch makes one)
+      if (k === 'axe') { if (INV.axe) sys('YOU HAVE THE AXE'); else if (INV.q === 2 && (axeHeph() || atForge())) axeForge(axeHeph()); else sys(INV.q ? 'HEPHAESTUS MAKES IT · A BRANCH AND A FLINT, TAKEN TO HIS FORGE' : 'HEPHAESTUS MAKES IT · GO AND SEE HIM AT HIS FORGE'); }
+      else if (k) craftMake(k); else if (low) sys(`/craft ${RECIPES.map(R => R.k === 'pick' ? 'pickaxe' : R.k).join(' · ')}`); else if (state === 'play') bagShow(true); return true; }
+    case 'build': if (state === 'play') bldMode(!BLD.on); return true;
     case 'text': case 'textsize': case 'size': { const i = /^(big|bigger|larger|up|\+)$/.test(low) ? UISZ.i + 1 : /^(small|smaller|down|-)$/.test(low) ? UISZ.i - 1 : /^(normal|reset|default)$/.test(low) ? 0 : /^[1-4]$/.test(low) ? +low - 1 : UISZ.i + 1; uiSizeSet(clamp(i, 0, 3), true); return true; }
     case 'help': case 'h': case 'commands': case '?': for (const [k, v] of CMD_HELP) sys(`${k} · ${v}`); if (MOD.admin) sys('KEEPER · /studio (every mission, the clock, scenes) · /agent ANYTHING · /noclip · /speed N · /spawn GOD · /kick NAME · /ban NAME · /ipban NAME · /unban NAME'); return true;
     case 'agent': agentAsk(arg); return true;
@@ -12377,6 +12382,10 @@ function padTick() {
   PAD.x = dz(gp.axes[0]); PAD.y = -dz(gp.axes[1]); PAD.roll = (btn(4) ? 1 : 0) - (btn(5) ? 1 : 0); PAD.brake = val(6); PAD.boost = val(7) > 0.3;
   if (gp.axes.length >= 4 && player.form === 'phoenix' && !dragging) camYawOff = clamp(camYawOff - dz(gp.axes[2]) * 0.04, -Math.PI, Math.PI);
   const was = PAD.b; PAD.b = gp.buttons.map(b => b.pressed);
+  if (state === 'play' && INV.open) {   // (the bag open: up and down pick a line, A makes it, Y or B closes it)
+    const L = CRAFT.rows.length; if (PAD.b[12] && !was[12] && L) { CRAFT.sel = (CRAFT.sel + L - 1) % L; invDirty(); } if (PAD.b[13] && !was[13] && L) { CRAFT.sel = (CRAFT.sel + 1) % L; invDirty(); }
+    if (PAD.b[0] && !was[0]) craftRowDo(CRAFT.sel); if ((PAD.b[3] && !was[3]) || (PAD.b[1] && !was[1])) bagShow(false); return; }
+  if (state === 'play' && PAD.b[3] && !was[3] && player.form === 'human' && !fshOn() && realm === 'over') { bagShow(true); return; }   // (Y on foot: the bag)
   if (state === 'play' && PAD.b[0] && !was[0]) { const M = MATCH; if (M.phase === 'count' && M.placed && MD.id === M.id && Date.now() < M.t0) { if (MD.ask === 'ready') mdReady(); if (mdCamOn()) mdSkip(); } else pressSpace(); }   // (in a fight's opening, A is Space there: a yes when asked, and his own lens)
   if (state === 'play' && PAD.b[3] && !was[3]) { if (fshOn()) fshTo('next'); else if (player.form === 'phoenix') birdTrick(''); }   // (Y: a trick; in a fight, the next shape)
   PAD.thr = (btn(12) ? 1 : 0) - (btn(13) ? 1 : 0);   // (up and down on the pad: the pilot's thrust lever)
@@ -21786,6 +21795,10 @@ function voiceRun(a) {
     case 'map_bigger': case 'map_smaller': if (XR.on) { if (!XMAP.on) xmapShow(true); XMAP.span = clamp(XMAP.span * (a === 'map_bigger' ? 0.6 : 1.6), 2500, 60000); XMAP.cx = NaN; toast(a === 'map_bigger' ? 'THE MAP, CLOSER IN' : 'THE MAP, FURTHER OUT'); } else voiceRun(a === 'map_bigger' ? 'closer' : 'further'); break;
     case 'xr_leave': if (XR.on) { try { XR.sess?.end(); } catch {} } break;
     case 'act': if (state === 'play' && spaceAction()) pressSpace(); else toast('NOTHING HERE TO DO THAT TO'); break;
+    case 'gather': if (state === 'play' && ['chop', 'mine', 'branch', 'flint'].includes(k)) pressSpace(); else toast(INV.axe ? 'NOTHING TO CHOP OR MINE RIGHT HERE · WALK UP TO A TREE OR A ROCK' : 'NOTHING TO MINE RIGHT HERE · WALK UP TO A ROCK'); break;
+    case 'craft': if (state === 'play') bagShow(true); break;
+    case 'craft:pick': case 'craft:torch': case 'craft:lantern': craftMake(a.slice(6)); break;
+    case 'build': if (state === 'play') bldMode(true); break;
     case 'letters_fit': lettersSet(null, 'LETTERS TO FIT THIS SCREEN'); break;
     case 'close': if (XF.open) xfList(false); else if (ALBUM.open) albumShow(false); else if (GUIDE.open) guideShow(false); else if (MENU.open) menuShow(false); else if (state === 'photo') closePhoto(); else if (state === 'map') closeMap(); else if (CHAT.open) closeChat(); else if (EXPLAIN.i >= 0) { EXPLAIN.i = 1e9; explainPanel(); } else if (who.pinned) who.pinned = false; else if (HEALTH.open) healthShow(false); break;
     case 'godmode': godMode(true); break; case 'godmode_off': godMode(false); break; case 'warzone': matchWar(); break;
@@ -21827,6 +21840,9 @@ function voiceRun(a) {
 }
 // what was said, cut into orders
 const V_RULES = [
+  [/^(please )?(chop( it| this| that| the tree)?( down)?|cut (it|this|that|the tree) down|fell (it|this|that|the tree)|mine( it| this| that| the (rock|stone|ore|bronze))?|dig( it)?|strike (the |a |some )?(flint|rock|stone)|break (the |this |that )?(rock|stone)|snap (off )?(a |the )?branch|(get|take|grab) (a |the )?branch)$/, 'gather'],
+  [/\b(make|craft|build me) (a |some |me a )?(pick ?axe|pick)\b/, 'craft:pick'], [/\b(make|craft) (a |some |me (a |some )?)?torch(es)?\b/, 'craft:torch'], [/\b(make|craft) (a |me a )?(lantern|lamp)\b/, 'craft:lantern'],
+  [/^(please )?(craft(ing)?|(open |show (me )?)?(my |the )?(bag|inventory|crafting)|what can i (make|craft))$/, 'craft'], [/^(please )?(build|start building|the builder|build (a |my )?(house|home|wall))$/, 'build'],
   [/\b(war ?zone|start a war|call (the|a) war)\b/, 'warzone'],
   [/\b(god ?mode off|leave god ?mode|out of god ?mode|mortal( again)?|stand down)\b/, 'godmode_off'], [/\b(god ?mode|jarvis( mode)?|i am a god|become a god|wake the god)\b/, 'godmode'],
   [/\b(stop (the )?record(ing)?|end (the )?record(ing)?|cut)\b/, 'record_stop'], [/\b(record( this| me| it)?|start record(ing)?|film this|roll (the )?camera)\b/, 'record'],
