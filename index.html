@@ -1714,6 +1714,7 @@ function groundAt(x, z, y = Infinity) {
     const d = Math.hypot(x - b.x, z - b.z);
     if (d < 6 && y >= b.y - 1) g = Math.max(g, b.y + (d < 4.2 ? 2.8 : 1.6));
   }
+  if (realm === 'over' && AGM.live.length) g = agmGround(x, z, y, g);   // (the monks' rocks, their floors, their bridges: see agmGround)
   return g;
 }
 
@@ -2469,6 +2470,8 @@ const crownBox = (x, z, th, w, d, y0, y1, what) => ({ x, z, c: Math.cos(th), s: 
 // The same, for what stands out in the country (the rocks of the monasteries, the Parthenon): boxes turned about the
 // upright, upright drums of rock, and floors — a floor is a rectangle with a height, somewhere to stand.
 const ROCKS = { boxes: [], cyls: [], floors: [], sites: new Map(), t: 0, mat: null, parth: null };
+// (the agents' Meteora, declared this early because groundAt asks it from the first frame: see agmRocks)
+const AGM = { STEP: 6.2832 / 14.6, RR: 125, IN: 45, R: 11, NC: 11, CH: 0.3, WH: 3.3, HW: 3.2, HD: 2.5, HZ: -1.2, live: [], im: null, cnt: {}, told: false, monS: { kind: 'agmon' } };
 // (the rocks that part: the stands out in the country, the Parthenon, and the crags that stand round Olympus out of the cloud)
 const stoneParts = S => !!S && (S.kind === 'meteora' || S.kind === 'parthenon' || S.kind === 'crags');
 const stoneOpen = c => PART.fly && stoneParts(c.S);   // (it parts for a bird in flight: there is nothing there to hit)
@@ -13285,7 +13288,8 @@ const PERCH = { spot: null, a: 0, t: 0, r: 5, ring: new THREE.Group(), mat: new 
 PERCH.ring.add(new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 56).rotateX(-Math.PI / 2), PERCH.mat), new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 40).rotateX(-Math.PI / 2), PERCH.mat),
   new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true).translate(0, 0.5, 0), PERCH.mat));
 PERCH.ring.visible = false; PERCH.ring.children.forEach(m => { m.frustumCulled = false; m.renderOrder = 3; }); scene.add(PERCH.ring);
-function perchSeek() {
+function perchSeek() { const w = PART.fly; PART.fly = false; const r = perchSeek0(); PART.fly = w; return r; }   // (asked as if he were already coming down: what is solid only to one standing counts, see agmGround)
+function perchSeek0() {
   const p = player, P = p.pos;
   if (p.wasRiding || p.sub || p.cine || story.phase === 'summit' || story.phase === 'leap') return null;
   const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
@@ -13314,7 +13318,8 @@ function perchSeek() {
   }
   return null;
 }
-function perchGo(S) {
+function perchGo(S) { const w = PART.fly; PART.fly = false; perchGo0(S); PART.fly = w; }
+function perchGo0(S) {
   const p = player, ty = surfAt(S.x, S.z, S.y + 3, S.under ? Math.max(S.y + 3, p.pos.y + 1) : S.y + 3, true) + 0.9 * birdK(), L = Math.hypot(S.x - p.pos.x, ty - p.pos.y, S.z - p.pos.z), hx = S.x - p.pos.x, hz = S.z - p.pos.z, hl = Math.hypot(hx, hz) || 1, in_ = Math.min(L * 0.25, 18);
   p.perchGo = { x: S.x, y: S.y, z: S.z, r: S.r, ty, name: S.name, t: 0, T: clamp(L / Math.max(38, p.speed * 0.6), 1.1, 5), beatT: 0,
     a: p.pos.clone(), b: p.pos.clone().addScaledVector(dir3, L * 0.38), c: new THREE.Vector3(S.x - hx / hl * in_, ty + clamp(L * 0.12, 3, 16), S.z - hz / hl * in_), d: new THREE.Vector3(S.x, ty, S.z) };
@@ -19871,6 +19876,7 @@ function netBurn(x, z) { if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', 
 function gotBurn(m) {
   if (!m || !ok(m.i) || realm !== 'over') return;
   const P = peerOf(m.i); if (flood(P)) return;
+  if (m.b === 1) { agmBurnAt(num(m.x, -1e6, 1e6), num(m.y, -1e5, 1e5), num(m.z, -1e6, 1e6)); return; }   // (a monks' bridge: see agmIgnite)
   igniteNear(num(m.x, -1e6, 1e6), num(m.z, -1e6, 1e6), 6, false);
 }
 
@@ -33085,7 +33091,7 @@ function updateTron(dt) {
 //    watchtower, a hall; and bridges woven out across the water (see agReach). Their figures fetch wool and weave it into
 //    whatever is going up, the threads running from their hands. Anyone flying by can read who they are and what they
 //    are at; and when it is their own traveller who comes, they drop everything and run to meet him.
-const AG = { list: [], srv: [], dmn: [], dsig: '', dT: 0, keep: null, ham: new Map(), mine: '', who: false, godT: -999, S: 1.45, R: 2400, mat: null, glow: null, fig: null, prism: null, box: null, cyl: null, orb: null };
+const AG = { list: [], srv: [], dmn: [], dsig: '', dT: 0, keep: null, ham: new Map(), mine: '', who: false, godT: -999, S: 0.55, R: 2400, mat: null, glow: null, fig: null, prism: null, box: null, cyl: null, orb: null };
 const AG_WORKS = [['woodpile', 4], ['home', 24], ['shrine', 36], ['home', 24], ...Object.keys(PATRONS).map(g => ['post:' + g, 8]), ['home', 24], ['tower', 40], ['home', 24], ['home', 24], ['hall', 80], ['home', 24], ['home', 24], ['home', 24]];
 const AG_HOMES = [[-28, -4], [28, -4], [-44, -24], [44, -24], [-30, -48], [30, -48], [-58, -44], [58, -44], [62, 4]];
 const AG_HEY = ['HEY BOSS!', 'BOSS! YOU CAME!', 'BOSS IS HERE!', 'GOOD TO SEE YOU, BOSS!', 'HEY HEY, BOSS!', 'BOSS! OVER HERE!'];
@@ -33250,16 +33256,6 @@ function agStakes(W, F, n, r, sq, y0, y1, col) { for (let i = 0; i < n; i++) { c
 function agRibs(W, F, n, y0, h, r, sq, col) { for (let i = 0; i < n; i++) { const a = i / n * 6.2832, p = agDome(y0, h, 1.04).map(([y, k]) => agW(F, Math.cos(a) * r * k, y, Math.sin(a) * r * k * sq)); agTube(W, p, 0.09 * AG.S, 4, col, col, 0.6, 2); } }
 
 // ───────── the houses
-function agCabin(B, G, W, F, a, wool) {   // its own house, woven of its own wool alone; the window lit while it is in
-  const lt = wool.clone().offsetHSL(0, -0.08, 0.14), dk = wool.clone().offsetHSL(0.02, 0, -0.16), lit = !a.gone;
-  agPut(B, F, AG.cyl, 0, -2.3, 0, 6.9, 5.2, 6.9, AG_STONE);
-  agRound(W, F, [[0.3, 1], [3.25, 1]], 3.0, wool, lt); agRim(W, F, 3.25, 3.05, 1, 0.24, dk, wool);
-  agRound(W, F, agDome(3.25, 2.6, 1.1), 3.0, dk, wool); agPut(B, F, AG.orb, 0, 5.95, 0, 0.7, 0.7, 0.7, lt);
-  agPut(B, F, AG.box, 1.9, 4.7, -0.9, 0.6, 2.0, 0.6, 0x77736b);   // (the stove's pipe: the smoke comes out of it)
-  agPut(B, F, AG.box, 0, 1.15, 2.9, 1.15, 2.1, 0.5, 0x3a2416); agPut(B, F, AG.box, 0, 2.28, 2.95, 1.45, 0.22, 0.56, dk);
-  agPut(lit ? G : B, F, AG.box, 2.0, 1.95, 2.2, 1.1, 0.9, 0.5, lit ? AG_WARM : 0x1c2230, { ry: 0.74 }); agPut(lit ? G : B, F, AG.box, -2.6, 1.95, -1.45, 0.95, 0.85, 0.5, lit ? AG_WARM : 0x1c2230, { ry: 1.06, k: 0.8 });
-  agPut(B, F, AG.box, 2.4, 0.55, 3.4, 1.6, 0.14, 0.5, 0x6b4728);   // (a bench by the door)
-}
 function agHome(B, G, W, F, f, ca, cb, cc) {   // a woven house, as far up as it has got: stakes, the walls round them, the ribs of the roof, the roof
   const R = 3.3, Hw = 3.4, top = 0.3 + Hw, hw = Hw * clamp(f / 0.6, 0, 1);
   agPut(B, F, AG.cyl, 0, -2.25, 0, R * 2 + 0.8, 5.1, R * 2 + 0.8, AG_STONE);
@@ -33316,44 +33312,90 @@ function agPlan(H) {
 }
 const agCabinAt = (H, i) => [(i - (H.agents.length - 1) / 2) * 15, 16 + (i % 2) * 6];
 const AG_RAD = { home: 3.3, shrine: 2.8, tower: 2.3, hall: 7.8, woodpile: 3.5 };   // (how far round each thing its flowers go)
-const agStand = w => (AG_RAD[w] ?? 0.4) + (w === 'hall' ? 1 : 4.2);   // (how far off a weaver stands to throw its threads: far enough for them to be seen)
+// the village at the foot of the rocks: the monks' own woven huts, the loom, the shrine, the posts, the tower and the hall,
+// all at their own small size (the houses up on the rocks are built for a man to walk into; these are theirs)
 function agBuild(H) {
   agTools(); agClear(H, 'group');
   const B = { pos: [], nor: [], col: [] }, G = { pos: [], nor: [], col: [] }, W = agAcc(), st = H.st, P = agPlan(H), F = {}, wl = H.agents.map(a => agWool(H, a)), n = wl.length, wq = q => wl[q % n];
-  H.agents.forEach((a, i) => { const [u, v] = agCabinAt(H, i); agAt(H, u, v, F); agCabin(B, G, W, F, a, wl[i]); });
   let hn = 0;
   for (let k = 0; k < AG_WORKS.length && k <= st.k; k++) { const w = AG_WORKS[k][0], f = k < st.k ? 1 : st.f; agAt(H, P[k][0], P[k][1], F);
     if (w === 'woodpile') { if (f > 0.3 || k < st.k) agPile(B, G, W, F, wl); } else if (w === 'home') { agHome(B, G, W, F, f, wq(hn), wq(hn + 1), wq(hn + 2)); hn++; } else if (w === 'shrine') agShrine(B, G, W, F, f, H.god, wl); else if (w === 'tower') agTower(B, G, W, F, f, wl); else if (w === 'hall') agHall(B, G, W, F, f, wl); else agPost(B, G, W, F, w.slice(5), f); }
-  H.group = new THREE.Group(); H.group.add(agMesh(B, AG.mat)); if (W.p.length) H.group.add(agWoven(W)); if (G.pos.length) H.group.add(agMesh(G, AG.glow)); scene.add(H.group);
+  H.group = new THREE.Group(); if (B.pos.length) H.group.add(agMesh(B, AG.mat)); if (W.p.length) H.group.add(agWoven(W)); if (G.pos.length) H.group.add(agMesh(G, AG.glow)); scene.add(H.group);
 }
 const agFree = g => g.traverse(o => { if (o.isInstancedMesh) o.dispose(); else o.geometry?.dispose(); });   // (the flowers share one shape: it is kept)
 function agClear(H, k) { const g = H[k]; if (!g) return; scene.remove(g); agFree(g); H[k] = null; }
 function agDrop(H, all) {
-  agClear(H, 'group'); agClear(H, 'web'); agClear(H, 'still'); H.stillOf = null;
+  agClear(H, 'group'); agClear(H, 'web'); agClear(H, 'still'); H.bst = null; agmDropRocks(H);
   if (H.thr) H.thr.visible = false;
-  if (!all) return; for (const f of H.figs.values()) { scene.remove(f.g); f.el.remove(); } H.figs.clear(); if (H.label) { H.label.remove(); H.label = null; } agClear(H, 'thr'); H.key = H.wkey = '';
+  if (!all) return; for (const f of H.figs.values()) f.el.remove(); H.figs.clear(); H.novs?.clear(); if (H.label) { H.label.remove(); H.label = null; } agClear(H, 'thr'); H.key = H.wkey = '';
 }
 
-// ───────── the bridges
-// where bridges can go from a hamlet: out from its shore, over water, to land again (another island, a rock, the far side of
-// a bay), looked for once; where there is only open sea, rocks are set in it for them to reach. Shortest first.
+// ───────── Meteora. The hamlet is a valley of rocks: sandstone pillars, sheer, fifty metres and more to their flat tops,
+//    standing in a ring round the monks' village in the valley. Each agent is a monk, and its home is a monastery on a rock
+//    of its own: Byzantine stone in courses with bands of brick, a red-tiled roof, a little dome on a drum, an apse, a bell
+//    in a belfry, a timber balcony hung out over the drop, a garden and window boxes of flowers, and at the lip a winch
+//    with a crank wheel and a basket on a rope, the only way up for what cannot climb. The monks are tiny (a man's knee
+//    high: the rocks are mountains to them), and they build all of it by hand: the walls rise a stone at a time on
+//    scaffolding, a treadwheel crane and a lever lift the blocks, the winch hauls stone up the face, and the teachings
+//    grow beside the church: scrolls on shelves, carved tablets, painted icons. Between the rocks they weave bridges of
+//    rope in their own wools: the man can walk them, from rock to rock and in at a monastery's open door; the phoenix sets
+//    them alight; and the monks weave them again. Two more rocks than there are monks stand at the ends of the ring,
+//    wild, with a hermit's cell, for the bridges to reach.
+//      What each one is seen doing is what it is doing for its traveller (the beats its hooks send, api/_mcp.js, as the
+//    world tells them: the word it last sent, or the words of its task):
+//        writing code ............ a mason: fetches a block from the pile and lays it in the wall, tapping it home
+//        reading the code ........ a scribe: studies the teachings at the lectern, or at the shelves of scrolls
+//        reading the brief ....... studies at the lectern
+//        running commands, tests . hauls: turns the winch, and the basket of stone goes up the face
+//        searching the web ....... scales the rock: down the face beside the ladder with a pick, driving pitons
+//        planning the work ....... surveys: stands at a bridge's anchor and points the way across with a staff
+//        using its tools ......... weaves: out on a bridge still going across, or down in the village at the loom
+//        sending out helpers ..... novices come out to work beside it (up to three: the treadwheel, the stone, the garden)
+//        waiting on the boss ..... prays at the edge, looking out for him
+//        just arrived ............ climbs the ladder up from the foot of its rock
+//        a task done ............. rings the bell
+//        quiet, but not gone ..... prays or reads, slowly; gone in: sits by the door by day, and is in after dark
+//    More done means more built: its own monastery goes up with its own timber; the bridges with all of theirs, and
+//    finer the more of them there are and the bigger the code they work in (see agReach). A bridge burned is woven again
+//    by the monk whose rock it starts from, from its end, out across the gap, the char left on the far stub.
+const AGM_FIRE = 2.4, AGM_FALL = 4.5, AGM_BURN = 6.5;   // (fire along a bridge: metres a second; how long a stretch burns before it falls; how long before it is out)
+const agmSlot = j => j % 2 ? (j + 1) / 2 : -j / 2;   // (0, 1, -1, 2, -2 …: each newcomer's rock stands next to the last, one side and then the other)
+// a point on a rock's top, from its own frame (x across, z toward the middle of the valley) to the world, and back
+const agmW = (R, lx, lz) => { const c = Math.cos(R.ry), s = Math.sin(R.ry); return [R.x + lx * c + lz * s, R.z - lx * s + lz * c]; };
+const agmL = (R, x, z) => { const c = Math.cos(R.ry), s = Math.sin(R.ry), ex = x - R.x, ez = z - R.z; return [ex * c - ez * s, ex * s + ez * c]; };
+const agmBear = (R, lx, lz) => { const [x, z] = agmW(R, lx, lz); return Math.atan2(z - R.z, x - R.x); };   // (which way that is from its middle, as its face is measured)
+const agmEdge = (R, lx, lz) => R.face(agmBear(R, lx, lz), R.top);   // (how far out its lip is, that way)
+function agmFace(R, a, y, off = 0.14) { const r = R.face(a, y) + off; return [R.x + Math.cos(a) * r, y, R.z + Math.sin(a) * r]; }   // (a point on its face)
+const agmIn = (lx, lz, m = 0) => Math.abs(lx) < AGM.HW - m && Math.abs(lz - AGM.HZ) < AGM.HD - m;   // (inside the church's walls)
+function agmRocks(H) {
+  const n = H.agents.length, P = clamp(n + 2, 3, 14);
+  if (H.rocks && H.rockP === P) return H.rocks;
+  agmDropRocks(H);
+  const S = H.site, cx = S.x - Math.cos(S.yaw) * AGM.IN, cz = S.z - Math.sin(S.yaw) * AGM.IN, seed = parseInt(H.o.slice(4, 12), 16) || 5, r = mulberry32(seed), all = [];
+  for (let j = 0; j < 14; j++) { const a = S.yaw + Math.PI + agmSlot(j) * AGM.STEP + (r() - 0.5) * 0.07, d = AGM.RR + (r() - 0.5) * 18, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d; all.push({ j, x, z, g: overHeight(x, z), ph: r() * 6.283, rs: r() }); }
+  const base = Math.max(...all.map(q => Math.max(q.g, WATER))) + 46;   // (worked out over all fourteen places, so that a newcomer's rock moves none of the others)
+  H.rockP = P; H.spans = null; H.cx = cx; H.cz = cz; H.r2 = (AGM.RR + 48) ** 2;
+  return H.rocks = all.slice(0, P).map(q => {
+    const g = Math.max(q.g, WATER - 9), top = base + 5 * Math.sin(q.ph), R = AGM.R * (0.94 + q.rs * 0.12), face = towerShape(R, g - 12, top, (seed + q.j * 131) % 9973);
+    const o = { j: q.j, x: q.x, z: q.z, g, top, R, face, ry: Math.atan2(cx - q.x, cz - q.z), own: q.j < n ? q.j : -1, key: '', grp: null, st: null, wa: 0, wb: 0, wdir: 1, wp: 0, cr: -9, ta: 0, tr: -9, ms: -9, bellT: -99 };
+    let mn = 1e9, mx = 0; for (let k = 0; k < 24; k++) { const e = face(k / 24 * 6.2832, top); mn = Math.min(mn, e); mx = Math.max(mx, e); } o.rt2 = (mn * 0.97) ** 2; o.rm2 = (mx * 0.995) ** 2;
+    o.ef = agmEdge(o, 0, 1); o.eb = agmEdge(o, 0, -1); o.af = agmBear(o, 0, 1);   // (its lip ahead, toward the valley, and behind, over the drop)
+    const la = 0.22, le = agmEdge(o, Math.sin(la), Math.cos(la)); o.aL = agmBear(o, Math.sin(la), Math.cos(la)); o.lad = [Math.sin(la) * (le - 0.4), Math.cos(la) * (le - 0.4)];   // (where its ladder goes over the lip)
+    { const p = agmFace(o, o.aL, g + 1.5, 0.2); o.footY = Math.max(terrainAt(p[0], p[2]), WATER - 0.4); o.foot = agmFace(o, o.aL, o.footY + 0.3, 0.7); o.foot[1] = o.footY; }
+    { let y = top - 2; for (; y > g + 1; y -= 1) if (face(o.af, y) > o.ef + 0.55) break; o.by0 = Math.min(top - 3, y + 1.2); }   // (how far down the basket can go before the rock spreads out under it)
+    return o; });
+}
+// where the bridges go: from each rock to the next one round the ring, anchored a little in from both lips, the end on the
+// rock that was there first the end it is woven from
 function agSpans(H) {
-  const S = H.site, out = [], open = [], far = (a, b) => Math.abs(wrapAngle(a - b));
-  for (let i = 0; i < 56; i++) { const b = S.yaw + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.1122, cx = Math.cos(b), cz = Math.sin(b); let r1 = 0, end = 0;
-    for (let r = 20; r < 760; r += 5) { const h = overHeight(S.x + cx * r, S.z + cz * r); if (!r1) { if (h < WATER - 0.4) r1 = r; else if (r > 250) break; } else if (h > WATER + 1.5) { end = r; break; } }
-    if (!r1) continue;
-    const at = (r, y) => [S.x + cx * r, y ?? Math.max(overHeight(S.x + cx * r, S.z + cz * r), WATER) + 0.35, S.z + cz * r];
-    if (!end) { open.push({ b, r1, at }); continue; }
-    const A = at(r1 - 5), B = at(end + 4); if (B[1] > WATER + 34 || A[1] > WATER + 34 || end + 9 - r1 < 22) continue;
-    out.push({ b, A, B, len: Math.hypot(B[0] - A[0], B[2] - A[2]) }); }
-  out.sort((a, b) => a.len - b.len); const pick = [];
-  for (const s of out) if (pick.length < 10 && pick.every(p => far(p.b, s.b) > 0.3)) pick.push(s);
-  open.sort((a, b) => far(a.b, S.yaw) - far(b.b, S.yaw));
-  for (const o of open) { if (pick.length >= 8) break; if (!pick.every(p => far(p.b, o.b) > 0.36)) continue; const D = 34 + 22 * (pick.length % 4), B = o.at(o.r1 + D, WATER + 6 + (pick.length % 3) * 2);
-    if (overHeight(B[0], B[2]) > WATER - 2) continue; const A = o.at(o.r1 - 5); pick.push({ b: o.b, A, B, len: Math.hypot(B[0] - A[0], B[2] - A[2]), stack: true }); }
-  pick.sort((a, b) => a.len - b.len);
-  for (const s of pick) { const dx = (s.B[0] - s.A[0]) / s.len, dz = (s.B[2] - s.A[2]) / s.len; s.d = [dx, dz]; s.sv = [-dz, 0, dx]; }
-  return pick;
+  const R = agmRocks(H), by = new Map(R.map(q => [agmSlot(q.j), q])), out = [];
+  for (const q of R) { const nb = by.get(agmSlot(q.j) + 1); if (!nb) continue;
+    const [qa, qb] = q.j < nb.j ? [q, nb] : [nb, q], ab = Math.atan2(qb.z - qa.z, qb.x - qa.x), ba = ab + Math.PI, ra = qa.face(ab, qa.top) - 1.1, rb = qb.face(ba, qb.top) - 1.1;
+    const A = [qa.x + Math.cos(ab) * ra, qa.top + 0.12, qa.z + Math.sin(ab) * ra], B = [qb.x + Math.cos(ba) * rb, qb.top + 0.12, qb.z + Math.sin(ba) * rb], len = Math.hypot(B[0] - A[0], B[2] - A[2]);
+    out.push({ b: ab, A, B, len, ka: qa.j, kb: qb.j, ord: Math.max(qa.j, qb.j) * 20 + Math.min(qa.j, qb.j) }); }
+  out.sort((a, b) => a.ord - b.ord);
+  for (const s of out) { const dx = (s.B[0] - s.A[0]) / s.len, dz = (s.B[2] - s.A[2]) / s.len; s.d = [dx, dz]; s.sv = [-dz, 0, dx]; }
+  return out;
 }
 // how far the bridges have got, by now: which are begun, how far across each is woven, how big and how fine they all are
 function agReach(H, u) {
@@ -33363,132 +33405,519 @@ function agReach(H, u) {
   const lv = clamp(Math.floor(0.5 * (n - 1) + 2.4 * g + u / 260), 0, 4), most = Math.min(H.spans.length, 1 + Math.ceil(n * 1.25)), br = [];   // (how fine: more of them, more done, bigger code)
   let T = 6;
   for (let i = 0; i < most; i++) { const sp = H.spans[i], C = 12 + sp.len * 0.22 * (1 + lv * 0.15), f = clamp((u - T) / C, 0, 1); if (f <= 0) break;
-    br.push({ sp, f, i, wd: 2.4 + 2.4 * g + 0.3 * lv, rh: 1.7 + 0.8 * g, rise: Math.min(26, 2 + sp.len * (0.05 + 0.06 * g) + lv * 0.5) }); T += C * 0.6 / (1 + 0.12 * (n - 1)); }
+    br.push({ sp, f, i, w: sp.ka < n ? sp.ka : sp.kb < n ? sp.kb : 0, wd: 1.5 + 0.45 * g + 0.08 * lv, rh: 1.05 + 0.12 * g, rise: -(0.5 + sp.len * (0.03 + 0.012 * g)), pc: [[0, f]] }); T += C * 0.6 / (1 + 0.12 * (n - 1)); }
   H.br = br; H.lv = lv; H.g = g;
   return `${lv}|${Math.round(g * 8)}|${br.map(b => Math.floor(b.f * 16)).join(',')}`;
 }
-// a point on a bridge: t of the way across, o to the side, h above the deck
+// a point on a bridge: t of the way across, o to the side, h above the deck (it sags: rise is below the line)
 function agDeck(b, t, o = 0, h = 0) { const A = b.sp.A, Z = b.sp.B, sv = b.sp.sv; return [A[0] + (Z[0] - A[0]) * t + sv[0] * o, A[1] + (Z[1] - A[1]) * t + b.rise * Math.sin(Math.PI * t) + h, A[2] + (Z[2] - A[2]) * t + sv[2] * o]; }
-// one bridge, woven out from the shore as far as it has got: the finer the hamlet's weaving (lv), the more goes into it.
-// What is to be seen from the air and from far off is cloth (the deck, the woven sides, the cloth under the arches); the
-// strands (ropes, webs, spirals, fans) are for whoever comes close
-function agBridge(W, B, G, FL, b, lv, g, wl, wl2, god, rng) {
-  const sp = b.sp, L = sp.len, f = b.f, n = wl.length, c = q => wl[(b.i + q) % n], cl = q => wl2[(b.i + q) % n], wd = b.wd, rh = b.rh, sv = sp.sv, along = [sp.d[0], 0, sp.d[1]], K = clamp(L / 130, 1, 1.7), r0 = (0.16 + 0.1 * g) * K, tl = 0.75 * K, Q = TOUCH ? 1.7 : 1, Wf = W.fine || W;   // (K: a long bridge is seen from further off, so all of it is a little heavier. Q: on a phone, fewer pieces. Wf: the fine strands, a piece of their own that is only drawn near)
-  const ns = Math.max(8, Math.ceil(L * f / (1.6 * Q))), path = (o, h) => { const p = []; for (let j = 0; j <= ns; j++) p.push(agDeck(b, f * j / ns, o, h)); return p; }, top = lv >= 1 ? rh + 1.2 + 0.6 * g : rh;
-  // (each weaver wove a stretch of it in its own wool, light on dark: from far off it is a sash of their colours, one after another)
-  const band = 12 * K, cols = (C, off, sh) => Array.from({ length: ns + 1 }, (_, j) => C(Math.floor((f * j / ns * L + sh * band) / band) + off));
-  agTube(W, path(0, 0), [wd / 2, 0.34], 8, cols(c, 0, 0), cols(cl, 0, 0), tl, 2 * Math.max(2, Math.round(wd / tl)), sv);   // (the deck: a flat woven band)
-  for (const o of [-wd / 2, wd / 2]) {
-    agTube(W, path(o, rh / 2), [0.08, rh / 2], 4, cols(c, o > 0 ? 2 : 1, 0.5), cols(cl, o > 0 ? 2 : 1, 0.5), tl, 2 * Math.max(2, Math.round(rh / tl)), sv);   // (its sides, woven up to the hand rope)
-    if (lv < 3 || TOUCH) agTube(W, path(o, rh), r0, 5, c(2), c(0), 0.6, 4);   // (the hand rope; braided of three, in the finer ones)
-    else for (let q = 0; q < 3; q++) { const p = []; for (let j = 0; j <= ns * 2; j++) { const t = f * j / (ns * 2), ph = t * L / (1.7 * K) * 6.2832 + q * 2.0944; p.push(agDeck(b, t, o + Math.cos(ph) * r0 * 1.2, rh + Math.sin(ph) * r0 * 1.2)); } agTube(Wf, p, r0 * 0.7, 4, c(q), c(q), 0.6, 2); }
-    if (lv >= 1) {   // (from the second fineness: a rope above that one, and a web of crossed threads between the two)
-      agTube(W, path(o, top), r0 * 0.8, 5, c(4), c(1), 0.6, 4); const hs = 2.6 * K * Q, nh = Math.floor(L * f / hs);
-      for (let k = 0; k <= nh; k++) { const t = k * hs / L, t2 = (k + 1) * hs / L; agTube(Wf, [agDeck(b, t, o, rh), agDeck(b, t, o, top)], 0.085 * K, 3, c(1), c(1), 0.5, 2);
-        if (k < nh) { agTube(Wf, [agDeck(b, t, o, rh), agDeck(b, t2, o, top)], 0.065 * K, 3, c(3), c(3), 0.5, 2); agTube(Wf, [agDeck(b, t, o, top), agDeck(b, t2, o, rh)], 0.065 * K, 3, c(5), c(5), 0.5, 2); } } } }
-  if (lv >= 2) {   // (arches under it, from foot to foot across the water, and cloth woven between each arch and the deck)
-    const na = clamp(Math.round(L / 46), 1, 9), gy = t => { const d = agDeck(b, t); return Math.min(Math.max(overHeight(d[0], d[2]), WATER) + 0.2, d[1] - 0.3); };
-    for (const o of [-wd * 0.42, wd * 0.42]) for (let a = 0; a < na; a++) { const t0 = 0.02 + 0.96 * a / na, t1 = 0.02 + 0.96 * (a + 1) / na, y0 = gy(t0), y1 = gy(t1), ym = agDeck(b, (t0 + t1) / 2)[1] - 0.7, arch = [], cloth = [];
-      for (let j = 0; j <= 24; j++) { const uu = j / 24, t = t0 + (t1 - t0) * uu; if (t > f) break; const d = agDeck(b, t, o, -0.3), base = y0 + (y1 - y0) * uu, y = Math.min(base + Math.max(0, ym - base) * Math.pow(Math.sin(Math.PI * uu), 0.6), d[1] - 0.1), h = (d[1] - y) / 2; arch.push([d[0], y, d[2]]); cloth.push([d[0], y + h, d[2], Math.max(0.02, h)]); }
-      agTube(W, arch, (0.26 + 0.14 * g) * K, 5, c(a + 1), c(a + 2), 0.6, 4); agTube(W, cloth, [0.07, 1], 4, c(a), cl(a), tl, 2 * Math.max(2, Math.round((ym - Math.min(y0, y1)) * 0.5 / tl)), sv, [0, 1, 0]); } }
-  if (lv >= 3) {   // (a spiral weave round the whole of it, two ways at once: a woven tunnel)
-    const nh2 = lv >= 4 && !TOUCH ? 4 : 2, pitch = (8 + 5 * g) * K, rx = wd * 0.64, ry = top * 0.5 + 0.9, m = Math.max(12, Math.ceil(L * f / (0.9 * K * Q)));
-    for (let q = 0; q < nh2; q++) { const p = [], dir = q % 2 ? 1 : -1; for (let j = 0; j <= m; j++) { const t = f * j / m, ph = dir * t * L / pitch * 6.2832 + Math.floor(q / 2) * Math.PI; p.push(agDeck(b, t, Math.cos(ph) * rx, top * 0.5 + Math.sin(ph) * ry)); } agTube(Wf, p, (0.1 + 0.05 * g) * K, 4, c(q + 1), c(q + 1), 0.6, 2); } }
-  if (lv >= 4) {   // (woven towers at the ends, an arch between each pair, fans of cable down to the ropes, and a cable slung from end to end)
-    const hp = 8 + 8 * g + Math.min(12, L * 0.03), po = wd / 2 + 0.7;
-    for (const te of f >= 1 ? [0.015, 0.985] : [0.015]) { const tops = [];
-      for (const o of [-po, po]) { const base = agDeck(b, te, o, -1.5), p = []; for (let j = 0; j <= 6; j++) p.push([base[0], base[1] + (hp + 1.5) * j / 6, base[2], 1 - 0.4 * j / 6]); agTube(W, p, 0.6 * K, 8, c(0), cl(0), tl, 6, along); tops.push(agDeck(b, te, o, hp)); }
-      const p = []; for (let j = 0; j <= 10; j++) { const a = j / 10 * Math.PI; p.push(agDeck(b, te, -Math.cos(a) * po, hp + Math.sin(a) * po * 0.6)); } agTube(W, p, 0.3 * K, 5, c(2), c(1), 0.6, 4);
-      for (let q = 0; q < 2; q++) for (let k = 1; k <= 7; k++) { const t = te < 0.5 ? te + k * 0.055 : te - k * 0.055; if (t > f) continue; agTube(Wf, [tops[q], agDeck(b, t, q ? wd / 2 : -wd / 2, top)], 0.06 * K, 3, c(k), c(k), 0.5, 2); } }
-    for (const o of [-po, po]) { const p = [], m = Math.max(8, Math.ceil(ns / 2)); for (let j = 0; j <= m; j++) { const t = Math.max(0.015, f * j / m), w = (t - 0.015) / 0.97; p.push(agDeck(b, t, o, top + 0.8 + (hp - top - 0.8) * (2 * w - 1) ** 2)); } agTube(W, p, 0.22 * K, 5, c(1), c(2), 0.5, 4); } }
-  if (f < 1) for (let q = 0; q < 5; q++) { const o = (q / 4 - 0.5) * wd, d = agDeck(b, f, o, 0), p = []; for (let j = 0; j <= 6; j++) p.push([d[0] + along[0] * j * 0.3 + Math.sin(j * 1.3 + q) * 0.25, d[1] - j * 0.42, d[2] + along[2] * j * 0.3 + Math.cos(j * 1.1 + q) * 0.25]); agTube(W, p, 0.05, 3, c(q), c(q), 0.5, 2); }   // (loose ends where the weaving has got to)
-  for (const te of f >= 1 ? [0, 1] : [0]) for (const o of [-wd / 2 - 0.25, wd / 2 + 0.25]) {   // (a woven post each side at each end, a lantern on it, flowers round it)
-    const d = agDeck(b, te, o, 0), y0 = Math.max(overHeight(d[0], d[2]), WATER) - 0.6, F = { x: d[0], y: d[1] + rh + 1.25, z: d[2], ry: 0 };
-    agTube(W, [[d[0], y0, d[2]], [d[0], d[1] + rh + 0.9, d[2]]], 0.3 + 0.1 * g, 6, c(0), c(1), 0.5, 4, along); agPut(G, F, AG.orb, 0, 0, 0, 0.5, 0.5, 0.5, AG_WARM, { k: 0.9 });
-    for (let q = 0; q < 4; q++) { const a = rng() * 6.2832, rr = 0.8 + rng() * 2.2, x = d[0] + Math.cos(a) * rr, z = d[2] + Math.sin(a) * rr, y = overHeight(x, z); if (y > WATER + 0.3) FL.push([x, y, z, rng() < 0.25 ? c(q) : god, 1.4 + rng() * 0.5]); } }
-  if (sp.stack && f > 0) { const Fs = { x: sp.B[0], y: WATER, z: sp.B[2], ry: sp.b }, tp = (sp.B[1] - WATER) / AG.S;   // (the rock set in the sea for it to reach)
-    agPut(B, Fs, AG.orb, 0, tp - 2.0, 0, 6.5, 4.2, 6.5, 0x8a867c); agPut(B, Fs, AG.orb, 1.1, tp - 4.6, 0.7, 8.5, 6.5, 8.5, AG_STONE); agPut(B, Fs, AG.orb, -1.3, -2, -0.9, 11, 8, 11, 0x7d796f); agPut(B, Fs, AG.orb, 4.6, -1.2, 2.4, 3.6, 3.0, 3.6, AG_STONE);
-    if (f >= 1) for (let q = 0; q < 7; q++) { const a = rng() * 6.2832, rr = 1 + rng() * 2.6; FL.push([sp.B[0] + Math.cos(a) * rr, sp.B[1] - 0.3, sp.B[2] + Math.sin(a) * rr, god, 1.3 + rng() * 0.4]); } }
-  for (let s = 2; s < L * f - 1; s += 4.2) { const k = Math.round(s / 4.2), d = agDeck(b, s / L, (k % 2 ? 1 : -1) * (wd / 2 - 0.45), 0.3); FL.push([d[0], d[1], d[2], rng() < 0.22 ? c(k) : god, 1.15 + rng() * 0.35]); }   // (flowers along the deck)
+// ───────── fire on a bridge. It runs both ways from where it caught, AGM_FIRE metres a second; each stretch burns for a
+// while, black, and falls; at the ends a charred stub is left hanging. When it is all down, the monk whose end it is
+// weaves it again out from that end (fast while it is there weaving, slowly if no one is). B: { c where it caught, at
+// when, b0 b1 what had already fallen, from which end it is woven again, full when all of it is down, rw how far
+// across it is woven again }
+function agmGap(B, L) {
+  if (B.full) return [B.b0, B.b1];
+  const df = AGM_FIRE * Math.max(0, time - B.at - AGM_FALL) / L; if (df <= 0) return [B.b0, B.b1];
+  return [Math.max(0.035, Math.min(B.b0, B.c - df)), Math.min(0.965, Math.max(B.b1, B.c + df))];
 }
-// garlands, house to house: each thing that stands is tied to the nearest one already tied, by two strands twisted, slung
+function agmPieces(H, b) {   // what of a bridge is there to stand on: [from, to] stretches of it
+  const B = H.burn && H.burn.get(b.i); let P;
+  if (!B) P = [[0, b.f]];
+  else { const [g0, g1] = agmGap(B, b.sp.len), w = B.full ? B.rw || 0 : 0; P = B.from ? [[0, g0], [g1 - (g1 - g0) * w, 1]] : [[0, g0 + (g1 - g0) * w], [g1, 1]]; P = P.map(([a, c]) => [a, Math.min(c, b.f)]); }
+  return P.filter(([a, c]) => c - a > 0.004);
+}
+const agmOn = (b, t) => b.pc.some(([a, c]) => t >= a - 1e-4 && t <= c + 1e-4);
+function agmIgnite(H, b, t, net) {
+  if (!H.burn) H.burn = new Map(); const B0 = H.burn.get(b.i);
+  if (B0 && !B0.full) return false;   // (it is alight already)
+  if (!agmPieces(H, b).some(([a, c]) => t >= a && t <= c)) return false;
+  let b0 = t, b1 = t; if (B0) { const w = B0.rw || 0; b0 = B0.from ? B0.b0 : B0.b0 + (B0.b1 - B0.b0) * w; b1 = B0.from ? B0.b1 - (B0.b1 - B0.b0) * w : B0.b1; }   // (what is still down stays down)
+  H.burn.set(b.i, { c: t, at: time, b0: Math.min(b0, t), b1: Math.max(b1, t), from: b.w === b.sp.kb ? 1 : 0, full: false, rw: 0, gap: [t, t] });
+  if (net) { const q = agDeck(b, t); if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'burn', payload: { i: NET.id, x: Math.round(q[0]), z: Math.round(q[2]), y: Math.round(q[1]), b: 1 } }); }   // (to the others as a fire is: where; their pages burn their own copy of it)
+  if (!AGM.told && state === 'play') { AGM.told = true; toast('THE MONKS’ BRIDGE IS BURNING · THEY WILL WEAVE IT AGAIN'); }
+  return true;
+}
+function agmBurnAt(x, y, z) {   // someone else's fire, on a bridge near where they say
+  for (const H of AGM.live) for (const b of H.br || []) { const A = b.sp.A, ex = x - A[0], ez = z - A[2], t = (ex * b.sp.d[0] + ez * b.sp.d[1]) / b.sp.len; if (t < -0.02 || t > 1.02) continue;
+    const o = ex * b.sp.sv[0] + ez * b.sp.sv[2], q = agDeck(b, clamp(t, 0, 1)); if (Math.abs(o) < b.wd / 2 + 4 && Math.abs(y - q[1]) < 6) { agmIgnite(H, b, clamp(t, 0, 1), false); return; } }
+}
+// each frame: the fire runs on, what has burned falls (and the planks and the char go down into the valley), what is down
+// is woven again
+function agmBurnStep(H, b, dt, d) {
+  const B = H.burn.get(b.i), L = b.sp.len; if (!B) return;
+  const [g0, g1] = agmGap(B, L);
+  if (!B.full) { if (g0 < B.gap[0] - 0.004 || g1 > B.gap[1] + 0.004) { if (d < 600) for (const t of [g0, g1]) for (let k = 0; k < (TOUCH ? 3 : 6); k++) { const q = agDeck(b, t, (Math.random() - 0.5) * b.wd, Math.random() * 0.3); emit(q[0], q[1], q[2], rnd(1.2), -1 - Math.random() * 2, rnd(1.2), 3 + Math.random() * 2, k % 3 ? [0.11, 0.085, 0.07] : pick(EMBER), -9, 0.8 + Math.random() * 0.8); } B.gap = [g0, g1]; }
+    if (g0 <= 0.036 && g1 >= 0.964) { B.full = true; B.b0 = g0; B.b1 = g1; B.outT = time; } }
+  else if (time - B.outT > 7) { const e = H.bst?.get(b.i), here = e && time - e.here < 0.5; B.rw = Math.min(1, B.rw + dt * (here ? 0.45 : 0.12) / L); if (B.rw >= 1) H.burn.delete(b.i); }   // (fast with its monk at it, weaving)
+  if (d > 600) return;
+  const e = time - B.at, reach = Math.min(1, AGM_FIRE * e / L);
+  for (let k = 0; k < (TOUCH ? 3 : 7); k++) { const t = clamp(B.c + (Math.random() * 2 - 1) * reach, 0, 1), et = e - Math.abs(t - B.c) * L / AGM_FIRE; if (et <= 0 || et > AGM_BURN || !agmOn(b, t)) continue;
+    const q = agDeck(b, t, (Math.random() - 0.5) * b.wd, Math.random() < 0.4 ? b.rh : Math.random() * 0.3), k2 = 1 - et / AGM_BURN;
+    emit(q[0], q[1], q[2], rnd(0.5) + WIND.x * 0.6, 1.5 + Math.random() * 3 * k2, rnd(0.5) + WIND.z * 0.6, 0.35 + Math.random() * 0.5, pick(EMBER), 4, 0.6 + Math.random() * 0.7 * k2);
+    if (Math.random() < 0.04) smokePuff(q[0], q[1] + 1, q[2], 2.2, d, 1); }
+}
+// one piece placed in the world (no frame, no hamlet scale), and one placed on a rock's top, in its own frame
+function agP(B, F, g, lx, ly, lz, sx, sy, sz, col, rx = 0, ry = 0, rz = 0) {
+  const c = Math.cos(F.ry), s = Math.sin(F.ry); _agP.set(F.x + lx * c + lz * s, F.y + ly, F.z - lx * s + lz * c); _agQ.setFromEuler(_agE.set(rx, F.ry + ry, rz, 'YXZ')); _agM.compose(_agP, _agQ, _agS.set(sx, sy, sz));
+  const P = g.attributes.position, N = g.attributes.normal; if (col && col.isColor) _agC.copy(col); else if (Array.isArray(col)) _agC.setRGB(col[0], col[1], col[2]); else _agC.setHex(col);
+  for (let i = 0; i < P.count; i++) { _agP.fromBufferAttribute(P, i).applyMatrix4(_agM); B.pos.push(_agP.x, _agP.y, _agP.z); _agN.fromBufferAttribute(N, i).applyQuaternion(_agQ); B.nor.push(_agN.x, _agN.y, _agN.z); B.col.push(_agC.r, _agC.g, _agC.b); }
+}
+const agmF = R => ({ x: R.x, y: R.top, z: R.z, ry: R.ry });
+function agmBeam(B, F, a, b, w, col) {   // a beam from a to b (points in F's frame)
+  const vx = b[0] - a[0], vy = b[1] - a[1], vz = b[2] - a[2], L = Math.hypot(vx, vy, vz) || 1e-3;
+  agP(B, F, AG.box, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, w, w, L, col, -Math.asin(clamp(vy / L, -1, 1)), Math.atan2(vx, vz), 0);
+}
+// ───────── a rope bridge, as it is: a deck of planks on a woven band of their wools, a hand rope each side on hangers,
+// posts at each end lashed in wool. Finer as the hamlet's weaving grows finer (lv): a web of crossed threads in the
+// sides; then a rope above to lean on and keel ropes slung under it; then the hand ropes braided of three; at the last
+// woven towers at its ends with fans of cable. pcs: the stretches of it
+// there are; B: its fire, if it has had one (what has burned is black, what is burning glows, and where it has burned
+// through, charred ends hang down)
+function agmBridge(H, b, pcs, B) {
+  const W = agAcc(), Wf = agAcc(), Bm = { pos: [], nor: [], col: [] }, G = { pos: [], nor: [], col: [] }, FL = [], grp = new THREE.Group();
+  const wl = H.agents.map(a => agWool(H, a)), wl2 = wl.map(c => c.clone().offsetHSL(0, -0.06, 0.15)), n = Math.max(1, wl.length), god = new THREE.Color(H.god ? PATRONS[H.god][0] : 0xfff0c8), rng = mulberry32((parseInt(H.o.slice(0, 8), 16) || 3) + b.i * 104729);
+  const sp = b.sp, L = sp.len, lv = H.lv, g = H.g, wd = b.wd, rh = b.rh, sv = sp.sv, along = [sp.d[0], 0, sp.d[1]], c = q => wl[(b.i + q) % n] || AG_UNDYED, cl = q => wl2[(b.i + q) % n] || AG_UNDYED, Q = TOUCH ? 1.6 : 1, yaw = Math.atan2(along[0], along[2]);
+  const e0 = B ? time - B.at : -1, gp = B ? agmGap(B, L) : [2, 2], w0 = B && B.full && B.rw > 0 ? (B.from ? gp[1] - (gp[1] - gp[0]) * B.rw : gp[0] + (gp[1] - gp[0]) * B.rw) : null;
+  const fresh = t => w0 !== null && (B.from ? t >= w0 - 1e-4 && t < gp[1] : t <= w0 + 1e-4 && t > gp[0]);   // (woven again since: clean)
+  const et = t => B && !fresh(t) ? e0 - Math.abs(t - B.c) * L / AGM_FIRE : -1;
+  const CH = (col, t) => { const C = col.isColor ? col.clone() : new THREE.Color(col), e = et(t); if (e <= 0) return C; const k = smoothstep(0, AGM_BURN * 0.8, e), h = e < AGM_BURN ? (1 - e / AGM_BURN) * (0.6 + 0.4 * rng()) : 0; return C.setRGB(lerp(C.r, 0.07, k) + h * 1.3, lerp(C.g, 0.055, k) + h * 0.38, lerp(C.b, 0.05, k) + h * 0.05); };
+  for (const [t0, t1] of pcs) {
+    const ns = Math.max(4, Math.ceil(L * (t1 - t0) / (1.1 * Q))), ts = Array.from({ length: ns + 1 }, (_, j) => t0 + (t1 - t0) * j / ns);
+    const path = (o, h) => ts.map(t => agDeck(b, t, o, h)), pc = (C, off, sh) => ts.map(t => CH(C(Math.floor((t * L + sh * 9) / 9) + off), t)), one = C0 => ts.map(t => CH(C0, t));
+    agTube(W, path(0, -0.05), [wd / 2, 0.05], 6, pc(c, 0, 0), pc(cl, 0, 0), 0.3, 2 * Math.max(2, Math.round(wd / 0.3)), sv);   // (the woven band the planks lie on: from below, a sash of their colours, one after another)
+    for (let s = t0 * L + 0.17; s < t1 * L - 0.1; s += 0.34 * Q) { const t = s / L, q = agDeck(b, t), q2 = agDeck(b, Math.min(1, t + 0.01)), sl = (q2[1] - q[1]) / (0.01 * L);   // (the planks)
+      agP(Bm, { x: q[0], y: q[1] + 0.02, z: q[2], ry: yaw }, AG.box, 0, 0, 0, wd + 0.14, 0.05, 0.25, CH(AG_WOOD[(rng() * 3) | 0], t), -Math.atan(sl), (rng() - 0.5) * 0.05, 0); }
+    for (const sd of [-1, 1]) { const o = sd * wd / 2;
+      if (lv < 3 || TOUCH) agTube(W, path(o, rh), 0.045 + 0.015 * g, 5, one(c(2)), one(c(0)), 0.5, 4);   // (the hand rope)
+      else for (let q = 0; q < 3; q++) { const p2 = [], cc = []; for (let j = 0; j <= ns * 2; j++) { const t = t0 + (t1 - t0) * j / (ns * 2), ph = t * L / 1.4 * 6.2832 + q * 2.0944; p2.push(agDeck(b, t, o + Math.cos(ph) * 0.05, rh + Math.sin(ph) * 0.05)); cc.push(CH(c(q), t)); } agTube(W, p2, 0.032, 4, cc, cc, 0.5, 2); }   // (braided of three)
+      for (let s = Math.ceil(t0 * L / 1.2) * 1.2; s <= t1 * L; s += 1.2 * Q) { const t = s / L; agTube(Wf, [agDeck(b, t, o, 0), agDeck(b, t, o, rh)], 0.018, 3, CH(c(1), t), CH(c(1), t), 0.4, 2);   // (the hangers)
+        if (lv >= 1 && s + 1.2 * Q <= t1 * L) { const t2 = (s + 1.2 * Q) / L; agTube(Wf, [agDeck(b, t, o, 0.05), agDeck(b, t2, o, rh - 0.05)], 0.014, 3, CH(c(3), t), CH(c(3), t2), 0.4, 2); agTube(Wf, [agDeck(b, t, o, rh - 0.05), agDeck(b, t2, o, 0.05)], 0.014, 3, CH(c(5), t), CH(c(5), t2), 0.4, 2); } }   // (and a web of crossed threads between them)
+      if (lv >= 2) { agTube(W, path(o, rh + 0.45 + 0.2 * g), 0.035, 5, one(c(4)), one(c(1)), 0.5, 4);   // (a rope above)
+        for (let s = Math.ceil(t0 * L / 1.2) * 1.2; s <= t1 * L; s += 1.2 * Q) { const t = s / L; agTube(Wf, [agDeck(b, t, o, rh), agDeck(b, t, o, rh + 0.45 + 0.2 * g)], 0.014, 3, CH(c(4), t), CH(c(4), t), 0.4, 2); }
+        const kp = ts.map(t => agDeck(b, t, o * 0.7, -0.25 - (0.5 + 0.5 * g) * Math.sin(Math.PI * t))); agTube(W, kp, 0.05, 5, one(c(1)), one(c(2)), 0.5, 4);   // (a keel rope slung under it)
+        for (let s = Math.ceil(t0 * L / 2.4) * 2.4; s <= t1 * L; s += 2.4 * Q) { const t = s / L; agTube(Wf, [agDeck(b, t, o * 0.7, -0.05), agDeck(b, t, o * 0.7, -0.25 - (0.5 + 0.5 * g) * Math.sin(Math.PI * t))], 0.016, 3, CH(c(2), t), CH(c(2), t), 0.4, 2); } } }
+    for (const te of [t0 <= 0.001 ? 0 : -1, t1 >= 0.999 ? 1 : -1]) { if (te < 0) continue;   // (an end that stands on its rock: posts lashed in wool, a lantern, flowers; and in the finest, a woven tower)
+      for (const sd of [-1, 1]) { const q = agDeck(b, te, sd * (wd / 2 + 0.12)), F = { x: q[0], y: q[1], z: q[2], ry: yaw };
+        agP(Bm, F, AG.box, 0, (rh + 0.4) / 2 - 0.05, 0, 0.17, rh + 0.5, 0.17, CH(AG_WOOD[0], te));
+        for (const hy of [0.25, rh]) { const ring = []; for (let k = 0; k <= 8; k++) { const a = k / 8 * 6.2832; ring.push([q[0] + Math.cos(a) * 0.12, q[1] + hy + Math.sin(a * 3) * 0.02, q[2] + Math.sin(a) * 0.12]); } agTube(W, ring, 0.025, 3, CH(c(sd > 0 ? 1 : 2), te), CH(c(0), te), 0.3, 2); }
+        if (lv >= 1) agP(G, F, AG.orb, 0, rh + 0.55, 0, 0.16, 0.2, 0.16, AG_WARM, 0, 0, 0);
+        for (let k = 0; k < 3; k++) FL.push([q[0] + rnd(0.5), q[1] + 0.05, q[2] + rnd(0.5), rng() < 0.3 ? c(k) : god, 0.24 + rng() * 0.1]); }
+      if (lv >= 4) { const hp = 3.2 + 2.5 * g, po = wd / 2 + 0.35, tw = te ? 0.985 : 0.015, tops = [];
+        for (const o of [-po, po]) { const base = agDeck(b, tw, o, -0.3), p2 = []; for (let j = 0; j <= 6; j++) p2.push([base[0], base[1] + (hp + 0.3) * j / 6, base[2], 1 - 0.4 * j / 6]); agTube(W, p2, 0.2, 8, CH(c(0), te), CH(cl(0), te), 0.5, 6, along); tops.push(agDeck(b, tw, o, hp)); }
+        const p2 = []; for (let j = 0; j <= 10; j++) { const a = j / 10 * Math.PI; p2.push(agDeck(b, tw, -Math.cos(a) * po, hp + Math.sin(a) * po * 0.6)); } agTube(W, p2, 0.1, 5, CH(c(2), te), CH(c(1), te), 0.5, 4);
+        for (let q = 0; q < 2; q++) for (let k = 1; k <= 6; k++) { const t = te ? tw - k * 0.05 : tw + k * 0.05; if (t < t0 || t > t1) continue; agTube(Wf, [tops[q], agDeck(b, t, q ? wd / 2 : -wd / 2, rh)], 0.02, 3, CH(c(k), t), CH(c(k), t), 0.4, 2); } } }
+    for (let s = t0 * L + 1.5; s < t1 * L - 1; s += 3) { const t = s / L, k = Math.round(s / 3), q = agDeck(b, t, (k % 2 ? 1 : -1) * (wd / 2 - 0.12), 0.05); if (et(t) <= 0) FL.push([q[0], q[1], q[2], rng() < 0.25 ? c(k) : god, 0.2 + rng() * 0.08]); }   // (flowers tied along the edge of the deck)
+    for (const [te, out] of [[t0, -1], [t1, 1]]) { if (te <= 0.001 || te >= 0.999) continue;   // (where it ends in the air)
+      const cut = B && et(te) > 0 && !(w0 !== null && Math.abs(te - w0) < 0.002), dx = along[0] * out, dz = along[2] * out;
+      for (let q = 0; q < 7; q++) { const o = q < 5 ? (q / 4 - 0.5) * wd : (q === 5 ? -1 : 1) * wd / 2, h = q < 5 ? 0 : rh, d0 = agDeck(b, te, o, h), p2 = [], m = 6, drop = cut ? 0.35 + rng() * 0.45 : 0.42, col = cut ? CH(AG_WOOD[1], te) : c(q);
+        for (let j = 0; j <= m; j++) p2.push([d0[0] + dx * j * (cut ? 0.06 : 0.3) + Math.sin(j * 1.3 + q) * 0.12, d0[1] - j * drop, d0[2] + dz * j * (cut ? 0.06 : 0.3) + Math.cos(j * 1.1 + q) * 0.12]);
+        agTube(W, p2, cut ? 0.035 : 0.04, 3, col, col, 0.5, 2);
+        if (cut && et(te) < AGM_BURN) agP(G, { x: p2[m][0], y: p2[m][1], z: p2[m][2], ry: 0 }, AG.orb, 0, 0, 0, 0.12, 0.12, 0.12, [2.6, 1.0, 0.25]); }   // (an ember at the end of each)
+      if (cut) for (let k = 0; k < 2; k++) { const q = agDeck(b, te, (k - 0.5) * wd * 0.5); agP(Bm, { x: q[0] + dx * 0.15, y: q[1] - 0.45 - k * 0.3, z: q[2] + dz * 0.15, ry: yaw }, AG.box, 0, 0, 0, wd * 0.5, 0.05, 0.25, CH(AG_WOOD[2], te), 1.1 + k * 0.3 * out, 0, (k - 0.5) * 0.6); } }   // (a plank or two hanging by a thread)
+  }
+  if (W.p.length) grp.add(agWoven(W)); let fine = null; if (Wf.p.length) grp.add(fine = agWoven(Wf)); if (Bm.pos.length) grp.add(agMesh(Bm, AG.mat)); if (G.pos.length) grp.add(agMesh(G, AG.glow));
+  const fl = agBloom(FL); if (fl) grp.add(fl);
+  return { grp, fine };
+}
+// each bridge its own piece, made again when it has moved on: more woven, burning, fallen, woven again (one in a frame,
+// so that nothing is ever a long wait)
+function agStill(H) {
+  if (!H.bst) H.bst = new Map(); if (!H.burn) H.burn = new Map(); if (!H.still) { H.still = new THREE.Group(); scene.add(H.still); }
+  for (const [i, e] of H.bst) if (!H.br.some(b => b.i === i)) { if (e.grp) { H.still.remove(e.grp); agFree(e.grp); } H.bst.delete(i); }
+  let done = false; const q = x => Math.round(x * 48);
+  for (const b of H.br) { let e = H.bst.get(b.i); if (!e) H.bst.set(b.i, e = { key: '', grp: null, fine: null, sp: b.sp, anch: false, here: -9 });
+    const B = H.burn.get(b.i); b.pc = agmPieces(H, b);
+    const key = `${H.lv}|${Math.round(H.g * 8)}|${H.woolSig}|${H.god}|${b.pc.map(([a, c]) => q(a) + '-' + q(c)).join(',')}|${B ? (B.full ? 'f' + Math.floor(B.rw * 40) : 'b' + Math.floor((time - B.at) / 0.75)) : ''}`;
+    if (key === e.key || done) continue; done = true;
+    const made = agmBridge(H, b, b.pc, B); if (e.grp) { H.still.remove(e.grp); agFree(e.grp); } e.grp = made.grp; e.fine = made.fine; e.key = key; e.sp = b.sp; H.still.add(made.grp); }
+}
+// the fine strands of a bridge (webs, braids, the spiral, the fans) are thinner than a letter from further off than this,
+// so they are drawn only for whoever is nearer to some part of it
+const AG_FINE = 170;
+function agNear(H, cam) {
+  if (!H.bst) return;
+  for (const e of H.bst.values()) { if (!e.fine) continue; const A = e.sp.A, Z = e.sp.B, dx = Z[0] - A[0], dz = Z[2] - A[2], t = clamp(((cam.x - A[0]) * dx + (cam.z - A[2]) * dz) / (dx * dx + dz * dz), 0, 1);
+    e.fine.visible = Math.hypot(cam.x - A[0] - dx * t, cam.y - A[1] - (Z[1] - A[1]) * t, cam.z - A[2] - dz * t) < AG_FINE; }
+}
+// garlands, house to house in the village: each thing that stands is tied to the nearest one already tied, by two strands twisted, slung
 function agGarlands(W, H, wl) {
-  const st = H.st, P = agPlan(H), F = {}, pts = [], n = wl.length;
-  H.agents.forEach((a, i) => { const [u, v] = agCabinAt(H, i); agAt(H, u, v, F); pts.push(agW(F, 0, 5.3, 0)); });
+  const st = H.st, P = agPlan(H), F = {}, pts = [], n = wl.length, k0 = AG.S / 1.45;
   for (let k = 0; k < st.k; k++) { const w = AG_WORKS[k][0], y = { home: 6.1, shrine: 6.2, tower: 9.6, hall: 7.4 }[w]; if (!y) continue; agAt(H, P[k][0], P[k][1], F); pts.push(agW(F, 0, y, 0)); }
   if (pts.length < 2) return; const inn = [0], rest = pts.map((_, i) => i).slice(1); let e = 0;
   while (rest.length) { let best = 1e9, bi = 0, bj = 0; for (const i of inn) for (let j = 0; j < rest.length; j++) { const p = pts[i], q = pts[rest[j]], d = (p[0] - q[0]) ** 2 + (p[2] - q[2]) ** 2; if (d < best) { best = d; bi = i; bj = j; } }
-    const j = rest.splice(bj, 1)[0]; inn.push(j); const p = pts[bi], q = pts[j], D = Math.sqrt(best); if (D > 75) continue;
-    const sv = [-(q[2] - p[2]) / D, 0, (q[0] - p[0]) / D], sag = 0.5 + D * 0.09, m = Math.max(10, Math.ceil(D / 1.2));
-    for (let s = 0; s < 2; s++) { const L = []; for (let i = 0; i <= m; i++) { const t = i / m, ph = t * D / 1.6 * 6.2832 + s * Math.PI, ox = Math.cos(ph) * 0.2, oy = Math.sin(ph) * 0.2; L.push([p[0] + (q[0] - p[0]) * t + sv[0] * ox, p[1] + (q[1] - p[1]) * t - sag * 4 * t * (1 - t) + oy, p[2] + (q[2] - p[2]) * t + sv[2] * ox]); } agTube(W, L, 0.13, 4, wl[(e + s) % n], wl[(e + s) % n], 0.5, 2); }
+    const j = rest.splice(bj, 1)[0]; inn.push(j); const p = pts[bi], q = pts[j], D = Math.sqrt(best); if (D > 75 * k0) continue;
+    const sv = [-(q[2] - p[2]) / D, 0, (q[0] - p[0]) / D], sag = (0.5 + D * 0.09) * k0, m = Math.max(10, Math.ceil(D / (1.2 * k0)));
+    for (let s = 0; s < 2; s++) { const L = []; for (let i = 0; i <= m; i++) { const t = i / m, ph = t * D / (1.6 * k0) * 6.2832 + s * Math.PI, ox = Math.cos(ph) * 0.2 * k0, oy = Math.sin(ph) * 0.2 * k0; L.push([p[0] + (q[0] - p[0]) * t + sv[0] * ox, p[1] + (q[1] - p[1]) * t - sag * 4 * t * (1 - t) + oy, p[2] + (q[2] - p[2]) * t + sv[2] * ox]); } agTube(W, L, 0.13 * k0, 4, wl[(e + s) % n], wl[(e + s) % n], 0.5 * k0, 2); }
     e++; }
 }
-// the flowers of the house: round every finished thing, scattered through the hamlet, more as it grows (the same places every time)
+// the flowers of the village: round every finished thing, scattered through it, more as it grows (the same places every time)
 function agFlowers(H, FL, wl, god, u) {
-  const st = H.st, P = agPlan(H), F = {}, n = wl.length, seed = parseInt(H.o.slice(8, 16), 16) || 7, spots = [];
-  const ring = (k, r, m) => { const R = mulberry32(seed + k * 7919); for (let j = 0; j < m; j++) { const a = R() * 6.2832, rr = r + 1.0 + R() * 2.2; if (Math.sin(a) > 0.82) continue; const [x, , z] = agW(F, Math.cos(a) * rr, 0, Math.sin(a) * rr), y = overHeight(x, z); if (y > WATER + 0.4) FL.push([x, y, z, R() < 0.2 ? wl[Math.floor(R() * n)] : god, 1.5 + R() * 0.6]); } };
-  H.agents.forEach((a, i) => { const [cu, cv] = agCabinAt(H, i); spots.push([cu, cv]); agAt(H, cu, cv, F); ring(100 + i, 3.1, 14); });
+  const st = H.st, P = agPlan(H), F = {}, n = wl.length, seed = parseInt(H.o.slice(8, 16), 16) || 7, spots = [], k0 = AG.S / 1.45;
+  const ring = (k, r, m) => { const R = mulberry32(seed + k * 7919); for (let j = 0; j < m; j++) { const a = R() * 6.2832, rr = r + 1.0 + R() * 2.2; if (Math.sin(a) > 0.82) continue; const [x, , z] = agW(F, Math.cos(a) * rr, 0, Math.sin(a) * rr), y = overHeight(x, z); if (y > WATER + 0.4) FL.push([x, y, z, R() < 0.2 ? wl[Math.floor(R() * n)] : god, (1.5 + R() * 0.6) * k0]); } };
   for (let k = 0; k < AG_WORKS.length && k <= st.k; k++) { spots.push(P[k]); if (k >= st.k) continue; const w = AG_WORKS[k][0]; agAt(H, P[k][0], P[k][1], F); ring(k, AG_RAD[w] ?? 0.6, w === 'hall' ? 34 : w === 'shrine' ? 20 : w.startsWith('post') ? 3 : 14); }
   const R = mulberry32(seed ^ 0x9e3779b9), m = Math.min(90, 12 + Math.floor(u / 5));
   for (let j = 0; j < m; j++) { const cu = -78 + R() * 156, cv = -88 + R() * 118, many = 3 + Math.floor(R() * 4), col = R() < 0.18 ? wl[Math.floor(R() * n)] : god;
     if (spots.some(([a, b]) => (a - cu) ** 2 + (b - cv) ** 2 < 64)) continue;
-    for (let q = 0; q < many; q++) { agAt(H, cu + (R() - 0.5) * 5, cv + (R() - 0.5) * 5, F); if (overHeight(F.x, F.z) > WATER + 0.5) FL.push([F.x, F.y, F.z, col, 1.4 + R() * 0.7]); } }
+    for (let q = 0; q < many; q++) { agAt(H, cu + (R() - 0.5) * 5, cv + (R() - 0.5) * 5, F); if (overHeight(F.x, F.z) > WATER + 0.5) FL.push([F.x, F.y, F.z, col, (1.4 + R() * 0.7) * k0]); } }
 }
 function agBloom(FL) {
   const n = Math.min(FL.length, 2000); if (!n) return null; const m = new THREE.InstancedMesh(AG.flower, AG.fmat, n);
   for (let i = 0; i < n; i++) { const [x, y, z, c, s] = FL[i]; _agM.compose(_agP.set(x, y, z), _agQ.setFromAxisAngle(UP, (i * 2.39996) % 6.2832), _agS.set(s, s, s)); m.setMatrixAt(i, _agM); m.setColorAt(i, _agC.copy(c).offsetHSL(0, 0, ((i * 0.618) % 1 - 0.5) * 0.12)); }
   m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; m.computeBoundingSphere(); return m;
 }
-// all that is woven outside the houses. The bridges still going across, the garlands and the flowers are made again each
-// time the work moves on (they are little); the finished bridges are kept, each its own piece, and made (or made again,
-// when the hamlet's weaving has grown finer) one in a frame, so that nothing is ever a long wait
-function agSpun(H, list, fl, fine = false) {
-  const wl = H.agents.map(a => agWool(H, a)), wl2 = wl.map(c => c.clone().offsetHSL(0, -0.06, 0.15)), god = new THREE.Color(H.god ? PATRONS[H.god][0] : 0xfff0c8), seed = parseInt(H.o.slice(0, 8), 16) || 3;
-  const W = agAcc(), B = { pos: [], nor: [], col: [] }, G = { pos: [], nor: [], col: [] }, grp = new THREE.Group(); if (fine) W.fine = agAcc();
-  for (const b of list) agBridge(W, B, G, fl, b, H.lv, H.g, wl, wl2, god, mulberry32(seed + b.i * 104729));
-  return { W, wl, god, grp, done: () => { if (W.p.length) grp.add(agWoven(W)); if (W.fine?.p.length) grp.add(grp.userData.fine = agWoven(W.fine)); if (B.pos.length) grp.add(agMesh(B, AG.mat)); if (G.pos.length) grp.add(agMesh(G, AG.glow)); return grp; } };
-}
-function agStill(H) {
-  const kb = `${H.lv}|${Math.round(H.g * 8)}|${H.woolSig}|${H.god}`; if (!H.still) { H.still = new THREE.Group(); H.stillOf = new Map(); scene.add(H.still); }
-  for (const [i, e] of H.stillOf) if (!H.br.some(b => b.i === i && b.f >= 1)) { H.still.remove(e.grp); agFree(e.grp); H.stillOf.delete(i); H.wkey = ''; }
-  const b = H.br.find(b => b.f >= 1 && H.stillOf.get(b.i)?.key !== kb); if (!b) return;
-  const old = H.stillOf.get(b.i), fl = [], grp = agSpun(H, [b], fl, true).done(); if (old) { H.still.remove(old.grp); agFree(old.grp); }
-  H.still.add(grp); H.stillOf.set(b.i, { key: kb, grp, fl, fine: grp.userData.fine || null, sp: b.sp }); H.wkey = '';   // (and the flowers along it, with the rest: see agWeb)
-}
-// the fine strands of a finished bridge (webs, braids, the spiral, the fans) are thinner than a letter from further off than
-// this, so they are drawn only for whoever is nearer to some part of it
-const AG_FINE = 170;
-function agNear(H, cam) {
-  if (!H.stillOf) return;
-  for (const e of H.stillOf.values()) { if (!e.fine) continue; const A = e.sp.A, Z = e.sp.B, dx = Z[0] - A[0], dz = Z[2] - A[2], t = clamp(((cam.x - A[0]) * dx + (cam.z - A[2]) * dz) / (dx * dx + dz * dz), 0, 1);
-    e.fine.visible = Math.hypot(cam.x - A[0] - dx * t, cam.y - A[1] - (Z[1] - A[1]) * t, cam.z - A[2] - dz * t) < AG_FINE; }
-}
+// the garlands and the flowers of the village, made again each time the work there moves on (the bridges keep their own)
 function agWeb(H, u) {
   agTools(); agClear(H, 'web');
-  const FL = [], now = agSpun(H, H.br.filter(b => b.f < 1), FL); agGarlands(now.W, H, now.wl); H.web = now.done();
-  agFlowers(H, FL, now.wl, now.god, u); const fl = agBloom((H.stillOf ? [...H.stillOf.values()].flatMap(e => e.fl) : []).concat(FL)); if (fl) H.web.add(fl);
+  const W = agAcc(), wl = H.agents.map(a => agWool(H, a)), god = new THREE.Color(H.god ? PATRONS[H.god][0] : 0xfff0c8), FL = [];
+  if (!wl.length) return; agGarlands(W, H, wl); H.web = new THREE.Group(); if (W.p.length) H.web.add(agWoven(W));
+  agFlowers(H, FL, wl, god, u); const fl = agBloom(FL); if (fl) H.web.add(fl);
   scene.add(H.web);
 }
-
-// ───────── the weavers themselves
-function agFigure(a, wool) {
-  agTools(); const wc = wool || AG_UNDYED, L = c => new THREE.MeshLambertMaterial({ color: c });
-  const g = new THREE.Group(), part = (geo, mat, x, y, z, sx, sy, sz, parent = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); parent.add(m); return m; };
-  const skin = L(0xd9a57a), cloth = L(wc.clone().multiplyScalar(0.8)), yarn = L(wc), dark = L(0x3a2a1c), piv = (x, y) => { const p = new THREE.Group(); p.position.set(x, y, 0); g.add(p); return p; };
-  part(AG.box, cloth, 0, 1.15, 0, 0.52, 0.72, 0.3); part(AG.box, skin, 0, 1.72, 0, 0.32, 0.32, 0.32); part(AG.prism, cloth, 0, 1.86, 0, 0.44, 0.34, 0.44);
-  const aL = piv(-0.34, 1.46), aR = piv(0.34, 1.46), lL = piv(-0.14, 0.8), lR = piv(0.14, 0.8);
-  part(AG.box, skin, 0, -0.34, 0, 0.15, 0.7, 0.16, aL); part(AG.box, skin, 0, -0.34, 0, 0.15, 0.7, 0.16, aR); part(AG.box, dark, 0, -0.4, 0, 0.19, 0.8, 0.21, lL); part(AG.box, dark, 0, -0.4, 0, 0.19, 0.8, 0.21, lR);
-  const log = part(AG.orb, yarn, 0, 1.22, 0.42, 0.95, 0.78, 0.8); log.visible = false;   // (an armful of wool, fetched from the baskets)
-  const ball = part(AG.orb, yarn, 0, -0.74, 0.1, 0.38, 0.38, 0.38, aL); ball.visible = false;   // (the ball it weaves from, turning in its hand as it unwinds)
-  const tip = new THREE.Object3D(); tip.position.set(0, -0.74, 0.08); aR.add(tip);
-  part(AG.orb, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.6, 0.6) }), 0.22, 0.95, 0.2, 0.16, 0.2, 0.16);   // (a lantern at the belt: found by it at night)
-  g.scale.setScalar(1.7); scene.add(g);   // (a little larger than life: they have to be seen from the air)
-  const el = document.createElement('div'); el.className = 'mk'; el.innerHTML = '<b></b><span></span>'; el.style.display = 'none'; el.style.pointerEvents = 'none'; $('markers').appendChild(el);
-  return { g, aL, aR, lL, lR, log, ball, tip, cloth, yarn, wool: wc.getHex(), el, x: 0, z: 0, y: 0, yaw: 0, st: 'idle', t: Math.random() * 3, ph: Math.random() * 6, tx: 0, tz: 0, has: false, hop: 0, say: '', sayT: -99, set: false, job: null, wt: null };
+// ───────── the rocks themselves: one stone each, the way the monasteries' rocks out in the country are drawn (they part for
+// a bird in flight the same way), a few blocks fallen at their feet
+function agmRocksBuild(H) {
+  if (H.rockMesh) return; ROCKS.matPart ||= rocksMat(true);
+  const acc = newAcc(); acc.sway = []; const S = H.rockS ||= { kind: 'meteora', id: 'ag' + H.o };
+  for (const R of H.rocks) { rockTower(acc, R.x, R.z, R.g - 12, R.top, R.face); const q = mulberry32(R.j * 31 + 7);
+    for (let k = 0; k < 7; k++) { const b = q() * 6.283, d2 = R.R * (1.35 + q() * 0.9), bx = R.x + Math.cos(b) * d2, bz = R.z + Math.sin(b) * d2, s = 0.8 + q() * 2.2; part(acc, G.rock, bx, overHeight(bx, bz) + s * 0.25, bz, s, s * 0.7, s * 1.1, SANDST[k % 4], q() * 6.28, q(), q()); }
+    ROCKS.cyls.push(R.cyl = { x: R.x, z: R.z, r: R.R * 0.96, y0: R.g - 6, y1: R.top - 0.6, what: 'a rock of the monks', S, rad: R.face }); }
+  const m = new THREE.Mesh(shardCen(accToGeo(acc)), ROCKS.matPart); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; scene.add(m); H.rockMesh = m;
 }
-function agDye(f, c) { f.cloth.color.copy(c).multiplyScalar(0.8); f.yarn.color.copy(c); f.wool = c.getHex(); }
-// where on what is going up a weaver's threads go: the side of it nearest the weaver, at the height it has reached, the
-// shuttle running to and fro
+function agmDropRocks(H) {
+  if (H.rockMesh) { scene.remove(H.rockMesh); H.rockMesh.geometry.dispose(); H.rockMesh = null; }
+  if (H.rockS) ROCKS.cyls = ROCKS.cyls.filter(c => c.S !== H.rockS);
+  for (const R of H.rocks || []) { if (R.grp) { scene.remove(R.grp); agFree(R.grp); R.grp = null; } if (R.boxes) { ROCKS.boxes = ROCKS.boxes.filter(b => !R.boxes.includes(b)); R.boxes = null; } R.key = ''; }
+}
+// the blocks of one course of the church's walls, the joints of each course over the middle of the blocks below: (x, y, z
+// of the block's middle, its length, whether it runs across) for each. A door in the front, a window each side of it,
+// one in each side wall
+function agmCourse(c, fn) {
+  const y = c * AGM.CH, L = TOUCH ? 1.3 : 0.75, off = c % 2 ? L / 2 : 0, hw = AGM.HW, hd = AGM.HD, z0 = AGM.HZ, door = y < 2.25, win = y > 1.15 && y < 2.05;
+  const cut = (a, b, gaps) => { let segs = [[a, b]]; for (const [g0, g1] of gaps) segs = segs.flatMap(([s0, s1]) => s1 <= g0 || s0 >= g1 ? [[s0, s1]] : [[s0, Math.min(s1, g0)], [Math.max(s0, g1), s1]].filter(([p, q]) => q - p > 0.1)); return segs; };
+  for (const sd of [1, -1]) { const zz = z0 + sd * (hd - 0.225), gaps = sd > 0 ? (door ? [[-0.65, 0.65]] : []).concat(win ? [[-2.35, -1.85], [1.85, 2.35]] : []) : [];
+    for (let x = -hw - off; x < hw; x += L) for (const [a, b] of cut(Math.max(x, -hw), Math.min(x + L, hw), gaps)) fn((a + b) / 2, y, zz, b - a, true); }
+  for (const sd of [1, -1]) { const xx = sd * (hw - 0.225), gaps = win ? [[z0 - 0.3, z0 + 0.3]] : [];
+    for (let z = z0 - hd + 0.45 - off; z < z0 + hd - 0.45; z += L) for (const [a, b] of cut(Math.max(z, z0 - hd + 0.45), Math.min(z + L, z0 + hd - 0.45), gaps)) fn(xx, y, (a + b) / 2, b - a, false); }
+}
+const AGM_STONE = [[0.8, 0.71, 0.55], [0.73, 0.64, 0.5], [0.85, 0.77, 0.62], [0.76, 0.67, 0.56]], AGM_BRICK = [0.66, 0.31, 0.21], AGM_DOME = [0.71, 0.36, 0.24], AGM_POLE = [0.52, 0.4, 0.26], AGM_SOIL = [0.24, 0.17, 0.11];
+const agmStone = (c, x, z) => c % 3 === 2 ? AGM_BRICK : AGM_STONE[((Math.round(x * 3.1 + z * 5.3 + c * 7) % 4) + 4) % 4];
+const AGM_TW = [-2.4, -5.6], AGM_LV = [2.3, -5.4], AGM_BT = [-5.0, 3.6], AGM_SC = [4.7, 3.6], AGM_LC = [1.4, 2.3];   // (on its top: the treadwheel crane, the lever, the belfry, the scriptorium, the lectern)
+// a monastery, as far up as it has got (R.st); or on a wild rock, a hermit's cell
+function agmMonBuild(H, R, a) {
+  agTools(); if (R.grp) { scene.remove(R.grp); agFree(R.grp); }
+  if (R.boxes) ROCKS.boxes = ROCKS.boxes.filter(b => !R.boxes.includes(b)); R.boxes = []; R.slots = [];
+  const B = { pos: [], nor: [], col: [] }, Gl = { pos: [], nor: [], col: [] }, W = agAcc(), FL = [], F = agmF(R), rng = mulberry32(R.j * 7919 + 17), god = new THREE.Color(H.god ? PATRONS[H.god][0] : 0xfff0c8);
+  const P = (g, lx, ly, lz, sx, sy, sz, c, rx = 0, ry = 0, rz = 0) => agP(B, F, g, lx, ly, lz, sx, sy, sz, c, rx, ry, rz), bm = (p, q, w, c) => agmBeam(B, F, p, q, w, c);
+  const wool = a ? agWool(H, a) : AG_UNDYED, wl = wool.clone().offsetHSL(0, -0.05, 0.12), C = (lx, lz) => { const [x, z] = agmW(R, lx, lz); return [x, z]; };
+  const flower = (lx, ly, lz, s, k = 1) => { for (let q = 0; q < k; q++) { const [x, z] = C(lx + rnd(0.18), lz + rnd(0.18)); FL.push([x, R.top + ly, z, rng() < 0.3 ? wool : god, s * (0.85 + rng() * 0.3)]); } };
+  // the way up: a rope ladder in its wool (on a wild rock, a fixed rope and pitons), over the lip and down the face to the ground
+  { const pts = [], ts = [-Math.sin(R.aL), 0, Math.cos(R.aL)], [lx, lz] = R.lad, [tx, tz] = C(lx, lz); pts.push([tx, R.top + 0.04, tz]);
+    for (let y = R.top - 0.05; y > R.footY - 0.2; y -= 1.5) pts.push(agmFace(R, R.aL, y, 0.12)); pts.push(agmFace(R, R.aL, R.footY, 0.12));
+    if (a) { for (const sd of [-1, 1]) agTube(W, pts.map(p => [p[0] + ts[0] * 0.17 * sd, p[1], p[2] + ts[2] * 0.17 * sd]), 0.022, 4, wool, wl, 0.3, 2);
+      const ry = Math.atan2(-Math.cos(R.aL), -Math.sin(R.aL)); for (let y = R.top - 0.3; y > R.footY + 0.1; y -= TOUCH ? 0.6 : 0.34) { const p = agmFace(R, R.aL, y, 0.12); agP(B, { x: p[0], y: p[1], z: p[2], ry }, AG.box, 0, 0, 0, 0.34, 0.025, 0.035, AG_WOOD[1]); } }
+    else { agTube(W, pts, 0.025, 4, AG_UNDYED, AG_UNDYED, 0.3, 2); for (let y = R.top - 2; y > R.footY + 1; y -= 3) { const p = agmFace(R, R.aL, y, 0.05); agP(B, { x: p[0], y: p[1], z: p[2], ry: 0 }, AG.box, 0, 0, 0, 0.06, 0.06, 0.06, [0.3, 0.3, 0.32]); } } }
+  if (!a) {   // the hermit's cell: a little room of stone under a dome, a cypress, a few flowers
+    for (let c = 0; c < 6; c++) for (let k = 0; k < 8; k++) { const an = k / 8 * 6.2832 + (c % 2) * 0.39; P(AG.box, Math.cos(an) * 0.85, c * 0.3 + 0.14, -1 + Math.sin(an) * 0.85, 0.66, 0.28, 0.3, agmStone(c, k, 1), 0, -an + Math.PI / 2, 0); }
+    P(AG.orb, 0, 1.8, -1, 2.0, 1.3, 2.0, AGM_DOME); P(AG.box, 0, 0.8, -0.1, 0.5, 1.5, 0.1, [0.1, 0.08, 0.07]);
+    for (const [x, z] of [[2.6, -2.4], [-3.0, 1.8]]) { P(G.tier, x, 0, z, 0.5, 4.2, 0.5, CYPRESS); P(G.tier, x, 1.4, z, 0.42, 3.4, 0.42, CYPRESS); }
+    for (let k = 0; k < 6; k++) flower(rnd(3), 0, 1.2 + rnd(1.5), 0.3, 1);
+  } else {
+    const st = R.st, hw = AGM.HW, hd = AGM.HD, z0 = AGM.HZ, fz = z0 + hd, bz = z0 - hd, WH = AGM.WH, hcur = st.full * AGM.CH;
+    P(AG.box, 0, 0.05, z0, hw * 2 - 0.5, 0.1, hd * 2 - 0.5, [0.6, 0.56, 0.5]);   // (the floor: flagstones)
+    for (let c = 0; c < st.full; c++) agmCourse(c, (x, y, z, l, ax) => P(AG.box, x, y + 0.14, z, ax ? l - 0.025 : 0.45, 0.28, ax ? 0.45 : l - 0.025, agmStone(c, x, z)));
+    if (st.full < AGM.NC) agmCourse(st.full, (x, y, z, l, ax) => { const [wx, wz] = C(x, z), M = new THREE.Matrix4().compose(new THREE.Vector3(wx, R.top + y + 0.14, wz), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, R.ry, 0)), new THREE.Vector3(ax ? l - 0.025 : 0.45, 0.28, ax ? 0.45 : l - 0.025)); R.slots.push({ M, c: new THREE.Color(...agmStone(st.full, x, z)), lx: x, lz: z, ax }); });   // (the course going on now: laid a block at a time, see agmMechs)
+    if (st.full >= 8) P(AG.box, 0, 2.32, fz - 0.225, 1.5, 0.16, 0.5, BEAM);   // (the lintel over the door)
+    if (st.full >= 7) for (const sx of [-2.1, 2.1]) P(AG.box, sx, 2.07, fz - 0.225, 0.62, 0.1, 0.5, BEAM);
+    if (st.full >= 6) for (const sx of [-2.1, 2.1]) { P(AG.box, sx, 1.12, fz + 0.12, 0.62, 0.15, 0.22, BEAM); flower(sx - 0.18, 1.2, fz + 0.12, 0.17, 2); flower(sx + 0.18, 1.2, fz + 0.12, 0.17, 2); }   // (window boxes)
+    if (st.f >= 0.7) P(AG.box, -0.66, 1.08, fz - 0.95, 0.06, 2.1, 1.25, AG_WOOD[0], 0, 0, 0);   // (its door, standing open)
+    if (st.f < 0.85) {   // scaffolding round it, as high as the walls have got and a bit more, and the crane and the lever
+      const hs = Math.min(WH + 1.2, hcur + 1.0), X = hw + 0.55, Z0 = bz - 0.55, Z1 = fz + 0.55, posts = [[-X, Z0], [X, Z0], [-X, Z1], [X, Z1], [0, Z0], [-X, z0], [X, z0], [-1.6, Z1], [1.6, Z1]];
+      for (const [x, z] of posts) P(AG.box, x, hs / 2, z, 0.06, hs, 0.06, AGM_POLE);
+      for (let y = 1.1; y < hs; y += 1.1) { bm([-X, y, Z0], [X, y, Z0], 0.05, AGM_POLE); bm([-X, y, Z0], [-X, y, Z1], 0.05, AGM_POLE); bm([X, y, Z0], [X, y, Z1], 0.05, AGM_POLE); bm([-X, y, Z1], [-0.8, y, Z1], 0.05, AGM_POLE); bm([0.8, y, Z1], [X, y, Z1], 0.05, AGM_POLE); }
+      if (hs > 1.5) { const py = hs - 1.0; P(AG.box, 0, py, Z0 + 0.2, 2 * X, 0.04, 0.4, AG_WOOD[2]); P(AG.box, -X + 0.2, py, z0, 0.4, 0.04, 2 * hd + 1, AG_WOOD[2]); P(AG.box, X - 0.2, py, z0, 0.4, 0.04, 2 * hd + 1, AG_WOOD[2]); }
+      bm([-X, 0, Z0], [-X + 1.4, hs, Z0], 0.04, AGM_POLE); bm([X, 0, Z0], [X - 1.4, hs, Z0], 0.04, AGM_POLE);
+      const [tx, tz] = AGM_TW; for (const sx of [-0.42, 0.42]) { bm([tx + sx, 0, tz - 0.7], [tx + sx, 1.0, tz], 0.06, BEAM); bm([tx + sx, 0, tz + 0.7], [tx + sx, 1.0, tz], 0.06, BEAM); }   // (the treadwheel's frame, and its jib over the back wall)
+      R.jib = [-1.5, hcur + 1.3, bz - 0.35]; bm([tx, 1.0, tz], R.jib, 0.07, BEAM); bm([tx, 0, tz - 0.4], [tx, 1.0, tz], 0.05, BEAM);
+      P(AG.box, AGM_LV[0], 0.18, AGM_LV[1], 0.3, 0.36, 0.3, AGM_STONE[1]);   // (the lever's fulcrum)
+      for (let k = 0; k < 6; k++) P(AG.box, -0.9 + (k % 3) * 0.2, 0.05 + Math.floor(k / 3) * 0.1, R.ef - 1.7 + (k % 2) * 0.12, 0.17, 0.09, 0.1, AGM_STONE[k % 4], 0, k * 0.3, 0); }   // (the pile the basket fills)
+    if (st.fr > 0) {   // the roof: rafters, then the tiles a row at a time from the eaves; the gables
+      const ov = 0.35, run = hd + ov, rise = 1.5, sl = Math.hypot(run, rise), th = Math.atan2(rise, run), rows = Math.round(st.fr * 7);
+      for (const sd of [1, -1]) { for (let k = 0; k < 5; k++) bm([-hw + 0.3 + k * (hw * 2 - 0.6) / 4, WH, z0 + sd * run], [-hw + 0.3 + k * (hw * 2 - 0.6) / 4, WH + rise, z0], 0.08, BEAM);
+        for (let k = 0; k < rows; k++) { const u = (k + 0.5) / 7; P(AG.box, 0, WH + rise * u + 0.06, z0 + sd * run * (1 - u), hw * 2 + 0.7, 0.07, sl / 7 * 1.15, k % 2 ? ROOFRED : [ROOFRED[0] * 0.9, ROOFRED[1] * 0.9, ROOFRED[2] * 0.88], sd * th, 0, 0); } }
+      for (const sx of [-1, 1]) for (let k = 0; k < 5; k++) P(AG.box, sx * (hw - 0.225), WH + 0.15 + k * 0.3, z0, 0.45, 0.3, (hd + 0.1) * 2 * (1 - (k + 0.5) / 5.2), agmStone(k, sx, 0));
+      if (st.fr >= 1) { P(AG.box, 0, WH + rise + 0.08, z0, hw * 2 + 0.8, 0.14, 0.24, [0.6, 0.24, 0.16]); P(AG.box, 2.3, WH + 1.3, z0 - 1.3, 0.4, 1.4, 0.4, AGM_STONE[1]); R.chim = [2.3, WH + 2.05, z0 - 1.3];   // (the ridge; the kitchen's chimney)
+        for (const sx of [-1.25, 1.25]) { P(AG.box, sx, 1.55, fz + 0.24, 0.44, 0.58, 0.03, GOLDLEAF); P(AG.box, sx, 1.53, fz + 0.255, 0.32, 0.44, 0.02, sx < 0 ? [0.62, 0.12, 0.1] : [0.14, 0.2, 0.5]); P(AG.orb, sx, 1.67, fz + 0.27, 0.12, 0.12, 0.02, [1.2, 0.95, 0.5]); }   // (two icons by the door)
+        for (let k = -1; k <= 1; k++) { P(AG.box, k * 0.9, 1.4, bz + 0.47, 0.5, 0.66, 0.03, GOLDLEAF); P(AG.box, k * 0.9, 1.38, bz + 0.485, 0.38, 0.5, 0.02, [[0.55, 0.1, 0.1], [0.12, 0.2, 0.48], [0.2, 0.38, 0.22]][k + 1]); }   // (and the screen of icons inside)
+        agP(Gl, F, AG.orb, 0, 0.95, bz + 0.9, 0.12, 0.16, 0.12, AG_WARM); }   // (the lamp before them)
+      if (st.fr >= 0.5) { const e = R.eb, by = -0.08;   // the balcony, hung out over the drop on struts, with a roof of its own
+        P(AG.box, 0, by, -(e + 0.2), 4.4, 0.08, 2.6, AG_WOOD[0]); for (let k = 0; k <= 8; k++) P(AG.box, -2.1 + k * 0.525, by + 0.45, -(e + 1.45), 0.06, 0.9, 0.06, BEAM); P(AG.box, 0, by + 0.9, -(e + 1.45), 4.3, 0.06, 0.06, BEAM);
+        for (const sx of [-1.8, 0, 1.8]) bm([sx, by - 0.05, -(e + 1.3)], [sx, by - 2.6, -(e - 0.4)], 0.1, BEAM);
+        P(AG.box, 0, by + 2.1, -(e + 0.3), 4.6, 0.08, 2.9, ROOFRED, 0.22); for (const sx of [-2.1, 2.1]) P(AG.box, sx, by + 1.05, -(e + 1.45), 0.08, 2.1, 0.08, BEAM); } }
+    if (st.fd > 0) {   // the drum and its dome, the apse; and when it is all done, the cross and the belfry
+      P(AG.cyl, 0, WH + 1.4, z0, 1.9, 1.2 * Math.min(1, st.fd * 2), 1.9, AGM_STONE[2]); P(AG.cyl, 0, 1.3, bz, 2.2, 2.6, 1.6, AGM_STONE[0]); P(AG.orb, 0, 2.6, bz, 2.3, 1.0, 1.7, ROOFRED);
+      if (st.fd >= 0.5) P(AG.orb, 0, WH + 2.0, z0, 2.0, 1.7, 2.0, AGM_DOME);
+      if (st.fd >= 1) { P(AG.box, 0, WH + 3.05, z0, 0.06, 0.5, 0.06, GOLDLEAF); P(AG.box, 0, WH + 3.15, z0, 0.3, 0.06, 0.06, GOLDLEAF);
+        const [bx, bz2] = AGM_BT; P(AG.box, bx, 0.12, bz2, 1.2, 0.24, 1.2, AGM_STONE[1]); for (const [x, z] of [[-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45]]) P(AG.box, bx + x, 1.3, bz2 + z, 0.13, 2.2, 0.13, AGM_STONE[(x > 0) + 1]);
+        P(AG.box, bx, 2.38, bz2, 1.15, 0.12, 1.15, BEAM); P(AG.prism, bx, 2.44, bz2, 1.4, 0.6, 1.4, ROOFRED); } }
+    { const [x, z] = AGM_LC; P(AG.box, x, 0.32, z, 0.06, 0.64, 0.06, BEAM); P(AG.box, x, 0.66, z, 0.36, 0.03, 0.28, BEAM, 0.45); P(AG.box, x, 0.69, z + 0.01, 0.3, 0.02, 0.2, [0.96, 0.92, 0.82], 0.45); }   // (the lectern, the book open on it)
+    if (st.ft > 0) {   // the teachings: a scriptorium, its shelves filling with scrolls, carved tablets along its wall
+      const [x, z] = AGM_SC; for (let c = 0; c < 6; c++) { P(AG.box, x + 0.9, c * 0.3 + 0.14, z, 0.4, 0.28, 2.0, agmStone(c, 1, z)); for (const sz of [-1, 1]) P(AG.box, x, c * 0.3 + 0.14, z + sz * 0.9, 1.8, 0.28, 0.4, agmStone(c, 2, sz)); }
+      if (st.ft > 0.3) P(AG.prism, x, 1.8, z, 2.2, 0.7, 2.4, ROOFRED, 0, Math.PI / 2, 0);
+      for (let s = 0; s < 3; s++) P(AG.box, x + 0.4, 0.4 + s * 0.42, z, 0.36, 0.03, 1.4, BEAM);
+      const ns = Math.round(st.ft * 24), SCR = [[0.93, 0.88, 0.72], [0.62, 0.16, 0.12], [0.2, 0.26, 0.5], [0.85, 0.66, 0.3]];
+      for (let k = 0; k < ns; k++) P(AG.cyl, x + 0.4, 0.46 + (k % 3) * 0.42, z - 0.6 + Math.floor(k / 3) * 0.17, 0.08, 0.3, 0.08, SCR[k % 4], Math.PI / 2, 0, 0);
+      const nt = Math.round(st.ft * 8); for (let k = 0; k < nt; k++) P(AG.box, x - 0.95, 0.21, z - 1.0 + k * 0.26, 0.05, 0.42, 0.22, [0.62, 0.61, 0.6], 0, 0, 0.18);
+      P(AG.box, 3.3, 0.22, 2.4, 0.5, 0.06, 0.4, AG_WOOD[2]); }   // (the bench the tablets are cut on)
+    // the winch at the front lip: its frame, its roof, and the jib out over the drop (the drum, the wheel, the basket move: agmMechs)
+    { const wz = R.ef - 0.9; for (const sx of [-0.45, 0.45]) { P(AG.box, sx, 0.45, wz, 0.08, 0.9, 0.08, BEAM); bm([sx, 0, wz - 0.4], [sx, 0.85, wz], 0.05, BEAM); }
+      P(AG.box, 0, 0.94, wz, 1.1, 0.06, 0.1, BEAM); P(AG.prism, 0, 1.3, wz, 1.5, 0.45, 1.0, ROOFRED); for (const sx of [-0.62, 0.62]) P(AG.box, sx, 0.65, wz, 0.06, 1.3, 0.06, BEAM);
+      bm([0, 1.05, wz - 0.3], [0, 1.05, R.ef + 0.95], 0.09, BEAM); bm([0, 0.6, R.ef - 0.2], [0, 1.05, R.ef + 0.7], 0.06, BEAM);
+      P(AG.box, 0.75, 1.25, wz, 0.08, 0.08, 0.5, BEAM); R.wz = wz; }
+    // the garden, at the front: two beds of the god's flowers and its own, edged with stone; and a cypress or two
+    for (const [x, z, w] of [[-2.7, 3.6, 1.7], [-3.2, 6.3, 1.4]]) { P(AG.box, x, 0.06, z, w, 0.12, 0.6, AGM_SOIL); P(AG.box, x, 0.08, z - 0.33, w + 0.1, 0.16, 0.08, AGM_STONE[1]); P(AG.box, x, 0.08, z + 0.33, w + 0.1, 0.16, 0.08, AGM_STONE[1]); for (let k = 0; k < 7; k++) flower(x + (k / 6 - 0.5) * (w - 0.3), 0.1, z + rnd(0.15), 0.3, 1); }
+    for (const [x, z] of [[5.4, -2.7], [-5.6, -2.9]]) { P(G.tier, x, 0, z, 0.45, 3.8, 0.45, CYPRESS); P(G.tier, x, 1.3, z, 0.36, 3.0, 0.36, CYPRESS); }
+    // what stops a man: the walls, as high as they are (the door is open, and a floor inside to stand on)
+    if (hcur >= 0.6) { const box = (lx, lz, w, d, y0, y1) => { const [x, z] = C(lx, lz), b = { x, z, c: Math.cos(R.ry), s: Math.sin(R.ry), hw: w / 2, hd: d / 2, y0: R.top + y0, y1: R.top + y1, what: 'a monastery wall', S: AGM.monS }; ROCKS.boxes.push(b); R.boxes.push(b); };
+      const h = Math.min(hcur, WH); box(0, bz + 0.225, hw * 2, 0.45, 0, h); box(-hw + 0.225, z0, 0.45, hd * 2, 0, h); box(hw - 0.225, z0, 0.45, hd * 2, 0, h);
+      box(-(hw + 0.65) / 2, fz - 0.225, hw - 0.65, 0.45, 0, h); box((hw + 0.65) / 2, fz - 0.225, hw - 0.65, 0.45, 0, h); if (h > 2.4) box(0, fz - 0.225, 1.3, 0.45, 2.4, h); }
+  }
+  R.grp = new THREE.Group(); if (B.pos.length) R.grp.add(agMesh(B, AG.mat)); if (W.p.length) R.grp.add(agWoven(W)); if (Gl.pos.length) R.grp.add(agMesh(Gl, AG.glow)); const fl = agBloom(FL); if (fl) R.grp.add(fl); scene.add(R.grp);
+}
+// how far each monastery has got, from its own monk's timber; and the one whose has moved on made again (one in a frame)
+function agmMons(H, now) {
+  let built = false;
+  for (const R of H.rocks) {
+    const a = R.own >= 0 ? H.agents[R.own] : null;
+    if (a) { const u = agTimber(a, now), f = clamp(0.08 + u / 40, 0, 1), fw = clamp(f / 0.7, 0, 1) * AGM.NC, full = Math.min(AGM.NC, Math.floor(fw)); R.st = { f, full, part: full >= AGM.NC ? 0 : fw - full, fr: clamp((f - 0.7) / 0.15, 0, 1), fd: clamp((f - 0.85) / 0.15, 0, 1), ft: clamp((u - 30) / 70, 0, 1) }; }
+    else R.st = null;
+    const s = R.st, key = s ? `${s.full}|${Math.round(s.fr * 7)}|${Math.round(s.fd * 4)}|${Math.round(s.ft * 8)}|${agWool(H, a).getHex()}|${H.god}` : 'w';
+    if (key !== R.key && !built) { built = true; R.key = key; agmMonBuild(H, R, a); }
+  }
+}
+// ───────── where the man stands, and the bird perches: on the rocks' tops, a monastery's floor, a bridge's planks (and,
+// for the bird, its hand ropes, the tops of its posts, a finished roof). Asked by groundAt; nothing of it for a bird in
+// flight, who goes through a bridge, and sets it alight
+function agmGround(x, z, y, g) {
+  if (PART.fly) return g; const bird = player.form === 'phoenix';
+  for (const H of AGM.live) { const dx = x - H.cx, dz = z - H.cz; if (dx * dx + dz * dz > H.r2) continue;
+    for (const R of H.rocks) { if (y < R.top - 2.5 || R.top <= g) continue; const ex = x - R.x, ez = z - R.z, d2 = ex * ex + ez * ez; if (d2 > R.rm2 || d2 > R.rt2 && d2 > (R.face(Math.atan2(ez, ex), R.top) * 0.985) ** 2) continue;
+      const lx = ex * Math.cos(R.ry) - ez * Math.sin(R.ry), lz = ex * Math.sin(R.ry) + ez * Math.cos(R.ry); let h = R.top;
+      if (R.st && agmIn(lx, lz, 0.05)) { h = R.top + 0.1; if (bird && R.st.fr >= 1 && y >= R.top + AGM.WH + 1.1 - 2.5) h = R.top + AGM.WH + 1.1; }
+      g = Math.max(g, h); }
+    for (const b of H.br || []) { const A = b.sp.A, ex = x - A[0], ez = z - A[2], t = (ex * b.sp.d[0] + ez * b.sp.d[1]) / b.sp.len; if (t < 0 || t > 1) continue;
+      const o = ex * b.sp.sv[0] + ez * b.sp.sv[2], ao = Math.abs(o); if (ao > b.wd / 2 + 0.45 || !agmOn(b, t)) continue;
+      const dy = agDeck(b, t)[1] + 0.05; let h = ao < b.wd / 2 + 0.05 ? dy : -1e9;
+      if (bird && Math.abs(ao - b.wd / 2) < 0.28) h = Math.max(h, dy + b.rh);   // (a hand rope)
+      if (bird && (t * b.sp.len < 0.5 || (1 - t) * b.sp.len < 0.5) && Math.abs(ao - b.wd / 2 - 0.12) < 0.3) h = Math.max(h, dy + b.rh + 0.4);   // (a post's top)
+      if (h > g && y >= h - 2.5) g = h; } }
+  return g;
+}
+// ───────── what moves, drawn many to a shape: the monks (robe, wool, head, arms, what they hold) and the machines (wheels,
+// drums, baskets, ropes, beams, bells, the blocks being laid and lifted). One set for every hamlet; filled each frame
+// only with what is near enough to be seen moving
+function agmIM() {
+  if (AGM.im) return AGM.im; agTools(); const im = AGM.im = {}, I4 = new THREE.Matrix4(), SK = col('#c99470'), DK = [0.09, 0.085, 0.08], IRON = [0.24, 0.24, 0.26], W1 = [1, 1, 1];
+  const geo = f => { const a = newAcc(); f(a); return accToGeo(a); }, ad = (a, g, c) => addGeo(a, g.index ? g.toNonIndexed() : g, I4, c), sph = new THREE.IcosahedronGeometry(1, 1).toNonIndexed(), cy = new THREE.CylinderGeometry(1, 1, 1, 8).toNonIndexed();
+  const mk = (k, g, n, tint) => { const m = new THREE.InstancedMesh(g, AG.mat, n); m.frustumCulled = false; m.count = 0; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); if (tint) { m.setColorAt(0, _agC.setRGB(1, 1, 1)); m.instanceColor.setUsage(THREE.DynamicDrawUsage); } scene.add(m); im[k] = m; };
+  // a monk, 0.62 of a metre to the top of his hat; facing +z
+  mk('robe', geo(a => { ad(a, new THREE.CylinderGeometry(0.058, 0.125, 0.44, 8).translate(0, 0.22, 0), W1); part(a, sph, 0, 0.43, 0, 0.078, 0.05, 0.066, W1); }), 64, true);
+  mk('wool', geo(a => { part(a, cy, 0, 0.27, 0, 0.087, 0.036, 0.087, W1); box(a, 0.05, 0.22, 0.014, 0, 0.36, 0.068, W1, -0.12); box(a, 0.03, 0.11, 0.012, 0.072, 0.21, 0.05, W1, 0, 0, 0.2); }), 64, true);   // (the sash and the stole: its own wool)
+  mk('head', geo(a => { part(a, sph, 0, 0.515, 0.005, 0.048, 0.054, 0.048, SK); box(a, 0.062, 0.075, 0.036, 0, 0.47, 0.03, [0.28, 0.27, 0.26]); part(a, cy, 0, 0.58, 0, 0.047, 0.06, 0.047, DK); part(a, cy, 0, 0.612, 0, 0.056, 0.008, 0.056, DK); box(a, 0.1, 0.11, 0.012, 0, 0.53, -0.047, DK); }), 64, false);   // (a beard, and the tall black hat with its veil)
+  mk('arm', geo(a => { box(a, 0.034, 0.17, 0.038, 0, -0.085, 0, DK); part(a, sph, 0, -0.185, 0.005, 0.02, 0.022, 0.02, SK); }), 128, false);
+  mk('hammer', geo(a => { box(a, 0.012, 0.012, 0.13, 0, 0, 0.05, BEAM); box(a, 0.05, 0.028, 0.028, 0, 0, 0.115, IRON); }), 48, false);
+  mk('pick', geo(a => { box(a, 0.012, 0.012, 0.16, 0, 0, 0.06, BEAM); box(a, 0.12, 0.016, 0.02, 0, 0, 0.135, IRON); }), 48, false);
+  mk('staff', geo(a => part(a, cy, 0, 0.05, 0, 0.008, 0.75, 0.008, BEAM)), 48, false);
+  mk('book', geo(a => { box(a, 0.12, 0.012, 0.09, 0, 0, 0, [0.95, 0.9, 0.78]); box(a, 0.125, 0.006, 0.095, 0, -0.009, 0, [0.55, 0.12, 0.1]); }), 48, false);
+  mk('shuttle', geo(a => { box(a, 0.024, 0.024, 0.09, 0, 0, 0.03, BEAM); part(a, sph, 0, 0, 0.03, 0.03, 0.03, 0.03, W1); }), 48, true);
+  mk('blk', geo(a => box(a, 1, 1, 1, 0, 0, 0, W1)), 640, true);   // (a block: of the course being laid, lifted, carried, or a counterweight)
+  // the machines
+  mk('wheel', geo(a => { ad(a, new THREE.TorusGeometry(1, 0.07, 4, 16).rotateY(Math.PI / 2), BEAM); for (let k = 0; k < 3; k++) box(a, 0.06, 2, 0.06, 0, 0, 0, BEAM, k * Math.PI / 3); box(a, 0.3, 0.07, 0.07, 0.15, 1, 0, BEAM); }), 64, false);   // (a crank wheel, a pulley: about its x)
+  mk('tread', geo(a => { for (const sx of [-0.5, 0.5]) { ad(a, new THREE.TorusGeometry(1, 0.05, 4, 18).rotateY(Math.PI / 2).translate(sx, 0, 0), BEAM); for (let k = 0; k < 4; k++) box(a, 0.05, 2, 0.05, sx, 0, 0, BEAM, k * Math.PI / 4); } for (let k = 0; k < 16; k++) { const an = k / 16 * 6.2832; box(a, 1.04, 0.04, 0.16, 0, Math.cos(an), Math.sin(an), AG_WOOD.map(h => new THREE.Color(h))[k % 3].toArray(), an); } }), 16, false);
+  mk('drum', geo(a => ad(a, new THREE.CylinderGeometry(1, 1, 1, 8).rotateZ(Math.PI / 2), [0.62, 0.5, 0.32])), 16, false);
+  mk('basket', geo(a => { ad(a, new THREE.CylinderGeometry(0.5, 0.38, 0.6, 8, 1, true).translate(0, 0.3, 0), [0.72, 0.58, 0.32]); part(a, cy, 0, 0.02, 0, 0.38, 0.04, 0.38, [0.6, 0.48, 0.26]); ad(a, new THREE.TorusGeometry(0.5, 0.04, 3, 10).rotateX(Math.PI / 2).translate(0, 0.6, 0), [0.55, 0.43, 0.24]); for (let k = 0; k < 3; k++) box(a, 0.36, 0.2, 0.3, (k - 1) * 0.16, 0.45, (k % 2) * 0.1, AGM_STONE[k]); }), 16, false);
+  mk('rope', geo(a => ad(a, new THREE.CylinderGeometry(1, 1, 1, 4).translate(0, 0.5, 0), [0.62, 0.52, 0.34])), 64, false);
+  mk('beam', geo(a => box(a, 1, 1, 1, 0, 0, 0, BEAM)), 32, false);
+  mk('bell', geo(a => ad(a, new THREE.LatheGeometry([[0.03, 0], [0.12, -0.03], [0.15, -0.14], [0.2, -0.3], [0.27, -0.38], [0.02, -0.38]].map(p => new THREE.Vector2(p[0], p[1])), 10), BRONZE)), 16, false);
+  return im;
+}
+const agmPut = (k, M, c) => { const m = AGM.im[k], n = AGM.cnt[k] || 0; if (n >= m.instanceMatrix.count) return; m.setMatrixAt(n, M); if (c && m.instanceColor) m.setColorAt(n, c); AGM.cnt[k] = n + 1; };
+function agmEnd() { if (!AGM.im) return; for (const k in AGM.im) { const m = AGM.im[k], n = AGM.cnt[k] || 0; if (m.count || n) { m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; } AGM.cnt[k] = 0; } }
+const _gmB = new THREE.Matrix4(), _gmA = new THREE.Matrix4(), _gmT = new THREE.Matrix4(), _gmX = new THREE.Matrix4(), _gmE = new THREE.Euler(), _gmQ = new THREE.Quaternion(), _gmV = new THREE.Vector3(), _gmS = new THREE.Vector3(), _gmC = new THREE.Color();
+const agmM = (out, x, y, z, rx, ry, rz, sx, sy = sx, sz = sx) => out.compose(_gmV.set(x, y, z), _gmQ.setFromEuler(_gmE.set(rx, ry, rz, 'YXZ')), _gmS.set(sx, sy, sz));
+const agmMR = (out, R, lx, ly, lz, rx, sx, sy = sx, sz = sx) => { const [x, z] = agmW(R, lx, lz); return agmM(out, x, R.top + ly, z, rx, R.ry, 0, sx, sy, sz); };   // (on a rock's top, turned about its own x)
+const AGM_ROBE = new THREE.Color(0.1, 0.09, 0.09), AGM_NOV = new THREE.Color(0.38, 0.27, 0.17), AGM_STONEC = new THREE.Color(0.78, 0.7, 0.56);
+// one monk, as it is holding itself (m.pose), at its size (sc)
+function agmDraw(m, sc) {
+  const t = time + m.ph, P = m.pose; let lean = 0, bob = 0, kn = 0, lx = 0, rx = 0, lz = 0.14, rz = -0.14, tool = m.tool, held = '';
+  if (P === 'walk') { const s = Math.sin(m.ph); bob = Math.abs(s) * 0.018; lx = s * 0.55; rx = -lx; if (m.carry) { lx = rx = -1.05; held = 'blk'; tool = ''; } }
+  else if (P === 'climb') { const s = Math.sin(m.ph); lean = -0.12; lx = -2.7 + s * 0.45; rx = -2.7 - s * 0.45; bob = s * 0.025; }
+  else if (P === 'hew') { lean = -0.1; lx = -2.6; rx = -1.6 - Math.max(0, Math.sin(t * 6)) * 1.0; tool = 'pick'; }
+  else if (P === 'mason' || P === 'carve') { kn = 1; lean = 0.35; lx = -0.8; rx = -1.3 - Math.max(0, Math.sin(t * (P === 'carve' ? 9 : 7))) * 0.9; tool = 'hammer'; }
+  else if (P === 'crank') { const c = m.crank || 0; lean = 0.2; lx = rx = -1.25 + Math.sin(c) * 0.55; lz = 0.2; rz = -0.2; bob = Math.cos(c) * 0.012; tool = ''; }
+  else if (P === 'read') { lean = 0.22; lx = rx = -0.95; lz = 0.38; rz = -0.38; if (!m.onLect) held = 'book'; tool = ''; }
+  else if (P === 'pray') { kn = 1; lean = -0.05; lx = rx = -1.45; lz = 0.42; rz = -0.42; tool = ''; }
+  else if (P === 'ring') { const s = Math.sin(t * 5); lx = rx = -2.9 + s * 0.4; bob = Math.max(0, -s) * 0.02; tool = ''; }
+  else if (P === 'weave') { const w = t * 5.5; lean = 0.25; lx = -1.15 + Math.sin(w) * 0.35; rx = -1.15 - Math.sin(w) * 0.35; lz = 0.3 + Math.cos(w) * 0.2; rz = -0.3 - Math.cos(w) * 0.2; tool = 'shuttle'; }
+  else if (P === 'survey') { lx = -0.3; rx = -1.55; rz = -0.25; tool = 'staff'; }
+  else if (P === 'wave') { bob = Math.abs(Math.sin(t * 9)) * 0.08; lx = Math.PI + Math.sin(t * 14) * 0.5; rx = Math.PI + Math.cos(t * 14) * 0.5; lz = 0.4; rz = -0.4; tool = ''; }
+  else if (P === 'tread') { const s = Math.sin(m.ph); bob = Math.abs(s) * 0.015; lx = rx = -1.4; tool = ''; }
+  else if (P === 'tend') { kn = 1; lean = 0.55; lx = -0.9 + Math.sin(t * 2) * 0.2; rx = -0.9 - Math.sin(t * 2.3) * 0.2; tool = ''; }
+  else if (P === 'sit') { kn = 1; lx = rx = -0.6; tool = ''; }
+  agmM(_gmB, m.x, m.y + bob - kn * 0.05 * sc, m.z, lean, m.yaw, 0, sc, sc * (1 - kn * 0.22), sc);
+  agmPut('robe', _gmB, m.a ? AGM_ROBE : AGM_NOV); agmPut('wool', _gmB, m.wool); agmPut('head', _gmB);
+  for (const sd of [-1, 1]) { agmM(_gmT, sd * 0.088, 0.43, 0, sd < 0 ? lx : rx, 0, sd < 0 ? lz : rz, 1); _gmA.multiplyMatrices(_gmB, _gmT); agmPut('arm', _gmA);
+    _gmV.set(0, -0.19, 0.01).applyMatrix4(_gmA); const hd = sd > 0 ? m.hand : m.hand2; hd[0] = _gmV.x; hd[1] = _gmV.y; hd[2] = _gmV.z;
+    if (sd > 0 && tool) { agmM(_gmT, 0, -0.19, 0.01, tool === 'staff' ? -rx - 0.15 : 0, 0, 0, 1); _gmX.multiplyMatrices(_gmA, _gmT); agmPut(tool, _gmX, m.wool); } }
+  if (held) { agmM(_gmT, 0, 0.3, 0.13, held === 'book' ? -0.6 : 0, 0, 0, held === 'blk' ? 0.16 : 1, held === 'blk' ? 0.09 : 1, held === 'blk' ? 0.1 : 1); _gmX.multiplyMatrices(_gmB, _gmT); agmPut(held, _gmX, AGM_STONEC); }
+}
+// the machines of one rock, and its course of stones as far as it is laid
+function agmMechs(H, R, dt) {
+  const s = R.st; if (!s) return;
+  // the winch: turned, the basket comes up the face full of stone, waits to be emptied, and goes down again
+  const on = time - R.cr < 0.4, span = R.top - 0.45 - R.by0;
+  if (on) { if (R.wp > 0) R.wp -= dt; else { R.wb += R.wdir * dt * 1.1 / Math.max(5, span); if (R.wb >= 1) { R.wb = 1; R.wdir = -1; R.wp = 3; } else if (R.wb <= 0) { R.wb = 0; R.wdir = 1; R.wp = 3; } R.wa += R.wdir * dt * 3.2; } }
+  const wz = R.wz ?? R.ef - 0.9, by = lerp(R.by0, R.top - 0.45, R.wb), [jx, jz] = agmW(R, 0, R.ef + 0.85);
+  agmMR(_gmT, R, 0, 0.62, wz, R.wa, 0.9, 0.16, 0.16); agmPut('drum', _gmT); agmMR(_gmT, R, 0.55, 0.62, wz, R.wa, 0.36); agmPut('wheel', _gmT); agmMR(_gmT, R, 0, 1.05, R.ef + 0.85, R.wa * 4, 0.09); agmPut('wheel', _gmT);
+  agmM(_gmT, jx, by, jz, 0, R.ry + R.wa * 0.05, 0, 0.42); agmPut('basket', _gmT); agmM(_gmT, jx, by + 0.25, jz, 0, 0, 0, 0.012, R.top + 1.0 - by - 0.25, 0.012); agmPut('rope', _gmT);
+  { const cy = 0.2 + 0.75 * (1 - R.wb); agmMR(_gmT, R, 0.75, cy, wz, 0, 0.16, 0.2, 0.16); agmPut('blk', _gmT, AGM_STONEC); agmMR(_gmT, R, 0.75, cy + 0.1, wz, 0, 0.01, 1.2 - cy - 0.1, 0.01); agmPut('rope', _gmT); }   // (its counterweight, going the other way)
+  // the course of stones being laid: as far as the monk's timber says, a block at a time
+  if (R.slots && R.slots.length) { const k = Math.min(R.slots.length, Math.floor(s.part * R.slots.length)); R.k = k; for (let j = 0; j < k; j++) agmPut('blk', R.slots[j].M, R.slots[j].c); }
+  if (s.f < 0.85) {   // the treadwheel crane lifting a block to the top of the wall, and the lever heaving one up
+    const tw = time - R.tr < 0.4, mw = time - R.ms < 0.4; if (tw || mw) R.ta += dt * 1.3;
+    agmMR(_gmT, R, AGM_TW[0], 0.8, AGM_TW[1], R.ta, 0.55, 0.75, 0.75); agmPut('tread', _gmT);
+    const J = R.jib || [-1.5, 1.5, AGM.HZ - AGM.HD - 0.35]; agmMR(_gmT, R, J[0], J[1], J[2], R.ta * 5, 0.07); agmPut('wheel', _gmT);
+    const hy = 0.25 + (J[1] - 0.6) * (0.5 - 0.5 * Math.cos(R.ta * 0.5)); agmMR(_gmT, R, J[0], hy, J[2], 0, 0.2, 0.12, 0.13); agmPut('blk', _gmT, AGM_STONEC); agmMR(_gmT, R, J[0], hy + 0.06, J[2], 0, 0.008, J[1] - hy - 0.06, 0.008); agmPut('rope', _gmT);
+    const la = mw ? 0.28 * Math.sin(time * 1.6) : -0.25; agmMR(_gmT, R, AGM_LV[0], 0.42, AGM_LV[1], la, 0.07, 0.07, 2.2); agmPut('beam', _gmT);
+    const ey = 0.42 - Math.sin(la) * 1.0, ez = AGM_LV[1] + Math.cos(la) * 1.0; agmMR(_gmT, R, AGM_LV[0], ey + 0.1, ez, la, 0.2, 0.13, 0.15); agmPut('blk', _gmT, AGM_STONEC); }
+  if (s.fd >= 1) { const e = time - R.bellT, sw = e < 9 ? Math.sin(e * 6) * 0.55 * Math.exp(-e * 0.25) : 0; agmMR(_gmT, R, AGM_BT[0], 2.3, AGM_BT[1], sw, 0.6); agmPut('bell', _gmT); }
+}
+// ───────── the monks: who they are and what they are doing
+const AGM_ACTS = { 'just arrived': 'start', 'reading the brief': 'think', 'writing code': 'write', 'running commands': 'run', 'reading the code': 'read', 'searching the web': 'web', 'sending out helpers': 'helpers', 'using its tools': 'tool', 'planning the work': 'plan', 'waiting on the boss': 'wait' };
+const AGM_GUESS = [[/test|lint|build|deploy|run|bench|\bci\b/, 'run'], [/review|read|explor|research|look|audit|study/, 'read'], [/plan|design|think|spec/, 'plan'], [/search|web|fetch|browse/, 'web'], [/writ|edit|fix|implement|refactor|add|code|port|patch|make/, 'write']];
+const AGM_SAY = { mason: 'LAYING STONE', carve: 'CARVING THE TEACHINGS', study: 'STUDYING THE TEACHINGS', winch: 'HAULING STONE UP', scale: 'SCALING THE ROCK', anchor: 'FIXING A NEW ANCHOR', survey: 'SURVEYING A BRIDGE', weave: 'WEAVING THE BRIDGE', village: 'WEAVING IN THE VILLAGE', ring: 'RINGING THE BELL', pray: 'PRAYING', wait: 'WAITING ON YOU', rest: 'RESTING', greet: 'GLAD TO SEE YOU', lead: 'SENDING OUT NOVICES', arrive: 'CLIMBING UP' };
+function agmAct(a, now) {   // what an agent is doing, in the words its hooks use (see the table above)
+  if (a.gone || now - a.hb > AG_IDLE) return 'gone';
+  if (now - a.hb > AG_ACTIVE) return 'idle';
+  const P = AGX.st.get(a.n); if (P && P.act && now - (P.hb || 0) < AG_ACTIVE) return P.act;
+  const k = String(a.k || '').toLowerCase(); if (AGM_ACTS[k]) return AGM_ACTS[k];
+  for (const [re, w] of AGM_GUESS) if (re.test(k)) return w; return 'tool';
+}
+function agFigure(a, wool) {   // one of them: a monk (its label is its own; its body is drawn with the others')
+  agmIM(); const el = document.createElement('div'); el.className = 'mk'; el.innerHTML = '<b></b><span></span>'; el.style.display = 'none'; el.style.pointerEvents = 'none'; $('markers').appendChild(el);
+  return agmMonk({ a, wool: (wool || AG_UNDYED).clone(), el });
+}
+const agmMonk = o => Object.assign({ x: 0, y: 0, z: 0, yaw: 0, reg: 'top', ri: 0, lx: 0, lz: 0, fy: 0, fa: 0, bi: -1, bt: 0, bo: 0, path: [], job: '', J: null, jobT: 0, pose: 'stand', ph: Math.random() * 6, tool: '', carry: false, set: false, say: '', sayT: -99, wt: null, hand: [0, 0, 0], hand2: [0, 0, 0], vis: false, sc: 1, st: '', stage: 0, d0: -1, crank: 0 }, o);
+const agmBrI = (H, i) => H.br.find(b => b.i === i) || null;
+const agmLink = (H, ri, rj) => H.br.find(b => b.f >= 1 && !H.burn?.has(b.i) && (b.sp.ka === ri && b.sp.kb === rj || b.sp.ka === rj && b.sp.kb === ri)) || null;
+function agmEnd0(b, t) { const p = b.pc.find(([a, c]) => t >= a - 1e-3 && t <= c + 1e-3); return p ? (p[0] <= 0.001 ? 0 : p[1] >= 0.999 ? 1 : -1) : -1; }   // (which end of the bridge he can get off at, from where he is on it)
+// round the church rather than through it: the corners to go by (in the rock's frame), or none
+function agmAround(ax, az, bx, bz) {
+  const X = AGM.HW + 0.45, Z0 = AGM.HZ - AGM.HD - 0.45, Z1 = AGM.HZ + AGM.HD + 0.45, hit = (p, q) => { let t0 = 0, t1 = 1; const d = [q[0] - p[0], q[1] - p[1]], lo = [-X + 0.02, Z0 + 0.02], hi = [X - 0.02, Z1 - 0.02]; for (let k = 0; k < 2; k++) { if (Math.abs(d[k]) < 1e-9) { if (p[k] <= lo[k] || p[k] >= hi[k]) return false; continue; } let u0 = (lo[k] - p[k]) / d[k], u1 = (hi[k] - p[k]) / d[k]; if (u0 > u1) [u0, u1] = [u1, u0]; t0 = Math.max(t0, u0); t1 = Math.min(t1, u1); if (t0 >= t1) return false; } return true; };
+  const A = [ax, az], Bp = [bx, bz]; if (agmIn(ax, az, -0.45) || agmIn(bx, bz, -0.45) || !hit(A, Bp)) return [];
+  const C = [[-X, Z0], [X, Z0], [X, Z1], [-X, Z1]], len = (...p) => p.slice(1).reduce((s, q, i) => s + Math.hypot(q[0] - p[i][0], q[1] - p[i][1]), 0); let best = null, bl = 1e9;
+  for (const c of C) if (!hit(A, c) && !hit(c, Bp)) { const l = len(A, c, Bp); if (l < bl) { bl = l; best = [c]; } }
+  for (let i = 0; i < 4; i++) for (const [c1, c2] of [[C[i], C[(i + 1) % 4]], [C[(i + 1) % 4], C[i]]]) if (!hit(A, c1) && !hit(c2, Bp)) { const l = len(A, c1, c2, Bp); if (l < bl) { bl = l; best = [c1, c2]; } }
+  return best || [];
+}
+// the way from where it is to D ({ k: 'top', ri, lx, lz } · { k: 'deck', bi, t, o } · { k: 'ground', x, z } · { k: 'face', ri, y }):
+// across a whole bridge if there is one, else down its ladder, over the ground and up the other's
+function agmRoute(H, m, D) {
+  const S = [], R = H.rocks; let at = m.reg === 'ground' ? -1 : m.ri;
+  if (m.reg === 'deck') { const b = agmBrI(H, m.bi), e = b ? agmEnd0(b, m.bt) : -1; if (e < 0) { agmSnap(H, m); at = m.ri; } else { S.push({ k: 'deck', bi: m.bi, t: e, o: 0 }); at = e ? b.sp.kb : b.sp.ka; } }
+  else if (m.reg === 'face') { if (D.k === 'ground' || D.ri !== m.ri || D.k === 'face') { S.push({ k: 'down', ri: m.ri, cont: true, y: D.k === 'face' && D.ri === m.ri ? D.y : undefined }); at = -1; if (D.k === 'face' && D.ri === m.ri) { m.path = S; return; } } else { S.push({ k: 'up', ri: m.ri, cont: true }); at = m.ri; } }
+  const goTop = rj => { if (at === rj) return;
+    if (at >= 0) { const b = agmLink(H, at, rj); if (b) { const fromA = b.sp.ka === at, A = fromA ? b.sp.A : b.sp.B, [lx, lz] = agmL(R[at], A[0], A[2]); S.push({ k: 'top', ri: at, lx, lz }, { k: 'deck', bi: b.i, from: fromA ? 0 : 1, t: fromA ? 1 : 0, o: 0 }); at = rj; return; }
+      S.push({ k: 'top', ri: at, lx: R[at].lad[0], lz: R[at].lad[1] }, { k: 'down', ri: at }); at = -1; }
+    S.push({ k: 'ground', x: R[rj].foot[0], z: R[rj].foot[2] }, { k: 'up', ri: rj }); at = rj; };
+  if (D.k === 'top') { goTop(D.ri); S.push({ k: 'top', ri: D.ri, lx: D.lx, lz: D.lz }); }
+  else if (D.k === 'deck') { const b = agmBrI(H, D.bi); if (b) { const e = D.from ? b.sp.kb : b.sp.ka, A = D.from ? b.sp.B : b.sp.A; goTop(e); const [lx, lz] = agmL(R[e], A[0], A[2]); S.push({ k: 'top', ri: e, lx, lz }, { k: 'deck', bi: D.bi, from: D.from, t: D.t, o: D.o }); } }
+  else if (D.k === 'face') { goTop(D.ri); S.push({ k: 'top', ri: D.ri, lx: R[D.ri].lad[0], lz: R[D.ri].lad[1] }, { k: 'down', ri: D.ri, y: D.y, fa: D.fa }); }
+  else { if (at >= 0) S.push({ k: 'top', ri: at, lx: R[at].lad[0], lz: R[at].lad[1] }, { k: 'down', ri: at }); S.push({ k: 'ground', x: D.x, z: D.z }); }
+  m.path = S;
+}
+function agmSnap(H, m) { const R = H.rocks[m.home] || H.rocks[0]; m.reg = 'top'; m.ri = R.j; m.lx = 0; m.lz = AGM.HZ + AGM.HD + 1.4; m.path = []; }   // (stranded: it is home again)
+// one step along its way; true when it has got there
+function agmMove(H, m, dt) {
+  const s = m.path[0]; if (!s) return true;
+  const sp = (m.a ? 0.8 : 0.65) * (H.greet ? 1.6 : 1), cl = 0.7, R = H.rocks[s.ri];
+  if (s.k === 'top') {
+    if (m.reg !== 'top' || m.ri !== s.ri) { const [lx, lz] = agmL(R, m.x, m.z); m.reg = 'top'; m.ri = s.ri; m.lx = lx; m.lz = lz; }
+    if (!s.chk) { s.chk = true; const via = agmAround(m.lx, m.lz, s.lx, s.lz); if (via.length) { m.path.unshift(...via.map(([lx, lz]) => ({ k: 'top', ri: s.ri, lx, lz, chk: true }))); return false; } }
+    const dx = s.lx - m.lx, dz = s.lz - m.lz, dl = Math.hypot(dx, dz); if (dl < 0.04) { m.path.shift(); return !m.path.length; }
+    const v = Math.min(sp * dt, dl); m.lx += dx / dl * v; m.lz += dz / dl * v; m.yaw = R.ry + Math.atan2(dx, dz); m.ph += v * 10; m.pose = 'walk'; return false; }
+  if (s.k === 'down' || s.k === 'up') {
+    if (!s.go) { s.go = true; if (!s.cont) { m.reg = 'face'; m.ri = s.ri; m.fa = s.fa ?? R.aL; m.fy = s.k === 'down' ? R.top - 0.05 : R.footY + 0.05; } else m.reg = 'face'; }
+    const end = s.k === 'up' ? R.top : s.y ?? R.footY + 0.05, dy = end - m.fy; m.pose = 'climb';
+    if (Math.abs(dy) < 0.03) { m.path.shift(); if (s.k === 'up') { m.reg = 'top'; m.lx = R.lad[0]; m.lz = R.lad[1]; } else if (s.y === undefined) { m.reg = 'ground'; m.x = R.foot[0]; m.z = R.foot[2]; } return !m.path.length; }
+    const v = Math.min(cl * dt, Math.abs(dy)); m.fy += Math.sign(dy) * v; m.ph += v * 14; return false; }
+  if (s.k === 'ground') {
+    if (m.reg !== 'ground') m.reg = 'ground';
+    const dx = s.x - m.x, dz = s.z - m.z, dl = Math.hypot(dx, dz); if (dl < 0.08) { m.path.shift(); return !m.path.length; }
+    const v = Math.min(sp * 1.2 * dt, dl); m.x += dx / dl * v; m.z += dz / dl * v; m.yaw = Math.atan2(dx, dz); m.ph += v * 10; m.pose = 'walk'; return false; }
+  if (s.k === 'deck') { const b = agmBrI(H, s.bi); if (!b) { m.path.shift(); agmSnap(H, m); return true; }
+    if (m.reg !== 'deck' || m.bi !== s.bi) { m.reg = 'deck'; m.bi = s.bi; m.bt = s.from ?? 0; m.bo = 0; }
+    const dt2 = s.t - m.bt, L = b.sp.len; m.bo = lerp(m.bo, s.o || 0, damp(2, dt)); if (Math.abs(dt2) * L < 0.05) { m.path.shift(); return !m.path.length; }
+    const v = Math.min(sp * dt / L, Math.abs(dt2)); m.bt += Math.sign(dt2) * v; m.yaw = Math.atan2(b.sp.d[0], b.sp.d[1]) + (dt2 < 0 ? Math.PI : 0); m.ph += v * L * 10; m.pose = 'walk'; return false; }
+  m.path.shift(); return !m.path.length;
+}
+function agmPos(H, m) {   // where it is in the world, from where it is on its way
+  if (m.reg === 'top') { const R = H.rocks[m.ri]; if (!R) return agmSnap(H, m); const [x, z] = agmW(R, m.lx, m.lz); m.x = x; m.z = z; m.y = R.top + (R.st && agmIn(m.lx, m.lz) ? 0.1 : 0); }
+  else if (m.reg === 'face') { const R = H.rocks[m.ri], p = agmFace(R, m.fa, m.fy, 0.13); m.x = p[0]; m.y = p[1] - 0.25; m.z = p[2]; m.yaw = Math.atan2(-Math.cos(m.fa), -Math.sin(m.fa)); }
+  else if (m.reg === 'ground') m.y = Math.max(terrainAt(m.x, m.z), WATER - 0.3);
+  else if (m.reg === 'deck') { const b = agmBrI(H, m.bi); if (!b || !agmOn(b, m.bt)) return agmSnap(H, m); const q = agDeck(b, m.bt, m.bo, 0.07); m.x = q[0]; m.y = q[1]; m.z = q[2]; }
+}
+// what a monk does next. top(…): a place on its own rock, how to hold itself there, what to face, for how long
+function agmJobFor(H, m, now) {
+  const a = m.a, R = H.rocks[m.home], st = R.st || { f: 1, fd: 0, ft: 0, full: AGM.NC }, act = agmAct(a, now), T = (x, y) => x + Math.random() * y, fz = AGM.HZ + AGM.HD;
+  const top = (k, lx, lz, pose, fx, fzz, t, o = {}) => ({ k, dest: { k: 'top', ri: m.home, lx, lz }, pose, face: [fx, fzz], T: t, act, ...o });
+  m.act0 = act;
+  if (act === 'gone') return top('rest', 0.9, fz + 0.6, 'sit', 0.9, fz + 3, T(40, 30));
+  if (a.d > m.d0 || act === 'done' && !m.rang) { m.d0 = Math.max(m.d0, a.d); m.rang = act === 'done'; return st.fd >= 1 ? top('ring', AGM_BT[0] + 0.32, AGM_BT[1], 'ring', AGM_BT[0], AGM_BT[1], 8, { bell: 1 }) : top('ring', 0.6, fz + 0.9, 'ring', 0.6, fz + 3, 6); }
+  if (act !== 'done') m.rang = false;
+  const own = H.br.filter(b => b.w === m.home), burnt = own.find(b => H.burn?.get(b.i)?.full), grow = own.find(b => b.f < 1 && !H.burn?.has(b.i));
+  if (burnt) return agmWeave(H, m, burnt, act);
+  if (grow && grow.f < 0.5 && grow.sp.kb >= H.agents.length && !H.bst?.get(grow.i)?.anch && act !== 'idle' && Math.random() < 0.5) {   // (a new bridge, to a wild rock: someone has to go over and fix its far end)
+    const Rb = H.rocks[grow.sp.kb], [lx, lz] = agmL(Rb, grow.sp.B[0], grow.sp.B[2]); return { k: 'anchor', dest: { k: 'top', ri: grow.sp.kb, lx: lx * 0.92, lz: lz * 0.92 }, pose: 'mason', face: [lx, lz], T: 8, bi: grow.i, act }; }
+  switch (act) {
+    case 'write': if (st.f < 1 && R.slots?.length) return { k: 'mason', stage: 0, T: T(20, 20), act }; return top('carve', 3.3, 1.95, 'carve', 3.3, 2.4, T(14, 10));
+    case 'read': if (st.ft > 0 && Math.random() < 0.5) return top('study', AGM_SC[0] - 1.6, AGM_SC[1], 'read', AGM_SC[0], AGM_SC[1], T(14, 10));
+    case 'think': return top('study', AGM_LC[0], AGM_LC[1] + 0.45, 'read', AGM_LC[0], AGM_LC[1], T(14, 10), { lect: 1 });
+    case 'run': return top('winch', 1.0, R.wz ?? R.ef - 0.9, 'crank', 0.55, R.wz ?? R.ef - 0.9, T(18, 12));
+    case 'web': return { k: 'scale', dest: { k: 'face', ri: m.home, y: R.top - 5 - Math.random() * 14, fa: R.aL - 0.07 }, pose: 'hew', T: T(10, 8), act };
+    case 'tool': if (grow) return agmWeave(H, m, grow, act); if (H.st?.now) return agmVillage(H, m, act); return top('study', AGM_LC[0], AGM_LC[1] + 0.45, 'read', AGM_LC[0], AGM_LC[1], T(12, 8), { lect: 1 });
+    case 'plan': { const b = grow || own[0]; if (b) { const e = b.sp.ka === m.home ? b.sp.A : b.sp.B, far = H.rocks[b.sp.ka === m.home ? b.sp.kb : b.sp.ka], [lx, lz] = agmL(R, e[0], e[2]), [fx, fzz] = agmL(R, far.x, far.z); return top('survey', lx * 0.85, lz * 0.85, 'survey', fx, fzz, T(10, 6)); } return top('survey', 0, R.ef - 1.6, 'survey', 0, R.ef + 9, 8); }
+    case 'helpers': return top('lead', -0.6, fz + 1.2, 'survey', 0, fz + 6, T(12, 8));
+    case 'wait': return top('wait', 0.9, R.ef - 1.3, 'pray', 0.9, R.ef + 6, T(16, 10));
+    case 'start': if (!m.came) { m.came = true; return { k: 'arrive', dest: { k: 'top', ri: m.home, lx: 0, lz: fz + 1.3 }, pose: 'pray', face: [0, fz + 5], T: 6, act }; } return top('study', AGM_LC[0], AGM_LC[1] + 0.45, 'read', AGM_LC[0], AGM_LC[1], 10, { lect: 1 });
+    case 'idle': return Math.random() < 0.5 ? top('pray', -0.9, R.ef - 1.4, 'pray', -0.9, R.ef + 6, T(20, 15)) : top('study', AGM_LC[0], AGM_LC[1] + 0.45, 'read', AGM_LC[0], AGM_LC[1], T(20, 15), { lect: 1 });
+  }
+  return top('study', AGM_LC[0], AGM_LC[1] + 0.45, 'read', AGM_LC[0], AGM_LC[1], 10, { lect: 1 });
+}
+function agmWeave(H, m, b, act) {   // out along the bridge to where the weaving has got to (from its end), and at it
+  const L = b.sp.len, B = H.burn?.get(b.i), from = B ? B.from : 0, edge = B ? (from ? B.b1 - (B.b1 - B.b0) * B.rw : B.b0 + (B.b1 - B.b0) * B.rw) : b.f, t = from ? Math.min(0.996, edge + 0.6 / L) : Math.max(0.004, edge - 0.6 / L);
+  return { k: 'weave', dest: { k: 'deck', bi: b.i, from, t, o: (m.i % 2 ? 0.22 : -0.22) * b.wd }, pose: 'weave', T: 14 + Math.random() * 8, bi: b.i, act };
+}
+function agmVillage(H, m, act) {   // down the ladder to the village, to weave at whatever is going up there
+  const P = agPlan(H), w = H.st.now, at = P[H.st.k] || [0, 3], off = (m.i * 2.4) % 6.2832, rr = (AG_RAD[w] ?? 0.4) + 3, F = {}; agAt(H, at[0] + Math.cos(off) * rr, at[1] + Math.sin(off) * rr * 0.85, F);
+  return { k: 'village', dest: { k: 'ground', x: F.x, z: F.z }, pose: 'weave', T: 24 + Math.random() * 12, act };
+}
+function agmNovJob(H, m, R) {   // a novice: whatever its monk's work needs a second pair of hands for, else the garden
+  const a = H.agents[R.own], mj = a && H.figs.get(a.id)?.job, fz = AGM.HZ + AGM.HD, T = (x, y) => x + Math.random() * y, top = (k, lx, lz, pose, fx, fzz, t, o = {}) => ({ k, dest: { k: 'top', ri: R.j, lx, lz }, pose, face: [fx, fzz], T: t, ...o });
+  if ((mj === 'mason' || mj === 'carve' || mj === 'lead') && R.st && R.st.f < 0.85 && m.nov === 0) return top('tread', AGM_TW[0], AGM_TW[1], 'tread', AGM_TW[0], AGM_TW[1] + 2, T(16, 10));
+  if (mj === 'mason' || mj === 'lead' && m.nov === 1) return { k: 'mason', stage: 0, T: T(16, 10), nov: 1 };
+  if (mj === 'winch' && m.nov === 0) return top('winch', -1.0, R.wz ?? R.ef - 0.9, 'crank', -0.55, R.wz ?? R.ef - 0.9, T(16, 10));
+  const beds = [[-2.7, 3.6], [-3.2, 6.3]], [bx, bz] = beds[(Math.random() * 2) | 0]; return Math.random() < 0.7 ? top('garden', bx + rnd(0.6), bz - 0.55, 'tend', bx, bz, T(10, 8)) : top('walk', rnd(2.5), fz + 1 + Math.random() * 3, 'stand', 0, fz + 6, T(4, 4));
+}
+// the mason's round: a block from the pile by the winch, carried to the wall and laid where the course has got to
+function agmMasonStep(H, m, R, dt) {
+  const J = m.J; if (m.path.length) return;
+  if (J.stage === 0) { m.carry = false; J.stage = 1; agmRoute(H, m, { k: 'top', ri: R.j, lx: -0.9 + rnd(0.25), lz: R.ef - 1.45 }); return; }
+  if (J.stage === 1) { m.pose = 'tend'; if ((J.w = (J.w || 0) + dt) > 0.8) { J.w = 0; m.carry = true; J.stage = 2; const sl = R.slots?.[Math.min((R.k ?? 0), (R.slots?.length || 1) - 1)]; const tx = sl ? sl.lx + (sl.ax ? 0 : Math.sign(sl.lx) * 0.48) : -AGM.HW - 0.5, tz = sl ? sl.lz + (sl.ax ? Math.sign(sl.lz - AGM.HZ) * 0.48 : 0) : AGM.HZ; J.at = [sl ? sl.lx : 0, sl ? sl.lz : AGM.HZ]; agmRoute(H, m, { k: 'top', ri: R.j, lx: tx, lz: tz }); } return; }
+  if (J.stage === 2) { m.carry = false; m.pose = J.nov ? 'tend' : 'mason'; m.yaw = R.ry + Math.atan2(J.at[0] - m.lx, J.at[1] - m.lz); R.ms = time; if ((J.w = (J.w || 0) + dt) > 3) { J.w = 0; J.stage = 0; } }
+}
+// where on what is going up in the village a weaver's threads go: the side of it nearest the weaver, at the height it
+// has reached, the shuttle running to and fro
 function agAim(H, F, f, i) {
   const st = H.st, w = st.now, ff = st.f, S = AG.S, c = Math.cos(F.ry), s = Math.sin(F.ry), wx = f.x - F.x, wz = f.z - F.z, lx = (wx * c - wz * s) / S, lz = (wx * s + wz * c) / S;
   if (w === 'woodpile') return agW(F, -3.2, 1.3 + Math.sin(time * 2 + i) * 0.5, Math.sin(time * 1.6 + i) * 1.1);   // (at the loom)
@@ -33496,8 +33925,9 @@ function agAim(H, F, f, i) {
   const y = w === 'home' ? 0.4 + Math.min(ff / 0.6, 1) * 3.4 + Math.max(0, ff - 0.6) * 6 : w === 'hall' ? 0.4 + Math.min(ff / 0.5, 1) * 4.4 + Math.max(0, ff - 0.5) * 6 : w === 'tower' ? 0.5 + Math.min(ff / 0.5, 1) * 8 + Math.max(0, ff - 0.5) * 6 : w === 'shrine' ? 1 + ff * 4.5 : 0.5 + ff * 3.2;
   return agW(F, Math.cos(a) * R, y, Math.sin(a) * R * sq);
 }
-// the threads in the air between each weaver and its work: three apiece, from the ball and the other hand, lifting, rippling,
-// a brighter pulse running along each; only for those near enough to be seen, and only while they weave
+function agmGive(H, m, J) { m.J = J; m.job = m.st = J.k; m.jobT = J.T; m.carry = false; m.onLect = !!J.lect; m.tool = { scale: 'pick', anchor: 'hammer', weave: 'shuttle', village: 'shuttle', survey: 'staff', lead: 'staff' }[J.k] || ''; if (J.dest) agmRoute(H, m, J.dest); else m.path = []; }
+// the threads in the air between a weaving monk's hands and the bridge (or the house going up), three apiece, lifting,
+// rippling, a brighter pulse running along each; only for those near enough to be seen
 const AG_TS = 12, AG_TMAX = 36;
 const _tA = new THREE.Vector3(), _tB = new THREE.Vector3(), _tP = new THREE.Vector3(), _tQ = new THREE.Vector3(), _tD = new THREE.Vector3(), _tS = new THREE.Vector3();
 function agThreads(H, list) {
@@ -33506,98 +33936,125 @@ function agThreads(H, list) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nV * 3), 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(nV * 3), 3).setUsage(THREE.DynamicDrawUsage)); g.setIndex(idx);
     H.thr = new THREE.Mesh(g, AG.thread); H.thr.frustumCulled = false; scene.add(H.thr); }
   const g = H.thr.geometry, Pa = g.attributes.position.array, Ca = g.attributes.color.array, cam = camera.position; let q = 0;
-  for (const f of list) { const col = _agC.setHex(f.wool), T = f.wt;
+  for (const f of list) { const col = f.wool, T = f.wt;
     for (let j = 0; j < 3 && q < AG_TMAX; j++, q++) {
-      (j ? f.tip : f.ball).getWorldPosition(_tA); _tB.set(T[0] + Math.sin(time * 2.3 + j * 2.1) * 0.6, T[1] + (j - 1) * 0.45, T[2] + Math.cos(time * 1.9 + j * 1.7) * 0.6);
-      _tD.subVectors(_tB, _tA); const len = Math.max(0.1, _tD.length()), lh = 0.4 + len * 0.1, wv = 0.1 + len * 0.018;
+      _tA.fromArray(j ? f.hand : f.hand2); _tB.set(T[0] + Math.sin(time * 2.3 + j * 2.1) * 0.25, T[1] + (j - 1) * 0.15, T[2] + Math.cos(time * 1.9 + j * 1.7) * 0.25);
+      _tD.subVectors(_tB, _tA); const len = Math.max(0.1, _tD.length()), lh = 0.15 + len * 0.08, wv = 0.04 + len * 0.012;
       for (let s = 0; s <= AG_TS; s++) { const t = s / AG_TS, sn = Math.sin(Math.PI * t);
         _tP.copy(_tA).addScaledVector(_tD, t); _tP.y += sn * lh + sn * Math.sin(time * 7 - t * 10 + j * 2) * wv;
         _tQ.copy(_tD).divideScalar(len); _tQ.y += Math.cos(Math.PI * t) * Math.PI * lh / len;
-        _tS.subVectors(_tP, cam).cross(_tQ).normalize().multiplyScalar(0.12 * (1 - t * 0.4));
+        _tS.subVectors(_tP, cam).cross(_tQ).normalize().multiplyScalar(0.035 * (1 - t * 0.4) * Math.max(1, _tP.distanceTo(cam) / 40));
         const o = (q * (AG_TS + 1) + s) * 6, k = 1.3 + 1.7 * Math.max(0, 1 - Math.abs(((time * 0.8 + j * 0.37) % 1) - t) * 7);
         Pa[o] = _tP.x - _tS.x; Pa[o + 1] = _tP.y - _tS.y; Pa[o + 2] = _tP.z - _tS.z; Pa[o + 3] = _tP.x + _tS.x; Pa[o + 4] = _tP.y + _tS.y; Pa[o + 5] = _tP.z + _tS.z;
         Ca[o] = Ca[o + 3] = col.r * k; Ca[o + 1] = Ca[o + 4] = col.g * k; Ca[o + 2] = Ca[o + 5] = col.b * k; } } }
   g.setDrawRange(0, q * AG_TS * 6); g.attributes.position.needsUpdate = true; g.attributes.color.needsUpdate = true; H.thr.visible = true;
 }
+// their own traveller near: those on the rock he stands on come round him; the rest come to the lip nearest him and wave
+function agmGreetJob(H, m) {
+  const p = player, R = H.rocks[m.home], q = m.i ?? m.nov ?? 0;
+  if (Math.abs(p.pos.y - R.top) < 4 && (p.pos.x - R.x) ** 2 + (p.pos.z - R.z) ** 2 < R.rm2) { const [lx, lz] = agmL(R, p.pos.x, p.pos.z), a = q * 1.3 + 0.5 + (m.a ? 0 : 3), r = 1.3 + (q % 3) * 0.35; return { k: 'greet', dest: { k: 'top', ri: m.home, lx: lx + Math.cos(a) * r, lz: lz + Math.sin(a) * r }, pose: 'wave', face: [lx, lz], T: 99 }; }
+  const [bx, bz] = agmL(R, p.pos.x, p.pos.z), bl = Math.hypot(bx, bz) || 1, e = agmEdge(R, bx / bl, bz / bl) - 1.0;
+  let lx = bx / bl * e - bz / bl * (q % 3 - 1) * 0.7, lz = bz / bl * e + bx / bl * (q % 3 - 1) * 0.7; if (agmIn(lx, lz, -0.6)) { lx = (q % 3 - 1) * 0.7; lz = R.ef - 1.2; }
+  return { k: 'greet', dest: { k: 'top', ri: m.home, lx, lz }, pose: 'wave', face: [bx, bz], T: 99 };
+}
+// one monk, one frame: a new job when its last is done (or its agent has moved on to something else, or a bridge of its
+// own has burned); its way there; and the work, once it is there
+function agmTick(H, m, dt, now) {
+  const R = H.rocks[m.home];
+  if (H.greet) { if (m.job !== 'greet') agmGive(H, m, agmGreetJob(H, m)); }
+  else { const act = m.a ? agmAct(m.a, now) : '', burnt = m.a && m.job !== 'weave' && H.br.some(b => b.w === m.home && H.burn?.get(b.i)?.full);
+    if (m.job === 'greet' || !m.J || m.jobT <= 0 && !m.path.length || m.a && act !== m.act0 && m.job !== 'weave' && m.job !== 'anchor' || burnt) {
+      if (m.J?.k === 'anchor' && !m.path.length) { const e = H.bst?.get(m.J.bi); if (e) e.anch = true; }
+      agmGive(H, m, m.a ? agmJobFor(H, m, now) : agmNovJob(H, m, R)); } }
+  agmMove(H, m, dt); agmPos(H, m);
+  const J = m.J; if (!J || m.path.length) return;
+  m.jobT -= dt;
+  if (J.k === 'mason') { agmMasonStep(H, m, R, dt); agmPos(H, m); return; }
+  m.pose = J.pose;
+  if (J.face && m.reg === 'top') { const Rr = H.rocks[m.ri]; m.yaw += wrapAngle(Rr.ry + Math.atan2(J.face[0] - m.lx, J.face[1] - m.lz) - m.yaw) * damp(8, dt); }
+  if (J.k === 'winch') { R.cr = time; m.crank = R.wa * (m.a ? 1 : -1); }
+  else if (J.k === 'tread') { R.tr = time; m.ph += dt * 6; m.yaw = R.ry; }
+  else if (J.k === 'ring' && J.bell && !J.rang) { J.rang = true; R.bellT = time; }
+  else if (J.k === 'scale') { if (Math.random() < dt * 2) emit(m.x + rnd(0.15), m.y + 0.4, m.z + rnd(0.15), rnd(0.4), -0.3, rnd(0.4), 0.9, [0.72, 0.63, 0.5], -6, 0.25); }   // (chips of stone off its pick)
+  else if (J.k === 'weave') { const b = agmBrI(H, J.bi), B = b && H.burn?.get(b.i);
+    if (!b || (B ? !B.full : b.f >= 1)) { m.jobT = 0; m.wt = null; return; }
+    const from = B ? B.from : 0, edge = B ? (from ? B.b1 - (B.b1 - B.b0) * B.rw : B.b0 + (B.b1 - B.b0) * B.rw) : b.f, L = b.sp.len, tt = from ? Math.min(0.996, edge + 0.6 / L) : Math.max(0.004, edge - 0.6 / L);
+    m.wt = agDeck(b, edge, Math.sin(time * 1.7 + (m.i || 0)) * b.wd * 0.42, 0.25); m.yaw = Math.atan2(b.sp.d[0], b.sp.d[1]) + (from ? Math.PI : 0); const e = H.bst?.get(b.i); if (e && m.reg === 'deck') e.here = time;
+    if (m.reg === 'deck' && Math.abs(tt - m.bt) * L > 0.8) m.path = [{ k: 'deck', bi: b.i, t: tt, o: m.bo }]; }
+  else if (J.k === 'village') { const P = agPlan(H), at = H.st?.now ? P[H.st.k] : null; if (!at) { m.jobT = 0; m.wt = null; return; } const F = {}; agAt(H, at[0], at[1], F); m.wt = agAim(H, F, m, m.i || 0); m.yaw += wrapAngle(Math.atan2(F.x - m.x, F.z - m.z) - m.yaw) * damp(6, dt); }
+}
+// all the monks of a hamlet: its agents', and the novices who come out to help them
+function agmMonks(H, dt, now, d, mine) {
+  const cam = camera.position, near = d < 520, R = H.rocks, weaving = [], draw = d < 420, all = [];
+  if (!H.novs) H.novs = new Map();
+  H.agents.forEach((a, i) => {
+    const wc = agWool(H, a); let m = H.figs.get(a.id); if (!m) H.figs.set(a.id, m = agFigure(a, wc)); else if (m.wool.getHex() !== wc.getHex()) m.wool.copy(wc);
+    m.a = a; m.i = i; m.home = Math.min(i, R.length - 1);
+    if (!m.set) { m.set = true; m.d0 = a.d; agmSnap(H, m);
+      if (agmAct(a, now) === 'start') { m.came = true; const Rh = R[m.home]; m.reg = 'ground'; m.x = Rh.foot[0]; m.z = Rh.foot[2]; agmGive(H, m, { k: 'arrive', dest: { k: 'top', ri: m.home, lx: 0, lz: AGM.HZ + AGM.HD + 1.3 }, pose: 'pray', face: [0, AGM.HZ + AGM.HD + 5], T: 6, act: 'start' }); }   // (just arrived: it climbs up from the foot of its rock)
+      agmPos(H, m); }
+    const active = !a.gone && now - a.hb < AG_ACTIVE, alone = !a.gone && !active && now - a.hb < AG_IDLE;
+    m.vis = near && (active || alone || !!H.greet || pal.stars < 0.5);   // (those who have gone in are in, after dark)
+    if (!near) { m.el.style.display = 'none'; return; }
+    agmTick(H, m, dt, now); all.push(m);
+    const fd = Math.hypot(m.x - cam.x, m.z - cam.z), saying = time - m.sayT < 5;
+    placeMarker(m.el, m.x, m.y + 0.62 * m.sc + 0.55, m.z, m.vis && state === 'play' && fd < (saying ? 260 : 150), saying ? '!' : '·', saying ? `${a.n} · ${m.say}` : `${a.n} · ${AGM_SAY[m.job] || 'AT PRAYER'}${a.k ? ' · ' + a.k.toUpperCase().slice(0, 30) : ''}`, saying || mine);
+  });
+  for (const Rr of R) { const a = Rr.own >= 0 ? H.agents[Rr.own] : null, act = a && near ? agmAct(a, now) : 'gone', want = act === 'helpers' ? 3 : act === 'gone' || act === 'idle' ? 0 : 1;
+    for (let k = 0; k < 3; k++) { const key = Rr.j * 4 + k; let m = H.novs.get(key);
+      if (k >= want) { if (m) H.novs.delete(key); continue; }
+      if (!m) { H.novs.set(key, m = agmMonk({ nov: k, home: Rr.j, wool: agWool(H, a).clone().offsetHSL(0, -0.2, 0.08) })); agmSnap(H, m); m.lx = (k - 1) * 0.5; agmPos(H, m); }
+      m.vis = true; agmTick(H, m, dt, now); all.push(m); } }
+  if (draw) { for (const m of all) { if (!m.vis) continue; const fd = Math.hypot(m.x - cam.x, m.y - cam.y, m.z - cam.z); if (fd > 320) continue; m.sc = 1 + clamp((fd - 25) / 200, 0, 1) * 1.6; agmDraw(m, m.sc); if (m.pose === 'weave' && m.wt && fd < 260) weaving.push(m); }   // (a little bigger the further off, so they can be found)
+    for (const Rr of R) agmMechs(H, Rr, dt); }
+  agThreads(H, weaving);
+}
 // the whole of it, every frame
 function updateAgents(dt) {
   if ((AG.dT -= dt) <= 0) { AG.dT = 2; agDaimons(); }
-  if (!AG.ham.size) return;
-  if (realm !== 'over') { if (!AG.hid) { AG.hid = true; for (const H of AG.ham.values()) { for (const k of ['group', 'web', 'still', 'thr']) if (H[k]) H[k].visible = false; if (H.label) H.label.style.display = 'none'; for (const f of H.figs.values()) { f.g.visible = false; f.el.style.display = 'none'; } } } return; }
-  if (AG.hid) { AG.hid = false; for (const H of AG.ham.values()) for (const k of ['group', 'web', 'still']) if (H[k]) H[k].visible = true; }
-  const now = Date.now(), cam = camera.position, p = player, R = 'over';
+  const live = [];
+  if (!AG.ham.size) { AGM.live = live; agmEnd(); return; }
+  if (realm !== 'over') { if (!AG.hid) { AG.hid = true; for (const H of AG.ham.values()) { for (const k of ['group', 'web', 'still', 'thr', 'rockMesh']) if (H[k]) H[k].visible = false; for (const R of H.rocks || []) if (R.grp) R.grp.visible = false; if (H.label) H.label.style.display = 'none'; for (const f of H.figs.values()) f.el.style.display = 'none'; } } AGM.live = live; agmEnd(); return; }
+  if (AG.hid) { AG.hid = false; for (const H of AG.ham.values()) { for (const k of ['group', 'web', 'still', 'rockMesh']) if (H[k]) H[k].visible = true; for (const R of H.rocks || []) if (R.grp) R.grp.visible = true; } }
+  const now = Date.now(), cam = camera.position, p = player;
   for (const H of AG.ham.values()) {
     if (H.site === undefined) H.site = agSite(H.o) || null;
     const S = H.site; if (!S) continue;
     const d = Math.hypot(S.x - cam.x, S.z - cam.z), mine = !!AG.mine && H.o === AG.mine || !!H.local;
     // its name, from a way off
     if (!H.label) { H.label = document.createElement('div'); H.label.className = 'mk'; H.label.innerHTML = '<b></b><span></span>'; H.label.style.display = 'none'; H.label.style.pointerEvents = 'none'; $('markers').appendChild(H.label); }
-    placeMarker(H.label, S.x, S.y + 30, S.z, state === 'play' && (mine ? d > 150 && d < 9000 : d > 150 && d < 900), '⌂', mine ? `YOUR AGENTS · ${fmtDist(d).toUpperCase()}` : `${H.boss}’S AGENTS`, mine);
-    if (d > AG.R + 600) { if (H.group || H.web || H.still) { agDrop(H, false); H.key = H.wkey = ''; } for (const f of H.figs.values()) { f.g.visible = false; f.el.style.display = 'none'; } continue; }
-    if (d > AG.R) { if (H.thr) H.thr.visible = false; continue; }
+    placeMarker(H.label, S.x, H.rocks ? H.rocks[0].top + 18 : S.y + 70, S.z, state === 'play' && (mine ? d > 150 && d < 9000 : d > 150 && d < 900), '⌂', mine ? `YOUR AGENTS · ${fmtDist(d).toUpperCase()}` : `${H.boss}’S AGENTS`, mine);
+    if (d > AG.R + 600) { if (H.group || H.web || H.still || H.rockMesh) { agDrop(H, false); H.key = H.wkey = ''; } for (const f of H.figs.values()) f.el.style.display = 'none'; continue; }
+    if (d > AG.R) { if (H.thr) H.thr.visible = false; for (const f of H.figs.values()) f.el.style.display = 'none'; if (H.rockMesh && H.br) live.push(H); continue; }
     // what stands, by now; and how far the bridges have got
     agWoolsNow(H);
     let u = 0; for (const a of H.agents) u += agTimber(a, now); const st = H.st = agStanding(u), steps = st.now === 'home' ? 14 : st.now === 'hall' ? 16 : st.now === 'shrine' || st.now === 'tower' ? 10 : 2;
     const key = `${H.agents.map(a => a.id + (a.gone ? 0 : 1)).join()}|${st.k}|${Math.floor(st.f * steps)}|${H.god}|${H.woolSig}`;
     if (key !== H.key) { H.key = key; H.plan = null; agBuild(H); }
+    agmRocks(H); agmRocksBuild(H); agmMons(H, now);
     const wk = key + '|' + agReach(H, u); if (wk !== H.wkey) { H.wkey = wk; agWeb(H, u); }
-    agStill(H); agNear(H, cam);
-    // the fires: smoke from the stoves of those who are in, sparks from the fire, the god's light at the shrine
+    agStill(H); agNear(H, cam); live.push(H);
+    for (const b of H.br) agmBurnStep(H, b, dt, d);
+    // the fires: smoke from the kitchens of those who are in, sparks from the village fire, the god's light at the shrine
     if (d < 700 && (H.smT = (H.smT || 0) - dt) <= 0) { H.smT = 0.22; const F = {};
-      H.agents.forEach((a, i) => { if (a.gone || now - a.hb > AG_IDLE) return; const [cu, cv] = agCabinAt(H, i); agAt(H, cu, cv, F); const c = Math.cos(F.ry), s = Math.sin(F.ry), lx = 1.9 * AG.S, lz = -0.9 * AG.S;
-        emit(F.x + lx * c + lz * s, F.y + 5.9 * AG.S, F.z - lx * s + lz * c, 0.4 + rnd(0.3), 1.6, rnd(0.3), 3.2 + Math.random() * 1.5, [0.34, 0.34, 0.37], 1.2, 1.3 + Math.random()); });
-      if (st.k > 0) { agAt(H, 0, 3, F); const c = Math.cos(F.ry), s = Math.sin(F.ry); emit(F.x + 1.6 * AG.S * c, F.y + 1.2, F.z - 1.6 * AG.S * s, rnd(0.6), 2.5 + Math.random() * 2, rnd(0.6), 0.6 + Math.random() * 0.6, [2.6, 1.2, 0.35], 3, 0.5); }
-      if (st.done.includes('shrine')) { agAt(H, 0, -30, F); const col = new THREE.Color(H.god ? PATRONS[H.god][0] : 0xfff0c8), c = Math.cos(F.ry), s = Math.sin(F.ry); emit(F.x - 0.3 * AG.S * s, F.y + 3.4 * AG.S, F.z - 0.3 * AG.S * c, rnd(0.4), 2 + Math.random() * 2, rnd(0.4), 0.7 + Math.random() * 0.7, [col.r * 2.4, col.g * 2.4, col.b * 2.4], 3, 0.6); } }
+      for (const R of H.rocks) { const a = R.own >= 0 && H.agents[R.own]; if (!a || a.gone || now - a.hb > AG_IDLE || !R.chim || !R.st || R.st.fr < 1) continue; const [x, z] = agmW(R, R.chim[0], R.chim[2]); emit(x, R.top + R.chim[1], z, 0.2 + rnd(0.15), 0.9, rnd(0.15), 3.2 + Math.random() * 1.5, [0.34, 0.34, 0.37], 1.2, 0.6 + Math.random() * 0.5); }
+      if (st.k > 0) { agAt(H, 0, 3, F); const c = Math.cos(F.ry), s = Math.sin(F.ry); emit(F.x + 1.6 * AG.S * c, F.y + 0.5, F.z - 1.6 * AG.S * s, rnd(0.3), 1.5 + Math.random(), rnd(0.3), 0.6 + Math.random() * 0.6, [2.6, 1.2, 0.35], 3, 0.3); }
+      if (st.done.includes('shrine')) { agAt(H, 0, -30, F); const col = new THREE.Color(H.god ? PATRONS[H.god][0] : 0xfff0c8), c = Math.cos(F.ry), s = Math.sin(F.ry); emit(F.x - 0.3 * AG.S * s, F.y + 3.4 * AG.S, F.z - 0.3 * AG.S * c, rnd(0.2), 1 + Math.random(), rnd(0.2), 0.7 + Math.random() * 0.7, [col.r * 2.4, col.g * 2.4, col.b * 2.4], 3, 0.35); } }
     // is it their own traveller who has come?
     const pd = Math.hypot(p.pos.x - S.x, p.pos.z - S.z), low = p.pos.y - Math.max(groundAt(p.pos.x, p.pos.z, p.pos.y + 5), WATER) < 80;
-    const boss = mine && state === 'play' && realm === R && pd < 100 && low && !p.sub;
+    const boss = mine && state === 'play' && pd < 190 && low && !p.sub;
     if (boss && !H.greet && time - H.greetT > 60) agGreet(H);
     if (H.greet) { if (!boss) { if ((H.awayT += dt) > 5) { H.greet = 0; H.greetT = time; } } else H.awayT = 0; }
-    // the weavers
-    const P = agPlan(H), F = {}, work = st.now ? P[st.k] : null, grow = H.br.find(b => b.f < 1), weaving = [];
-    H.agents.forEach((a, i) => {
-      const wc = agWool(H, a); let f = H.figs.get(a.id); if (!f) H.figs.set(a.id, f = agFigure(a, wc)); else if (f.wool !== wc.getHex()) agDye(f, wc);
-      const active = !a.gone && now - a.hb < AG_ACTIVE, alone = !a.gone && !active && now - a.hb < AG_IDLE, [cu, cv] = agCabinAt(H, i);
-      if (!f.set) { agAt(H, cu + 3.4, cv + 4.2, F); f.x = F.x; f.z = F.z; f.yaw = S.yaw; f.set = true; }
-      const near = d < 520; f.g.visible = near && (active || alone || !!H.greet || pal.stars < 0.5);   // (those who have gone in are in, after dark)
-      if (!near) { f.el.style.display = 'none'; return; }
-      // what it is doing: greeting; or fetching wool from the baskets, taking it to what is going up (a house; or a bridge
-      // still going across, out along its deck to where the weaving has got to, and back the same way) and weaving it in;
-      // or sitting by its door
-      const sp = active ? 3.4 : 1.7; let tx = f.x, tz = f.z, run = 0, face = null; const job = f.job !== null ? H.br.find(b => b.i === f.job) : null;
-      if (H.greet) { const a2 = (i / Math.max(1, H.agents.length)) * 6.2832 + H.greet, rr = 5.5 + (i % 3) * 1.6; tx = p.pos.x + Math.cos(a2) * rr; tz = p.pos.z + Math.sin(a2) * rr; run = 8.5; face = p.pos; f.st = 'greet'; f.log.visible = false; f.has = false; }
-      else if ((active || alone) && (work || grow)) {
-        if (f.st === 'greet' || f.st === 'idle' || (f.st === 'haul' || f.st === 'weave') && !job && !work) { f.st = 'fetch'; f.t = 0; f.has = false; }
-        if (f.st === 'fetch') { agAt(H, -3.2 + (i % 3 - 1) * 1.5, 5.2, F); tx = F.x; tz = F.z; run = sp; if (Math.hypot(tx - f.x, tz - f.z) < 1.2) { f.st = 'haul'; f.has = true; f.job = grow && (!work || i % 2 === 1 || H.agents.length === 1 && Math.random() < 0.4) ? grow.i : null; } }
-        else if (f.st === 'haul' || f.st === 'back') { if (job) { const s = job.sp, k = (i % 3 - 1) * 1.8; tx = s.A[0] - s.d[0] * 3.5 + s.sv[0] * k; tz = s.A[2] - s.d[1] * 3.5 + s.sv[2] * k; } else if (work) { const off = (i * 2.4) % 6.2832; agAt(H, work[0] + Math.cos(off) * agStand(st.now), work[1] + Math.sin(off) * agStand(st.now) * 0.85, F); tx = F.x; tz = F.z; }
-          run = sp * 0.85; if (f.st === 'back' && !job || Math.hypot(tx - f.x, tz - f.z) < 1.2) { if (f.st === 'back') f.st = 'fetch'; else if (job) f.st = 'cross'; else { f.st = 'weave'; f.t = active ? 4 + Math.random() * 3 : 6 + Math.random() * 6; f.has = false; } } }
-        else if (f.st === 'cross') { if (!job) f.st = 'fetch'; else { const q = agDeck(job, Math.max(0, job.f - 5 / job.sp.len), (i % 3 - 1) * job.wd * 0.25); tx = q[0]; tz = q[2]; run = sp * 0.85; if (Math.hypot(tx - f.x, tz - f.z) < 1.2) { f.st = 'weave'; f.t = active ? 4 + Math.random() * 3 : 6 + Math.random() * 6; f.has = false; } } }   // (out along the bridge, to where the weaving has got to)
-        else if (f.st === 'weave') { if (job) { f.wt = agDeck(job, job.f, Math.sin(time * 1.7 + i) * job.wd * 0.42, 0.25); face = { x: f.wt[0], z: f.wt[2] }; } else { agAt(H, work[0], work[1], F); face = F; f.wt = agAim(H, F, f, i); }
-          if ((f.t -= dt) <= 0) f.st = job ? 'back' : 'fetch'; else if (Math.random() < dt * 3) { const c = _agC.setHex(f.wool); emit(f.x + rnd(0.6), f.y + 2.2, f.z + rnd(0.6), rnd(0.8), 0.6 + Math.random(), rnd(0.8), 0.9, [c.r * 1.7, c.g * 1.7, c.b * 1.7], 1.2, 0.3); } }   // (a little fluff off the wool)
-        f.log.visible = f.has;
-      } else { f.st = 'idle'; f.log.visible = false; agAt(H, cu + 3.0, cv + 4.4, F); tx = F.x; tz = F.z; run = Math.hypot(tx - f.x, tz - f.z) > 1 ? 1.6 : 0; if (!run) face = { x: S.x + Math.cos(S.yaw) * 400, z: S.z + Math.sin(S.yaw) * 400 }; }
-      const dx = tx - f.x, dz = tz - f.z, dl = Math.hypot(dx, dz), moving = run > 0 && dl > 0.4;
-      if (moving) { const v = Math.min(run * dt, dl); f.x += dx / dl * v; f.z += dz / dl * v; f.yaw = Math.atan2(dx, dz); f.ph += dt * run * 2.4; }
-      else if (face) f.yaw += wrapAngle(Math.atan2(face.x - f.x, face.z - f.z) - f.yaw) * damp(8, dt);
-      f.y = Math.max(groundAt(f.x, f.z, S.y + 80), WATER + 0.2);
-      if (job && !H.greet && (f.st === 'cross' || f.st === 'weave' || f.st === 'back')) { const s = job.sp, bt = ((f.x - s.A[0]) * s.d[0] + (f.z - s.A[2]) * s.d[1]) / s.len; if (bt > 0) f.y = Math.max(f.y, agDeck(job, Math.min(bt, 1))[1] + 0.34); }   // (out on a bridge, it stands on the deck)
-      // how it holds itself: weaving, both hands at the work, the shuttle passing from one to the other
-      const sw = moving ? Math.sin(f.ph) * 0.7 : 0, joy = f.st === 'greet' && !moving, wv = f.st === 'weave' && !moving;
-      f.hop = joy ? Math.abs(Math.sin(time * 9 + i * 1.7)) * 0.55 : 0;
-      f.lL.rotation.x = sw; f.lR.rotation.x = -sw; f.ball.visible = wv;
-      if (joy) { f.aL.rotation.set(Math.PI + Math.sin(time * 14 + i) * 0.5, 0, 0.35); f.aR.rotation.set(Math.PI + Math.cos(time * 14 + i) * 0.5, 0, -0.35); }
-      else if (wv) { const w = time * 5.5 + i; f.aL.rotation.set(-1.15 + Math.sin(w) * 0.35, 0, 0.3 + Math.cos(w) * 0.22); f.aR.rotation.set(-1.15 - Math.sin(w) * 0.35, 0, -0.3 - Math.cos(w) * 0.22); f.ball.rotation.x += dt * 9; f.ball.scale.setScalar(0.2 + 0.2 * clamp(f.t / 6, 0, 1)); }   // (the ball smaller as it unwinds)
-      else if (f.has) { f.aL.rotation.set(-1.0 - sw * 0.1, 0, 0.3); f.aR.rotation.set(-1.0 + sw * 0.1, 0, -0.3); }
-      else if (f.st === 'idle' && !moving) { f.aL.rotation.set(-0.2, 0, 0.1); f.aR.rotation.set(-0.2, 0, -0.1); }
-      else { f.aL.rotation.set(-sw, 0, 0); f.aR.rotation.set(sw, 0, 0); }
-      f.g.position.set(f.x, f.y + f.hop, f.z); f.g.rotation.y = f.yaw + (joy ? Math.sin(time * 4 + i) * 0.25 : wv ? Math.sin(time * 2.2 + i) * 0.12 : 0);
-      // its name, and what it is at (or what it has to say to him)
-      const fd = Math.hypot(f.x - cam.x, f.z - cam.z), saying = time - f.sayT < 5;
-      if (wv && f.wt && f.g.visible && fd < 300) weaving.push(f);
-      placeMarker(f.el, f.x, f.y + 4.1 + f.hop, f.z, f.g.visible && state === 'play' && fd < (saying ? 260 : 150), saying ? '!' : '·', saying ? `${a.n} · ${f.say}` : `${a.n} · ${a.k ? a.k.toUpperCase().slice(0, 44) : active ? 'WEAVING' : alone ? 'WEAVING ON' : 'RESTING'}`, saying || mine);
-    });
-    agThreads(H, weaving);
+    agmMonks(H, dt, now, d, mine);
+    // the bird of fire: a bridge he flies through, or close by, catches (not one he is coming in to land on, or going up off)
+    if (state === 'play' && p.form === 'phoenix' && !p.perch && !p.perchGo && !p.takeoff && !p.sub && !p.cine && !SH.def && d < 600) for (const b of H.br) { const A = b.sp.A, ex = p.pos.x - A[0], ez = p.pos.z - A[2], t = (ex * b.sp.d[0] + ez * b.sp.d[1]) / b.sp.len; if (t < 0 || t > 1) continue;
+      const o = ex * b.sp.sv[0] + ez * b.sp.sv[2], K = birdK(), dy = p.pos.y - agDeck(b, t)[1]; if (Math.abs(o) < b.wd / 2 + 3 * K && dy > -3 * K && dy < b.rh + 3.5 * K && agmOn(b, t)) agmIgnite(H, b, t, true); }
+    // a man on a bridge keeps to it: he can lean on the hand rope, not go through it
+    if (p.form === 'human' && p.grounded && !p.climb) for (const b of H.br) { const A = b.sp.A, ex = p.pos.x - A[0], ez = p.pos.z - A[2], t = (ex * b.sp.d[0] + ez * b.sp.d[1]) / b.sp.len; if (t < 0.02 || t > 0.98 || !agmOn(b, t)) continue;
+      const o = ex * b.sp.sv[0] + ez * b.sp.sv[2], lim = b.wd / 2 - 0.22; if (Math.abs(o) <= lim || Math.abs(o) > b.wd / 2 + 0.3 || Math.abs(p.pos.y - agDeck(b, t)[1] - 0.05) > 0.5) continue;
+      const k = (Math.sign(o) * lim - o); p.pos.x += b.sp.sv[0] * k; p.pos.z += b.sp.sv[2] * k; }
   }
+  AGM.live = live; agmEnd();
 }
 // their own traveller has come: they drop what they are carrying and run to him
 function agGreet(H) {
@@ -33606,8 +34063,8 @@ function agGreet(H) {
   const pool = AG_HEY.slice().sort(() => Math.random() - 0.5);
   H.agents.forEach((a, i) => { let f = H.figs.get(a.id); if (!f) H.figs.set(a.id, f = agFigure(a, agWool(H, a)));
     setTimeout(() => { if (!H.greet) return; f.say = i === 0 ? pool.pop() : a.k && i % 2 ? `HEY BOSS! STILL ON: ${a.k.toUpperCase().slice(0, 40)}` : more.length ? more.shift() : pool.pop() || 'HEY BOSS!'; f.sayT = time;   // (no two of them the same thing)
-      if (i < 4) chatLine('', `${a.n} · ${f.say}`, 'sys'); burst(f.x, f.y + 2.2, f.z, TOUCH ? 14 : 30, 7, 0.9);
-      for (let k = 0; k < (TOUCH ? 8 : 18); k++) emit(f.x + rnd(0.8), f.y + 2 + Math.random() * 1.5, f.z + rnd(0.8), rnd(3), 3 + Math.random() * 4, rnd(3), 0.8 + Math.random() * 0.7, [col.r * 2.4 + 0.2, col.g * 2.4 + 0.2, col.b * 2.4 + 0.2], 2, 0.5); }, 250 + i * 650); });
+      if (i < 4) chatLine('', `${a.n} · ${f.say}`, 'sys'); burst(f.x, f.y + 0.7, f.z, TOUCH ? 10 : 20, 3, 0.7);
+      for (let k = 0; k < (TOUCH ? 8 : 18); k++) emit(f.x + rnd(0.4), f.y + 0.6 + Math.random() * 0.8, f.z + rnd(0.4), rnd(1.5), 1.5 + Math.random() * 2, rnd(1.5), 0.8 + Math.random() * 0.7, [col.r * 2.4 + 0.2, col.g * 2.4 + 0.2, col.b * 2.4 + 0.2], 2, 0.5); }, 250 + i * 650); });
   audio.sfx.newcomer?.(); toast(H.agents.length === 1 ? `${H.agents[0].n} IS GLAD TO SEE YOU` : `YOUR ${H.agents.length} AGENTS ARE GLAD TO SEE YOU`);
 }
 // ── Your agents, all in the game: one card for bringing them in (the line for a terminal, the address for any app, where
@@ -33776,6 +34233,7 @@ function agxDoing(a, P, now) {   // what one of them is at, in a few words
 function agxSpot(a, out = {}) {
   const H = agxHam(); if (!H || !a) return null; if (H.site === undefined) H.site = agSite(H.o) || null; if (!H.site) return null;
   const f = H.figs.get(a.id); if (f && f.set) { out.x = f.x; out.y = f.y; out.z = f.z; return out; }
+  const R = agmRocks(H)[Math.max(0, H.agents.indexOf(a))]; if (R) { const [x, z] = agmW(R, 0, AGM.HZ + AGM.HD + 1.3); out.x = x; out.y = R.top; out.z = z; return out; }   // (else its own monastery's door)
   const [cu, cv] = agCabinAt(H, Math.max(0, H.agents.indexOf(a))); agAt(H, cu + 3, cv + 4.4, out); return out;
 }
 function agxGo(a) {
@@ -38621,7 +39079,7 @@ setTimeout(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { perchLook, ROCK, ROCKK, rockSpot, rockFixed, rockFront, rockMake, rockBreak, mineSwing, gotMine, DROP, dropAdd, GATHER, gatherAct, errandNear, axeCheck, axeHeph, atForge, RECIPES, CRAFT, craftRows, craftRowDo, craftMake, bldList, invHas, DREAM, dreamSkip, topAt, surfAt, structHit, roostFind, camera, dir3, MOUSE, turnForm, turnMan, turnBird, wingsOut, armsOut, TURNC, MOUNT, updatePerch, get camYaw() { return camYaw; }, get time() { return time; }, agBuild, agWeb, agReach, agSpans, agWool, agStill, agNear, FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { perchLook, ROCK, ROCKK, rockSpot, rockFixed, rockFront, rockMake, rockBreak, mineSwing, gotMine, DROP, dropAdd, GATHER, gatherAct, errandNear, axeCheck, axeHeph, atForge, RECIPES, CRAFT, craftRows, craftRowDo, craftMake, bldList, invHas, DREAM, dreamSkip, topAt, surfAt, structHit, roostFind, camera, dir3, MOUSE, turnForm, turnMan, turnBird, wingsOut, armsOut, TURNC, MOUNT, updatePerch, get camYaw() { return camYaw; }, get time() { return time; }, agBuild, agWeb, agReach, agSpans, agWool, agStill, agNear, AGM, agmRocks, agmIgnite, agmGround, agmPieces, agmBurnAt, agDeck, agmAct, FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, RR, rrJoin, rrMine, rrFetch, rrPlace, rrLayout, gotRjoin, get RING_DONE() { return RING_DONE; }, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { cpusCmd, MOD, die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AG, agTake, AGX, agxPoll, agxSend, agxDraw, agxTab, agxAt, agxHear, agxCommand, CH, chShow, sendChat, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { MINI, miniSet, miniCycle, miniWhoShow, miniShown, BINDS, BIND, bindTxt, devNow, CTL, ctlShow, ctlDraw, PG, PG_LESSONS, pgStart, pgEnd, pgSkip, pgTopic, pgFire, pgCardDraw, hmSummon, hmParse, hmHeard, pgHeard, CMD_HELP, sendChat });
