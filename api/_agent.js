@@ -24,7 +24,11 @@ const tools = [
 async function readTable(a) {
   if (!TABLES.has(a.table)) return { error: 'no such table' };
   if (a.filter && !okFilter(a.filter)) return { error: 'that filter is not allowed' };
-  const sel = /^[\w,*()":.\s-]{1,200}$/.test(a.select || '') ? a.select : '*', lim = Math.max(1, Math.min(200, a.limit | 0 || 50));
+  let sel = /^[\w,*()":.\s-]{1,200}$/.test(a.select || '') ? a.select : '*'; const lim = Math.max(1, Math.min(200, a.limit | 0 || 50));
+  // (an account's travel code opens that traveller's whole journey and steers their agents: it is never read out to the model, whose
+  // context also holds whatever players wrote in the rows it read)
+  if (a.table === 'accounts') sel = 'user_id,email,name,created_at,seen_at';
+  if (a.filter && a.table === 'accounts' && /(^|[&(,.])code\b/.test(a.filter)) return { error: 'that filter is not allowed' };
   const r = await rest(`${a.table}?select=${encodeURIComponent(sel)}${a.filter ? '&' + a.filter : ''}&limit=${lim}`);
   return r.ok ? { rows: r.data } : { error: `read failed (${r.status})`, detail: r.data };
 }
@@ -92,7 +96,10 @@ export async function POST(req) {
       else if (n === 'decree') { const k = String(a.kind || ''), v = String(a.value || '').toLowerCase().trim(), okv = { gather: ['olympus', 'crete', 'me'], weather: ['clear', 'storm', 'rain', 'mist', 'day', 'night'], regulars: ['off', 'on', 'more'] }[k];
         if (!okv || !okv.includes(v)) out = { error: 'bad decree' }; else { actions.push({ type: 'decree', kind: k, value: v }); out = { ok: true, note: 'the keeper\'s page signs it and sends it to everyone' }; } }
       else if (n === 'announce') { const t = clip(String(a.text || ''), 200); if (t) actions.push({ type: 'chat', text: t }); out = { ok: true }; }
-      else if (n === 'teach') { const nm = String(a.name || '').toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 40); const r = nm.length >= 2 ? await rest('agent_skills?on_conflict=name', { method: 'POST', body: { name: nm, body: clip(String(a.body || ''), 4000), by_email: me.email }, prefer: 'resolution=merge-duplicates,return=minimal' }) : { ok: false }; out = r.ok ? { ok: true, kept: nm } : { error: 'not kept' }; }
+      else if (n === 'teach') {   // (held, like a change: a skill is read back to it every time from now on, and what it has just read may be a player's words)
+        const nm = String(a.name || '').toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 40), body = clip(String(a.body || ''), 4000);
+        if (nm.length < 2 || !body) out = { error: 'a skill needs a name and a body' };
+        else { const what = `TEACH ${nm}: ${clip(body, 160)}`; PENDING.set(me.id, { what, run: async () => { const r = await rest('agent_skills?on_conflict=name', { method: 'POST', body: { name: nm, body, by_email: me.email }, prefer: 'resolution=merge-duplicates,return=minimal' }); return r.ok ? { ok: true } : { error: 'not kept' }; } }); held = what; out = { held: true, what, note: 'waiting for the keeper to say /agent yes' }; } }
       else if (n === 'unteach') { const r = await rest(`agent_skills?name=eq.${encodeURIComponent(String(a.name || ''))}`, { method: 'DELETE' }); out = { ok: r.ok }; }
       else if (n === 'change' || n === 'order') {
         const p = plan({ ...a, name: n, name_: a.name }, me);

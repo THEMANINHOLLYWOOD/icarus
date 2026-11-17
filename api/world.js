@@ -13,6 +13,8 @@ import { bannedFor, ipOf } from './_bans.js';
 import { agentsPublic } from './_mcp.js';
 // deeds the server itself sees happen, which a page cannot claim: meeting a god, a course of rings, the torches, a god's strike
 const SERVER_DEEDS = new Set(['met', 'arena', 'torch', 'smitten']);
+// phases only the server writes (an agent, a sign-in waiting to be collected, a note between a traveller and an agent)
+const RESERVED = new Set(['agent', 'pair', 'note']);
 
 const URL_ = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -225,7 +227,9 @@ export async function POST(req) {
     // where he is and how far his story has gone, kept for when he comes back; says what changed while he was away
     if (b.op === 'sync') {
       if (limited(req, 'world-sync', 12)) return json({ error: 'slow down' }, 429);
-      const row = { hash, name, realm, x: fin(b.x, 4e6), z: fin(b.z, 4e6), phase: clip(String(b.phase || ''), 16), seen: new Date().toISOString() };
+      // (agent, pair and note are the server's own kinds of row in this table: see _mcp.js and _talk.js. A traveller who
+      // named one of them as their phase would be read as a traveller's agent, a sign-in or a note to an agent.)
+      const ph = clip(String(b.phase || ''), 16), row = { hash, name, realm, x: fin(b.x, 4e6), z: fin(b.z, 4e6), phase: RESERVED.has(ph.toLowerCase()) ? '' : ph, seen: new Date().toISOString() };
       const fits = (v, n) => { try { return JSON.stringify(v).length <= n; } catch { return false; } };   // (a save is small; a map of what he has seen, bigger; nothing past that is kept)
       if (b.save && typeof b.save === 'object' && fits(b.save, 48_000)) row.save = b.save;
       if (b.map && typeof b.map === 'object' && fits(b.map, 160_000)) row.map = b.map;

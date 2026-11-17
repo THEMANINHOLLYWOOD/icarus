@@ -90,10 +90,13 @@ export function originOf(req) {
 // ───────── the rows
 const agentName = s => plain(s, 40).toUpperCase().replace(/[^A-Z0-9 \-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 12);
 const agentHash = (owner, name) => createHash('sha256').update(`icarus-agent:${owner}:${name}`).digest('hex');
+// a row this door made itself: its hash is the hash of its traveller and its name, which nobody else can make a row under
+// (the travellers table is written by other doors too; a row that only says it is an agent is not one)
+const real = r => !!r && typeof r.hash === 'string' && !!r.save && typeof r.save === 'object' && typeof r.save.owner === 'string' && r.hash === agentHash(r.save.owner, String(r.name ?? ''));
 async function agentsOf(owner) {
-  if (!LIVE) return [...MEM.values()].filter(r => r.save.owner === owner);
+  if (!LIVE) return [...MEM.values()].filter(r => r.save.owner === owner && real(r));
   const r = await rest(`travellers?select=hash,name,save,seen,first_at&phase=eq.agent&save->>owner=eq.${owner}&order=first_at&limit=${MAX_AGENTS + 4}`);
-  return Array.isArray(r.data) ? r.data.filter(x => x.save && typeof x.save === 'object') : [];
+  return Array.isArray(r.data) ? r.data.filter(real) : [];
 }
 async function put(row) {
   PUB.at = 0;
@@ -113,7 +116,7 @@ export async function agentsPublic() {
   let rows = [];
   if (!LIVE) rows = [...MEM.values()];
   else { const r = await rest(`travellers?select=hash,name,save,seen&phase=eq.agent&seen=gte.${new Date(Date.now() - 45 * 864e5).toISOString()}&order=seen.desc&limit=120`); if (!r.ok) return PUB.v; rows = Array.isArray(r.data) ? r.data : []; }
-  PUB.v = rows.filter(r => r.save && typeof r.save.owner === 'string').map(r => ({ id: r.hash.slice(0, 12), n: agentName(r.name), o: r.save.owner.slice(0, 16), b: agentName(r.save.boss), g: GODS.includes(r.save.god) ? r.save.god : '',
+  PUB.v = rows.filter(real).map(r => ({ id: r.hash.slice(0, 12), n: agentName(r.name), o: r.save.owner.slice(0, 16), b: agentName(r.save.boss), g: GODS.includes(r.save.god) ? r.save.god : '',
     k: plain(r.save.task, 80), u: Math.round((+r.save.u || 0) * 10) / 10, t: +r.save.t || 0, hb: +r.save.hb || 0, s: +r.save.since || 0, d: r.save.done | 0, gone: r.save.gone ? 1 : 0 }));
   PUB.at = Date.now(); return PUB.v;
 }
