@@ -1082,6 +1082,24 @@
 <div id="loading">kindling the hills…</div>
 
 <script type="module">
+// THE CROSSING (crossover/x.js): the way between this world and BURNING STUDIO MUSIC. This runs before the game, so a page that
+// was just crossed into is covered at once in the style its traveller came from (the game uncovers it when they are placed),
+// and the game knows whether it is hosting a visitor from there before it decides anything about saves. If x.js cannot be
+// had, none of this happens and the game is as it always was (XO, in the game, finds nothing here).
+import * as XM from '/crossover/x.js';
+const E = globalThis.ICX_EARLY = { M: XM, land: null, ticket: false, visit: null, guess: '' };
+try {
+  E.ticket = /^#x=[0-9a-f]{16}/.test(location.hash);
+  if (E.ticket) E.land = XM.landing();
+  let v = null; try { v = JSON.parse(sessionStorage.getItem('x-visit') || 'null'); } catch (e) {}
+  let ret = false; try { const r = JSON.parse(localStorage.getItem('x-ret:icarus') || 'null'); ret = !!r && Date.now() - r.at < 864e5; } catch (e) {}
+  E.visit = v && v.h === 'brn' ? v : null;
+  // (a ticket is redeemed before the game starts, so this is only a first guess: someone of ours with a way back saved is
+  //  coming home; anyone else holding a ticket is a visitor. A visitor reloading the page is still one.)
+  E.guess = E.ticket ? (ret ? 'home' : 'visit') : E.visit ? 'visit' : '';
+} catch (e) {}
+</script>
+<script type="module">
 import * as THREE from 'three';
 import { createAudio } from './audio.js';
 import { makeHands, fakeHand } from './xr.js';
@@ -1149,6 +1167,8 @@ const damp = (rate, dt) => 1 - Math.exp(-rate * dt);
 const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
 const $ = id => document.getElementById(id);
 const MOD = { admin: false, banned: false, noclip: false, speed: 1, asked: false };   // (the keeper's: see chatCommand)
+// the crossing to BURNING STUDIO MUSIC (see XO, by space): what the page knew before the game began, and whether it hosts a visitor from there
+const XO = { E: globalThis.ICX_EARLY || null, vis: false }; XO.vis = !!(XO.E && XO.E.guess === 'visit');
 // phones & tablets: touch controls and a lighter render budget
 const TOUCH = matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && !matchMedia('(hover: hover)').matches);
 const VISION = /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1 && 'xr' in navigator;   // (Safari on a Vision Pro: it gives a Mac's name, has fingers, and has a way into the room)
@@ -4988,6 +5008,13 @@ function buildGlyphs(cand = GLYPH0, font = GFONT.mono, into = null) {
 }
 const glyphs = buildGlyphs();
 A3.u.tex.value = glyphs.tex; A3.u.n.value = glyphs.total;
+// BURNING STUDIO MUSIC's 8-bit palette (its px.js: the NES 2C02, and the darks a black-box theatre needs) and its 4x4 ordered dither,
+// as constants of the ASCII pass: a visitor from there is drawn in them (XO, and crossover/kit.js)
+const XO_GLSL = (() => { const P = [0x7C7C7C, 0x0000FC, 0x0000BC, 0x4428BC, 0x940084, 0xA80020, 0xA81000, 0x881400, 0x503000, 0x007800, 0x006800, 0x005800, 0x004058, 0x000000,
+  0xBCBCBC, 0x0078F8, 0x0058F8, 0x6844FC, 0xD800CC, 0xE40058, 0xF83800, 0xE45C10, 0xAC7C00, 0x00B800, 0x00A800, 0x00A844, 0x008888, 0xF8F8F8, 0x3CBCFC, 0x6888FC, 0x9878F8, 0xF878F8, 0xF85898, 0xF87858, 0xFCA044, 0xF8B800, 0xB8F818, 0x58D854, 0x58F898, 0x00E8D8, 0x787878,
+  0xFCFCFC, 0xA4E4FC, 0xB8B8F8, 0xD8B8F8, 0xF8B8F8, 0xF8A4C0, 0xF0D0B0, 0xFCE0A8, 0xF8D878, 0xD8F878, 0xB8F8B8, 0xB8F8D8, 0x00FCFC, 0xF8D8F8, 0x0c0c10, 0x16161b, 0x222128, 0x302f37, 0x45434d, 0x5c5a64, 0x2a1218, 0x3e1a20, 0x5a2a1c, 0x7a4a2a, 0xd8b080, 0x9a6a48];
+  const f = v => (v / 255).toFixed(4);
+  return `const int XPALN = ${P.length}; const vec3 XPAL[${P.length}] = vec3[${P.length}](${P.map(c => `vec3(${f(c >> 16 & 255)}, ${f(c >> 8 & 255)}, ${f(c & 255)})`).join(', ')}); const float XBAY[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);`; })();
 const rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType });
 rt.depthTexture = new THREE.DepthTexture(4, 4);
 const postMat = new THREE.ShaderMaterial({
@@ -4998,13 +5025,14 @@ const postMat = new THREE.ShaderMaterial({
     uNear: { value: 0.3 }, uFar: { value: 14000 }, uEdge: { value: 1 }, uLineFar: { value: 1e5 }, uFlash: { value: 0 }, uFlashCol: { value: new THREE.Color(1, 0.75, 0.45) }, uHeat: { value: 0 }, uGlow: { value: 0 },
     uTint: { value: new THREE.Color(1, 1, 1) }, uFade: { value: 1 }, uVeil: { value: 0 }, uBarPx: { value: 0 }, uVeilCol: { value: new THREE.Color(0, 0, 0) }, uWarp: { value: 0 }, uLight: { value: 0 }, uSpeed: { value: 0 }, uDanger: { value: 0 }, uDof: { value: 0 }, uSea: { value: 0 }, uSeaNear: { value: 0 }, uSeaLo: { value: new THREE.Color(0.02, 0.17, 0.4) }, uSeaHi: { value: new THREE.Color(0.22, 0.8, 0.98) }, uSeaMul: { value: new THREE.Color(0.4, 0.86, 1.22) }, uVib: { value: 1 }, tBlur: { value: null }, uTime: worldFx.uTime,
     tCells: { value: null }, tCells2: { value: null }, uCells: { value: new THREE.Vector2(1, 1) }, uRelief: { value: 6 },
-    uGlitch: { value: 0 }, uStTint: { value: new THREE.Color(1, 1, 1) }, uStA: { value: new THREE.Vector4(0, 1, 1, 1) }, uStB: { value: new THREE.Vector4(1, 1, 0, 0) }, tUI: { value: null }, tChars: { value: null }, uUiOn: { value: 0 }, uUiK: { value: 1 }, uUiN: { value: new THREE.Vector2(1, 1) }, tUI2: { value: null }, uUi2On: { value: 0 }, uUi2N: { value: new THREE.Vector2(1, 1) }, uWt: { value: [new THREE.Color(1, 0.9, 0.7), new THREE.Color(1, 0.7, 0.35), new THREE.Color(0.4, 0.2, 0.08)] }, uSayCol: { value: new THREE.Color(1, 0.7, 0.35) }, uUiCol: { value: [new THREE.Color(1, 0.54, 0.23), new THREE.Color(1, 0.85, 0.66), new THREE.Color(0.42, 0.15, 0.03)] }, uMk: { value: Array.from({ length: 6 }, () => new THREE.Color(0.75, 0.9, 1)) } },
+    uGlitch: { value: 0 }, uStTint: { value: new THREE.Color(1, 1, 1) }, uStA: { value: new THREE.Vector4(0, 1, 1, 1) }, uStB: { value: new THREE.Vector4(1, 1, 0, 0) }, tUI: { value: null }, tChars: { value: null }, uUiOn: { value: 0 }, uUiK: { value: 1 }, uUiN: { value: new THREE.Vector2(1, 1) }, tUI2: { value: null }, uUi2On: { value: 0 }, uUi2N: { value: new THREE.Vector2(1, 1) }, uWt: { value: [new THREE.Color(1, 0.9, 0.7), new THREE.Color(1, 0.7, 0.35), new THREE.Color(0.4, 0.2, 0.08)] }, uSayCol: { value: new THREE.Color(1, 0.7, 0.35) }, uUiCol: { value: [new THREE.Color(1, 0.54, 0.23), new THREE.Color(1, 0.85, 0.66), new THREE.Color(0.42, 0.15, 0.03)] }, uMk: { value: Array.from({ length: 6 }, () => new THREE.Color(0.75, 0.9, 1)) }, uVisOn: { value: 0 } },   // (uVisOn: a visitor from BURNING STUDIO MUSIC is in the picture, drawn in their own 8-bit: see XO)
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tScene, tDepth, tGlyph, tName, tPrev; uniform vec2 uRes, uCell; uniform vec3 uTint, uFlashCol, uVeilCol; uniform float uVeil, uBarPx; uniform float uNameNs[9]; uniform float uNameW;
     uniform float uAscii, uTotal, uNear, uFar, uEdge, uFlash, uHeat, uGlow, uFade, uWarp, uLight, uSpeed, uDanger, uTime, uPersist, uTitleT, uRays; uniform vec2 uSunUV; uniform sampler2D tTitle;
     uniform sampler2D tCells, tCells2, tBlur; uniform vec2 uCells; uniform float uDof, uSea, uVib, uSeaNear; uniform vec3 uSeaLo, uSeaHi, uSeaMul;
     uniform vec3 uStTint; uniform vec4 uStA, uStB; uniform sampler2D tUI, tUI2, tChars; uniform float uUiOn, uUi2On, uGlitch, uUiK; uniform vec2 uUi2N; uniform vec3 uWt[3], uSayCol; uniform vec2 uUiN; uniform vec3 uUiCol[3]; uniform vec3 uMk[6];
+    uniform float uVisOn; ${XO_GLSL}   // (BURNING STUDIO MUSIC's palette and its dither, for the visitors from there: see below)
     uniform vec3 uInk[16];   // (16 to 31: inks lent out to whatever has words of its own to put in the picture — see INKW)
     // ── the name, on fire. A texture of the word stretched to fill the screen; flames are the word's own shape pulled upward
     //    by moving noise; then a ragged front burns through it, leaving a glowing edge, char, and then nothing but sparks.
@@ -5130,6 +5158,18 @@ const postMat = new THREE.ShaderMaterial({
         vec2 vq = vUv - 0.5; w *= 1.0 - dot(vq, vq) * 0.85;
         w = mix(w, col * vec3(1.05, 0.82, 0.7), smoothstep(0.18, 0.5, col.r - max(col.g, col.b)) * 0.85);   // (fire is still fire down here: his tail, a bird's wake)
         col = mix(col, w, uSea);
+      }
+      if (uVisOn > 0.5) {   // a visitor from BURNING STUDIO MUSIC (everything of theirs writes alpha one fifth): not letters but their own 8-bit,
+        // the picture in blocks, snapped to their palette and dithered the way they dither it. Whatever stands in front of them is
+        // in front of them already: only their own pixels carry the mark.
+        float bs = max(2.0, floor(uCell.x * 0.5)); vec2 bq = floor(gl_FragCoord.xy / bs);
+        vec4 vs = texture2D(tScene, (bq + 0.5) * bs / uRes);
+        if (abs(vs.a - 0.2) < 0.06) {
+          vec3 vc = pow(toSRGB(vs.rgb / max(1.0, max(vs.r, max(vs.g, vs.b)))), vec3(0.9)) + (XBAY[int(mod(bq.y, 4.0)) * 4 + int(mod(bq.x, 4.0))] / 16.0 - 0.47) * 0.086;
+          vec3 best = XPAL[0]; float bd = 1e9;
+          for (int i = 0; i < XPALN; i++) { vec3 d = vc - XPAL[i]; float e = d.r * d.r * 3.0 + d.g * d.g * 4.0 + d.b * d.b * 2.0; if (e < bd) { bd = e; best = XPAL[i]; } }
+          col = best;
+        }
       }
       col *= uTint;
       col += uFlash * uFlashCol;
@@ -5370,7 +5410,7 @@ function peerLook(P) {
 function setName(n, keep = true) {
   n = (n || '').toUpperCase().replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 12);
   heroName = n || 'ICARUS'; keeperLook();
-  if (keep) try { localStorage.setItem('icarus.name', n); } catch {}
+  if (keep && !XO.vis) try { localStorage.setItem('icarus.name', n); } catch {}   // (a visitor's name is theirs from the other world, for this visit)
   nameRow(4, heroName);   // (his own is the middle row)
 }
 // a new name, in the middle of a life: what he is written in changes on every screen that can see him
@@ -8314,7 +8354,7 @@ function peerOf(id) {
   return P;
 }
 function dropPeer(id, P) {
-  xfGone(id); bldPeerGone(id); if (P && P.seen) regNote('left', P);
+  xfGone(id); bldPeerGone(id); if (P && P.seen) regNote('left', P); if (P && P.xr) xoPeerOff(P, null);
   if (P.seen && performance.now() - CHAT.joinedAt > 4000) chatLine('', `${P.name} LANDED · GONE`, 'sys');
   if (P.av) { scene.remove(P.av.man.group, P.av.bird.group);
     for (const g of [P.av.man.group, P.av.bird.group]) g.traverse(o => { if (!o.isMesh) return; o.geometry?.dispose(); for (const m of [].concat(o.material)) if (m && m !== INK && m !== capeMat && m !== fireMat) m.dispose?.(); });
@@ -8359,6 +8399,7 @@ function gotState(m) {
     if (was && was !== P.name && P.av && P.pos && state !== 'title' && P.pos.distanceToSquared(player.pos) < 1400 * 1400) {   // (a new name: seen from here, a burst of fire, and out of it the same traveller written differently)
       const K = Math.max(bigName(was), bigName(P.name)); burst(P.pos.x, P.pos.y + 0.6, P.pos.z, 260, 26 * K, 1.2); shock(P.pos.x, P.pos.y + 0.6, P.pos.z, 0xffb060, 40 * K, 1.0); shock(P.pos.x, P.pos.y + 0.6, P.pos.z, 0xfff0c0, 16 * K, 0.5, true); } }
   if (typeof m.vk === 'string' && m.vk.length === 88 && /^[A-Za-z0-9+/]+=*$/.test(m.vk) && !P.vkBad) { if (!P.vk) P.vk = m.vk; else if (m.vk !== P.vk) vkPoison(P); }   // (their key; two different keys for one id and neither is trusted again this visit)
+  P.px = m.sk === 'px'; P.pet = typeof m.pe === 'string' && XO_PETS.includes(m.pe) ? m.pe : ''; P.lk = typeof m.lk === 'string' && XO_LOOK.test(m.lk) ? m.lk : '';   // (from BURNING STUDIO MUSIC: drawn in their own 8-bit, their look and their pet: see xoPeer)
   const pt = typeof m.pt === 'string' && PATRONS[m.pt] ? m.pt : '';
   if (pt !== (P.patron || '')) { P.patron = pt; paintPeer(P); }
   if (first || P.pos.distanceToSquared(_v.set(x, y, z)) > 400 * 400) { P.pos.set(x, y, z); P.yaw = P.yawT; }
@@ -8441,6 +8482,7 @@ function netSend(dt) {
   const E = PL.on && COSMOS.exit, P0 = E ? _woV.set(E.x, E.y, E.z) : p.pos, pl = E ? { pl: PL.B.id, pn: PL.name, pp: [r1(p.pos.x - PL_O), r1(p.pos.y), r1(p.pos.z - PL_O)], pv: [r1(v.x), r1(v.y), r1(v.z)] } : null;
   NET.ch.send({ type: 'broadcast', event: 's', payload: { i: NET.id, n: heroName, p: [r1(P0.x), r1(P0.y), r1(P0.z)], v: E ? [0, 0, 0] : [r1(v.x), r1(v.y), r1(v.z)], ...pl,
     ...(p.form === 'phoenix' ? (([a, b, c]) => ({ y: r2(a), pi: r2(b), b: r2(c) }))(flipNet(p)) : { y: r2(yaw), pi: r2(p.pitch || 0), b: r2(p.bank || 0) }), f, r: realm === 'under' ? 1 : 0, gm: GODM.on ? 1 : undefined, sm: SMALL.want < 1 ? 1 : undefined, bk: BIG.k && BIG.k < bigName(heroName) - 0.5 && !BIG.anim ? Math.round(BIG.k * 10) / 10 : undefined, fa: FAC.tag || undefined, rd: XR.on && XR.mode === 'rider' && p.form === 'phoenix' ? 1 : undefined, gf: GFLY.on ? [GFLY.g.id, Math.round(GFLY.B.pos.x), Math.round(GFLY.B.pos.y), Math.round(GFLY.B.pos.z)] : undefined, ma: MATCH.phase === 'live' && MATCH.me.alive ? MATCH.id : undefined, ts, tp, m: LIVE.on ? 1 : undefined, tk: LIVE.on && LIVE.tk ? LIVE.tk : undefined, g: p.grounded ? 1 : 0, w: r2(p.form === 'human' ? (a => a > 0.5 ? a : 0)((Math.abs(human.armL.rotation.z) + Math.abs(human.armR.rotation.z)) / 2) : p.wingF || 0), pt: PATRON.id || undefined, fc: fc || undefined,
+    sk: XO.vis ? 'px' : undefined, pe: XO.vis && XO.pet || undefined, lk: XO.vis && XO.lk || undefined,   // (a visitor from BURNING STUDIO MUSIC: their style, their pet, their look)
     vk: VK.pub || undefined } });   // (in every one: someone just arrived has it at once, before anyone else can claim this id)
 }
 // ── what other people look like: a man, or a burning bird, with their name over them
@@ -8550,7 +8592,7 @@ function updatePeers(dt) {
     const away = me !== P.realm || now - P.s.t > 15000 || MATCH.phase === 'live' && MATCH.roster.get(P.id)?.alive === false && !MATCH.roster.get(P.id)?.left || P.ghostAt > P.s.t;   // (out of the fight: gone until it is over; one who left it flies on, seen; a ghost watching one is not seen at all)
     const A = P.s.t ? avatarOf(P) : null; if (!A) continue;
     if (P.painted !== P.name) paintPeer(P);
-    if (away || SHUN.block.has(P.name)) { A.man.group.visible = A.bird.group.visible = false; P.label.style.display = 'none'; continue; }
+    if (away || SHUN.block.has(P.name)) { A.man.group.visible = A.bird.group.visible = false; P.label.style.display = 'none'; if (P.xr) xoPeer(P, A, dt); continue; }
     if (P.form === 'p' && state === 'play' && (P.flapT = (P.flapT ?? Math.random()) - dt) <= 0) {   // another bird's wings, from wherever it is: coming up behind, going over
       P.flapT = 0.5 + Math.random() * 0.3; const dd = P.pos.distanceTo(camera.position);
       if (dd < 170 && dd > 3) audio.at3(P.pos.x, P.pos.y, P.pos.z, () => audio.sfx.flap?.(0.55), { ref: 10, max: 180 });
@@ -8591,6 +8633,7 @@ function updatePeers(dt) {
     // their name over them; what they just said, under it
     const d = camera.position.distanceTo(P.pos), said = now - P.saidT < 5500 && d < 400 ? P.said : '';
     placeWaypoint(P, d, said, bird);
+    if (P.px || P.xr) xoPeer(P, A, dt);   // (someone from BURNING STUDIO MUSIC: their 8-bit body takes the pose just worked out)
   }
 }
 // Wherever they are, there is a small mark for them in their own colour: over them when they are in view, and when
@@ -8645,7 +8688,7 @@ function updateWho(dt) {
     + wbtn(n, 'friend', '♦', 'friend', FRIENDS.has(n), 'Add them as a friend: they are told, and can add you back') + wbtn(n, 'mute', '◌', 'mute', SHUN.mute.has(n), 'Stop hearing them') + wbtn(n, 'block', '⊘', 'block', SHUN.block.has(n), 'Stop seeing them') + wbtn(n, 'xf', '✉', 'send', false, 'Send them a voice note or a file') + (P.npc && MOD.admin ? wbtn(n, 'npcx', '✕', 'send away', false, 'Send this regular away') : ''); };
   // (a row: their mark and name in their house's colour, their god, how far, which way; what can be done shows under the one row pointed at)
   const row = (col, name, form, dist, arrow, c = '', go = '') => `<div class="r${go && go === who.sel ? ' sel' : ''}${go ? '' : ' me'}"${go ? ` data-who="${esc(go)}"` : ''}><b style="color:${col}">${go ? '·' : '>'}</b><span style="color:${col}"${go ? ` data-n="${esc(go)}" data-k="go"` : ''}>${esc(name)}</span><u>${form}</u><i>${dist}</i><em>${arrow}</em>${c ? `<p>${c}</p>` : ''}</div>`;
-  const formOf = P => [performance.now() - (P.ring?.t || -1e9) < 9000 ? 'in the rings' : P.form === 'p' ? '' : 'on foot', P.patron ? godById[P.patron]?.name || '' : ''].filter(Boolean).join(' · ');
+  const formOf = P => [performance.now() - (P.ring?.t || -1e9) < 9000 ? 'in the rings' : P.form === 'p' ? '' : 'on foot', P.patron ? godById[P.patron]?.name || '' : '', P.px ? 'from burning studio music' : ''].filter(Boolean).join(' · ');
   if (who.sel && !list.some(w => w.P.name === who.sel)) who.sel = '';
   let h = `<h4>IN THE SKY · ${list.length + 1}</h4>` + row(PATRONS[PATRON.id]?.[0] || '#ff1206', `${heroName}`, [player.form === 'phoenix' ? '' : 'on foot', PATRON.id ? godById[PATRON.id]?.name : ''].filter(Boolean).join(' · '), realm === 'under' ? 'below' : 'you', '');
   for (const w of list) h += row(w.P.css || '#bfe6ff', (FRIENDS.has(w.P.name) ? '♦ ' : '') + w.P.name, formOf(w.P), w.there ? fmtDist(w.d) : (typeof w.P.realm === 'string' ? (w.P.plName || 'in space').toLowerCase() : w.P.realm ? 'below' : 'above'), w.there ? w.arrow : '', w.P.name === who.sel ? ctl(w.P) : '', w.P.name);
@@ -8655,6 +8698,7 @@ function updateWho(dt) {
     h += `<div class="kp"><h4>THE KEEPER</h4><p>cpu fliers ${kb('npcoff', 'remove all', 'Send every one of the game\'s own fliers away (/cpus off)')} ${kb('npcon', off ? 'bring back the normal number' : 'normal number', 'As many as usual, coming and going by themselves (/cpus on)')} ${kb('npcadd', '+ one more', 'Call up another')}</p>`
       + `<p>olympus ${['clear', 'storm', 'rain', 'mist', 'day', 'night'].map(w => kb('wx:' + w, w, 'Over Olympus, for everyone')).join(' ')}</p><p>everyone ${kb('go:me', 'to me', 'Carry everyone flying to you')} ${kb('go:oly', 'to the summit', 'Carry everyone to the top of Olympus')} ${kb('go:crete', 'to crete', 'Carry everyone to Crete')}</p>`
       + `<p>studio ${kb('studio', '◇ every mission · the clock · scenes', 'Your studio: go to and play any mission, drive the story clock, write scenes (/studio)')}</p></div>`; }
+  h += xoWhoHtml(esc);   // (and the people in the other world: see XO)
   el.innerHTML = h;
 }
 $('whoBtn').addEventListener('click', e => { e.stopPropagation(); who.pinned = !who.pinned; who.t = 0; });
@@ -8663,6 +8707,7 @@ $('who').addEventListener('pointerdown', e => { const r = e.target.closest('.r[d
   if (r && TOUCH && r.dataset.who !== who.sel && (!b || b.dataset.k === 'go')) { e.stopPropagation(); e.preventDefault(); who.sel = r.dataset.who; who.t = 0; return; }   // (on a phone the first tap on someone opens their row; the next one on their name carries him to them)
   if (!b) return; e.stopPropagation(); e.preventDefault(); const k = b.dataset.k;
   if (b.dataset.n === '__k') { keeperAct(k); return; }   // (the keeper's own buttons)
+  if (b.dataset.n === '__x') { if (k.startsWith('xdm:')) xoWrite(k.slice(4)); return; }   // (someone in BURNING STUDIO MUSIC: a line to them)
   if (k === 'npcx') { const C = NPCS.list.find(c => c && c.name === b.dataset.n); if (C) keeperAct('npcx:' + C.i); return; }
   if (k === 'xf') { const P = peerNamed(b.dataset.n); if (P) xfChoose(P); else toast('THEY HAVE GONE'); return; }   // (it only opens the card: its buttons are pressed with a click, which a phone lets ask for the microphone)
   if (k === 'go' || k === 'track' || k === 'follow' || k === 'friend') { const P = peerNamed(b.dataset.n); who.t = 0;
@@ -10663,6 +10708,7 @@ function chatCommand(text) {
   if (c === 'watch' && (MATCH.phase || MATCH.seen && Date.now() < MATCH.seen.until)) { matchGhost(); return true; }   // (while a fight is on, /watch is the fight; otherwise Crete)
   switch (c) {
     case 'stats': if (state === 'stats') statsClose(); else statsOpen(); return true;
+    case 'crossing': xoCmd(arg); return true;   // (the way to BURNING STUDIO MUSIC: how it is; for the keeper, his panel and its switch)
     case 'keys': case 'controls': case 'keybinds': if (CHAT.open) closeChat(); ctlShow(true); return true;   // (the controls card)
     case 'playground': case 'pg': case 'lessons': if (CHAT.open) closeChat(); if (/^(end|stop|off|quit|leave)$/.test(low)) pgEnd('stop'); else if (!arg) pgStart(); else hmSummon(arg); return true;
     case 'minimap': case 'mini': miniSet(/^north/.test(low) ? 'north' : /^(turn|rotate|heading|on)$/.test(low) ? 'turn' : off ? 'off' : MINI.mode === 'off' ? 'turn' : 'off', true); return true;   // (/record is the camera's: see below)
@@ -10812,7 +10858,7 @@ function chTarget() {   // who a message to one person goes to: whoever was last
 function chShow() {
   const row = $('chatRow'); if (!row) return; const sp = row.firstElementChild, inp = $('chatInput'); if (!chList().includes(CH.cur)) CH.cur = 'pub';
   const k = CH.cur, T = k === 'dm' ? chTarget() : null;
-  sp.textContent = k === 'ag' ? agxPrompt() : k === 'fac' ? `${FAC.name} ›` : k === 'dm' ? `TO ${T ? T.name : '…'} ›` : k === 'god' ? 'THE SKY ›' : k === 'ask' ? 'THE GODS ›' : k === 'reg' ? 'REGULARS ›' : chList().length > 2 || FAC.key ? 'ALL ›' : '›'; sp.className = 'ch-' + k;
+  sp.textContent = k === 'ag' ? agxPrompt() : k === 'fac' ? `${FAC.name} ›` : k === 'dm' ? (CH.xto ? `TO ${CH.xto.n} · BRN ›` : `TO ${T ? T.name : '…'} ›`) : k === 'god' ? 'THE SKY ›' : k === 'ask' ? 'THE GODS ›' : k === 'reg' ? 'REGULARS ›' : chList().length > 2 || FAC.key ? 'ALL ›' : '›'; sp.className = 'ch-' + k;
   inp.placeholder = k === 'ag' ? agxHint() : k === 'ask' ? 'ask the gods anything · they answer, and do it if they can' : k === 'reg' ? 'say something to your regulars · they answer you alone' : k === 'fac' ? 'say something to your faction' : k === 'dm' ? (T ? `say something to ${T.name.toLowerCase()} alone` : 'nobody to write to yet · @name first') : k === 'god' ? 'say it to everyone, from the sky' : 'say something to everyone · tab changes who hears it';
 }
 function chNext() { const L = chList(); CH.cur = L[(L.indexOf(CH.cur) + 1) % L.length]; chShow(); audio.sfx.menuHover?.(); }
@@ -10834,7 +10880,8 @@ function sendCh(text) {   // a line typed with a channel other than everyone cho
     const U = ' ' + text.toUpperCase().replace(/[^A-Z0-9 ]/g, ' ') + ' ', C = L.find(c => U.includes(' ' + c.name + ' ')) || npcPick(L); npcAsk(C, heroName, NET.id, text, false, true, true); return true; }
   if (k === 'god') { if (!(KEEP_ON || MOD.admin)) { CH.cur = 'pub'; chShow(); return false; } if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'god', payload: { i: NET.id, n: heroName, t: text } }); skyWord(text, true); return true; }
   if (k === 'fac') { if (!FAC.key) { CH.cur = 'pub'; chShow(); return false; } sendTo('fac', text); return true; }
-  if (k === 'dm') { let P = null, t = text; const m = /^@([A-Za-z0-9]{2,12})[:,]?\s+(.+)$/.exec(text); if (m) { const Q = peerNamed(m[1]); if (Q) { P = Q; t = m[2]; CH.to = Q.name; } }
+  if (k === 'dm') { let P = null, t = text; const m = /^@([A-Za-z0-9]{2,12})[:,]?\s+(.+)$/.exec(text); if (m) { const Q = peerNamed(m[1]); if (Q) { P = Q; t = m[2]; CH.to = Q.name; CH.xto = null; } else { const c = xoNamed(m[1]); if (c) { CH.xto = { id: c.id, n: cleanName(c.n) }; t = m[2]; } } }
+    if (!P && CH.xto && xoDm(t)) { chShow(); return true; }   // (to someone in BURNING STUDIO MUSIC, over the crossing)
     P = P || chTarget(); if (!P) { sysLine('NOBODY TO WRITE TO · /message NAME AND WHAT YOU WANT TO SAY'); return true; } if (P.npc) { npcDm(P, t); chShow(); return true; } if (!P.vk) { sysLine(`${P.name} CANNOT BE REACHED YET · TRY AGAIN IN A MOMENT`); return true; }
     sendTo('dm', t, P); chShow(); return true; }
   return false;
@@ -12992,6 +13039,7 @@ function sendChat(raw) {
   if (text[0] === '@' && agxAt(text)) return;   // (@NAME, where the name is one of his own agents)
   if (CH.cur !== 'pub' && sendCh(text)) return;   // (to his faction, to one person, or from the sky: see CH)
   chatLine(heroName, text, 'me'); npcHeard(heroName, NET.id, text, false);
+  if (COSMOS.on && XO.X) XO.X.say(text);   // (out in space it is also said into the sky between the worlds: whoever is out there, from either, hears it)
   if (NET.on && NET.ch) NET.ch.send({ type: 'broadcast', event: 'chat', payload: { i: NET.id, n: heroName, t: text } });
   else if (!CHAT.alone && !NPCS.list.some(C => C && C.on)) { CHAT.alone = true; chatLine('', 'NO ONE ELSE IS FLYING RIGHT NOW', 'sys'); }
 }
@@ -26543,7 +26591,7 @@ function templeHost(not) {
 }
 
 // ───────────────────────── saved progress (this device, this browser) ─────────────────────────
-const SAVE_KEY = 'icarus.save.v3';
+let SAVE_KEY = 'icarus.save.v3';   // (a visitor from BURNING STUDIO MUSIC keeps theirs apart: see xoSaveKey)
 let saveT = 20, resumed = false;
 function saveSoon() { saveT = Math.min(saveT, 1.5); }
 function saveGame() {
@@ -27293,11 +27341,7 @@ const CODE_A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const WORLD = { code: '', cells: { over: new Map(), under: new Map() }, names: [], nameIx: new Map(), marks: [], trav: [], shrines: [],
   pend: { over: new Map(), under: new Map() }, lookT: 3, lookX: 1e9, lookZ: 1e9, looking: false, flushT: 6, syncT: 25, mapT: 0, totals: null,
   first: 0, firstT: 0, hello: false, live: false, fails: 0, realm: 'over', emberT: 0 };
-try { WORLD.code = localStorage.getItem('icarus.code') || ''; } catch {}
-if (!/^[A-HJ-NP-Z2-9]{12}$/.test(WORLD.code)) {
-  WORLD.code = [...crypto.getRandomValues(new Uint8Array(12))].map(v => CODE_A[v & 31]).join('');
-  try { localStorage.setItem('icarus.code', WORLD.code); } catch {}
-}
+WORLD.code = xoCode();   // (this device's; a visitor from BURNING STUDIO MUSIC has one of their own for the visit, and this device's is left alone)
 const codeShow = c => c.replace(/(.{4})(?=.)/g, '$1-');
 const agoISO = t => { const s = (Date.now() - Date.parse(t)) / 1000; return !(s >= 0) ? '' : s < 120 ? 'just now' : s < 7200 ? `${Math.round(s / 60)} min ago` : s < 172800 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} days ago`; };
 const nameId = n => { if (!WORLD.nameIx.has(n)) { WORLD.nameIx.set(n, WORLD.names.length); WORLD.names.push(n); } return WORLD.nameIx.get(n); };
@@ -27364,6 +27408,7 @@ function mapData() {
 // where he is and how far he has come, kept for when he comes back
 function worldSync(beacon) {
   WORLD.syncT = 60;
+  if (XO.vis) return;   // (a visitor's journey here is not kept on the server)
   const P = player.pos, body = { op: 'sync', x: P.x, z: P.z, phase: story.phase, save: saveData() };
   if (beacon) { if (JSON.stringify(body.save).length > 50000) delete body.save; return worldPost(body, true); }
   if ((WORLD.mapT -= 60) <= 0) { WORLD.mapT = 300; body.map = mapData(); }
@@ -32528,6 +32573,7 @@ function tick(dt) {
   if (CAMB.T) camBlend(dt);
   if (TURNC.T) turnCam(dt);
   if (window.__icarus?.testCam) window.__icarus.testCam(camera);   // (tests only: look from wherever a test says)
+  xoTick(dt);   // (the crossing: see XO)
   cosmosStep(dt);
   if (COSMOS.on || COSMOS.fadeT > 0) cosmosPresent(); else if (M3.on && mapV.open && state === 'map') m3Present(); else present(scene, camera);
   if (DP.grab) { const r = DP.grab; DP.grab = null; r(dpFrame()); }
@@ -39012,7 +39058,7 @@ function cosmosPlace(dt) {
   // him
   czPlaceBody(false); czMorphStep(dt); if (player.form === 'human') czManPose(dt); else czBirdWings(dt); _czv.subVectors(C.pos, C.camPos);
   C.me.visible = M; if (M) { const d = _czv.length(), k = czK(d); C.me.position.copy(_czv).multiplyScalar(k); C.me.scale.setScalar(d * k * 0.018); C.me.quaternion.copy(C.q); }
-  czTrail(dt); czRocks();
+  czTrail(dt); czRocks(); xoCosmos(dt);   // (and the way to BURNING STUDIO MUSIC, and whoever is out here from either world)
 }
 const t0z = () => (Date.now() / 1000) % 100000;   // (the rings go round by the shared clock too)
 // sparks off him, left hanging where he passed
@@ -39047,6 +39093,384 @@ function czRocks() {
   }
   R.count = i; R.instanceMatrix.needsUpdate = true; if (R.instanceColor) R.instanceColor.needsUpdate = true;
 }
+// ───────────────────────── the crossing ─────────────────────────
+// ── THE CROSSING: the way between this world and BURNING STUDIO MUSIC (burningstudiomusic.com: all pixels, a stadium of its own
+//    out in space, COSMIC, the biggest screen there is). Out here beside the moons its stadium floats, drawn in letters like
+//    everything else in this world; fly into it and you cross over, and the other world comes up out of a tear in the picture.
+//    Who crosses keeps their own style: someone from there is drawn here in their own 8-bit (their changing-room look, their
+//    box phoenix, their cat), every pixel of them blocked out and snapped to their palette instead of lettered (postMat, uVisOn),
+//    and they have all of this world as anyone does, its form changing, its chat, its gods. The line itself (crossover/x.js)
+//    goes to a Durable Object both worlds share, "the Crossing": tickets to cross, who is where in either world, the sky
+//    between the two space scenes, words from one world to the other, and the keeper's switch. Held behind ?x=1 until it is
+//    live; with the line down, or x.js not to be had, the game is exactly as it was. Nothing secret goes over it.
+//    (The bodies are built in crossover/kit.js, loaded only when someone from there is to be drawn.)
+const XO_LAYER = 7, XO_PETS = ['murph', 'odie', 'batman', 'cali'], XO_LOOK = /^b[0-9a-f]{25}$/;
+Object.assign(XO, { on: false, M: null, K: null, kitP: null, X: null, pp: null, ppDone: false, booted: false, arrived: false, pet: '', lk: '',
+  B: new THREE.Vector3(24000, 18000, -16000), q: new THREE.Quaternion(), stad: null, sg: null, paintT: 0, pre: false, inside: false, graceT: 0, going: false, last: new THREE.Vector3(), lastOk: false,
+  meT: 0, meK: '', rtT: 4, admT: 0, panel: null, looking: false, skyT: 0, sky: new Map(), skyPx: 0, pxN: 0, me: null, tag: null, t: 0, hint: '' });
+const _xoV = new THREE.Vector3(), _xoW = new THREE.Vector3(), _xoU = new THREE.Vector3(), _xoF = new THREE.Vector3(), _xoQ = new THREE.Quaternion(), _xoM = new THREE.Matrix4();
+function xoKit() {   // (the bodies: only fetched when someone is to be drawn in them)
+  if (!XO.kitP) XO.kitP = import('/crossover/kit.js').then(K => { XO.K = K; return K; }).catch(e => { console.warn('[x] kit', e); XO.kitP = null; return null; });
+  return XO.kitP;
+}
+// a visitor's travel code: their own for this visit (kept in the tab, never put in place of this device's), and no journey saved under it
+function xoCode() {
+  if (XO.vis) { let c = ''; try { c = sessionStorage.getItem('x-visit-code') || ''; } catch {} if (!/^[A-HJ-NP-Z2-9]{12}$/.test(c)) { c = [...crypto.getRandomValues(new Uint8Array(12))].map(v => CODE_A[v & 31]).join(''); try { sessionStorage.setItem('x-visit-code', c); } catch {} } return c; }
+  let c = ''; try { c = localStorage.getItem('icarus.code') || ''; } catch {}
+  if (!/^[A-HJ-NP-Z2-9]{12}$/.test(c)) { c = [...crypto.getRandomValues(new Uint8Array(12))].map(v => CODE_A[v & 31]).join(''); try { localStorage.setItem('icarus.code', c); } catch {} }
+  return c;
+}
+// before the game decides anything: is this a visitor, and whose save is it
+function xoHold(fn) {
+  const E = XO.E; let done = false;
+  const go = () => { if (done) return; done = true; xoSaveKey(); fn(); };
+  if (!E) return go();
+  const p = xoStart().catch(e => console.warn('[x]', e));
+  if (!E.ticket && !E.visit) return go();   // (nobody arriving: the line can come up while the title does)
+  p.finally(go); setTimeout(go, 9000);   // (a ticket is waited for, but not for long)
+}
+function xoSaveKey() {
+  SAVE_KEY = XO.vis ? 'icarus.visit.v3' : 'icarus.save.v3';
+  if (XO.vis) {   // (somebody from the other world: a returning traveller of their own here, not a new one, so no opening on Crete; their god is Hermes, who looks after travellers)
+    try { if (!localStorage.getItem(SAVE_KEY)) localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 3, realm: 'over', phase: 'free', deaths: 1, met: [], gossip: [], events: [], quests: [], perks: {}, known: [], intro: [], lit: [], gods: {}, others: {}, great: {}, stats: {}, cv: CRETE_V, toured: true, patron: 'hermes' })); } catch {}
+    if (!PATRON.id) PATRON.id = 'hermes';
+  }
+  WORLD.code = xoCode();
+}
+async function xoStart() {
+  const E = XO.E, M = XO.M = E.M;
+  const local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  if (local && !M.flagged() && !E.ticket && !E.visit) return;   // (on a test machine the line is not even asked about, unless ?x=1 says so)
+  const w = await M.wanted(); if (!w.on) return;
+  if (!E.ticket && !E.visit) { const st = w.st || await M.state(); if (st.down) { setTimeout(() => xoStart().catch(() => {}), 9e4); return; } }   // (the line is down: the game as it was, and ask again later)
+  if (XO.X) return;
+  const X = XO.X = globalThis.ICX = new M.Crossing({ home: XO.vis ? 'brn' : 'icarus', world: 'icarus' });
+  XO.on = true; xoWire(X); xoKit();
+  let pp = null;
+  if (E.ticket) pp = await X.arrived(); else if (E.visit) pp = X.visit();
+  XO.pp = pp; XO.ppDone = true;
+  if (pp) XO.vis = pp.h === 'brn'; else if (E.ticket) XO.vis = false;   // (a ticket that was spent or too old: an ordinary page of this world)
+  X.home = XO.vis ? 'brn' : 'icarus'; X.mine.h = X.home;
+  if (XO.vis) { XO.pet = XO_PETS.includes(pp.pe) ? pp.pe : ''; XO.lk = XO_LOOK.test(pp.lk || '') ? pp.lk : ''; if (/^[0-9a-f]{12}$/.test(pp.vt || '')) X.mine.vt = pp.vt; }
+  xoMe(true);
+  if (XO.booted) xoArrive();
+}
+// what comes over the line
+function xoWire(X) {
+  X.on('sky', s => xoSkyGot(s));
+  X.on('say', m => { const S = XO.sky.get(m.id); if (S) { S.said = cleanText(m.x).slice(0, 140); S.saidT = performance.now(); } if (m.h === 'brn' && COSMOS.on) chatLine(`${cleanName(m.n)} · IN THE SKY`, cleanText(m.x)); });
+  X.on('dm', m => { const n = cleanName(m.n), t = cleanText(m.x); if (!t) return; chatLine(`${n} · ${m.w === 'brn' ? 'BURNING STUDIO MUSIC' : m.h === 'brn' ? 'FROM BURNING STUDIO MUSIC' : 'ACROSS'} → YOU`, t, 'dm xo'); CH.xto = { id: m.id, n }; if (CHAT.open) chShow(); audio.sfx.ui?.(); if (!CHAT.open) toast(`${n} WRITES FROM BURNING STUDIO MUSIC · T TO ANSWER`); });
+  X.on('dmno', () => sysLine('THEY HAVE GONE FROM THE LINE'));
+  X.on('state', () => { XO.paintT = 0; });
+  X.on('home', () => { if (XO.vis) { toast('THE KEEPER IS SENDING EVERYONE HOME'); xoCross(true); } });
+  X.on('people', () => { who.t = 0; });
+}
+// the game is up (the title showing): a visitor is taken straight out into space by the stadium, as if they had just flown out of it; one
+// of ours coming home is put back where they crossed
+function xoBooted() { XO.booted = true; if (XO.ppDone || !XO.E || !XO.E.ticket) xoArrive(); }
+function xoArrive() {
+  if (XO.arrived) return; XO.arrived = true;
+  const E = XO.E, uncover = () => { const L = E && E.land; if (L) { E.land = null; try { L.go(); } catch {} } };
+  try {
+    if (XO.vis && XO.pp) xoVisitStart(!!(E && E.ticket));
+    else if (XO.pp && XO.pp.h === 'icarus') { const r = XO.M.takeReturn('icarus'); if (state === 'title') begin(); xoWhenPlay(() => { xoToSpace(r && r.f); toast('HOME AGAIN · ICARUS'); }); }
+  } catch (e) { console.warn('[x] arrive', e); }
+  if (XO.pp) { xoWhenPlay(() => setTimeout(uncover, 450)); setTimeout(uncover, 9000); } else uncover();   // (uncovered once they are in place: out in space, by the stadium)
+}
+function xoVisitStart(first) {
+  const n0 = cleanName(XO.pp.n), n = n0.replace(/ /g, '').length >= 2 && n0 !== 'SOMEONE' ? n0 : 'TRAVELLER';
+  nameInput.value = n; setName(n, false); nameAsked = true;
+  if (state === 'title') begin();
+  xoWhenPlay(() => { if (first) xoToSpace(XO.pp.f === 'man' ? 'man' : 'phoenix'); toast(`WELCOME TO ICARUS, ${n} · YOU KEEP YOUR OWN LOOK HERE`); });
+}
+function xoWhenPlay(fn, left = 40) { if (state === 'play') fn(); else if (left > 0) setTimeout(() => xoWhenPlay(fn, left - 1), 250); }   // (from the live title the bird takes a moment to be his)
+// out into space by the stadium, heading for the globe (and not straight back in: out of it first)
+function xoToSpace(f, tries = 4) {
+  const p = player, C = COSMOS; cosmosInit(); xoStadium();
+  setTimeout(() => { if (!COSMOS.on && state === 'play' && tries > 1) xoToSpace(f, tries - 1); }, 700);   // (the world can take him back in the first moments after waking: then again)
+  if (p.form !== 'phoenix') toBird();
+  p.perch = false; p.sub = null; p.cine = null; p.takeoff = null; p.perchGo = null;
+  C.hy = true; cosmosEnter();
+  const out = _xoV.copy(XO.B).negate().normalize(), up = _xoU.set(0, 1, 0).applyQuaternion(XO.q);
+  C.pos.copy(XO.B).addScaledVector(out, (XO.stad ? XO.stad.R : 1500) * 0.95); czLook(C.q, out, up); C.v = 480; C.camOff = null;
+  XO.graceT = 6; XO.inside = true; XO.lastOk = false;
+  if (f === 'man') czForm('human', true);
+}
+
+// ── who I am, where I am, for the line (and how busy this world's own channel is, for the keeper)
+function xoMe(force) {
+  const X = XO.X; if (!X) return;
+  const f = player.form === 'phoenix' ? 'phoenix' : 'man', pl = realm === 'under' ? 'under' : PL.on ? 'p:' + String(PL.name || 'world').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) : COSMOS.on ? 'cosmos' : 'olympus';
+  const k = [heroName, f, pl, XO.pet, XO.lk].join('|'); if (!force && k === XO.meK) return; XO.meK = k;
+  X.me({ n: heroName, lk: XO.vis ? XO.lk : '', f, pe: XO.vis ? XO.pet : '', pl });
+}
+function xoRt() {   // (rt: how many are on this world's channel, and how many messages a second reach this page from it: the Supabase plan's limit is 100)
+  const X = XO.X; if (!X || !NET.on || !NET.ch) return;
+  let n = 1; try { n = Math.max(1, Object.keys(NET.ch.presenceState() || {}).length); } catch {}
+  X.me({ rt: { n, in: Math.round(HEALTH.inR || 0) } });
+}
+// ── the keeper: his own server vouches for him (a ten-minute token, /api/hub?fn=xadmin), and the panel and the switch are his
+function xoKeeper(dt) {
+  const X = XO.X; if (!X || !MOD.admin || (XO.admT -= dt) > 0) return; XO.admT = 480;
+  fetch('/api/hub?fn=xadmin', { method: 'POST', headers: authH({ 'Content-Type': 'application/json' }), body: '{}' }).then(r => r.ok ? r.json() : null).then(j => { if (j && j.tok) xoAdmin(j.tok); }).catch(() => {});
+}
+function xoAdmin(tok) { const X = XO.X; if (!X) return; X.admin(tok); if (!XO.panel) XO.panel = XO.M.mountPanel(X); }
+function xoCmd(arg) {   // /crossing: the keeper's panel; for anyone else, how the way is
+  const X = XO.X; if (!X) return sysLine('THE WAY TO BURNING STUDIO MUSIC IS NOT OPEN FROM HERE');
+  if (X.ad && XO.panel) { XO.panel.toggle(); return; }
+  if (MOD.admin) { XO.admT = 0; return sysLine('THE CROSSING IS ASKED TO KNOW YOU · /crossing AGAIN IN A MOMENT'); }
+  const n = [...X.people.values()].filter(c => c.w === 'brn').length;
+  sysLine(`THE WAY TO BURNING STUDIO MUSIC IS ${X.st.open ? 'OPEN' : 'CLOSED'} · ${n ? n + ' THERE NOW' : 'NOBODY THERE NOW'} · ITS STADIUM FLOATS OUT IN SPACE`);
+}
+// ── words across: the Tab list's people in the other world, and a line to one of them
+function xoWhoHtml(esc) {
+  const X = XO.X; if (!X) return '';
+  const L = [...X.people.values()].filter(c => c.w === 'brn' && c.id !== X.id).sort((a, b) => a.n.localeCompare(b.n));
+  let h = `<h4>IN BURNING STUDIO MUSIC · ${L.length}</h4>`;
+  for (const c of L.slice(0, 24)) h += `<div class="r"><b style="color:#f8b800">·</b><span style="color:#f8d878">${esc(c.n)}</span><u>${esc([c.h === 'icarus' ? 'one of ours' : '', c.pe ? XO_PETS.includes(c.pe) ? c.pe : '' : ''].filter(Boolean).join(' · '))}</u><i>${esc(String(c.pl || '').replace(/^p:/, '').slice(0, 14))}</i><em></em><p><s data-n="__x" data-k="xdm:${esc(c.id)}" title="Write to them: it reaches them over there">✉ write</s></p></div>`;
+  if (!L.length) h += `<div class="none">nobody is over there right now · its stadium floats out in space</div>`;
+  return h;
+}
+function xoWrite(id) {
+  const c = XO.X?.people.get(id); if (!c) { toast('THEY HAVE GONE'); return; }
+  CH.cur = 'dm'; CH.xto = { id, n: cleanName(c.n) }; who.pinned = false; who.open = false; openChat(); chShow();
+}
+function xoDm(text) {   // a line typed to someone across (sendCh): true if it went that way
+  const T = CH.xto, X = XO.X; if (!T || !X) return false;
+  if (!X.people.has(T.id)) { sysLine(`${T.n} HAS GONE FROM THE LINE`); CH.xto = null; chShow(); return true; }
+  if (X.dm(T.id, text)) chatLine(`→ ${T.n} · BURNING STUDIO MUSIC`, text, 'dm me'); else sysLine('THE LINE IS DOWN · TRY AGAIN IN A MOMENT');
+  return true;
+}
+const xoNamed = n => { n = String(n || '').toUpperCase().replace(/[^A-Z0-9 ]/g, ''); if (!XO.X || !n) return null; for (const c of XO.X.people.values()) if (c.w === 'brn' && cleanName(c.n).startsWith(n)) return c; return null; };
+
+// ── the stadium of COSMIC, out here: fixed in the dark by the rings, its screen turned toward home
+function xoStadium() {
+  const C = COSMOS, K = XO.K; if (XO.stad || !C.scene || !K || !XO.X) return;
+  const S = XO.stad = K.stadium(7), outer = XO.sg = new THREE.Group(); S.group.position.copy(S.mid).negate(); outer.add(S.group); outer.frustumCulled = false; C.scene.add(outer);
+  // (tipped toward home, so from the globe you look down into its bowl and see the screen over the rows; its screen faces that way too)
+  const t = _xoV.copy(XO.B).negate().normalize(), yp = _xoU.set(0, 1, 0).addScaledVector(t, -t.y).normalize(), ey = yp.multiplyScalar(0.7).addScaledVector(t, 0.7).normalize();
+  const ex = _xoF.copy(t).addScaledVector(ey, -t.dot(ey)).normalize(), ez = _xoW.crossVectors(ex, ey);
+  XO.q.setFromRotationMatrix(_xoM.makeBasis(ex, ey, ez));
+  const tag = XO.tag = document.createElement('div'); tag.id = 'xoTag'; tag.style.cssText = 'position:fixed;left:0;top:0;transform:translate(-50%,-120%);pointer-events:none;font:11px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.18em;color:#f8d878;text-shadow:0 0 6px #000;white-space:nowrap;display:none;z-index:40;text-align:center';
+  document.body.appendChild(tag);
+}
+// every frame out in space, once he and the eye are placed (cosmosPlace)
+function xoCosmos(dt) {
+  const C = COSMOS, X = XO.X;
+  if (X && XO.K && !XO.stad) xoStadium();
+  if (XO.stad) xoDoor(dt);
+  if (X) xoSkySend(dt);
+  xoSkyers(dt);
+  if (XO.vis) xoSelf(dt);
+}
+function xoDoor(dt) {
+  const C = COSMOS, S = XO.stad, X = XO.X, open = !!(X && X.st.open), R = S.R;
+  czPlace(XO.sg, XO.B, R, 1); XO.sg.quaternion.copy(XO.q); XO.sg.visible = true;
+  const d = C.pos.distanceTo(XO.B);
+  if ((XO.paintT -= dt) <= 0 && d < 400000) { XO.paintT = 0.25; S.paint(time, open); }
+  // its name over it, and how far
+  { const T = XO.tag, k = czK(_xoV.subVectors(XO.B, C.camPos).length()); _xoV.multiplyScalar(k); C.cam.updateMatrixWorld(); _xoV.project(C.cam);
+    const show = _xoV.z < 1 && Math.abs(_xoV.x) < 1.2 && Math.abs(_xoV.y) < 1.2 && !C.map.on && state === 'play';
+    if (show) { T.style.display = ''; T.style.left = ((_xoV.x * 0.5 + 0.5) * innerWidth).toFixed(0) + 'px'; T.style.top = ((-_xoV.y * 0.5 + 0.5) * innerHeight).toFixed(0) + 'px';
+      const t = open ? `BURNING STUDIO MUSIC<br><small style="color:#bcbcbc">${d > R * 1.2 ? fmtDist(d - R * 0.5) + ' · ' : ''}${d < R * 6 ? 'FLY IN TO CROSS OVER' : 'ANOTHER WORLD'}</small>` : `BURNING STUDIO MUSIC<br><small style="color:#f87858">THE WAY IS CLOSED</small>`;
+      if (T._t !== t) { T._t = t; T.innerHTML = t; } }
+    else if (T.style.display !== 'none') T.style.display = 'none'; }
+  // near it: the other world is fetched ahead, and he is told how; into it, and across he goes
+  if (d < R * 6 && !XO.pre) { XO.pre = true; if (open) XO.M.prefetch('brn'); toast(open ? 'BURNING STUDIO MUSIC · FLY INTO ITS STADIUM TO CROSS OVER' : 'BURNING STUDIO MUSIC · THE WAY IS CLOSED'); }
+  else if (d > R * 9) XO.pre = false;
+  if (XO.graceT > 0) XO.graceT -= dt;
+  const r = R * 0.42; let hit = d < r;
+  if (!hit && XO.lastOk) {   // (fast enough to go right through it between two frames: the line he flew along)
+    _xoW.subVectors(C.pos, XO.last); const L2 = _xoW.lengthSq(); if (L2 > 1) { const t = clamp(_xoV.subVectors(XO.B, XO.last).dot(_xoW) / L2, 0, 1); hit = _xoU.copy(XO.last).addScaledVector(_xoW, t).distanceTo(XO.B) < r; } }
+  if (hit && !XO.inside && XO.graceT <= 0 && !XO.going && state === 'play') { if (open || X?.ad) xoCross(false); else if (performance.now() - (XO.shutT || 0) > 4000) { XO.shutT = performance.now(); toast('THE WAY IS CLOSED · THE KEEPER HAS SHUT IT'); } }
+  XO.inside = d < R * 0.55; XO.last.copy(C.pos); XO.lastOk = true;
+}
+// across: a ticket from the Crossing, the tear, and the other world's page (a visitor going home: home, whatever the switch says)
+async function xoCross(home) {
+  const X = XO.X, M = XO.M; if (!X || XO.going) return; XO.going = true;
+  const f = player.form === 'phoenix' ? 'phoenix' : 'man';
+  try { saveGame(); } catch {}
+  toast(XO.vis ? 'HOME TO BURNING STUDIO MUSIC…' : 'CROSSING OVER TO BURNING STUDIO MUSIC…'); audio.sfx.whoosh?.(true);
+  const r = await M.cross(X, 'brn', { f, pe: XO.vis ? XO.pet : '', ret: XO.vis ? null : { at: 'cosmos', f } });
+  if (r && r.tk) return;
+  if (XO.vis) { await M.tear('ascii', 'px'); location.href = M.worldUrl('brn') + '/'; return; }   // (no ticket to be had, but nobody is kept from their own world)
+  XO.going = false; XO.graceT = 3;
+  toast(r && r.err === 'closed' ? 'THE WAY IS CLOSED · THE KEEPER HAS SHUT IT' : 'THE WAY WOULD NOT OPEN · TRY AGAIN IN A MOMENT');
+}
+
+// ── the sky between: where he is out here, a few times a second, in the frame both worlds share (the globe's middle, the stadium's)
+const xoA = [0, 0, 0];
+function xoSkySend(dt) {
+  const X = XO.X, C = COSMOS, M = XO.M; if (!X.id) return;
+  if (!XO.looking) { XO.looking = true; X.look(true); }
+  if ((XO.skyT -= dt) > 0) return; XO.skyT = 0.18;   // (under six a second: the Crossing passes on no more than seven)
+  const B = XO.B.toArray(), fw = _xoF.set(0, 0, -1).applyQuaternion(C.q);
+  X.sky(M.toShared(C.pos.toArray(), xoA, B), M.dirToShared(fw.toArray(), xoA, B), player.form === 'phoenix' ? 'phoenix' : 'man');
+}
+function xoSkyOff() { const X = XO.X; XO.looking = false; if (X) { X.skyOff(); X.look(false); } for (const S of XO.sky.values()) xoSkyHide(S); }
+function xoSkyGot(s) {
+  const M = XO.M; if (!M || s.id === XO.X?.id) return;
+  let S = XO.sky.get(s.id);
+  if (s.off) { if (S) { xoSkyDrop(S); XO.sky.delete(s.id); } return; }
+  const B = XO.B.toArray(), p = M.fromShared(s.p, xoA, B), d = M.dirFromShared(s.d, xoA, B), now = performance.now();
+  if (!S) { S = { id: s.id, pos: new THREE.Vector3(...p), tgt: new THREE.Vector3(...p), vel: new THREE.Vector3(), dir: new THREE.Vector3(...d), f: s.f, t: now, ph: Math.random() * 6, said: '', saidT: 0, body: null, kind: '', el: null }; XO.sky.set(s.id, S); }
+  else { const dt = Math.max(0.05, (now - S.t) / 1000); _xoV.set(...p); S.vel.subVectors(_xoV, S.tgt).divideScalar(dt); if (S.vel.length() > 2e5) S.vel.set(0, 0, 0); S.tgt.copy(_xoV); S.dir.set(...d); S.f = s.f; S.t = now; }
+}
+// who someone out there is drawn as: one of ours as anyone of ours is (in letters, their name in them); one from there in their 8-bit
+function xoSkyBody(S, card) {
+  const K = XO.K, brn = card && card.h === 'brn', kind = brn ? (S.f === 'ship' ? 'ship' : S.f === 'phoenix' ? 'xbird' : 'xman') : S.f === 'man' ? 'man' : 'bird';
+  if (S.kind === kind && S.body) return S.body;
+  xoSkyDrop(S); S.kind = kind; const C = COSMOS, n = cleanName(card ? card.n : 'SOMEONE');
+  let g = null, o = {};
+  if (kind === 'ship') { const L = K.SHIP_KINDS, h = [...S.id].reduce((a, c) => a + c.charCodeAt(0), 0); o = K.boxShip(L[h % L.length]); g = o.group; o.scale = 1; }
+  else if (kind === 'xbird') { o = K.boxPhoenix(); o.helm.visible = true; g = o.group; o.scale = PHX_S; }
+  else if (kind === 'xman') { o = K.boxPerson(K.lookFor(S.id + n)); o.dress(true); g = o.group; o.scale = 1; o.armL.rotation.z = -0.5; o.armR.rotation.z = 0.5; o.legL.rotation.x = 0.3; o.shinL.rotation.x = -0.4; }
+  else {
+    const slot = nameSlot(), who = { value: whoAlpha(slot) }; nameRow(slot, n); o.slot = slot;
+    if (kind === 'bird') { const b = makePhoenix(); b.light.intensity = 0; b.group.remove(b.light); const fire = o.fire = makeFireMat(0xffffff, 0.9, null, who), cape = heroMask(peerCape.clone(), who);
+      b.group.traverse(m => { if (m.isMesh && m.material === capeMat) m.material = cape; else if (m.isMesh && m.material === fireMat) m.material = fire; });
+      for (const t of b.tails) b.group.traverse(m => { if (m.isMesh && m.geometry === t.geo) m.visible = false; });   // (its long tail streams from where it has been: out here, with nothing to go by, it is left off)
+      fire.userData.tint?.value?.set(PEER_COLS[slot % PEER_COLS.length]); o.b = b; g = b.group; o.scale = PHX_S; o.wings = b.wings; }
+    else { const m = makeHuman(true, who); g = m.group; o.scale = MAN_SCALE; o.m = m; m.armL.rotation.set(0.3, 0, -0.5); m.armR.rotation.set(0.3, 0, 0.5); }
+  }
+  g.traverse(m => { if (m.isMesh) m.frustumCulled = false; }); C.scene.add(g); o.g = g;
+  return S.body = o;
+}
+function xoSkyHide(S) { if (S.body) S.body.g.visible = false; if (S.el) S.el.style.display = 'none'; }
+function xoSkyDrop(S) {
+  if (S.body) { const g = S.body.g; g.parent?.remove(g); if (S.kind.startsWith('x') || S.kind === 'ship') g.traverse(m => { if (m.isMesh) m.geometry.dispose(); }); S.body = null; }   // (the boxes are theirs alone; an Icarus body's parts are shared, and kept)
+  if (S.el) { S.el.remove(); S.el = null; }
+}
+function xoSkyers(dt) {
+  const C = COSMOS, X = XO.X, K = XO.K, now = performance.now(); XO.skyPx = 0;
+  if (!X || !K) return;
+  for (const [id, S] of XO.sky) {
+    if (!X.skyers.has(id) || now - S.t > 20000) { xoSkyDrop(S); XO.sky.delete(id); continue; }
+    const age = Math.min(1, (now - S.t) / 1000); _xoV.copy(S.tgt).addScaledVector(S.vel, age);
+    if (S.pos.distanceToSquared(_xoV) > 4e8) S.pos.copy(_xoV); else S.pos.lerp(_xoV, damp(5, dt));
+    const card = X.people.get(id), o = xoSkyBody(S, card), g = o.g; g.visible = !C.map.on;
+    const s = czPlace(g, S.pos, 12, o.scale); S.ph += dt * (S.f === 'phoenix' ? 5 : 1.5);
+    _xoU.copy(S.pos).normalize(); if (Math.abs(_xoU.dot(S.dir)) > 0.97) _xoU.set(0, 1, 0); czLook(g.quaternion, _xoF.copy(S.dir).normalize(), _xoU);
+    if (o.wings && o.b) for (const w of o.wings) w.shoulder.rotation.z = -(0.15 + Math.sin(S.ph) * 0.55);
+    if (S.kind === 'xbird') K.flap(o, S.ph);
+    if (S.kind.startsWith('x') || S.kind === 'ship') XO.skyPx++;
+    // their name, how far, and what they just said
+    const d = S.pos.distanceTo(C.pos), said = now - S.saidT < 7000 ? S.said : '';
+    if (!S.el) { const e = S.el = document.createElement('div'); e.style.cssText = 'position:fixed;left:0;top:0;transform:translate(-50%,-130%);pointer-events:none;font:11px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.12em;text-shadow:0 0 5px #000;white-space:nowrap;z-index:40;text-align:center'; document.body.appendChild(e); }
+    _xoV.copy(g.position); C.cam.updateMatrixWorld(); _xoV.project(C.cam);
+    const on = _xoV.z < 1 && Math.abs(_xoV.x) < 1.1 && Math.abs(_xoV.y) < 1.1 && !C.map.on && (d < 60000 || said);
+    S.el.style.display = on ? '' : 'none';
+    if (on) { S.el.style.left = ((_xoV.x * 0.5 + 0.5) * innerWidth).toFixed(0) + 'px'; S.el.style.top = ((-_xoV.y * 0.5 + 0.5) * innerHeight).toFixed(0) + 'px';
+      const brn = card && card.h === 'brn', nm = cleanName(card ? card.n : 'SOMEONE'), t = `<span style="color:${brn ? '#f8d878' : '#bfe6ff'}">${nm}${brn ? ' · BRN' : ''}</span>${said ? `<br><b style="color:#fff;font-weight:normal">“${said.replace(/[<>&]/g, '')}”</b>` : d > 200 ? `<br><small style="color:#999">${fmtDist(d)}</small>` : ''}`;
+      if (S.el._t !== t) { S.el._t = t; S.el.innerHTML = t; } }
+  }
+}
+
+// ── a body from there: an Icarus body stands in for it (so it moves as any of ours does, every way they can), and the box
+//    figure takes its pose joint by joint; the Icarus body is kept off the screen (on a layer no eye looks at), all but the
+//    bird's long tail of fire, which is theirs too and is drawn, like the rest of them, in their pixels
+function xoHide(G, bird) {
+  const tails = bird ? new Set(bird.tails.map(t => t.geo)) : null;
+  G.traverse(o => { if (!o.isMesh) return; if (tails && tails.has(o.geometry) && o.material.type === 'MeshBasicMaterial') return;   // (the fire of the tail stays; the cape over the bird's back does not)
+    if (o.layers.mask !== 1 << XO_LAYER) o.layers.set(XO_LAYER); });
+}
+function xoShow(G) { G.traverse(o => { if (o.isMesh && o.layers.mask === 1 << XO_LAYER) o.layers.set(0); }); }
+const xoOn = R => R.group.traverse(o => { if (o.isMesh) o.layers.enable(1); });   // (on a world in space too: its eye looks at the worlds' layer)
+function xoCopyWing(d, s) { d.root.quaternion.copy(s.root.quaternion); d.shoulder.quaternion.copy(s.shoulder.quaternion); d.shoulder.scale.copy(s.shoulder.scale); d.elbow.quaternion.copy(s.elbow.quaternion); d.wrist.quaternion.copy(s.wrist.quaternion); }
+function xoCopyMan(R, H, vis) {
+  const G = H.group; if (G.parent && R.group.parent !== G.parent) G.parent.add(R.group);
+  R.group.visible = vis && !!G.parent; if (!R.group.visible) return;
+  R.group.position.copy(G.position); R.group.quaternion.copy(G.quaternion); R.group.scale.copy(G.scale).multiplyScalar(1 / MAN_SCALE);
+  R.hips.position.set(H.rig.position.x * MAN_SCALE, 0.8 + (H.rig.position.y - 1) * MAN_SCALE, H.rig.position.z * MAN_SCALE); R.hips.quaternion.copy(H.rig.quaternion);
+  for (const k of ['chest', 'head', 'armL', 'armR', 'foreL', 'foreR', 'legL', 'legR', 'shinL', 'shinR']) R[k].quaternion.copy(H[k].quaternion);
+  const W = H.wings, wo = !!(W && W.visible); R.wingsG.visible = wo;
+  if (wo) { R.wingsG.position.copy(W.position).multiplyScalar(MAN_SCALE); R.wingsG.quaternion.copy(W.quaternion); R.wingsG.scale.copy(W.scale).multiplyScalar(MAN_SCALE); H.wingParts.forEach((w, i) => xoCopyWing(R.wings[i], w)); }
+}
+function xoCopyBird(R, P, vis) {
+  const G = P.group; if (G.parent && R.group.parent !== G.parent) G.parent.add(R.group);
+  R.group.visible = vis && !!G.parent; if (!R.group.visible) return;
+  R.group.position.copy(G.position); R.group.quaternion.copy(G.quaternion); R.group.scale.copy(G.scale);
+  R.head.quaternion.copy(P.head.quaternion); P.wings.forEach((w, i) => xoCopyWing(R.wings[i], w));
+}
+// his own body, if he is a visitor: in his own 8-bit too, and his cat (or dog) with him
+function xoSelf(dt) {
+  const K = XO.K; if (!K) return;
+  let S = XO.me;
+  if (!S) { S = XO.me = { P: K.boxPerson(K.decodeLook(XO.lk) || K.lookFor(heroName)), B: K.boxPhoenix(), pet: XO.pet ? xoPetMake(XO.pet) : null, hideT: 0 }; xoOn(S.P); xoOn(S.B); WHO_ME.value = K.VIS_A; }
+  if ((S.hideT -= dt) <= 0) { S.hideT = 0.4; xoHide(human.group); xoHide(phoenix.group, phoenix); }
+  xoCopyMan(S.P, human, human.group.visible); xoCopyBird(S.B, phoenix, phoenix.group.visible);
+  const space = COSMOS.on; S.P.dress(space && CZS.on); S.B.helm.visible = space;
+  if (S.pet) { const p = player, bird = p.form === 'phoenix' && !p.perch && !p.grounded;
+    if (space) xoPetSpace(S.pet, dt); else xoPetStep(S.pet, p.pos, bird ? p.yaw : human.group.rotation.y, bird, dt, scene, bird ? phoenix.group : null, p.form === 'phoenix' ? phoenix.group.scale.x : 0); }
+}
+// someone else from there, on this screen: their state says so (sk), and their look (lk) and pet (pe)
+function xoPeer(P, A, dt) {
+  const K = XO.K; if (!K) { xoKit(); return; }
+  if (!P.px) { if (P.xr) xoPeerOff(P, A); return; }
+  let R = P.xr;
+  if (!R || R.lk !== P.lk || R.pe !== P.pet) { if (R) xoPeerOff(P, A); R = P.xr = { P: K.boxPerson(K.decodeLook(P.lk) || K.lookFor(P.name)), B: K.boxPhoenix(), lk: P.lk, pe: P.pet, pet: P.pet ? xoPetMake(P.pet) : null, hideT: 0 }; if (A.xray) A.xray.uniforms.uWho.value = K.VIS_A; }
+  if ((R.hideT -= dt) <= 0) { R.hideT = 0.5; xoHide(A.man.group); xoHide(A.bird.group, A.bird); }
+  const mv = A.man.group.visible, bv = A.bird.group.visible;
+  xoCopyMan(R.P, A.man, mv); xoCopyBird(R.B, A.bird, bv);
+  if (P.form === 'w' && mv) { R.P.wingsG.visible = true; R.P.wingsG.scale.setScalar(WING_S * MAN_SCALE); R.P.wingsG.position.set(0, 0.54, 0.06); R.P.wingsG.rotation.set(0.9, 0, 0); R.P.wings.forEach((w, i) => { w.shoulder.rotation.set(0, 0, -0.1); w.elbow.rotation.set(0, 0, -0.05); w.wrist.rotation.set(0, 0, 0); w.root.rotation.set(0, 0, 0); }); }   // (under their wings: the pose they glide in)
+  if (R.pet) xoPetStep(R.pet, P.pos, P.yaw || 0, P.form === 'p' && !P.gr, dt, scene, P.form === 'p' ? A.bird.group : null, A.bird.group.scale.x, !(mv || bv));
+  if (mv || bv) XO.pxN++;
+}
+function xoPeerOff(P, A) {
+  const R = P.xr; if (!R) return; P.xr = null;
+  for (const G of [R.P.group, R.B.group, R.pet?.cat.group, R.pet?.bird.group]) if (G) G.parent?.remove(G);
+  if (A) { xoShow(A.man.group); xoShow(A.bird.group); if (A.xray) A.xray.uniforms.uWho.value = whoAlpha(A.slot); }
+}
+
+// ── the pets: they follow whoever brought them, by a rule every screen works out the same from where that one is and which way
+//    they face (nothing more is sent for them than which pet it is). On the ground a cat (or Cali) at their heel; with them in
+//    the air, a small bird of fire off their wing; out in space, in a suit of its own with a bubble of glass round its head.
+function xoPetMake(kind) {
+  const K = XO.K, c = K.boxPet(kind), b = K.boxPhoenix({ mini: true });
+  for (const G of [c.group, b.group]) G.traverse(o => { if (o.isMesh) o.layers.enable(1); });
+  return { kind, cat: c, bird: b, pos: new THREE.Vector3(), yaw: 0, ph: Math.random() * 6, fly: -1, set: false, sp: 0 };
+}
+function xoPetStep(T, at, yaw, flying, dt, parent, birdG, bs, hide) {
+  const c = T.cat, b = T.bird; for (const G of [c.group, b.group]) if (G.parent !== parent) parent.add(G);
+  if (hide) { c.group.visible = b.group.visible = false; return; }
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+  const k = flying ? Math.max(1, bs || 1.5) : 1, side = flying ? 4.2 * k : 0.7, back = flying ? 2.8 * k : 1.0, up = flying ? 0.6 * k : 0;
+  _xoV.set(at.x + rx * side - fx * back, at.y + up, at.z + rz * side - fz * back);
+  if (!flying) _xoV.y = groundAt(_xoV.x, _xoV.z, at.y + 1.5);
+  if (flying !== !!T.fly) { if (T.fly !== -1) for (let i = 0; i < 14; i++) emit(T.pos.x + rnd(0.4), T.pos.y + 0.3 + rnd(0.3), T.pos.z + rnd(0.4), rnd(2), 1 + Math.random() * 2, rnd(2), 0.4 + Math.random() * 0.3, pick(EMBER)); T.fly = flying ? 1 : 0; }   // (up into the air: it takes fire; down again, a cat)
+  const was = _xoW.copy(T.pos); if (!T.set || T.pos.distanceToSquared(_xoV) > 900) { T.pos.copy(_xoV); T.set = true; } else T.pos.lerp(_xoV, damp(flying ? 6 : 4, dt));
+  T.sp = lerp(T.sp, was.distanceTo(T.pos) / Math.max(dt, 1e-3), damp(6, dt)); T.ph += dt * (flying ? 9 : 2 + T.sp * 4);
+  c.group.visible = !flying; b.group.visible = flying;
+  if (flying) { b.group.position.copy(T.pos); if (birdG) b.group.quaternion.copy(birdG.quaternion); else b.group.rotation.set(0, yaw, 0); b.group.scale.setScalar(k * 0.22); XO.K.flap(b, T.ph); b.helm.visible = false; return; }
+  if (T.sp > 0.3) T.yaw = Math.atan2(-(T.pos.x - was.x), -(T.pos.z - was.z)); else T.yaw += wrapAngle(yaw - T.yaw) * damp(1.5, dt);
+  c.group.position.copy(T.pos); c.group.rotation.set(0, T.yaw, 0); c.group.scale.setScalar(1.25); c.dress(false);
+  const sw = Math.min(1, T.sp / 3) * 0.7; c.legs.forEach((l, i) => { l.rotation.x = Math.sin(T.ph * 2 + (i === 0 || i === 3 ? 0 : Math.PI)) * sw; });
+  c.tail.forEach((t, i) => { t.rotation.x = -0.5 - i * 0.15 + Math.sin(T.ph * 0.8 + i) * 0.12; t.rotation.y = Math.sin(T.ph * 0.6 + i * 0.7) * 0.25; });
+}
+function xoPetSpace(T, dt) {   // (out in space, rigid off him: he goes too fast for anything to follow)
+  const C = COSMOS, c = T.cat, b = T.bird, bird = player.form === 'phoenix';
+  for (const G of [c.group, b.group]) if (G.parent !== C.scene) C.scene.add(G);
+  T.ph += dt; const k = bird ? phoenix.group.scale.x : 1;
+  _xoV.set(bird ? -4.6 * k : 1.3, bird ? 0.5 * k + Math.sin(T.ph * 1.3) * 0.2 * k : -0.4 + Math.sin(T.ph) * 0.15, bird ? 3.2 * k : 1.2).applyQuaternion(C.q).add(C.pos).sub(C.camPos);
+  c.group.visible = !bird && !C.map.on; b.group.visible = bird && !C.map.on;
+  if (bird) { b.group.position.copy(_xoV); b.group.quaternion.copy(C.q); b.group.scale.setScalar(k * 0.2); XO.K.flap(b, T.ph * 7); b.helm.visible = true; }
+  else { c.group.position.copy(_xoV); c.group.quaternion.copy(C.q).multiply(_xoQ.setFromAxisAngle(_czY, T.ph * 0.3)); c.group.scale.setScalar(1.6); c.dress(true); c.legs.forEach((l, i) => { l.rotation.x = Math.sin(T.ph * 1.5 + i) * 0.3; }); }
+}
+// each frame, wherever he is (and on a world in space): the line kept told, the keeper's token, his body if he is from there
+function xoTick(dt) {
+  if (!XO.on && !XO.K) return;
+  XO.t += dt;
+  if (XO.X) {
+    if ((XO.meT -= dt) <= 0) { XO.meT = 1; xoMe(false); }
+    if ((XO.rtT -= dt) <= 0) { XO.rtT = 15; xoRt(); }
+    xoKeeper(dt);
+    if (!COSMOS.on && XO.looking) xoSkyOff();
+    if (!COSMOS.on && XO.tag && XO.tag.style.display !== 'none') XO.tag.style.display = 'none';
+  }
+  if (XO.vis && !COSMOS.on) xoSelf(dt);   // (out in space it is done once he has been placed there: see xoCosmos)
+  postMat.uniforms.uVisOn.value = XO.vis || XO.pxN > 0 || XO.skyPx > 0 ? 1 : 0; XO.pxN = 0;
+}
+
 // drawn in place of the world (and the dip into the dark and out again at either end of the way up)
 function cosmosPresent() {
   const C = COSMOS, U = postMat.uniforms, f0 = U.uFade.value, k = C.fadeT > 0 ? 1 - 0.9 * Math.pow(C.fadeT / CZ_FADE, 1.5) : 1;
@@ -39896,6 +40320,7 @@ function plTick(dt) {
   if (TURNC.T) turnCam(dt);
   if (window.__icarus?.testCam) window.__icarus.testCam(camera);
   PL.sky.position.copy(camera.position); PL.stars.position.copy(camera.position);
+  xoTick(dt);
   { const f0 = U.uFade.value, k = PL.fadeT > 0 ? 1 - 0.95 * Math.pow(PL.fadeT / 1.1, 1.5) : 1; U.uFade.value = f0 * k; present(scene, camera); U.uFade.value = f0; }
   if (DP.grab) { const r = DP.grab; DP.grab = null; r(dpFrame()); }
   if (photo.snap) { photo.snap = false; const done = photo.blobR; photo.blobR = null;
@@ -40510,8 +40935,8 @@ addEventListener('keydown', e => { if (!STU.open || e.key !== 'Escape') return; 
 stuLoad();
 try { if (sessionStorage.getItem('icarusStudio.reopen')) { sessionStorage.removeItem('icarusStudio.reopen'); setTimeout(() => toast('YOUR OWN GAME · AS YOU LEFT IT'), 4000); } } catch {}
 
-// build the summit and its surroundings before showing the title
-setTimeout(() => {
+// build the summit and its surroundings before showing the title (a traveller just crossed in from BURNING STUDIO MUSIC is waited for a moment first: see xoHold)
+setTimeout(() => xoHold(() => {
   resumed = loadGame(); loadMap(); camUI(); codeUI();
   $('ctl').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation(); $('ctl').classList.remove('open'); if (b.dataset.c === 'tilt') useTilt(); else useStick(); });
   $('ctlBtn').addEventListener('click', e => { e.stopPropagation(); if (tilt.on) { useStick(); toast('THE STICK · LEFT THUMB'); } else useTilt(); });
@@ -40536,6 +40961,7 @@ setTimeout(() => {
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, RR, rrJoin, rrMine, rrFetch, rrPlace, rrLayout, gotRjoin, get RING_DONE() { return RING_DONE; }, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { cpusCmd, MOD, die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AG, agTake, AGX, agxPoll, agxSend, agxDraw, agxTab, agxAt, agxHear, agxCommand, CH, chShow, sendChat, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { FLY, flyDrag, airLift });
+  if (window.__icarus) Object.assign(window.__icarus, { XO, xoToSpace, xoCross, xoAdmin, xoPeer, xoSkyGot, xoWrite, xoStadium, gotState, COSMOS, czForm, PL });   // (tests: the crossing)
   if (window.__icarus) Object.assign(window.__icarus, { MINI, miniSet, miniCycle, miniWhoShow, miniShown, BINDS, BIND, bindTxt, devNow, CTL, ctlShow, ctlDraw, PG, PG_LESSONS, pgStart, pgEnd, pgSkip, pgTopic, pgFire, pgCardDraw, hmSummon, hmParse, hmHeard, pgHeard, CMD_HELP, sendChat });
   if (window.__icarus) Object.assign(window.__icarus, { NEWB, newbHear, newbHeard, newbTyped, newbTalk, newbFallback, newbArrive });
   if (window.__icarus) Object.assign(window.__icarus, { WS, wingSolve, wingState, wingSet, wingRead, birdWings, airRough, WPOSE: { M: POSE_M, CUP: POSE_CUP, TEAR: POSE_TEAR, LOAD: POSE_LOAD, WIDE: POSE_WIDE, BRAKE: POSE_BRAKE, FOLD: FOLDW }, fireMat, featherFx, updateTails, updatePeers, body, PC, PT, SWIM, SWW, swimPose, swimUnderPose, poseOn });   // (tests: the wings, and the swimmer)
@@ -40552,7 +40978,8 @@ setTimeout(() => {
   if (window.__icarus) Object.assign(window.__icarus, { updateBirds, BSP, BSPL, BLOD, BIRD_KINDS, birdRig, birdRigDrive, birdSpots, birdsUp, perchLook, birdFlap, eagleFly, VULT, BBURN, MEAT, birdIgnite, birdHeatR, birdBurn, meatDrop, meatEat, meatNear });   // (tests: the birds)
   if (window.__icarus) Object.assign(window.__icarus, { HY, HY_MUL, hyperTick, hyperGo, hyperOff, hyperPeers, PEER_COLS, auiHyper, FAN, FAN_Q, get flash() { return flash; } });   // (tests: hyper)   // (tests: the dive bomb, and the lens opened for speed)
   frame();
-}, 30);
+  xoBooted();
+}), 30);
 </script>
 </body>
 </html>
