@@ -337,7 +337,7 @@
   #authMsg { min-height:14px; margin-top:8px; color:#ffb070; font-size:10px; letter-spacing:.08em; }
   /* where he is: one quiet line across the top, when he crosses into a named country */
   #areaBar { position:fixed; left:50%; top:calc(var(--st, 0px) + 10px); transform:translate(-50%, -8px); z-index:7; pointer-events:none; text-align:center; opacity:0; transition:opacity .9s, transform .9s; white-space:nowrap; text-shadow:0 0 8px #000, 0 0 2px #000; }
-  #areaBar.on { opacity:1; transform:translate(-50%, 0); }
+  #areaBar.on { opacity:1; transform:translate(-50%, 0); } body.mapon #areaBar, body.mapon #tut { visibility:hidden; }
   #areaBar b { display:block; font-weight:500; font-size:11px; letter-spacing:.5em; padding-left:.5em; color:#fff1dc; }
   #areaBar i { display:block; font-style:normal; font-size:9px; letter-spacing:.3em; padding-left:.3em; margin-top:4px; color:var(--dim); }
   .touch #areaBar { top:calc(var(--st, 0px) + 46px); }
@@ -23533,6 +23533,7 @@ function voiceRun(a) {
   if (a.startsWith('become:')) return shapeshift(a.slice(7));
   if (a.startsWith('name:')) return void renameSelf(a.slice(5));
   if (a.startsWith('view:')) { if (state === 'play') openPhoto(true); if (state === 'photo') photoPreset(+a.slice(5) || 1); return; }
+  if ((a.startsWith('goto:') || a.startsWith('warp:')) && COSMOS.on) { const n = a.slice(a.indexOf(':') + 1).trim().toUpperCase(), B = COSMOS.bodies.find(B => B.name && (B.name.toUpperCase() === n || B.name.toUpperCase().startsWith(n) || n.includes(B.name.toUpperCase()))); if (B) { czGo(B.id); return; } if (/\b(world|home|earth|globe)\b/i.test(n)) { czGo('globe'); return; } }
   if (a.startsWith('goto:')) { const w = placeNamed(a.slice(5)); if (!w) { toast("I DON'T KNOW WHERE THAT IS"); return; } if (state === 'map') closeMap(); apMark(w); AP.kind = 'go'; AP.t0 = time; AP.follow = w.peer || null; toast(`TO ${w.label.toUpperCase()}`); return; }
   if (a.startsWith('warp:')) { const F = peerNamed(a.slice(5)); if (F) warpToPeer(F); else { const w = placeNamed(a.slice(5)); if (w && flags.morphed && state !== 'talk') { if (state === 'map') closeMap(); startWarp(w.x, w.z); } else toast('NOBODY BY THAT NAME IS FLYING'); } return; }
   if (a.startsWith('track:')) { const F = peerNamed(a.slice(6)); if (F) trackPeer(F, true); else toast('NOBODY BY THAT NAME IS FLYING'); return; }
@@ -23553,17 +23554,20 @@ function voiceRun(a) {
     case 'jump': if (p.grounded || p.climb) { if (k === 'jump' || k === 'jumpoff' || k === 'ignite') pressSpace(); else jump(); } break;
     case 'dive': if (p.form === 'human' && p.swim) humanDive(); else { apTimed(0, -0.9, 2.6, p.form === 'phoenix'); toast('DIVE'); } break;
     case 'climb': apTimed(0, 0.8, 2.6); toast('CLIMB'); break;
-    case 'faster': apTimed(0, 0, 4, true); toast('FASTER'); break;
-    case 'slower': apTimed(0, 0.35, 2.5); toast('SLOWER'); break;
+    case 'faster': if (COSMOS.on) { COSMOS.brakeT = 0; cosmosBeat(); toast('FASTER'); break; } apTimed(0, 0, 4, true); toast('FASTER'); break;
+    case 'slower': if (COSMOS.on) { COSMOS.brakeT = time + 4; toast('SLOWING DOWN'); break; } apTimed(0, 0.35, 2.5); toast('SLOWER'); break;
+    case 'quests': if (state === 'map') closeMap(); qlShow(!QL.open); break;
+    case 'stats': if (state === 'stats') statsClose(); else if (state === 'play') statsOpen(); break;
+    case 'controls': ctlShow(true); break;
     case 'left': case 'right': {
       const sd = a === 'left' ? -1 : 1;
       if (p.form === 'human' && p.grounded) { human.group.rotation.y -= sd * 0.8; camYaw -= sd * 0.8; } else apTimed(sd, 0, 1.3);
       toast(a.toUpperCase()); break; }
     case 'around': if (p.form === 'human' && p.grounded) { human.group.rotation.y += Math.PI; camYaw += Math.PI; } else apTimed(1, 0, 2.6); toast('TURNING ROUND'); break;
     case 'walk': case 'run': AP.kind = 'walk'; AP.run = a === 'run'; AP.until = time + 25; toast(a === 'run' ? 'RUN' : 'WALK'); break;
-    case 'stop': apClear(); AP.q.length = 0; if (AP.wp) apUnmark(); toast('STOP'); break;
+    case 'stop': if (COSMOS.on) { COSMOS.brakeT = time + 8; toast('STOPPING · SAY GO OR BEAT YOUR WINGS TO FLY ON'); break; } apClear(); AP.q.length = 0; if (AP.wp) apUnmark(); toast('STOP'); break;
     case 'go_there': if (state === 'map' && mapV.vr && mapV.vr !== realm) { toast(mapWayHint(mapV.vr)); break; } if (state === 'map') { const w = { x: mapV.x, z: mapV.z }; w.y = Math.max(groundAt(w.x, w.z), WATER); closeMap(); apMark(w); } else apMark(gazePoint()); AP.kind = 'go'; AP.t0 = time; break;
-    case 'map': if (XR.on) xmapShow(!XMAP.on); else if (state === 'map') closeMap(); else if (state === 'play') openMap(); break;
+    case 'map': if (XR.on) xmapShow(!XMAP.on); else if (COSMOS.on) cosmosMap(!COSMOS.map.on); else if (state === 'map') closeMap(); else if (state === 'play') openMap(); break;
     case 'photo': if (state === 'play') openPhoto(true); break;
     case 'snap': if (state === 'photo') snapPhoto(); else if (state === 'play') { openPhoto(true); setTimeout(() => snapPhoto(), 250); } break;
     case 'menu': if (XR.on) xrMenuShow(!XM.open); else menuShow(!MENU.open); break;
@@ -23594,7 +23598,7 @@ function voiceRun(a) {
     case 'craft:pick': case 'craft:torch': case 'craft:lantern': craftMake(a.slice(6)); break;
     case 'build': if (state === 'play') bldMode(true); break;
     case 'letters_fit': lettersSet(null, 'LETTERS TO FIT THIS SCREEN'); break;
-    case 'close': if (XF.open) xfList(false); else if (ALBUM.open) albumShow(false); else if (GUIDE.open) guideShow(false); else if (MENU.open) menuShow(false); else if (state === 'photo') closePhoto(); else if (state === 'map') closeMap(); else if (CHAT.open) closeChat(); else if (EXPLAIN.i >= 0) { EXPLAIN.i = 1e9; explainPanel(); } else if (who.pinned) who.pinned = false; else if (HEALTH.open) healthShow(false); break;
+    case 'close': if (COSMOS.map?.on) cosmosMap(false); else if (XF.open) xfList(false); else if (ALBUM.open) albumShow(false); else if (GUIDE.open) guideShow(false); else if (MENU.open) menuShow(false); else if (state === 'photo') closePhoto(); else if (state === 'map') closeMap(); else if (CHAT.open) closeChat(); else if (EXPLAIN.i >= 0) { EXPLAIN.i = 1e9; explainPanel(); } else if (who.pinned) who.pinned = false; else if (HEALTH.open) healthShow(false); break;
     case 'godmode': godMode(true); break; case 'godmode_off': godMode(false); break; case 'warzone': matchWar(); break;
     case 'cinematic': TUT.cineOpen = true; cinema.manual = true; toast('CINEMATIC CAMERA'); break;
     case 'pilot': pilotSet(true); break; case 'pilot_off': pilotSet(false); break; case 'pilot_hold': pilotSet(true, true); pilotHold(true); break; case 'pilot_free': pilotHold(false); break;
@@ -23660,6 +23664,7 @@ const V_RULES = [
   [/\b(mic(rophone)? off|mute (me|my ?self|my (mic|microphone|voice))|stop listening|don'?t listen|turn (the |my )?mic(rophone)? off)\b/, 'mic_off'],
   [/\b(tilt (steering|control|mode|to steer)|steer (with|by) (tilt|tilting|the phone)|use (the )?tilt)\b/, 'tilt'],
   [/\b(thumb (steering|control|stick|mode)|(use|steer with) (the |my )?(stick|joystick|thumb)|joystick)\b/, 'thumb'],
+  [/\b((open|show|close|hide) (the |my )?(quests?|journal|missions?|tasks?)|quests?|journal|quest log)\b/, 'quests'], [/\b((open|show|close|hide) (the |my )?stats|my stats|stats|statistics|how am i doing)\b/, 'stats'], [/\b((open|show) (the )?(controls|keys|key ?binds)|controls|what are the keys|keyboard)\b/, 'controls'],
   [/\b((open|show|close|hide) (the )?(menu|settings|options)|menu|settings|options)\b/, 'menu'],
   [/\b((better|higher|more|best|sharper|nicer) (graphics|quality|detail)|(graphics|quality|detail) (up|higher))\b/, 'quality_up'],
   [/\b((lower|less|worse|faster) (graphics|quality|detail)|(graphics|quality|detail) (down|lower)|make it (smoother|run faster|faster to run)|it'?s (lagging|laggy|choppy|stuttering))\b/, 'quality_down'],
@@ -28009,17 +28014,17 @@ function openMap() {
   const dpr = Math.min(devicePixelRatio, 2); mapCv.width = innerWidth * dpr; mapCv.height = innerHeight * dpr;
   // it opens out of where he is standing: close in on him, then the country spreads
   mapV.x = mapV.tx = player.pos.x; mapV.z = mapV.tz = player.pos.z; mapV.s = 0.34; mapV.ts = TOUCH ? 0.06 : 0.085;
-  if (mapV.layer !== 'both') mapV.layer = realm;   // (one world or the other: always the one he is in, to begin with)
+  mapV.layer = realm;   // (always the world he is in, to begin with: U shows the other, or both)
   mapV.vr = realm; mapV.both = false; mapV.vrKey = ''; mapTitle(realm, false);
   if (WORLD.lookT > 20) WORLD.lookT = 0.2;   // a fresh look at the world while the map is open
   mapHint(); mapLayerShow(); mapV.T = 1; mapV.h = player.pos.y; mapV.ptr = null; mapV.hot = null;   // (it opens lying flat, and stands up)
-  mapEl.classList.add('open'); audio.sfx.ui();
+  mapEl.classList.add('open'); document.body.classList.add('mapon'); audio.sfx.ui();
 }
 function closeMap() {
   if (mapV.open) audio.sfx.mapClose?.();
   if (!mapV.open) return;
   mapV.open = false; mapEl.classList.remove('open'); M3.on = false; M3.keys = {}; mapV.m3c = false; mapEl.classList.remove('m3'); document.body.classList.remove('map3');
-  if (state === 'map') state = 'play';
+  document.body.classList.remove('mapon'); if (state === 'map') state = 'play';
 }
 // the heading: which country, how much of it he has seen, how much everyone has (and, with both, the other under or over it)
 function mapTitle(r, both) {
@@ -28077,6 +28082,11 @@ function m3Init() {
     M3.cut = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })); M3.cut.frustumCulled = false; M3.cut.visible = false; S.add(M3.cut); }
   // him: a bright dart at the height he is at; everyone else a bead; each on a thread down to the ground under them
   M3.me = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.7, 6).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xff8a3a, fog: false })); S.add(M3.me);
+  { const body = new THREE.ConeGeometry(0.32, 1.9, 5).rotateX(-Math.PI / 2), wing = sd => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -0.45, 0, 0, 0.55, sd * 2.5, 0, 0.35, 0, 0, -0.45, sd * 2.5, 0, 0.35, sd * 1.4, 0, -0.2], 3)); g.computeVertexNormals(); return g; };
+    const mk = geo => { const m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ fog: false, side: THREE.DoubleSide }), 49); m.count = 0; m.frustumCulled = false; m.setColorAt(0, new THREE.Color(1, 1, 1)); S.add(m); return m; };
+    M3.bB = mk(body); M3.bL = mk(wing(-1)); M3.bR = mk(wing(1)); M3.bT = mk(new THREE.ConeGeometry(0.42, 0.9, 4).rotateX(Math.PI / 2).translate(0, 0, 1.15));   // (every bird on the table: a body, two wings that beat, a tail)
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(49 * 40 * 6), 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(49 * 40 * 6), 3).setUsage(THREE.DynamicDrawUsage));
+    M3.trail = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85, fog: false, blending: THREE.AdditiveBlending, depthWrite: false })); M3.trail.frustumCulled = false; S.add(M3.trail); }
   M3.peers = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 10, 8), new THREE.MeshBasicMaterial({ fog: false }), 24); M3.peers.count = 0; M3.peers.frustumCulled = false; M3.peers.setColorAt(0, new THREE.Color(1, 1, 1)); S.add(M3.peers);
   { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(25 * 6), 3).setUsage(THREE.DynamicDrawUsage)); M3.threads = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffb070, transparent: true, opacity: 0.55, fog: false })); M3.threads.frustumCulled = false; S.add(M3.threads); }
   M3.marks = new THREE.Group(); S.add(M3.marks);
@@ -28119,7 +28129,7 @@ function m3Build(dt, hurry) {
       else for (let i = 0; i < N; i++) { const o = j * N + i, h = J.h[o], hx = J.h[j * N + Math.min(N - 1, i + 1)] - J.h[j * N + Math.max(0, i - 1)], hz = J.h[Math.min(N - 1, j + 1) * N + i] - J.h[Math.max(0, j - 1) * N + i];
         const ny = 2 * st / Math.hypot(hx, 2 * st, hz), x = x0 + i * st, z = z0 + j * st, o3 = o * 3;
         J.pos[o3] = x; J.pos[o3 + 1] = h; J.pos[o3 + 2] = z; terrainColor(x, z, h, ny, J.col, o3);
-        if (!mapKnown(x, z)) { const g = (J.col[o3] + J.col[o3 + 1] + J.col[o3 + 2]) * 0.05; J.col[o3] = g + 0.035; J.col[o3 + 1] = g + 0.042; J.col[o3 + 2] = g + 0.06; } }   // (never charted: a dark shape, no more)
+        if (!mapKnown(x, z)) { const g = (J.col[o3] + J.col[o3 + 1] + J.col[o3 + 2]) / 3; for (let c = 0; c < 3; c++) J.col[o3 + c] = lerp(g, J.col[o3 + c], 0.35) * 0.42 + [0.02, 0.028, 0.05][c]; } }   // (never charted: dim and grey, but there to be read and gone to)
       if (++J.j >= N) { J.j = 0; J.phase++; } } });
     if (J.phase < 2) break;   // (the nearer one first; the wider ones wait their turn)
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(J.pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(J.col, 3)); g.setIndex(M3.idx); g.computeVertexNormals();
@@ -28226,6 +28236,20 @@ addEventListener('keyup', e => { M3.keys[e.code] = false; });
 addEventListener('blur', () => { M3.keys = {}; });
 // every frame the map is standing: the meshes, the sea, the things that stand on it, and everyone on it
 const _m3m = new THREE.Matrix4(), _m3c = new THREE.Color(), _m3s = new THREE.Vector3(), _m3p = new THREE.Vector3(), _m3q = new THREE.Quaternion();
+const _m3w = new THREE.Matrix4(), _m3e = new THREE.Euler(0, 0, 0, 'YXZ'), _m3q2 = new THREE.Quaternion();
+// one bird on the model, as it is flying: turned the way it is going, pitched and banked, its wings beating (faster as it
+// climbs, held out as it glides, folded back as it dives fast), and behind it a fading line of where it has just been
+function m3Bird(i, id, x, y, z, yaw, pitch, bank, sp, sc, css, o) {
+  const tm = time + (o.m3ph ??= Math.random() * 9), fold = smoothstep(80, 260, sp), beat = Math.sin(tm * (sp < 30 ? 9 : 5.5)) * (0.75 - 0.5 * fold) + 0.12, col = _m3c.set(css);
+  _m3q.setFromEuler(_m3e.set(clamp(pitch, -1.2, 1.2), yaw, clamp(-bank, -1.2, 1.2))); _m3m.compose(_m3p.set(x, y, z), _m3q, _m3s.setScalar(sc));
+  M3.bB.setMatrixAt(i, _m3m); M3.bB.setColorAt(i, col); M3.bT.setMatrixAt(i, _m3m); M3.bT.setColorAt(i, col);
+  for (const [M, sd] of [[M3.bL, -1], [M3.bR, 1]]) { _m3q2.setFromAxisAngle(_v.set(0, 0, 1), -sd * beat); _m3w.makeRotationFromQuaternion(_m3q2).scale(_m3s.set(1, 1, 1 - fold * 0.35)); M.setMatrixAt(i, _m3w.premultiply(_m3m)); M.setColorAt(i, _m3c.set(css).multiplyScalar(1.25)); }
+  // where it has been: kept on the bird, a point a fifth of a second
+  const H = o.m3tr ||= []; if (!H.length || time - H[H.length - 1][3] > 0.2) { H.push([x, y, z, time]); if (H.length > 40) H.shift(); }
+  const P = M3.trail.geometry.attributes.position, C = M3.trail.geometry.attributes.color; col.set(css);
+  for (let j = 1; j < H.length && M3.trN < P.count - 2; j++) { const a = H[j - 1], b = H[j], f = j / H.length * smoothstep(8, 4, time - b[3]);
+    P.setXYZ(M3.trN, a[0], a[1], a[2]); C.setXYZ(M3.trN++, col.r * f, col.g * f, col.b * f); P.setXYZ(M3.trN, b[0], b[1], b[2]); C.setXYZ(M3.trN++, col.r * f, col.g * f, col.b * f); }
+}
 function m3Update(dt) {
   m3Init(); const V = mapV, under = realm === 'under', both = V.both, other = under ? 'over' : 'under', mine = realm === V.real;
   if (M3.realm !== realm) { M3.realm = realm; for (const L of M3.lv) { L.key = ''; L.job = null; L.built = false; L.mesh.visible = false; } M3.bg.set(under ? 0x05060c : 0x070a12); M3.marksKey = ''; }
@@ -28242,15 +28266,21 @@ function m3Update(dt) {
   M3.sea.visible = !under || both; M3.sea.position.set(V.x, WATER + (under ? M3.offX : 0), V.z); M3.sea.scale.set(far * 2.6, 1, far * 2.6);
   // him and everyone, at the height they are at (him only on the world he is in; the others on whichever world they are in)
   const P = player.pos, k = Math.max(2.5, M3.D * 0.016), yaw = player.form === 'human' ? human.group.rotation.y : player.yaw, T = M3.threads.geometry.attributes.position; let n = 0, t = 0;
-  M3.me.visible = mine && m3Vis(realm, P.x, P.z, true);
+  const meBird = mine && m3Vis(realm, P.x, P.z, true) && player.form === 'phoenix';
+  M3.me.visible = mine && m3Vis(realm, P.x, P.z, true) && !meBird;
   M3.me.position.copy(P); M3.me.rotation.set(0, yaw, 0); M3.me.scale.setScalar(k * 1.5);
-  if (M3.me.visible) { T.setXYZ(t++, P.x, P.y, P.z); T.setXYZ(t++, P.x, reliefH(P.x, P.z), P.z); }
-  const now = performance.now();
-  for (const Q of NET.peers.values()) { if (n >= 24 || !Q.s || now - Q.s.t > 15000 || SHUN.block.has(Q.name)) continue;
+  if (mine && m3Vis(realm, P.x, P.z, true)) { T.setXYZ(t++, P.x, P.y, P.z); T.setXYZ(t++, P.x, reliefH(P.x, P.z), P.z); }
+  const now = performance.now(); let nb = 0; M3.trN = 0;
+  if (meBird) m3Bird(nb++, 'me', P.x, P.y, P.z, player.yaw, player.pitch || 0, player.bank || 0, player.speed, k * 2.4, '#ff9a48', player);
+  for (const Q of NET.peers.values()) { if (n >= 24 && nb >= 49 || !Q.s || now - Q.s.t > 15000 || SHUN.block.has(Q.name)) continue;
     const qr = Q.realm ? 'under' : 'over', off = qr === realm ? 0 : M3.offX; if (typeof Q.realm === 'string' || qr !== realm && !both || !m3Vis(qr, Q.pos.x, Q.pos.z, true)) continue;
-    _m3m.compose(_m3p.set(Q.pos.x, Q.pos.y + off, Q.pos.z), _m3q, _m3s.setScalar(k * 1.6)); M3.peers.setMatrixAt(n, _m3m); M3.peers.setColorAt(n, _m3c.set(Q.css || '#bfe6ff')); n++;
+    if (Q.form === 'p' && nb < 49) { const sp = Math.hypot(Q.s.vx || 0, Q.s.vy || 0, Q.s.vz || 0), yw = sp > 2 ? Math.atan2(-(Q.s.vx || 0), -(Q.s.vz || 0)) : (Q.yaw ?? Q.yawT ?? 0);
+      m3Bird(nb++, Q.id || Q.name, Q.pos.x, Q.pos.y + off, Q.pos.z, yw, Q.pitch ?? Q.pitchT ?? 0, Q.bank ?? Q.bankT ?? 0, sp, k * 2, Q.css || '#bfe6ff', Q); }
+    else if (n < 24) { _m3m.compose(_m3p.set(Q.pos.x, Q.pos.y + off, Q.pos.z), _m3q, _m3s.setScalar(k * 1.2)); M3.peers.setMatrixAt(n, _m3m); M3.peers.setColorAt(n, _m3c.set(Q.css || '#bfe6ff')); n++; }
     T.setXYZ(t++, Q.pos.x, Q.pos.y + off, Q.pos.z); T.setXYZ(t++, Q.pos.x, relOf(qr, Q.pos.x, Q.pos.z) + off, Q.pos.z); }
   M3.peers.count = n; if (n) { M3.peers.instanceMatrix.needsUpdate = true; M3.peers.instanceColor.needsUpdate = true; }
+  for (const m of [M3.bB, M3.bL, M3.bR, M3.bT]) { m.count = nb; if (nb) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; } }
+  M3.trail.geometry.setDrawRange(0, M3.trN); M3.trail.geometry.attributes.position.needsUpdate = true; M3.trail.geometry.attributes.color.needsUpdate = true;
   T.needsUpdate = true; M3.threads.geometry.setDrawRange(0, t);
 }
 // drawn in place of the world while it stands
@@ -28304,6 +28334,21 @@ function mapTurn(dYaw, dT) { const V = mapV; if (!V.relief) mapMode(true); const
   if (Math.floor(V.yaw3 / 0.2618) !== Math.floor(y0 / 0.2618)) audio.sfx.mapTurn?.(0.5 + 0.5 * Math.cos(V.yaw3));
   else if (Math.floor(V.T3 / 0.06) !== Math.floor(t0 / 0.06)) audio.sfx.mapTurn?.(-0.4 + V.T3 * 0.5); }
 function mapNorth() { const V = mapV; V.yaw3 = Math.round(V.yaw / TAU_) * TAU_; V.T3 = 0.52; (audio.sfx.mapNorth || audio.sfx.ui)?.(); }
+// carried across, from the map: to a place in the other world (the dark only once he has found his own way down into it)
+function mapCross(to, x, z) {
+  if (!flags.morphed || state !== 'map' || PL.on || COSMOS.on) return false;
+  if (to === 'under' && !UNDER.known && !UNDER.seen) return false;
+  const p = player, man = p.form === 'human', yaw = man ? human.group.rotation.y : p.yaw, ox = p.pos.x, oy = p.pos.y, oz = p.pos.z;
+  closeMap(); audio.sfx.mapPick?.(); audio.sfx.teleport?.();
+  setRealm(to, x, z, yaw);
+  const g = Math.max(groundAt(x, z), to === 'over' ? WATER : -1e9), y = to === 'under' ? Math.min(g + 70, UNDER.ceil - 60) : g + 150;
+  p.pos.set(x, y, z); _v.set(x - ox, y - oy, z - oz); camera.position.add(_v); lookAt.add(_v); p.fallTop = p.pos.y; p.fallCause = ''; p.vel.set(0, 0, 0);
+  if (man) { p.grounded = false; p.tumble = false; } else { p.vy = 0; p.pitch = 0; p.speed = Math.max(p.speed, 40); }
+  checkpoint.set(x, y, z); SHORE.realm = ''; SHORE.row = -1; SHORE.fast = true; flash = Math.max(flash, 0.35); camShake = Math.max(camShake, 0.4);
+  if (to === 'under') { UNDER.known = true; titleCard('THE UNDERWORLD', 'carried down · the country of the dead', 2600, '#6f8cff'); }
+  else { questEvent.wasUnder = false; titleCard('THE DAY', 'carried up · the hills', 2200); }
+  saveSoon(); return true;
+}
 function mapBirdAt(px, py, r) { let best = null, bd = r * r; for (const h of mapV.hits) { const d = (h.x - px) ** 2 + (h.y - py) ** 2; if (d < bd) { bd = d; best = h.P; } } return best; }
 {
   const pts = new Map(); let tw = null;   // (two fingers: how far apart they are, at what angle, and how high on the glass)
@@ -28348,11 +28393,11 @@ function mapBirdAt(px, py, r) { let best = null, bd = r * r; for (const h of map
     if (P) { audio.sfx.mapPick?.(); warpToPeer(P); return; }
     const q = mapPickL(e.clientX, e.clientY);   // (where it is, and in which world: a place in the other one cannot be gone to, nor kept, from here)
     if (q.out) { audio.sfx.mapNo?.(); return; }
-    if (q.r !== realm) { audio.sfx.mapNo?.(); toast(mapWayHint(q.r)); return; }
+    if (q.r !== realm) { if (mapCross(q.r, q.x, q.z)) return; audio.sfx.mapNo?.(); toast(mapWayHint(q.r)); return; }
     if (keep) { if (wpAdd(q.x, Math.max(reliefH(q.x, q.z), WATER), q.z)) wpSelect(wpAll().length - 1); return; }   // (pressed and held, or with shift: a mark is kept there)
     const { x, z } = q;
-    if (mapKnown(x, z) && flags.morphed) { audio.sfx.mapPick?.(); closeMap(); startWarp(x, z); }
-    else audio.sfx.mapNo?.();   // (nobody has been there: nothing to be carried to)
+    if (flags.morphed) { audio.sfx.mapPick?.(); closeMap(); startWarp(x, z); }
+    else { audio.sfx.mapNo?.(); toast('FLY ONCE FIRST · THEN THE MAP CARRIES YOU ANYWHERE ON IT'); }
   };
   mapEl.addEventListener('pointerup', up); mapEl.addEventListener('pointercancel', up);
   mapEl.addEventListener('pointerleave', () => { mapV.ptr = null; });
@@ -33062,9 +33107,9 @@ function godMode(on = !GODM.on, quiet = false) {
     if (!flags.morphed) { toast('YOU HAVE NOT FLOWN YET'); return; }
     if (state !== 'play' || p.cine || realm === 'under' && false) { toast('NOT NOW'); return; }
     if (GODM.charge < 0.12 && !GODM.forced && !KEEP_ON && !MOD.admin) { toast(`THE GOD IN YOU IS SPENT · ${Math.ceil((0.12 - GODM.charge) * 110)} S`); return; }
-    if (GODM.spent && !GODM.forced && !isKeeper()) { toast('YOU ARE SPENT · LAND AND REST FIRST'); return; }
+    if (GODM.spent && !GODM.forced && !isKeeper()) { toast(`YOU ARE SPENT · LAND AND REST, OR WAIT ${Math.max(1, Math.ceil(15 - (GODM.spentT || 0)))} S`); return; }
     godBuild(); GODM.on = true; NET.lastSent = null; p.flame = 1; p.burnout = false;
-    if (p.form !== 'phoenix' && !SH.def) voiceFly();
+    if (p.form !== 'phoenix' && !SH.def) { if (COSMOS.on) czForm('phoenix'); else voiceFly(); }   // (out in space the man becomes the bird the way he does there)
     if (!quiet) { try { SESSION.titleTex?.dispose?.(); SESSION.titleTex = titleTexture(); } catch {} titleBurn();   // (the name, across the whole sky)
       audio.sfx.rebirth?.(); audio.sfx.halo?.(); flash = Math.max(flash, 0.6); camShake = Math.max(camShake, 0.7);
       shock(p.pos.x, p.pos.y + 1, p.pos.z, 0xfff0c0, 70 * birdK(), 1.1, true); shock(p.pos.x, p.pos.y + 1, p.pos.z, 0xffb060, 34 * birdK(), 0.7);
@@ -33075,8 +33120,8 @@ function godMode(on = !GODM.on, quiet = false) {
   } else {
     const cost = !quiet && !GODM.forced && !GODM.freeUntil && !isKeeper() && !KEEP_ON;   // (what it costs: see GODM)
     GODM.on = false; GODM.forced = false; GODM.freeUntil = 0; NET.lastSent = null; document.body.classList.remove('godeye');
-    if (cost) { GODM.spent = 1; GODM.restT = 0; p.burnout = false; }
-    if (!quiet) { toast(cost ? 'MORTAL AGAIN · YOU ARE SPENT · LAND AND REST' : 'MORTAL AGAIN'); audio.sfx.flameout?.(); }
+    if (cost) { GODM.spent = 1; GODM.restT = 0; GODM.spentT = 0; p.burnout = false; }
+    if (!quiet) { toast(cost ? 'MORTAL AGAIN · REST A MOMENT (LAND, OR WAIT 15 S)' : 'MORTAL AGAIN'); audio.sfx.flameout?.(); }
   }
 }
 function updateGod(dt) {
@@ -33087,7 +33132,8 @@ function updateGod(dt) {
   else G.charge = Math.min(1, G.charge + dt / 110);
   if (G.spent) {   // spent: it comes back only on the ground (or a perch), standing still a few breaths
     const rest = (p.form === 'human' && p.grounded || p.perch) && state === 'play'; G.restT = rest ? G.restT + dt : 0;
-    if (G.restT > 4 || state === 'dead') { G.spent = 0; G.restT = 0; if (state !== 'dead') toast('RESTED · YOUR WINGS ARE YOURS AGAIN'); } }
+    G.spentT = (G.spentT || 0) + dt;   // (or, wherever he is — in the air, in space, in the dark — a quarter of a minute)
+    if (G.restT > 4 || G.spentT > 15 || state === 'dead') { G.spent = 0; G.restT = 0; G.spentT = 0; if (state !== 'dead') toast('RESTED · THE GOD IN YOU CAN WAKE AGAIN'); } }
   if (G.built) {
     const show = G.k > 0.02 && bird && !p.gone; for (const m of G.parts) { m.visible = show; if (show) m.scale.setScalar(Math.max(0.001, G.k)); }
     G.halo.visible = show;
@@ -33622,7 +33668,7 @@ function modeBarSet() {
 function godDash(x, z, y = null) {
   const p = player; if (state !== 'play' || p.cine || p.sub) return false;
   if (p.form !== 'phoenix') toBird();
-  const g = Math.max(height(x, z), WATER), ty = y != null ? Math.max(y, g + 25) : g + 170;
+  const g = Math.max(height(x, z), realm === 'under' ? -1e9 : WATER), top = realm === 'under' && !PL.on ? UNDER.ceil - 90 : 1e9, ty = Math.min(top, y != null ? Math.max(y, g + 25) : g + 170);
   const to = new THREE.Vector3(x, ty, z), from = p.pos.clone(), d = from.distanceTo(to); if (d < 80) return false;
   const dir = to.clone().sub(from).normalize(); to.addScaledVector(dir, -Math.min(140, d * 0.2));
   to.y = Math.max(to.y, Math.max(height(to.x, to.z), WATER) + 40);
@@ -39218,8 +39264,11 @@ function cosmosFly(dt) {
   C.q.normalize();
   const dW = C.dWorld ?? C.dNear, hk = HY.on ? 1 + 15 * smoothstep(1500, 30000, dW) : 1;   // (not near a world: it would be through it before he could turn. Only the worlds hold hyper back; the stones it goes through)
   const base = (boost ? 320 : 150) * MOD.speed * (1 + 0.15 * perks.swift) * (man ? 0.6 : 1), want0 = Math.min(base * (1 + Math.max(0, HY.on ? dW : C.dNear) / 700) * hk, HY.on ? 5e7 : 3e6);
-  const want = HY.on && CZD.dField < 3000 ? Math.min(want0, 2600 + Math.max(0, CZD.dField) * 4) : want0;   // (in among the stones, hyper smashes through them at a speed the eye can still follow)
-  C.v = lerp(C.v, M ? 0 : want, damp(want < C.v || M ? 4 : HY.on ? 1.1 : 0.45, dt));   // (slow to gather speed, quick to shed it near a world)
+  const brake = !M && state === 'play' && (C.brakeKey || C.brakeHold || (C.brakeT || 0) > time);   // (the brake: X, the phone's SLOW, or "slow down")
+  if (brake && HY.on) hyperOff('again');
+  const want = brake ? 22 : HY.on && CZD.dField < 3000 ? Math.min(want0, 2600 + Math.max(0, CZD.dField) * 4) : want0;   // (in among the stones, hyper smashes through them at a speed the eye can still follow)
+  C.v = lerp(C.v, M ? 0 : want, damp(brake ? 3.2 : want < C.v || M ? 4 : HY.on ? 1.1 : 0.45, dt));
+  if (brake && C.v > 60 && Math.random() < dt * 30) emit(C.pos.x + rnd(3), C.pos.y + rnd(3), C.pos.z + rnd(3), rnd(6), rnd(6), rnd(6), 0.4, [0.6, 0.8, 1.6], 0, 0.6);   // (slow to gather speed, quick to shed it near a world)
   f.set(0, 0, -1).applyQuaternion(C.q);
   CZD.prev.copy(C.pos); C.pos.addScaledVector(f, C.v * dt);
   if (C.nearB && C.nearD < C.nearB.R * 3) { C.pos.add(C.nearB.dp); CZD.prev.add(C.nearB.dp); }   // (carried along with the world he is near)
@@ -39240,7 +39289,7 @@ function cosmosFly(dt) {
 // sliding along a surface whose outward normal is n: what was going into it goes along it
 function czSlide(n) { const f = _czf.set(0, 0, -1).applyQuaternion(COSMOS.q), into = f.dot(n); if (into >= 0) return; _czw.copy(f).addScaledVector(n, -into * 1.15).normalize(); COSMOS.q.premultiply(_czq.setFromUnitVectors(f, _czw)); }
 // a wingbeat (Space, or a tap): a burst of speed
-function cosmosBeat() { const C = COSMOS; if (C.beatT > 0.45) return; C.beatT = 0.9; C.v *= player.form === 'human' ? 1.18 : 1.25; WR.beat = 1; CZS.ring = 1; audio.sfx.flap?.(1); }   // (one stroke at a time: a long one, out here)
+function cosmosBeat() { const C = COSMOS; C.brakeT = 0; if (C.beatT > 0.45) return; C.beatT = 0.9; C.v *= player.form === 'human' ? 1.18 : 1.25; WR.beat = 1; CZS.ring = 1; audio.sfx.flap?.(1); }   // (one stroke at a time: a long one, out here)
 // the frame in space: the worlds moved on, the eye placed, everything put where the eye sees it
 function cosmosFrame(dt) {
   const C = COSMOS, p = player, t = Date.now() / 1000; C.uT.value = time;
@@ -40678,11 +40727,22 @@ function czZoom(f) { const M = COSMOS.map; M.td = clamp(M.td * f, 25, 4e8); }
 function czMapKeys(dt) { const K = COSMOS.map.keys;
   if (K.KeyA || K.ArrowLeft) czOrbit(-260 * dt, 0); if (K.KeyD || K.ArrowRight) czOrbit(260 * dt, 0); if (K.KeyW || K.ArrowUp) czOrbit(0, -260 * dt); if (K.KeyS || K.ArrowDown) czOrbit(0, 260 * dt);
   if (K.KeyQ) czDial(1.4 * dt); if (K.KeyE) czDial(-1.4 * dt); if (K.Equal || K.NumpadAdd) czZoom(Math.pow(0.3, dt)); if (K.Minus || K.NumpadSubtract) czZoom(Math.pow(3.3, dt)); }
+// carried to a world from the map of the heavens: set down a little way out from it, facing it, slow
+function czGo(id) {
+  const C = COSMOS, B = C.bodies.find(B => B.id === id), c = B ? B.pos : _cz0, R = B ? B.R : CZ_RG;
+  if (!C.on || state !== 'play' || PL.on || PL.pend) return false;
+  _czv.subVectors(C.pos, c); if (_czv.lengthSq() < 1) _czv.set(0, 1, 0); _czv.normalize();
+  C.pos.copy(c).addScaledVector(_czv, R * (B ? 2.6 : 1.7)); CZD.prev?.copy(C.pos);
+  _czw.copy(_czv).negate(); const up = Math.abs(_czw.y) > 0.95 ? _czu.set(1, 0, 0) : _czu.set(0, 1, 0); czLook(C.q, _czw, up);
+  C.v = 140; C.pv = 0; C.camOff = null; if (HY.on) hyperOff('again');
+  cosmosMap(false); flash = Math.max(flash, 0.3); audio.sfx.teleport?.(); toast(`TO ${B ? B.name : 'THE WORLD'}`);
+  return true;
+}
 function czFocus(id) { const C = COSMOS, M = C.map, B = C.bodies.find(B => B.id === id); M.pid = id; M.td = id === 'me' ? 260 : id === 'globe' ? CZ_RG * 7 : B ? B.R * 6 : M.td; audio.sfx.mapPick?.(); }
 function czMapText() {
   const C = COSMOS, km = Math.max(0, (C.pos.length() - CZ_RG) / 1000);
   C.mapT.textContent = `THE HEAVENS · ${C.found.size} WORLDS FOUND · ${km < 100 ? km.toFixed(1) : Math.round(km).toLocaleString()} KM FROM THE WORLD`;
-  C.mapH.textContent = TOUCH ? 'drag to turn it round · pinch to zoom · twist to dial · tap a world to go round it' : 'drag, or two fingers, to turn it round · fingers round in a circle dial it · pinch or scroll to zoom · click a world to go round it · H you · G the world · M to close';
+  C.mapH.textContent = TOUCH ? 'drag to turn it round · pinch to zoom · twist to dial · tap a world to go round it, tap again to go there' : 'drag, or two fingers, to turn it round · fingers round in a circle dial it · pinch or scroll to zoom · click a world to go round it, click it again to go there · H you · G the world · M to close';
 }
 // the names, written over it where the eye sees each world
 function czLabels() {
@@ -40718,8 +40778,9 @@ function czUI() {
     #czMapX { position:absolute; right:calc(var(--sr, 0px) + 14px); top:calc(var(--st, 0px) + 10px); min-height:40px; padding:8px 14px; border:1px solid rgba(160,190,255,.4); border-radius:20px; background:rgba(5,7,13,.5); color:#cfe0ff; font:inherit; font-size:10px; letter-spacing:.22em; cursor:pointer; }
     @media (max-width: 900px), (max-height: 520px) { #czMapT, #czMapH { font-size:9px; letter-spacing:.14em; line-height:1.5; } }`;
   document.head.appendChild(st);
-  const bar = C.barEl = document.createElement('div'); bar.id = 'czBar'; bar.innerHTML = '<b></b><i></i><button type="button">◎ MAP</button>'; document.body.appendChild(bar);
+  const bar = C.barEl = document.createElement('div'); bar.id = 'czBar'; bar.innerHTML = '<b></b><i></i><button type="button">◎ MAP</button> <button type="button" class="czslow">◇ SLOW</button>'; document.body.appendChild(bar);
   bar.querySelector('button').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); cosmosMap(true); });
+  { const b = bar.querySelector('.czslow'), on = v => e => { e.stopPropagation(); e.preventDefault(); C.brakeHold = v; }; b.addEventListener('pointerdown', on(true)); for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, on(false)); }
   const el = C.mapEl = document.createElement('div'); el.id = 'czMap'; el.innerHTML = '<canvas></canvas><div id="czMapT"></div><div id="czMapH"></div><button id="czMapX" type="button">CLOSE</button>'; document.body.appendChild(el);
   C.mapC = el.querySelector('canvas'); C.mapX = C.mapC.getContext('2d'); C.mapT = el.querySelector('#czMapT'); C.mapH = el.querySelector('#czMapH');
   el.querySelector('#czMapX').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); cosmosMap(false); });
@@ -40735,7 +40796,7 @@ function czUI() {
     czOrbit(dx * (e.pointerType === 'touch' ? 1.3 : 1), dy * (e.pointerType === 'touch' ? 1.3 : 1)); });
   const up = e => { pts.delete(e.pointerId); tw = null; const d = dn; dn = null; if (!d || d.moved || e.type !== 'pointerup') return;
     let best = null, bd = 1e9; for (const h of COSMOS.map.hits) { const q = Math.hypot(h.x - e.clientX, h.y - e.clientY); if (q < h.r + (e.pointerType === 'touch' ? 14 : 6) && q < bd) { bd = q; best = h; } }
-    if (best && best.id) czFocus(best.id); };
+    if (best && best.id) { if (best.id !== 'me' && best.id === COSMOS.map.pid && performance.now() - (COSMOS.map.pickT || 0) > 250) czGo(best.id); else { czFocus(best.id); COSMOS.map.pickT = performance.now(); } } };
   el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
   // the trackpad: two fingers swiped turn it; drawn round in a circle, the way they are going turns steadily one way, and
   // that turns it like a dial; a pinch (or a mouse wheel) pushes in and pulls back
@@ -40778,8 +40839,10 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyM') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) cosmosMap(true); }
   else if (e.code === 'Space') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) cosmosBeat(); }
   else if (e.code === 'KeyQ') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) czForm(player.form === 'human' ? 'phoenix' : 'human'); }   // (the other body, out here too: the man in his suit)
-  else if (['KeyH', 'KeyX', 'KeyR', 'KeyF', 'KeyB', 'KeyL', 'KeyK'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); }
+  else if (e.code === 'KeyX') { e.preventDefault(); e.stopPropagation(); C.brakeKey = true; if (!e.repeat && !C.brakeTold) { C.brakeTold = true; toast('SLOWING · LET GO OF X TO FLY ON'); } }
+  else if (['KeyH', 'KeyR', 'KeyF', 'KeyB', 'KeyL', 'KeyK'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); }
 }, true);
+addEventListener('keyup', e => { if (e.code === 'KeyX') COSMOS.brakeKey = false; }, true); addEventListener('blur', () => { COSMOS.brakeKey = false; COSMOS.brakeHold = false; });
 addEventListener('keyup', e => { COSMOS.map.keys[e.code] = false; }, true);
 setTimeout(() => { if (window.__icarus) Object.assign(window.__icarus, { COSMOS, cosmosOpen, cosmosEnter, cosmosLeave, cosmosMap, cosmosStep, czFrame, czCell, czOrbit, czDial, czZoom, czFocus, CZ_TOP, CZ_RG, CZD, CZN, CZF, czdFields, czdCloud, czdReefs, czdGatesOf, czdGateLight, czdDist, czdMask, czfHeard, HY, hyperGo, hyperOff, CZG, czgWant, czgStart, czgEnd, czgSay, czgFacts, czgLines }); }, 200);
 // ── The first time out. The first time he breaks through the top of the sky, the god he chose comes up through it with him,
@@ -42137,7 +42200,7 @@ setTimeout(() => xoHold(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { OSTAR, SANCT, TABLE, ostarAt, ostarGive, gotOly, pillarLight, perchLook, ROCK, ROCKK, rockSpot, rockFixed, rockFront, rockMake, rockBreak, mineSwing, gotMine, DROP, dropAdd, GATHER, gatherAct, errandNear, axeCheck, axeHeph, atForge, RECIPES, CRAFT, craftRows, craftRowDo, craftMake, bldList, invHas, DREAM, dreamSkip, topAt, surfAt, structHit, roostFind, camera, dir3, MOUSE, turnForm, turnMan, turnBird, wingsOut, armsOut, TURNC, MOUNT, updatePerch, get camYaw() { return camYaw; }, get time() { return time; }, agBuild, agWeb, agReach, agSpans, agWool, agStill, agNear, AGM, agmRocks, agmIgnite, agmGround, agmPieces, agmBurnAt, agDeck, agmAct, FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { mapCross, czGo, cosmosMap, voiceParse, COSMOS, HY, mapCv: typeof mapCv !== 'undefined' ? mapCv : null, OSTAR, SANCT, TABLE, ostarAt, ostarGive, gotOly, pillarLight, perchLook, ROCK, ROCKK, rockSpot, rockFixed, rockFront, rockMake, rockBreak, mineSwing, gotMine, DROP, dropAdd, GATHER, gatherAct, errandNear, axeCheck, axeHeph, atForge, RECIPES, CRAFT, craftRows, craftRowDo, craftMake, bldList, invHas, DREAM, dreamSkip, topAt, surfAt, structHit, roostFind, camera, dir3, MOUSE, turnForm, turnMan, turnBird, wingsOut, armsOut, TURNC, MOUNT, updatePerch, get camYaw() { return camYaw; }, get time() { return time; }, agBuild, agWeb, agReach, agSpans, agWool, agStill, agNear, AGM, agmRocks, agmIgnite, agmGround, agmPieces, agmBurnAt, agDeck, agmAct, FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, RR, rrJoin, rrMine, rrFetch, rrPlace, rrLayout, gotRjoin, get RING_DONE() { return RING_DONE; }, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { cpusCmd, MOD, die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AG, agTake, AGX, agxPoll, agxSend, agxDraw, agxTab, agxAt, agxHear, agxCommand, CH, chShow, sendChat, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { FLY, flyDrag, airLift });

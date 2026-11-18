@@ -19,6 +19,8 @@
 
 ## Getting around
 - [ ] **M** opens the map. Click a place to be carried there, or double-click it to fly there yourself.
+- [ ] **New:** a click on the map carries you anywhere on it, charted or not (after your first flight). Ground nobody has charted shows dim and grey, not black. In the 3D view (**R**) everyone flying is a little bird in their colour, flapping and leaving a fading trail, turned the way they're going; you're the orange one.
+- [ ] **New, the Underworld map:** **M** down there opens on the Underworld alone. Click to be carried anywhere in it. Once you've been down once, switch to both worlds with **U** and click a place in the hills to be carried up (or the other way down).
 - [ ] **U** on the map, or its pill, shows the Underworld as a 3D block under the ground.
 - [ ] The small map sits in the corner. **Shift M** turns it, points it north, or hides it.
 - [ ] **F1** opens the controls card. **?** asks Hermes how to do something.
@@ -45,6 +47,8 @@
 - [ ] **New, space has life:** drifts of rocks, from grit to moonlets, walled into mazes with doorways between home and its moons and round some worlds. Big rocks push you off; small ones get knocked aside or burn up. In hyper you smash straight through. Look for wrecks (columns, statue heads, burnt wings), and named wrecks where real players fell. Six lantern-lit lanes run out from home, phoenix flocks fly them, and gates in the drifts light up for everyone when anyone flies through.
 - [ ] **New, friends in space:** other players in space show up as birds in their own colour with their names.
 - [ ] In space, **M** opens the map of the heavens: drag it, pinch it, pick a world.
+- [ ] **New:** on the map of the heavens, click a world to go round it, then click it again to be carried there, set down just outside it, facing it.
+- [ ] **New, slowing in space:** hold **X** (on a phone, hold **SLOW**) and you slow to a drift; let go to fly on. Saying "slow down" or "stop" does it too; a wingbeat (**Space**) or "faster" goes again.
 - [ ] Dive at any world. **New:** the screen fills with the colour of its sky, and the world comes up out of the mist.
 - [ ] Try all nine:
   - rock
@@ -67,6 +71,8 @@
 ## Gods and story
 - [ ] Walk up to a god and speak or type. Be rude and Zeus smites you.
 - [ ] **J** shows quests and **Z** your stats.
+- [ ] **New, voice:** say "quests", "stats", "controls", "map", "close", "slow down", and in space "go to" and a world's name.
+- [ ] **New, god mode:** after it ends you can call it again once you land and rest, or after 15 s anywhere (in the air, in space, in the Underworld). The man in space becomes the bird when it starts.
 - [ ] **B**, or say "become a whale", takes any shape.
 
 ## Playing with others
