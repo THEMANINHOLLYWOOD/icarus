@@ -1447,10 +1447,22 @@ const ALP_TOP = SUMMIT - 150;   // (nothing out there stands as high as the moun
 const SKY_LIMIT = SUMMIT + 620;
 const CLOUD_SEA = SUMMIT - 720;
 const EDGE = { x: MOUNT.x - 3, z: MOUNT.z - 26 };   // the north lip of the summit, facing the hills
-// The table of the gods: behind the thrones and the house of Zeus the summit opens out into a broad snowfield on cliffs,
-// three hundred metres across and two hundred and fifty deep, room for a shrine to each of the Twelve, the Sacred Way and
-// a long walk. Its north edge stops short of the lip, so the lip still juts out over the drop the way it always did.
+// The table of the gods: behind the thrones and the house of Zeus the summit opens out into a broad high meadow on
+// cliffs, three hundred metres across and two hundred and fifty deep: short alpine turf, worn pale where the rock comes
+// through, white and blue with small flowers. The shrines of the Twelve are at the back of it, past the needle; the front
+// is left open, a meadow running to the lip, and from the lip the north face drops sheer: the leap is a leap.
 const TABLE = { cz: 110, rx: 150, rz: 128 };   // (its middle, south of the peak; its half-width; its half-depth)
+const SANCT_G = { cz: 150, RX: 100, RZ: 55 };    // (the horseshoe of shrines, south of the needle, open to the north and to the Way)
+// the top of the mountain, where it is turf and not snow (h: the ground's height there)
+const meadK = (x, z, h) => { const dx = x - MOUNT.x, dz = z - MOUNT.z; return dx * dx + dz * dz > 320 * 320 ? 0 : smoothstep(SUMMIT - 34, SUMMIT - 10, h); };
+// where the table is paved (the Sacred Way, the ring through the shrines) or built on: no grass grows through it
+function tablePaved(x, z) {
+  const dx = x - MOUNT.x, dz = z - MOUNT.z; if (dz < 50 || dz > TABLE.cz + TABLE.rz) return false;
+  if (Math.abs(dx) < 2.7 && dz > 60) return true;
+  const ex = dx / (SANCT_G.RX - 13), ez = (dz - SANCT_G.cz) / (SANCT_G.RZ - 13), q = Math.hypot(ex, ez); if (q > 0.6 && Math.abs(q - 1) * Math.hypot(dx, dz - SANCT_G.cz) / q < 2.1) return true;
+  for (const S of SANCT.list) if ((x - S.x) ** 2 + (z - S.z) ** 2 < 64) return true;
+  return false;
+}
 
 // ── The great ranges. The country round the mountain is hills; a long way out it is walled. Three ranges stand on the
 //    horizon, north, west and east of Olympus (never nearer it than seven kilometres: its rivers, its beacons and the
@@ -1594,6 +1606,10 @@ function overHeight(x, z) {
     if (k2 > 0) { const away = smoothstep(40, 100, Math.hypot(mdx, mdz - 6)), t2 = SUMMIT + away * (smoothstep(70, 220, mdz) * 7 + noise2(x / 70 + 3.1, z / 70 - 1.7) * 1.1), t1 = SUMMIT + Math.max(0, -mdz) * -0.12;
       h = lerp(h, (t1 * k1 + t2 * k2) / Math.max(1e-6, k1 + k2), Math.max(k1, k2)); }   // (rising a little to the south, gently uneven; the thrones' ground just as it was)
     else h = lerp(h, SUMMIT + Math.max(0, -mdz) * -0.12, k1);
+    if (mdz < -8) {   // the north face: past the lip (and the table's north edge) the mountain drops sheer, nearly two hundred metres before it slopes again
+      const u = Math.min((md - 23) / 0.72, (e - 1) * TABLE.rz);
+      if (u > 0) h = lerp(h, Math.min(h, SUMMIT - 3 - 190 * Math.pow(Math.min(1, u / 14), 0.65) - Math.max(0, u - 14) * 1.7 - noise2(x / 45 + 2.2, z / 45 - 5.5) * 14 * smoothstep(14, 40, u)), smoothstep(-8, -26, mdz));   // (and below the face the mountain goes on falling, steep and broken)
+    }
   }
   for (const s of SITES) {
     const dx = x - s.x, dz = z - s.z, d2 = dx * dx + dz * dz;
@@ -1630,7 +1646,7 @@ function overHeight(x, z) {
 const RIV = { ready: false, list: [], cell: 96, grid: new Map(), falls: [], sprayT: 0, group: null };
 const rivKey = (gx, gz) => (gx + 4096) * 8192 + (gz + 4096);
 (() => {
-  const srcs = [{ x: MOUNT.x + 55, z: MOUNT.z + 150, seed: 7101 }];
+  const srcs = [{ x: MOUNT.x + 55, z: MOUNT.z + TABLE.cz + TABLE.rz - 4, seed: 7101 }];   // (at the south rim of the table: it goes over the cliff there)
   for (const T of HIGH) {   // (each spring a little below its temple, on the side away from the summit)
     const dx = T.x - MOUNT.x, dz = T.z - MOUNT.z, l = Math.hypot(dx, dz) || 1;
     srcs.push({ x: T.x + dx / l * 48, z: T.z + dz / l * 48, seed: T.seed + 900 });
@@ -1814,6 +1830,7 @@ function underColor(x, z, h, ny, out, o) {
 // thin alpine grass below the snow, blue in the drifts, bare ice where it is too steep for snow to lie, and near the top the
 // white marble the gods' houses are cut from, with gold in it
 const ROCKC = { lime: col('#b9b3a2'), sand: col('#a98d69'), schist: col('#55535c'), scree: col('#9c958b'), lichen: col('#8f9a55'), alp: col('#a9a45a'), drift: col('#a9bcd8'), crust: col('#eef3fa'), ice: col('#97c3e2'), marble: col('#e8e2d5'), gold: col('#e6bd5c') };
+const MEAD = { dark: col('#4f7a2c'), light: col('#7fa63e'), sun: col('#a6c257'), dry: col('#b0a564'), stone: col('#b8b3a6'), edel: col('#eeeedd'), gentian: col('#3d5fc8') };
 const SEAC = { wet: col('#a3916e'), grass: col('#4f7038'), grass2: col('#6c7a3a'), rubble: col('#b0a596'), pink: col('#c49a92'), deep: col('#5b6670') };
 function terrainColor(x, z, h, ny, out, o) {
   if (realm === 'under') return underColor(x, z, h, ny, out, o);
@@ -1843,6 +1860,12 @@ function terrainColor(x, z, h, ny, out, o) {
     const top = smoothstep(SUMMIT - 340, SUMMIT - 70, h) * smoothstep(0.82, 0.5, ny);   // and the last of it is marble
     if (top > 0) { mix(ROCKC.marble, top * 0.82); mix(ROCKC.gold, top * smoothstep(0.9, 0.985, 1 - Math.abs(noise2(x / 14 + 7, z / 14 - 2 + h / 22))) * 0.9); }
   }
+  { const mk = meadK(x, z, h) * smoothstep(0.8, 0.94, ny); if (mk > 0) {   // the top of Olympus: short alpine turf, dry in patches, pale rock through it, specks of flowers
+    const a = noise2(x / 40 + 8.1, z / 40 - 2.7) * 0.5 + 0.5, fine = noise2(x / 6.5 - 4.4, z / 6.5 + 9.9);
+    mix(MEAD.dark, mk * 0.97); mix(MEAD.light, mk * a * 0.72); mix(MEAD.sun, mk * smoothstep(0.55, 0.9, a) * 0.45);
+    mix(MEAD.dry, mk * smoothstep(0.35, 0.7, noise2(x / 22 + 1.3, z / 22 - 6.1)) * 0.38);
+    mix(MEAD.stone, mk * smoothstep(0.62, 0.8, noise2(x / 15 - 9.3, z / 15 + 3.1)) * 0.75);
+    if (fine > 0.6) mix(fine > 0.8 ? MEAD.gentian : MEAD.edel, mk * (fine - 0.6) * 1.6); } }
   if (realm === 'over') { const S = caveSite(Math.floor(x / CAVE.C), Math.floor(z / CAVE.C)); if (S && (x - S.x) ** 2 + (z - S.z) ** 2 < (S.R * 2.6) ** 2) { mix(COL.rock, smoothstep(S.g + 6, S.g - 14, h)); mix([0.03, 0.035, 0.05], smoothstep(S.g - 18, S.g - S.depth * 0.7, h)); } }   // (a throat: rock at the lip, then nothing)
   mix(COL.sand, smoothstep(WATER + 5, WATER + 1, h));
   if (h < WATER - 0.6) {   // the floor of the sea: wet sand going grey with depth, meadows of sea-grass, and broken pale rubble round the reefs
@@ -7441,7 +7464,7 @@ function groundKind(x, z, y) {
   if (g < WATER + 0.25) return 'water';
   if (g < WATER + 4.5 || duneK(x, z) > 0.5) return 'sand';
   for (const v of VOLCANOES) if ((x - v.x) ** 2 + (z - v.z) ** 2 < v.R0 * v.R0) return 'ash';
-  if (g > 600) return 'snow';
+  if (g > 600) return meadK(x, z, g) > 0.5 ? 'grass' : 'snow';
   if (g > 400) return 'rock';
   if (forestAt(x, z) > 0.45 && g < 520) return 'leaves';
   return 'grass';
@@ -20920,12 +20943,14 @@ function grassTile(tx, tz) {
     if (fx + fz <= 1) { h = h00 + (h10 - h00) * fx + (h01 - h00) * fz; sx = h10 - h00; sz = h01 - h00; }
     else { h = h11 + (h01 - h11) * (1 - fx) + (h10 - h11) * (1 - fz); sx = h11 - h01; sz = h11 - h10; }
     const ny = 1 / Math.sqrt(1 + (sx * sx + sz * sz) / (STEP * STEP));
-    if (h < WATER + 2.4 || h > 420 || ny < 0.83 || riverF(x, z) < 1.25) continue;
-    const wood = forestAt(x, z); if (r() < wood * 0.55) continue;
+    const mead = h > 420 ? meadK(x, z, h) : 0;
+    if (h < WATER + 2.4 || (h > 420 && mead < 0.5) || ny < 0.83 || riverF(x, z) < 1.25) continue;
+    if (mead && tablePaved(x, z)) continue;
+    const wood = mead ? 0 : forestAt(x, z); if (r() < wood * 0.55) continue;
     if (clear.some(c => (x - c.x) ** 2 + (z - c.z) ** 2 < (c.r * 0.8) ** 2)) continue;
     if (temples.some(t => Math.abs(x - t.x) < t.hw + 3 && Math.abs(z - t.z) < t.hd + 3)) continue;
     terrainColor(x, z, h, ny, _gc, 0);
-    const b = 0.82 + lit * 0.36, tall = (0.32 + ht * ht * 0.62) * (1 - wood * 0.35) * smoothstep(WATER + 2.4, WATER + 6, h) * (1 - flowerAt(x, z) * 0.5);
+    const b = 0.82 + lit * 0.36, tall = (0.32 + ht * ht * 0.62) * (1 - wood * 0.35) * smoothstep(WATER + 2.4, WATER + 6, h) * (1 - flowerAt(x, z) * 0.5) * (mead ? 0.55 : 1);   // (up on the summit, short turf)
     _gm.compose(_gp.set(x, h - 0.03, z), _gq.setFromAxisAngle(UP, rot), _gs.set(sw, tall, sw));
     _gm.toArray(M, k * 16);
     Cc[k * 3] = _gc[0] * b * 1.05; Cc[k * 3 + 1] = _gc[1] * b * 1.08; Cc[k * 3 + 2] = _gc[2] * b * 0.9;
@@ -20944,10 +20969,11 @@ function grassTile(tx, tz) {
       if (fx + fz <= 1) { h = h00 + (h10 - h00) * fx + (h01 - h00) * fz; sx = h10 - h00; sz = h01 - h00; }
       else { h = h11 + (h01 - h11) * (1 - fx) + (h10 - h11) * (1 - fz); sx = h11 - h01; sz = h11 - h10; }
       const ny = 1 / Math.sqrt(1 + (sx * sx + sz * sz) / (STEP * STEP));
-      if (h < WATER + 2.6 || h > 420 || ny < 0.85 || forestAt(x, z) > 0.4) continue;
+      const fmead = h > 420 ? meadK(x, z, h) : 0;
+      if (h < WATER + 2.6 || (h > 420 && fmead < 0.5) || ny < 0.85 || forestAt(x, z) > 0.4 || (fmead && (tablePaved(x, z) || r() < 0.6))) continue;
       if (clear.some(c => (x - c.x) ** 2 + (z - c.z) ** 2 < (c.r * 0.8) ** 2) || temples.some(t => Math.abs(x - t.x) < t.hw + 3 && Math.abs(z - t.z) < t.hd + 3)) continue;
-      const col = odd < 0.9 ? flowerCol(x, z) : FLOWER_COLS[Math.floor(odd * 77) % FLOWER_COLS.length];   // (a stray of another colour, now and then)
-      _gm.compose(_gp.set(x, h - 0.02, z), _gq.setFromAxisAngle(UP, rot), _gs.set(sc, sc * tall, sc)); _gm.toArray(FM, fn * 16);
+      const col = fmead ? FLOWER_COLS[[3, 4, 1][Math.floor(odd * 3)]] : odd < 0.9 ? flowerCol(x, z) : FLOWER_COLS[Math.floor(odd * 77) % FLOWER_COLS.length];   // (a stray of another colour, now and then; on the summit, small and white, blue or yellow)
+      const fs = fmead ? 0.5 : 1; _gm.compose(_gp.set(x, h - 0.02, z), _gq.setFromAxisAngle(UP, rot), _gs.set(sc * fs, sc * tall * fs, sc * fs)); _gm.toArray(FM, fn * 16);
       FC[fn * 3] = col[0] * b; FC[fn * 3 + 1] = col[1] * b; FC[fn * 3 + 2] = col[2] * b; fn++;
     }
   }
@@ -21868,7 +21894,7 @@ function updateHigh(dt) {
   }
   if (!on || state === 'title' || state === 'loading') return;
   // it snows round the high temples, and anywhere high on the mountain; harder and softer as the wind comes and goes
-  const nearT = HIGH.some(T => (P.x - T.x) ** 2 + (P.z - T.z) ** 2 < 450 * 450), high = c.y > 880 && terrainAt(c.x, c.z) > 600;
+  const meadow = meadK(P.x, P.z, terrainAt(P.x, P.z)) > 0.5 && P.y < SUMMIT + 120, nearT = !meadow && HIGH.some(T => (P.x - T.x) ** 2 + (P.z - T.z) ** 2 < 450 * 450), high = !meadow && c.y > 880 && terrainAt(c.x, c.z) > 600;   // (not over the meadow on top)
   HIGHT.snowK = lerp(HIGHT.snowK, nearT || high ? 0.55 + 0.45 * Math.sin(time * 0.31) * Math.sin(time * 0.13 + 1) : 0, damp(0.6, dt));
   const n = HIGHT.snowK * (TOUCH ? 3 : 6) * dt * 60;
   for (let i = 0; i < n; i++) {
@@ -22392,10 +22418,10 @@ function crownAnimate(grp, dt) {
 //    when the god has been given something.
 const SANCT = { list: [], flame: null, glow: null, beam: null, built: false, here: '', hereT: 0 };
 function buildSanctuaries(acc, ids) {
-  const cx = MOUNT.x, cz = MOUNT.z + TABLE.cz + 12, RX = 112, RZ = 92, marble = MARBLEF, gold = GOLDLEAF, bronze = BRONZE, sun = [2.4, 2.0, 1.2];
+  const cx = MOUNT.x, cz = MOUNT.z + SANCT_G.cz, RX = SANCT_G.RX, RZ = SANCT_G.RZ, marble = MARBLEF, gold = GOLDLEAF, bronze = BRONZE, sun = [2.4, 2.0, 1.2];
   const glow = c => { const k = new THREE.Color(c); return [k.r * 2.3, k.g * 2.3, k.b * 2.3]; };
   // (the twelve places round the horseshoe, given out so that each shrine is the one in front of its own pillar)
-  const slots = []; for (let i = 0; i < 12; i++) { const th = -2.62 + i * 5.24 / 11; slots.push({ th, x: cx + Math.sin(th) * RX, z: cz + Math.cos(th) * RZ }); }
+  const slots = []; for (let i = 0; i < 12; i++) { const th = i < 6 ? -2.2 + i * 0.37 : 0.35 + (i - 6) * 0.37; slots.push({ th, x: cx + Math.sin(th) * RX, z: cz + Math.cos(th) * RZ }); }   // (six either side, the Way between them at the south)
   const ang = id => { const P = CROWN.pylons.find(q => q.id === id); return P ? Math.atan2(P.x - cx, P.z - cz) : 0; };
   const gods = ids.slice().sort((a, b) => ang(a) - ang(b));
   gods.forEach((id, i) => {
@@ -22425,13 +22451,13 @@ function buildSanctuaries(acc, ids) {
     for (const sd of [-1, 1]) { const sx = cx + sd * 4.6, g = terrainAt(sx, zz); box(acc, 0.9, 8.5, 0.9, sx, g + 4.25, zz, marble); box(acc, 1.2, 0.5, 1.2, sx, g + 8.75, zz, gold); part(acc, G.oct, sx, g + 9.6, zz, 0.35, 0.55, 0.35, sun, k * 0.7);
       CROWN.boxes.push(crownBox(sx, zz, 0, 0.9, 0.9, g, g + 9, 'a stele of the Sacred Way')); } }
   // the paving through the shrines
-  for (let k = 0; k < 150; k++) { const th = -2.75 + k * 5.5 / 149, x = cx + Math.sin(th) * (RX - 13), z = cz + Math.cos(th) * (RZ - 13), g = terrainAt(x, z);
-    if (Math.hypot(x - cx, z - (MOUNT.z + 135)) < 20) continue; box(acc, 2.3, 0.6, 3.4, x, g - 0.22, z, k % 5 ? marble : [0.86, 0.82, 0.74], 0, Math.atan2(Math.cos(th) * (RX - 13), -Math.sin(th) * (RZ - 13)), 0); }
+  for (let k = 0; k < 120; k++) { const th = -2.75 + k * 5.5 / 119, x = cx + Math.sin(th) * (RX - 13), z = cz + Math.cos(th) * (RZ - 13), g = terrainAt(x, z);
+    if (Math.hypot(x - cx, z - (MOUNT.z + 135)) < 20 || Math.abs(x - cx) < 3) continue; box(acc, 2.3, 0.6, 3.4, x, g - 0.22, z, k % 5 ? marble : [0.86, 0.82, 0.74], 0, Math.atan2(Math.cos(th) * (RX - 13), -Math.sin(th) * (RZ - 13)), 0); }
   // and at the end of the Way, on the south rim, a half ring of columns to stand in and look out at the world
   { const oz = z1 + 4; for (let k = 0; k < 7; k++) { const a = -1.3 + k * 2.6 / 6, px = cx + Math.sin(a) * 13, pz = oz + Math.cos(a) * 13 - 6, g = terrainAt(px, pz);
       part(acc, G.islandTop, px, g + 4, pz, 0.6, 8, 0.6, marble); box(acc, 1.5, 0.5, 1.5, px, g + 8.2, pz, gold); CROWN.boxes.push(crownBox(px, pz, 0, 1.2, 1.2, g, g + 8.5, 'the columns at the south rim')); }
     lookout('THE SOUTH RIM', cx, terrainAt(cx, oz) + 0.2, oz, 7, 'over'); }
-  SANCT.built = true;
+  SANCT.built = true; grassRetile(cx, cz, 160);   // (the turf that had grown where the shrines now stand)
 }
 // what burns in them: a bowl of fire for each, and a pillar of the god's light standing up out of it for a while after a gift
 function sanctMeshes() {
