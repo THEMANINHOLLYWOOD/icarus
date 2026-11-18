@@ -1174,7 +1174,7 @@ const TIERS = [
   { name: 'ULTRA', rt: 0.85, cell: 2, viewR: 9, fog: 3400, far: 64000, shadows: 2048, glow: 0.7,  deco: 104, animals: 1,   clouds: 320, dpr: 2, dof: 1 },
 ];   // (viewR: how many 400 m squares of country are built in full round him. fog: how far he sees down among the hills. far: how far from up high — see FAR)
 // phones run the top tier too, on a budget a phone GPU can hold; if frames still drop it steps down quietly
-if (TOUCH && !VISION) { Object.assign(TIERS[2], { rt: 0.6, viewR: 7, fog: 2900, far: 30000, shadows: 0, deco: 72, clouds: 200, dpr: 2, cell: 2 }); Object.assign(TIERS[1], { rt: 0.5, far: 22000, shadows: 0, clouds: 160, cell: 2 }); Object.assign(TIERS[0], { far: 16000, cell: 3 }); }   // (a phone: letters a little bigger than a computer's, and finer than they were)
+if (TOUCH && !VISION) { Object.assign(TIERS[2], { rt: 0.6, viewR: 7, fog: 2900, far: 30000, shadows: 0, deco: 72, clouds: 200, dpr: 3, cell: 2 }); Object.assign(TIERS[1], { rt: 0.5, far: 22000, shadows: 0, clouds: 160, cell: 2, dpr: 3 }); Object.assign(TIERS[0], { far: 16000, cell: 3, dpr: 3 }); }   // (dpr 3: a phone's letters drawn on its own pixels, one to one, never stretched up from a smaller picture; the picture under them is held to its own budget, see PX_SCENE, so this costs only the last pass)   // (a phone: letters a little bigger than a computer's, and finer than they were)
 function detectTier() {
   try {
     const gl = document.createElement('canvas').getContext('webgl2');
@@ -5606,7 +5606,8 @@ function lettersSet(i, say) { FIT.user = i === null ? null : clamp(i, 0, CELLS.l
 // what the machine is asked to fill: never more than it can, however big the window is made. The letters are cheap; it is
 // the picture under them and the page itself that cost, and neither needs more than this to be as sharp as the glass.
 const PX_PAGE = [4.2e6, 8.4e6, 15e6], PX_SCENE = [1.5e6, 2.8e6, 4.5e6];
-const fitDpr = () => Math.max(1, Math.min(devicePixelRatio || 1, tier.dpr, Math.sqrt(PX_PAGE[tierIdx] / Math.max(1, innerWidth * innerHeight))));
+let DPRC = 9;   // (how fine the page may be drawn, lowered if frames drop: see adaptQuality)
+const fitDpr = () => Math.max(1, Math.min(devicePixelRatio || 1, tier.dpr, DPRC, Math.sqrt(PX_PAGE[tierIdx] / Math.max(1, innerWidth * innerHeight))));
 // ── The interface is written into the picture. With the letters on, the world is a grid of characters; the strip, its
 //    pictures, the word in the corner, what the game has to say and the names of places are typed into that same grid,
 //    a character to a cell, and go through everything the picture goes through (the glow, the afterimage). One small
@@ -5675,7 +5676,7 @@ function resize() {
   const dpr = renderer.getPixelRatio();
   renderer.setSize(w, h);
   camera.aspect = w / h; camera.updateProjectionMatrix();
-  const sc0 = asciiOn ? rtScale : Math.min(1, rtScale * 1.6), sc = sc0 * Math.min(1, Math.sqrt((asciiOn ? PX_SCENE[tierIdx] : 8.4e6) / Math.max(1, w * dpr * sc0 * h * dpr * sc0)));
+  const sc0 = asciiOn ? rtScale : Math.min(1, rtScale * 1.6), sc = sc0 * Math.min(1, Math.sqrt((asciiOn ? PX_SCENE[tierIdx] : TOUCH ? 3.2e6 : 8.4e6) / Math.max(1, w * dpr * sc0 * h * dpr * sc0)));
   rt.setSize(Math.max(4, Math.floor(w * dpr * sc)), Math.max(4, Math.floor(h * dpr * sc)));
   { const bw = Math.max(4, Math.floor(w * dpr * sc / 4)), bh = Math.max(4, Math.floor(h * dpr * sc / 4)); blurA.setSize(bw, bh); blurB.setSize(bw, bh); }
   postMat.uniforms.uRes.value.set(w * dpr, h * dpr);
@@ -5695,7 +5696,7 @@ function applyTier(i, announce, persist = true) {
   tierIdx = i; tier = TIERS[i];
   if (persist) try { localStorage.setItem('icarus.tier', i); } catch {}
   rtScale = tier.rt; cellIdx = tier.cell; VIEW_R = tier.viewR; fogFar = scene.fog.far = tier.fog * (realm === 'under' ? 0.85 : 1);
-  renderer.setPixelRatio(Math.min(devicePixelRatio, tier.dpr));
+  renderer.setPixelRatio(fitDpr());
   const sh = tier.shadows > 0;
   if (sh !== renderer.shadowMap.enabled) scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => m.needsUpdate = true); });
   renderer.shadowMap.enabled = sh; sun.castShadow = sh;
@@ -31632,6 +31633,7 @@ function adaptQuality(dt) {
   const avg = perf.t / perf.n; perf.t = perf.n = 0;
   if (avg < 1 / 42) return;
   if (rtScale > tier.rt * 0.72) { rtScale = Math.max(0.28, rtScale - 0.08); resize(); }
+  else if (renderer.getPixelRatio() > 2.05) { DPRC = 2; resize(); }   // (then the page a little coarser, before a whole tier goes)
   else if (tierIdx > 0) applyTier(tierIdx - 1, false, false);
 }
 
