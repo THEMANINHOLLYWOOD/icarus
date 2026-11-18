@@ -2824,6 +2824,7 @@ function updateHeavens(dt) {
   HEAVEN.planets[0].rotation.y += dt * 0.05; HEAVEN.planets[1].rotation.y += dt * 0.04;
   skyMat.uniforms.uTime.value = time;
   skyMat.uniforms.uAur.value = AUR.k = k * (0.7 + 0.3 * smoothstep(0.1, 0.6, 0.5 + 0.5 * Math.sin(time * 0.017 + 1))) * (0.8 + 0.2 * high) * (1 - clamp(storm, 0, 1) * 0.8);   // (it swells and sinks through the night, and a storm hides it)
+  if (realm === 'over') { const top = smoothstep(SKY_LIMIT - 900, SKY_LIMIT + 700, camera.position.y); if (top > 0) skyMat.uniforms.uAur.value = Math.max(AUR.k, top * (0.45 + 0.4 * k)); }   // (up near the top of the sky it is there by day too: the edge of the dark)
   waterMat.uniforms.uAur.value = AUR.k;
   const M = HEAVEN.meteor;
   if (M.l.material.opacity > 0 || HEAVEN.mU < 1) {
@@ -3262,6 +3263,9 @@ const cloudKinds = [
     K.mesh = new THREE.InstancedMesh(K.geo, cloudMat, K.n); K.mesh.frustumCulled = false; K.mesh.renderOrder = 3; K.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     K.data = Array.from({ length: K.n }, () => ({ x: (r() - 0.5) * CLOUD_W, z: (r() - 0.5) * CLOUD_W, yk: r(), y: lerp(K.y[0], K.y[1], r()), s: lerp(K.s[0], K.s[1], r()),
       ox: 0, oy: 0, oz: 0, vx: 0, vy: 0, vz: 0, puff: 0, sa: 0, sv: 0, rot: K.high ? Math.atan2(-WIND.z, WIND.x) + (r() - 0.5) * 0.3 : r() * 6.28, spin: K.high ? 0 : (r() - 0.5) * 0.006, ph: r(), T: 110 + r() * 160, v: 7 + r() * 9 + (K.high ? 14 : 0) }));
+    // (each its own shade, set as it goes: dark under a storm, lit orange over a fire; and how much sky it is in, see updateClouds)
+    K.id = cloudKinds.indexOf(K); K.data.forEach((c, i) => { Object.assign(c, { ph0: c.ph, cov: 0.5, covT: 0.5, st: 0, stT: 0, fi: 0, fiT: 0, sT: i % 40 }); K.mesh.setColorAt(i, new THREE.Color(1, 1, 1)); });
+    K.mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
     scene.add(K.mesh);
   }
 }
@@ -3283,6 +3287,8 @@ scene.add(cloudSea);
 const wrapW = v => ((v + CLOUD_W / 2) % CLOUD_W + CLOUD_W) % CLOUD_W - CLOUD_W / 2;
 let cloudIn = 0, fogFar = tier.fog;
 const _cc = new THREE.Color(), WHITE_C = new THREE.Color(0xffffff);
+// (a veil laid over the picture that leaves its alpha alone: the picture's mark of who is who, and of the sky, is not disturbed)
+const keepA = m => Object.assign(m, { blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor });
 // What the bird does to a cloud he flies at: it is shouldered aside, dragged a little way after him, swells, turns, and
 // then, slowly, the wind puts it back.
 let trailT = 0;
@@ -3396,6 +3402,66 @@ function farStep(dt) {
   FAR.sky.copy(skyMat.uniforms.hor.value).lerp(skyMat.uniforms.mistCol.value, skyMat.uniforms.mist.value).lerp(scene.fog.color, c.y < WATER ? 1 : clamp(Math.max(WX.fog || 0, cloudIn), 0, 1));
   waterMat.uniforms.uFarSky.value.copy(FAR.sky);
 }
+const CLOUD_STORM = new THREE.Color(0.5, 0.53, 0.62), CLOUD_FIRE = new THREE.Color(1.35, 0.62, 0.38);
+// ── The sky over the clouds. Over every thunderstorm the shared weather has, its anvil: a dark tower going up out of the
+//    cloud and spreading flat and white at the top, kilometres across, going downwind with its storm. Higher, cirrus: long
+//    thin streaks combed out along the wind, thicker over bad weather. And near the top of the sky, where it starts to go
+//    dark, the jet stream: pale lanes of light going over fast, faint by day, glowing by night and brightest as the blue goes
+//    out of the sky above him. All by the clock everyone shares.
+const SKYL = { anv: null, st: [], t: 0, hi: null, cov: 0 }, SKYL_S = 16000;
+function updateSkyLayers(dt) {
+  const c = camera.position, over = realm === 'over' && state !== 'title' && state !== 'loading', t = Date.now() / 1000;
+  if (!SKYL.anv) {
+    const A = SKYL.anv = new THREE.InstancedMesh(cloudGeoOf(321, 14, [130, 6, 120], true), cloudMat, 16); A.frustumCulled = false; A.renderOrder = 3; A.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    for (let i = 0; i < 16; i++) A.setColorAt(i, WHITE_C); A.count = 0; scene.add(A);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([-1, 1, -1, 1, 1, -1, 1, 1, 1, -1, 1, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1], 3)); g.setIndex([0, 2, 1, 0, 3, 2, 4, 6, 5, 4, 7, 6]);   // (the jet's sheet first, then the cirrus under it)
+    SKYL.hi = new THREE.Mesh(g, keepA(new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
+      uniforms: { uCam: { value: new THREE.Vector3() }, uOff: { value: new THREE.Vector4() }, uY: { value: new THREE.Vector2(SUMMIT + 320, SKY_LIMIT + 260) }, uCov: { value: 0 }, uK: { value: new THREE.Vector2() }, uCol: { value: new THREE.Color() }, uWd: { value: new THREE.Vector2(WIND.x, WIND.z).normalize() } },
+      vertexShader: `uniform vec3 uCam; uniform vec2 uY; varying vec3 vW; varying float vL;
+        void main() { vL = position.y; vW = vec3(uCam.x + position.x * ${SKYL_S.toFixed(1)}, position.y < 0.5 ? uY.x : uY.y, uCam.z + position.z * ${SKYL_S.toFixed(1)}); gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0); }`,
+      fragmentShader: `uniform vec3 uCam, uCol; uniform vec4 uOff; uniform vec2 uK, uWd; uniform float uCov; varying vec3 vW; varying float vL;
+        float hs(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float ns(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hs(i), hs(i + vec2(1.0, 0.0)), f.x), mix(hs(i + vec2(0.0, 1.0)), hs(i + vec2(1.0, 1.0)), f.x), f.y); }
+        void main() { float r = length(vW.xz - uCam.xz) / ${SKYL_S.toFixed(1)}, fade = smoothstep(1.0, 0.5, r) * smoothstep(0.0, 0.04, abs(vW.y - uCam.y) / ${SKYL_S.toFixed(1)});
+          float u = dot(vW.xz, uWd), v = dot(vW.xz, vec2(-uWd.y, uWd.x)), a; vec3 c;
+          if (vL < 0.5) {   // cirrus: fields of it, streaks combed out along the wind with the fine hooks of ice in them
+            vec2 q = vec2((u - uOff.x) / 1700.0, v / 380.0), w = vec2(ns(q * 0.35 + 3.1), ns(q * 0.35 + 8.7));
+            float n = ns(q + w * 1.4) * 0.6 + ns(q * 2.3 + w) * 0.3 + ns(q * 6.0) * 0.1, hook = ns(vec2((u - uOff.x) / 700.0, v / 95.0) + w * 2.0);
+            a = smoothstep(0.55 - uCov * 0.22, 0.92, n) * (0.55 + 0.45 * hook) * smoothstep(0.32, 0.62, ns(vec2((u - uOff.x) / 9000.0, v / 7000.0)) + uCov * 0.45) * uK.x;
+            c = uCol * (0.85 + 0.3 * hook);
+          } else {   // the jet: lanes of it, and fast streaks going along them
+            vec2 q = vec2((u - uOff.z) / 5200.0, v / 950.0);
+            float lane = smoothstep(0.58, 0.82, ns(vec2(q.x * 0.12, q.y * 0.8 + 4.0))), streak = ns(vec2(q.x * 3.0, q.y * 13.0)), s3 = streak * streak * streak;
+            a = lane * (0.2 + 1.2 * s3) * uK.y;
+            c = mix(vec3(0.45, 0.85, 1.0), vec3(0.78, 0.5, 1.0), ns(q * 0.5 + 2.0)) * (0.7 + 0.8 * s3);
+          }
+          a *= fade; if (a < 0.008) discard;
+          gl_FragColor = vec4(c, min(a, 0.85)); }` })));
+    SKYL.hi.frustumCulled = false; SKYL.hi.renderOrder = 2; scene.add(SKYL.hi);
+  }
+  // the anvils, over the storms near enough to see
+  const A = SKYL.anv; let n = 0;
+  if (over) {
+    if ((SKYL.t -= dt) < 0) { SKYL.t = 1; wxStorms(c.x, c.z, 10000, SKYL.st, t); SKYL.st.sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z)); if (SKYL.st.length > 8) SKYL.st.length = 8; }
+    for (const S of SKYL.st) {
+      wxStormNow(S, t); if (S.s <= 0.02) continue;
+      const k = S.s, s = S.r * 1.25 / 130 * (0.35 + 0.65 * k), rot = Math.atan2(-WIND.z, WIND.x);
+      _mat.compose(_p.set(S.x + WIND.x * S.r * 0.3, 1400 + S.h1 * 240, S.z + WIND.z * S.r * 0.3), _q.setFromAxisAngle(UP, rot + S.h2 * 0.6), _s.set(s, s * 0.3, s * 0.8)); A.setMatrixAt(n, _mat); A.setColorAt(n, _cc.setRGB(1.06, 1.06, 1.1)); n++;
+      _mat.compose(_p.set(S.x, 360, S.z), _q.setFromAxisAngle(UP, S.h1 * 6), _s.set(s * 0.42, s * 1.9 * k, s * 0.42)); A.setMatrixAt(n, _mat); A.setColorAt(n, _cc.copy(CLOUD_STORM).multiplyScalar(0.92)); n++;
+    }
+  }
+  A.count = n; if (n) { A.instanceMatrix.needsUpdate = true; A.instanceColor.needsUpdate = true; }
+  // the cirrus and the jet
+  const H = SKYL.hi; H.visible = over;
+  if (over) {
+    const U = H.material.uniforms, top = smoothstep(SKY_LIMIT - 1100, SKY_LIMIT + 300, c.y), lit = clamp(pal.hemiI / 1.45, 0.12, 1.05), w = WX.want;
+    if (w) SKYL.cov = lerp(SKYL.cov, clamp(Math.max(w.grey, w.rain, w.thunder, w.squall), 0, 1), damp(0.2, dt));
+    U.uCam.value.copy(c); U.uOff.value.set((t * 32) % 200000, 0, (t * 85) % 200000, 0); U.uCov.value = SKYL.cov;
+    U.uK.value.set(0.85 * (1 - 0.6 * WX.fog) * (1 - cloudIn), (0.3 + 0.55 * pal.stars + 0.9 * Math.max(top, COSMOS.up)) * (1 - clamp(storm, 0, 1) * 0.5));
+    U.uCol.value.copy(pal.sun).lerp(WHITE_C, 0.55).multiplyScalar(lit * (0.7 + 0.3 * Math.min(1, WX.light))).lerp(pal.hor, 0.15);
+    H.renderOrder = c.y > U.uY.value.x ? 4 : 2;
+  }
+}
 function updateClouds(dt) {
   if (SIZ.k > 0) {
     if ((SIZ.t -= dt) < 0) { SIZ.t = 0.2; audio.sfx.sizzle?.(Math.min(1, SIZ.k * 0.5)); }
@@ -3411,25 +3477,33 @@ function updateClouds(dt) {
   // the line he has flown these last two seconds, for the clouds to open along
   if ((trailT -= dt) <= 0) { trailT = 0.2; const last = cloudTrail.pop(); cloudTrail.unshift(last); cloudTrail[1].set(pl.pos.x, pl.pos.y, pl.pos.z, flying ? time : -1); }
   cloudTrail[0].set(pl.pos.x, pl.pos.y, pl.pos.z, flying ? time : -1);
+  // (where each one is, and where in its life, goes by the clock everyone shares: the same clouds over the same hills for
+  // everyone, drifting on the same wind; each builds where the weather is wet and thins where it is fine: see wxSky)
+  const wt = Date.now() / 1000 - 1.7e9, ck = damp(0.35, dt), over = realm === 'over';
   for (const K of cloudKinds) {
     K.mesh.visible = !(under && K.high);
     if (!K.mesh.visible) continue;
     for (let i = 0; i < K.n; i++) {
       const c = K.data[i];
-      c.ph += dt / c.T;
-      if (c.ph >= 1) { c.ph -= 1; c.x += (Math.random() - 0.5) * 900; c.z += (Math.random() - 0.5) * 900; }   // it forms again somewhere else
-      const env = smoothstep(0, 0.2, c.ph) * smoothstep(1, 0.78, c.ph), d = time * c.v;
-      const x = cx + wrapW(c.x + WIND.x * d - cx), z = cz + wrapW(c.z + WIND.z * d - cz);
+      const cyc = wt / c.T + c.ph0, n = Math.floor(cyc), jx = (wxHash(i, n, K.id * 31 + 5) - 0.5) * 1800, jz = (wxHash(i, n, K.id * 31 + 6) - 0.5) * 1800;   // it forms again somewhere else
+      c.ph = cyc - n;
+      const env = smoothstep(0, 0.2, c.ph) * smoothstep(1, 0.78, c.ph), d = wt * c.v;
+      const x = cx + wrapW(c.x + jx + WIND.x * d - cx), z = cz + wrapW(c.z + jz + WIND.z * d - cz);
       if (c.heat) c.heat = Math.max(0, c.heat - dt * 0.04);   // (it gathers again, slowly)
-      const y = under ? WATER + 10 + c.yk * 60 : c.y, s = c.s * (0.2 + 0.8 * env) * (1 + c.puff * 0.3) * (1 - 0.6 * (c.heat || 0)) * (under ? 1 : 1 + 0.4 * WX.storm), sy = (under ? 0.2 : K.sy) * (0.8 + 0.2 * env);   // (in wet weather they build)
+      if (over && --c.sT < 0) { c.sT = 40 + (i % 13); const o = wxSky(x, z); c.covT = o.cover; c.stT = o.storm; c.fiT = wxFireK(x, z); }
+      c.cov = lerp(c.cov, c.covT, ck); c.st = lerp(c.st, c.stT, ck); c.fi = lerp(c.fi, c.fiT, ck);
+      const wet = under ? 1 : lerp(0.55, 1.35, c.cov) * (K.id === 2 ? lerp(0.6, 1.45, c.st) : 1);   // (in wet weather they build; the towers most under a storm)
+      const y = under ? WATER + 10 + c.yk * 60 : c.y, s = c.s * (0.2 + 0.8 * env) * (1 + c.puff * 0.3) * (1 - 0.6 * (c.heat || 0)) * wet, sy = (under ? 0.2 : K.sy) * (0.8 + 0.2 * env) * (1 + c.st * 0.25);
       shove(c, x + c.ox, y + c.oy + 7 * s * sy, z + c.oz, 36 * s + 30, dt);
       _mat.compose(_p.set(x + c.ox, y + c.oy, z + c.oz), _q.setFromAxisAngle(UP, c.rot + time * c.spin + c.sa), _s.set(s, s * sy, s));
       K.mesh.setMatrixAt(i, _mat);
+      _cc.setRGB(1, 1, 1).lerp(CLOUD_STORM, c.st * 0.8).lerp(CLOUD_FIRE, c.fi * 0.75); K.mesh.setColorAt(i, _cc);
       const qx = (cx - x) / (30 * s), qy = (cam.y - y - 7 * s * sy) / (10 * s * sy + 3), qz = (cz - z) / (30 * s), q = qx * qx + qy * qy + qz * qz;
       if (q < 1) inside = Math.max(inside, (1 - q) * (under ? 0.5 : 1));
     }
-    K.mesh.instanceMatrix.needsUpdate = true;
+    K.mesh.instanceMatrix.needsUpdate = true; K.mesh.instanceColor.needsUpdate = true;
   }
+  updateSkyLayers(dt);
   const md = Math.hypot(cx - MOUNT.x, cz - MOUNT.z);
   cloudSea.visible = !under && md < 9000;
   if (cloudSea.visible) {
@@ -20081,6 +20155,7 @@ function wxAt(x, z) {
 }
 function updateWeather(dt) {
   if ((WX.olyT -= dt) < 0) WX.olyT = 0;
+  if (realm === 'over') wxFires(dt);
   WX.god = WX.god.filter(q => time < q.until);
   if ((WX.sampleT -= dt) < 0 || !WX.want) { WX.sampleT = 0.25; WX.want = realm === 'over' ? wxAt(player.pos.x, player.pos.z) : { thunder: 0, rain: 0, grey: 0, bright: 0, mist: 0, waves: 0, gold: 0, dust: 0, squall: 0 }; }
   const w = WX.want, k = damp(0.35, dt);
@@ -20122,13 +20197,13 @@ function twisterMesh() {
     const s = new THREE.CylinderGeometry(1, 1, 1, 28, 8, true).translate(0, 0.5, 0), Q = s.attributes.position;   // (the skirt: wide at the ground, drawing in as it rises)
     for (let i = 0; i < Q.count; i++) { const y = Q.getY(i), r = 1 - 0.55 * y + 0.2 * y * y; Q.setX(i, Q.getX(i) * r); Q.setZ(i, Q.getZ(i) * r); }
     TW.geo = g; TW.sgeo = s;
-    TW.mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uCol: { value: new THREE.Color(0.1, 0.105, 0.125) }, uFoot: { value: new THREE.Color(0.4, 0.33, 0.25) }, uSk: { value: 0 }, uK: { value: 1 } },
+    TW.mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uCol: { value: new THREE.Color(0.075, 0.08, 0.1) }, uFoot: { value: new THREE.Color(0.4, 0.33, 0.25) }, uSk: { value: 0 }, uK: { value: 1 }, uFl: { value: 0 } },
       vertexShader: `uniform float uTime, uSk; varying vec2 vU;
         void main() { vU = uv; vec3 p = position; float h = p.y, a = uTime * 0.9 + h * 5.0, bend = h * (1.0 - h * 0.6);
           if (uSk < 0.5) { p.x += (sin(a) * 0.05 + sin(uTime * 0.31 + h * 2.0) * 0.035) * bend; p.z += cos(a * 0.8) * 0.05 * bend; }   // (the rope sways and snakes)
           p.xz *= 1.0 + (0.07 * sin(h * 26.0 - uTime * 7.0 + uv.x * 18.85) * (1.0 - h * 0.5)) * (1.0 - uSk) + uSk * 0.14 * sin(uv.x * 37.7 + uTime * 3.0 + h * 9.0);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
-      fragmentShader: `uniform float uTime, uSk, uK; uniform vec3 uCol, uFoot; varying vec2 vU;
+      fragmentShader: `uniform float uTime, uSk, uK, uFl; uniform vec3 uCol, uFoot; varying vec2 vU;
         float hsh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float ns(vec2 p, float W) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); float a = mod(i.x, W), b = mod(i.x + 1.0, W);   // (wrapped round the funnel: no seam)
           return mix(mix(hsh(vec2(a, i.y)), hsh(vec2(b, i.y)), f.x), mix(hsh(vec2(a, i.y + 1.0)), hsh(vec2(b, i.y + 1.0)), f.x), f.y); }
@@ -20136,48 +20211,106 @@ function twisterMesh() {
           float a; vec3 c;
           if (uSk > 0.5) { a = (0.4 + 0.45 * s + 0.15 * s2) * smoothstep(0.0, 0.08, vU.y) * (1.0 - smoothstep(0.2, 1.0, vU.y)) * 0.9; c = uFoot * (0.55 + 0.8 * s); }
           else { a = min(1.0, 0.86 + 0.24 * s) * smoothstep(0.0, 0.02, vU.y) * (1.0 - smoothstep(0.9, 1.0, vU.y)); c = mix(uFoot, uCol, smoothstep(0.0, 0.16, vU.y)) * (0.45 + 0.8 * s) * (0.85 + 0.3 * s2); }
+          if (uSk < 0.5) {   // (the light in it: a core going up it, threads of lightning crawling round it, all of it flaring when it strikes)
+            float r = ns(vec2(vU.x * 23.0 - uTime * 5.0, vU.y * 60.0 - uTime * 14.0), 23.0), arc = smoothstep(0.04, 0.0, abs(r - 0.5)) * step(0.6, s2) * smoothstep(0.03, 0.12, vU.y) * (1.0 - smoothstep(0.7, 0.92, vU.y));
+            float band = pow(ns(vec2(vU.x * 7.0 + uTime * 2.2, vU.y * 18.0 - uTime * 5.0), 7.0), 4.0) * smoothstep(0.04, 0.2, vU.y) * (1.0 - smoothstep(0.6, 0.9, vU.y));
+            c += mix(vec3(0.42, 0.26, 1.0), vec3(0.35, 0.95, 1.0), s) * band * (0.55 + 1.2 * uFl) + vec3(0.85, 0.9, 1.0) * arc * (0.45 + 1.6 * uFl);
+            if (a * uK < 0.45) discard; a = 1.0; }
           gl_FragColor = vec4(c, a * uK); }` });
+    keepA(TW.mat);
     // the wreckage going round it: stones, earth, splintered wood
     TW.deb = new THREE.InstancedMesh(G.rock, new THREE.MeshLambertMaterial({ color: 0x3e352b }), TW_DEB); TW.deb.frustumCulled = false; TW.deb.count = 0; scene.add(TW.deb);
     TW.dd = Array.from({ length: TW_DEB }, () => ({ h: Math.random(), a: Math.random() * 6.28, rk: Math.random(), w: 0.35 + Math.random() * 0.8, s: 0.5 + Math.random() * Math.random() * 3.5, ph: Math.random() * 6.28 }));
   }
-  const mk = (geo, sk) => { const mat = TW.mat.clone(); mat.uniforms.uTime = TW.mat.uniforms.uTime; mat.uniforms.uSk.value = sk; const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.renderOrder = 3; scene.add(m); return m; };
-  return [mk(TW.geo, 0), mk(TW.sgeo, 1)];
+  if (!TW.wgeo) twisterParts();
+  const mk = (geo, sk) => { const mat = TW.mat.clone(); mat.uniforms.uTime = TW.mat.uniforms.uTime; mat.uniforms.uSk.value = sk; mat.depthWrite = !sk; const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.renderOrder = 3; scene.add(m); return m; };
+  const mk2 = (geo, M, ro) => { const mat = M.clone(); mat.uniforms.uTime = TW.mat.uniforms.uTime; const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.renderOrder = ro; scene.add(m); return m; };
+  return [mk(TW.geo, 0), mk(TW.sgeo, 1), mk2(TW.wgeo, TW.wmat, 3), mk2(TW.rgeo, TW.rmat, 4)];
+}
+// What makes it more than a rope of cloud (besides the light in the funnel itself: see TW.mat): the wall cloud it
+// hangs from, a slow wheel half a kilometre across with arms wound into it, lit from inside when the lightning goes; and
+// round its foot, rings of dust and grit thrown out flat and going round, glinting where the sun catches them.
+function twisterParts() {
+  const NS = `float hsh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float ns(vec2 p, float W) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); float a = mod(i.x, W), b = mod(i.x + 1.0, W);
+      return mix(mix(hsh(vec2(a, i.y)), hsh(vec2(b, i.y)), f.x), mix(hsh(vec2(a, i.y + 1.0)), hsh(vec2(b, i.y + 1.0)), f.x), f.y); }`;
+  // the wall cloud: a disc, sagging in the middle, turning
+  { const g = new THREE.RingGeometry(0.03, 1, 64, 8).rotateX(-Math.PI / 2), P = g.attributes.position;
+    for (let i = 0; i < P.count; i++) { const r = Math.hypot(P.getX(i), P.getZ(i)); P.setY(i, -0.16 * (1 - r) * (1 - r) + 0.05 * r * r); }
+    TW.wgeo = g; }
+  TW.wmat = keepA(new THREE.ShaderMaterial({ transparent: true, depthWrite: true, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uK: { value: 0 }, uFl: { value: 0 }, uFlP: { value: new THREE.Vector2() }, uCol: { value: new THREE.Color(0.2, 0.21, 0.25) }, uLit: { value: new THREE.Color(0.6, 0.62, 0.68) } },
+    vertexShader: `uniform float uTime; varying vec2 vP; void main() { vP = position.xz; vec3 p = position; p.y += 0.03 * sin(atan(p.z, p.x) * 5.0 + uTime * 0.4 + length(p.xz) * 9.0); gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
+    fragmentShader: `uniform float uTime, uK, uFl; uniform vec2 uFlP; uniform vec3 uCol, uLit; varying vec2 vP; ${NS}
+      void main() { float r = length(vP), a = atan(vP.y, vP.x) / 6.2831853 + 0.5;
+        float sw = a + uTime * 0.035 / (r + 0.25) + log(r + 0.02) * 0.35;   // (wound in: the inside going round faster)
+        float s = ns(vec2(sw * 18.0, r * 7.0 - uTime * 0.08), 18.0) * 0.65 + ns(vec2(sw * 48.0, r * 19.0), 48.0) * 0.35, arm = 0.5 + 0.5 * sin(sw * 6.2831853 * 4.0);
+        float al = uK * smoothstep(1.0, 0.55, r + (s - 0.5) * 0.3) * (0.55 + 0.35 * s + 0.2 * arm);
+        if (al < 0.3) discard;
+        float fl = uFl * exp(-dot(vP - uFlP, vP - uFlP) * 9.0);
+        vec3 c = mix(uCol, uLit, smoothstep(0.35, 1.0, r) * s) * (0.7 + 0.6 * s) + vec3(0.35, 0.3, 0.7) * smoothstep(0.25, 0.0, r) * 0.5 + vec3(0.85, 0.9, 1.3) * (fl * 2.2 + uFl * 0.25);
+        gl_FragColor = vec4(c, min(1.0, al)); }` }));
+  // the rings round the foot: three flat bands, one above another, each its own speed
+  { const acc = { pos: [], nor: [], col: [] };
+    [[0.02, 1, 0], [0.09, 0.78, 1], [0.2, 0.55, 2]].forEach(([y, s, L]) => { _mat.compose(_p.set(0, y, 0), _q.identity(), _s.set(s, 1, s)); addGeo(acc, new THREE.RingGeometry(0.45, 1, 48, 1).rotateX(-Math.PI / 2).toNonIndexed(), _mat, [L, 0, 0]); });
+    TW.rgeo = accToGeo(acc); }
+  TW.rmat = keepA(new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, vertexColors: true, uniforms: { uTime: { value: 0 }, uK: { value: 0 }, uFoot: { value: new THREE.Color() }, uSun: { value: 1 } },
+    vertexShader: `varying vec3 vP; varying float vL; void main() { vL = color.r; vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform float uTime, uK, uSun; uniform vec3 uFoot; varying vec3 vP; varying float vL; ${NS}
+      void main() { float r = length(vP.xz) / (1.0 - vL * 0.22 - vL * vL * 0.11), a = atan(vP.z, vP.x) / 6.2831853 + 0.5 + uTime * (0.11 + 0.07 * vL) / max(r, 0.4);
+        float n = ns(vec2(a * 30.0, r * 9.0 + vL * 3.0), 30.0) * 0.7 + ns(vec2(a * 90.0, r * 23.0), 90.0) * 0.3;
+        float al = uK * smoothstep(0.5, 0.85, n) * smoothstep(0.45, 0.6, r) * smoothstep(1.0, 0.8, r) * (0.8 - vL * 0.2);
+        float gl = step(0.975, hsh(floor(vec2(a * 400.0, r * 40.0)) + floor(uTime * 8.0))) * uSun;   // (grit, catching the sun)
+        if (al + gl * uK < 0.02) discard;
+        gl_FragColor = vec4(uFoot * (0.75 + 0.6 * n) + vec3(1.3, 1.1, 0.75) * gl * 1.4, min(1.0, al + gl * uK)); }` }));
+}
+// the parts of one, put where it is now
+function twisterDress(T, g, H, Rk, foot, k, wet, dt) {
+  if ((T.flT = (T.flT ?? 1) - dt) < 0) { T.flT = 0.25 + Math.random() * (k > 0.6 ? 1.6 : 3.5); T.fl = 1.2; T.flP = [rnd(0.6), rnd(0.6)]; if (Math.random() < 0.5) skyFlash = Math.max(skyFlash, 0.45 * k * smoothstep(5000, 600, Math.hypot(T.x - camera.position.x, T.z - camera.position.z))); }   // (its lightning)
+  T.fl = (T.fl || 0) * Math.exp(-dt * 10) * (Math.random() < 0.8 ? 1 : 0.3);
+  const lit = clamp(pal.hemiI / 1.45, 0.25, 1.1);
+  T.m.material.uniforms.uFl.value = T.fl;
+  const wr = Rk * 2.1; T.wall.position.set(T.x, g + H * 0.985, T.z); T.wall.scale.set(wr, wr, wr); const W = T.wall.material.uniforms;
+  W.uK.value = smoothstep(0, 0.5, k); W.uFl.value = T.fl; W.uFlP.value.set(T.flP?.[0] || 0, T.flP?.[1] || 0); W.uCol.value.setRGB(0.17, 0.18, 0.22).multiplyScalar(0.5 + 0.6 * lit); W.uLit.value.copy(pal.cloud).lerp(WHITE_C, 0.3).multiplyScalar(0.55 * lit);
+  const rr = foot * 5.2; T.ring.position.set(T.x, g, T.z); T.ring.scale.set(rr, H * 0.9, rr); const R = T.ring.material.uniforms;
+  R.uK.value = k * 0.85; R.uFoot.value.setRGB(...(wet ? [0.6, 0.68, 0.76] : [0.5, 0.41, 0.3])).multiplyScalar(0.6 + 0.5 * lit); R.uSun.value = smoothstep(0.02, 0.25, sunDir.y);
 }
 function twisterSpawn(x, z) {
-  const [m, sk] = twisterMesh();
-  const T = { id: ++TW.n, x, z, a: Math.random() * 6.28, t: 0, life: 100 + Math.random() * 60, R: 480 + Math.random() * 240, H: 1050 + Math.random() * 400, m, sk, sT: 0, told: false, inT: 0, out: 0 };
+  const [m, sk, wall, ring] = twisterMesh();
+  const T = { id: ++TW.n, x, z, a: Math.random() * 6.28, t: 0, life: 100 + Math.random() * 60, R: 480 + Math.random() * 240, H: 1050 + Math.random() * 400, m, sk, wall, ring, k: 0, sT: 0, told: false, inT: 0, out: 0 };
   TW.list.push(T); return T;
 }
-function twisterDrop(T) { for (const m of [T.m, T.sk]) { scene.remove(m); m.material.dispose(); } }
+function twisterDrop(T) { for (const m of [T.m, T.sk, T.wall, T.ring]) { scene.remove(m); m.material.dispose(); } }
 function updateTwisters(dt) {
   const p = player;
   if (realm !== 'over') { for (const T of TW.list) twisterDrop(T); TW.list.length = 0; if (TW.deb) TW.deb.count = 0; return; }
-  const far = Math.hypot(p.pos.x - MOUNT.x, p.pos.z - MOUNT.z) > 3000, want = !far || state !== 'play' ? 0 : WX.thunder > 0.5 ? 2 : WX.storm > 0.6 ? 1 : 0;
-  if ((TW.t -= dt) < 0) {
-    TW.t = 5 + Math.random() * 9;
-    if (TW.list.length < want) {   // (a long way off, and somewhere he can see it: it is too big to come up on anyone unseen)
-      const a = Math.atan2(dir3.z, dir3.x) + rnd(1.1), d = 1500 + Math.random() * 1200, x = p.pos.x + Math.cos(a) * d, z = p.pos.z + Math.sin(a) * d;
-      if (Math.hypot(x - MOUNT.x, z - MOUNT.z) > 3400 && !TW.list.some(o => Math.hypot(o.x - x, o.z - z) < 1500)) { twisterSpawn(x, z); toast('A TORNADO'); } }
-  }
+  // the tornadoes are the storms' (wxTwisterAt): the ones near enough to see are made, the ones gone or out of sight let go
+  const tn = Date.now() / 1000;
+  if ((TW.t -= dt) < 0) { TW.t = 0.5; const c = camera.position; wxStorms(c.x, c.z, 7000, TW.st || (TW.st = []), tn); const C = []; for (const S of TW.st) wxTwisters(S, C, tn);
+    for (let i = TW.list.length - 1; i >= 0; i--) { const T = TW.list[i]; if (T.key && !C.some(q => q.key === T.key)) { twisterDrop(T); TW.list.splice(i, 1); } }
+    for (const q of C) if (!TW.list.some(T => T.key === q.key)) Object.assign(twisterSpawn(q.x, q.z), { key: q.key, S: q.S, j: q.j, R: q.R, H: q.H, life: 1e9 }); }
   if (!TW.list.length) { if (TW.deb) TW.deb.count = 0; return; }
   TW.mat.uniforms.uTime.value = time;
   for (let i = TW.list.length - 1; i >= 0; i--) {
     const T = TW.list[i]; T.t += dt;
-    if (T.t > T.life || Math.hypot(T.x - MOUNT.x, T.z - MOUNT.z) < 2900) { twisterDrop(T); TW.list.splice(i, 1); continue; }
-    T.a += rnd(0.7) * dt; T.x += (WIND.x * 9 + Math.cos(T.a) * 8) * dt; T.z += (WIND.z * 9 + Math.sin(T.a) * 8) * dt;
-    const g = Math.max(terrainAt(T.x, T.z), WATER), k = smoothstep(0, 8, T.t) * smoothstep(T.life, T.life - 10, T.t), wet = g <= WATER + 0.5, H = T.H * (0.3 + 0.7 * k), Rk = T.R * (0.25 + 0.75 * k);
-    T.g = g; T.k = k;
+    if (T.key) { if (!wxTwisterAt(wxStormNow(T.S, tn), T.j, tn, T)) { twisterDrop(T); TW.list.splice(i, 1); continue; } }
+    else {   // (one put down by hand: it walks with the wind on its own, and lives its own life)
+      if (T.t > T.life || Math.hypot(T.x - MOUNT.x, T.z - MOUNT.z) < 2900) { twisterDrop(T); TW.list.splice(i, 1); continue; }
+      T.a += rnd(0.7) * dt; T.x += (WIND.x * 9 + Math.cos(T.a) * 8) * dt; T.z += (WIND.z * 9 + Math.sin(T.a) * 8) * dt; T.k = smoothstep(0, 8, T.t) * smoothstep(T.life, T.life - 10, T.t); }
+    const g = Math.max(terrainAt(T.x, T.z), WATER), k = T.k, wet = g <= WATER + 0.5, H = T.H * (0.3 + 0.7 * k), Rk = T.R * (0.25 + 0.75 * k);
+    T.g = g;
+    if (!T.seen && k > 0.3 && state === 'play' && Math.hypot(T.x - player.pos.x, T.z - player.pos.z) < 3500) { T.seen = true; toast('A TORNADO'); }
     T.m.position.set(T.x, g - 4, T.z); T.m.scale.set(Rk, H, Rk); T.m.material.uniforms.uK.value = smoothstep(0, 0.3, k);
     const foot = Rk * 0.075, sr = foot * (2.4 + 0.3 * Math.sin(time * 0.7 + T.id)), sh = 120 + 40 * k;
     T.sk.position.set(T.x, g - 3, T.z); T.sk.scale.set(sr, sh, sr); T.sk.material.uniforms.uK.value = k;
     T.sk.material.uniforms.uFoot.value.setRGB(...(wet ? [0.62, 0.7, 0.78] : [0.44, 0.36, 0.27])); T.m.material.uniforms.uFoot.value.copy(T.sk.material.uniforms.uFoot.value);
+    twisterDress(T, g, H, Rk, foot, k, wet, dt);
     const cd2 = (camera.position.x - T.x) ** 2 + (camera.position.z - T.z) ** 2;
     if (cd2 < 2500 * 2500) for (let j = 0, n = TOUCH ? 3 : 7; j < n; j++) {   // what it is tearing up: dust (or spray), whirled up and out
       const b = Math.random() * 6.28, r = foot * (0.6 + Math.random() * 1.8), up = Math.random();
       emit(T.x + Math.cos(b) * r, g + up * up * 90, T.z + Math.sin(b) * r, -Math.sin(b) * 45 + Math.cos(b) * 8, 10 + Math.random() * 24, Math.cos(b) * 45 + Math.sin(b) * 8, 1.4 + Math.random(), wet ? [0.8, 0.9, 1] : [0.5, 0.44, 0.36], 6, 2 + Math.random() * 3);
     }
     const dx = p.pos.x - T.x, dz = p.pos.z - T.z, d = Math.hypot(dx, dz) || 1, alt = p.pos.y - g, hf = clamp(alt / H, 0, 1), core = twR(hf) * Rk;
+    if (!wet && d < core + 260 && alt < 260) WX.dust = Math.max(WX.dust, 0.7 * k * smoothstep(core + 260, core, d));   // (what it lifts off dry ground is all round him)
     if (audio.emit) audio.emit('tw:' + T.id, 'twister', T.x, g + 90, T.z, { ttl: 1.2, ref: 260, max: 3600, size: 1 + k * 1.5 });
     if ((T.sT -= dt) < 0 && d < 3000) { T.sT = 1.1; audio.at3(T.x, g + 90, T.z, () => audio.sfx.twister?.(k), { ref: 240, max: 3200 }); }
     if (state !== 'play' || alt < -5 || alt > H * 1.06 || d > core + 700) continue;
@@ -20216,6 +20349,47 @@ function godWeather(g, sky) {
 }
 // someone new in the world: Zeus greets them the only way he knows
 function joinStorm() { WX.olyT = 50; WX.sampleT = 0; }
+// ── The weather everyone shares, as places. The thunderstorms wxAt is made of, each where it is now (going downwind on the
+//    clock), how big, and how far on in its life; the tornadoes a grown one puts down (which, and where, from the clock too,
+//    so two people a world apart see the same funnel walk the same field); the sky's cover at a point, that the clouds build
+//    or thin by; and where the forest is burning, for the clouds over it to take the glow. The globe seen from space is
+//    painted from the same numbers (czGlobeWx), so coming down out of the dark he comes down into the clouds he saw.
+const WX_T = 7000, WX_V = 7, _wxs = { cover: 0, storm: 0, dust: 0 };
+function wxStorms(x, z, R, out, t = Date.now() / 1000) {
+  out.length = 0; const ox = WIND.x * WX_V * t, oz = WIND.z * WX_V * t;
+  const a0 = Math.floor((x - R - ox) / WX_T) - 1, a1 = Math.floor((x + R - ox) / WX_T) + 1, b0 = Math.floor((z - R - oz) / WX_T) - 1, b1 = Math.floor((z + R - oz) / WX_T) + 1;
+  for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) for (let k = 0; k < 6; k++) {
+    const h4 = wxHash(a, b, k + 150); if (WX_KINDS[Math.floor(h4 * 997) % WX_KINDS.length] !== 'thunder') continue;
+    const S = { a, b, k, h1: wxHash(a, b, k), h2: wxHash(a, b, k + 50), h4, r: 900 + wxHash(a, b, k + 100) * 1500, x: 0, z: 0, life: 0, s: 0, cyc: 0 };
+    wxStormNow(S, t); if (S.life <= 0.02 || Math.abs(S.x - x) > R || Math.abs(S.z - z) > R) continue;
+    S.cyc = Math.floor((t / (420 + h4 * 600) + S.h1 * 40) / (Math.PI * 2)); out.push(S);
+  }
+  return out;
+}
+function wxStormNow(S, t) { S.x = (S.a + S.h1) * WX_T + WIND.x * WX_V * t; S.z = (S.b + S.h2) * WX_T + WIND.z * WX_V * t; S.life = Math.sin(t / (420 + S.h4 * 600) + S.h1 * 40); S.s = smoothstep(0, 0.35, S.life); return S; }
+// tornado j of a grown storm, now (into o: x, z, k); false if it has none, or not now
+function wxTwisterAt(S, j, t, o) {
+  if (S.life < 0.4) return false;
+  const h = wxHash(S.a * 13 + j, S.b + S.cyc * 7, S.k + 300); if (h > 0.42) return false;
+  const ang = h * 40 + t * (0.0025 + 0.002 * j) * (h > 0.21 ? 1 : -1), rr = S.r * (0.25 + 0.3 * wxHash(S.a, S.b, S.k + 310 + j)) * (0.75 + 0.25 * Math.sin(t * 0.013 + h * 17));
+  o.x = S.x + Math.cos(ang) * rr + Math.sin(t * 0.031 + h * 9) * 60; o.z = S.z + Math.sin(ang) * rr + Math.cos(t * 0.027 + h * 5) * 60;   // (it wanders round under its storm)
+  if (Math.hypot(o.x - MOUNT.x, o.z - MOUNT.z) < 3400) return false;
+  o.k = smoothstep(0.4, 0.62, S.life); o.R = 480 + h * 570; o.H = 1050 + wxHash(S.a, S.b, S.k + 320 + j) * 400; return true;
+}
+function wxTwisters(S, out, t) { for (let j = 0; j < 2; j++) { const o = { key: `${S.a},${S.b},${S.k},${S.cyc},${j}`, S, j }; if (wxTwisterAt(S, j, t, o)) out.push(o); } return out; }
+// how much cloud the sky has over a point, how much of it is storm, how much sand is up
+function wxSky(x, z, o = _wxs) {
+  const w = wxAt(x, z); o.cover = clamp(Math.max(w.grey * 0.85, w.rain, w.thunder, w.mist * 0.55, w.squall * 0.85, w.waves * 0.6) - w.bright * 0.35, 0, 1);
+  o.storm = Math.max(w.thunder, w.squall * 0.6); o.dust = w.dust; return o;
+}
+// where the country is burning: the trees alight, gathered into a few fires
+const WXF = { list: [], t: 0 };
+function wxFires(dt) {
+  if ((WXF.t -= dt) > 0) return; WXF.t = 1;
+  const m = new Map(); for (const b of BLAZE.list) if (b.t < F_BLACK) { const k = Math.round(b.x / 700) * 100000 + Math.round(b.z / 700); let c = m.get(k); if (!c) m.set(k, c = { x: 0, z: 0, n: 0 }); c.x += b.x; c.z += b.z; c.n++; }
+  WXF.list = [...m.values()].sort((a, b) => b.n - a.n).slice(0, 4).map(c => ({ x: c.x / c.n, z: c.z / c.n, n: c.n, k: Math.min(1, c.n / 12) }));
+}
+function wxFireK(x, z) { let k = 0; for (const f of WXF.list) k = Math.max(k, f.k * smoothstep(1100, 200, Math.hypot(x - f.x, z - f.z))); return k; }
 
 // ───────────────────────── the air over the land: dust, squalls, valley mist, and the water going round ─────────────────────────
 // What the weather knows about the ground under it, a kilometre square at a time (worked out once, kept): how high it is,
@@ -20256,26 +20430,59 @@ function updateDust(dt) {
   if (show && !DUST.mesh) {
     DUST.mat = cloudMaterial({ color: 0xd6a066, emissive: 0x5a3818, opacity: 0.62, fog: false });   // (it is seen from a long way off: it hazes by its own rule, below)
     DUST.mesh = new THREE.InstancedMesh(cloudGeoOf(313, 10, [120, 46, 70], false), DUST.mat, DUST.N); DUST.mesh.frustumCulled = false; DUST.mesh.renderOrder = 3; DUST.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(DUST.mesh);
-    // and behind the heaps the body of it, one sheet the width of the sand with a torn, boiling top, so there is no daylight through the wall
-    DUST.sheet = new THREE.Mesh(new THREE.PlaneGeometry(1, 1, 1, 1), new THREE.ShaderMaterial({ transparent: true, depthWrite: true, side: THREE.DoubleSide, uniforms: { uTime: worldFx.uTime, uCol: { value: new THREE.Color() }, uA: { value: 0.9 } },
-      vertexShader: `varying vec2 vU; void main() { vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `uniform float uTime, uA; uniform vec3 uCol; varying vec2 vU;
-        float hs(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-        float ns(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hs(i), hs(i + vec2(1.0, 0.0)), f.x), mix(hs(i + vec2(0.0, 1.0)), hs(i + vec2(1.0, 1.0)), f.x), f.y); }
-        void main() { float n = ns(vec2(vU.x * 26.0 + uTime * 0.05, vU.y * 2.5 - uTime * 0.2)) * 0.6 + ns(vec2(vU.x * 80.0 - uTime * 0.1, vU.y * 7.0 - uTime * 0.5)) * 0.4;
-          float top = 0.62 + 0.3 * ns(vec2(vU.x * 18.0 + uTime * 0.03, uTime * 0.05));
-          float a = uA * smoothstep(top, top - 0.25, vU.y + n * 0.12) * smoothstep(0.0, 0.08, vU.x) * smoothstep(1.0, 0.92, vU.x);
-          if (a < uA * 0.4) discard;   // (a solid body with a torn top: what is behind it is behind it, outlines and all)
-          gl_FragColor = vec4(uCol * (0.75 + 0.45 * n) * mix(0.8, 1.1, vU.y), min(1.0, a * 1.15)); }` }));
-    DUST.sheet.frustumCulled = false; DUST.sheet.renderOrder = 2; scene.add(DUST.sheet);
+    // and behind the heaps the body of it, towering: three walls one behind another, each higher than the one in front, rolling
+    // and swirling each at its own pace, the back ones going from rust to violet at the top; a lid of boiling dust over the
+    // whole depth of it, so from above it is a body and not a fence; lightning going off inside it; and the grit in its face
+    // glinting in the sun. (One mesh: the walls are x across the sand, y up as a share of its height, z metres back from its face)
+    { const P = [], U = [], L = [], I = []; const quad = (z0, z1, y0, y1, l, nx, nz) => { for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) { const u = i / nx, v = j / nz; P.push(u - 0.5, l < 3 ? lerp(y0, y1, v) : y0, l < 3 ? z0 : lerp(z0, z1, v)); U.push(u, v); L.push(l); }
+        const b = P.length / 3 - (nx + 1) * (nz + 1); for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const a = b + j * (nx + 1) + i; I.push(a, a + nx + 1, a + 1, a + 1, a + nx + 1, a + nx + 2); } };
+      quad(-150, -1450, 0.7, 0, 3, 24, 6); quad(-820, 0, 0, 1, 2, 24, 1); quad(-420, 0, 0, 0.86, 1, 24, 1); quad(0, 0, 0, 0.64, 0, 24, 1);   // (drawn back to front)
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setAttribute('aL', new THREE.Float32BufferAttribute(L, 1)); g.setIndex(I);
+      DUST.sheet = new THREE.Mesh(g, keepA(new THREE.ShaderMaterial({ transparent: true, depthWrite: true, side: THREE.DoubleSide, uniforms: { uTime: worldFx.uTime, uCol: { value: new THREE.Color() }, uA: { value: 0.9 }, uFl: { value: 0 }, uFlP: { value: new THREE.Vector3() }, uSpk: { value: 0 } },
+        vertexShader: `uniform float uTime; attribute float aL; varying vec2 vU; varying float vL;
+          void main() { vU = uv; vL = aL; vec3 p = position;
+            if (aL > 2.5) p.y += 0.07 * sin(p.x * 21.0 + uTime * 0.21) * sin(p.z * 0.006 - uTime * 0.15) + 0.04 * sin(p.x * 57.0 - uTime * 0.4);   // (the lid heaves)
+            else p.z += (30.0 + aL * 25.0) * sin(p.x * 23.0 + uTime * 0.3 + aL * 1.7) * uv.y;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
+        fragmentShader: `uniform float uTime, uA, uFl, uSpk; uniform vec3 uCol, uFlP; varying vec2 vU; varying float vL;
+          float hs(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+          float ns(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hs(i), hs(i + vec2(1.0, 0.0)), f.x), mix(hs(i + vec2(0.0, 1.0)), hs(i + vec2(1.0, 1.0)), f.x), f.y); }
+          void main() { float L = vL, a; vec3 c;
+            if (L < 2.5) {
+              vec2 q = vec2(vU.x * (34.0 - L * 7.0), vU.y * (3.2 + L));
+              float wn = ns(q * 0.6 + vec2(uTime * (0.06 + L * 0.02), -uTime * 0.1 + L)) * 6.2832; vec2 w = vec2(cos(wn), sin(wn));   // (the rolls in it, turning over)
+              float n = ns(q + w * 1.3 + vec2(uTime * 0.04, -uTime * 0.22)) * 0.62 + ns(q * 2.9 + w * 0.9 - vec2(uTime * 0.12, uTime * 0.45)) * 0.38;
+              float top = 0.8 + 0.17 * ns(vec2(vU.x * 15.0 + L * 3.1 + uTime * 0.03, uTime * 0.05 + L));
+              a = uA * smoothstep(top, top - 0.2, vU.y + (n - 0.5) * 0.22) * smoothstep(0.0, 0.07, vU.x) * smoothstep(1.0, 0.93, vU.x) * (L < 0.5 ? 1.0 : 0.88);
+              c = uCol * (0.4 + 0.85 * n) * mix(0.62, 1.2, vU.y) * (1.0 - L * 0.13);
+              c = mix(c, c * vec3(0.78, 0.55, 1.08) + vec3(0.05, 0.02, 0.09), smoothstep(0.35, 1.0, vU.y) * (0.25 + L * 0.25));
+              vec2 d = (vU - uFlP.xy) * vec2(16.0, 2.2); float on = 1.0 - step(0.5, abs(L - uFlP.z));
+              float jag = abs(vU.x - uFlP.x - (sin(vU.y * 47.0 + uFlP.x * 90.0) * 0.6 + sin(vU.y * 131.0) * 0.4) * 0.012);
+              c += vec3(0.85, 0.75, 1.35) * uFl * (on * (exp(-dot(d, d)) * 1.8 + smoothstep(0.003, 0.0, jag) * step(vU.y, uFlP.y) * 3.5) + 0.22);   // (lightning in it: the bolt, and the dust round it lit)
+              float gl = step(0.988, hs(floor(vec2(vU.x * 700.0 + uTime * 25.0, vU.y * 140.0 - uTime * 9.0)) + floor(uTime * 7.0))) * uSpk * (1.0 - L * 0.3);   // (grit catching the light)
+              c += vec3(1.3, 1.05, 0.7) * gl * 1.6;
+            } else {
+              vec2 q = vec2(vU.x * 24.0, vU.y * 5.0); float n = ns(q + vec2(uTime * 0.05, -uTime * 0.09)) * 0.6 + ns(q * 3.1 - uTime * 0.14) * 0.4;
+              a = uA * 0.9 * smoothstep(0.0, 0.07, vU.x) * smoothstep(1.0, 0.93, vU.x) * smoothstep(0.0, 0.08, vU.y) * smoothstep(1.0, 0.7, vU.y) * smoothstep(0.22, 0.5, n);
+              c = uCol * (0.75 + 0.55 * n) + vec3(0.6, 0.5, 1.0) * uFl * 0.35;
+            }
+            if (a < uA * 0.4) discard;   // (a solid body with a torn top: what is behind it is behind it, outlines and all)
+            gl_FragColor = vec4(c, min(1.0, a * 1.25)); }` })));
+      DUST.sheet.frustumCulled = false; DUST.sheet.renderOrder = 2; scene.add(DUST.sheet); }
   }
   if (DUST.mesh) DUST.mesh.visible = DUST.sheet.visible = show;
   if (show) {
     const L = DUNE.R + 500, per = DUST.N / 3, lit = clamp(pal.hemiI / 1.45, 0.2, 1.1) * (0.6 + 0.4 * Math.min(1, WX.light));
     const u0 = c.x * DUNE.wx + c.z * DUNE.wz, v0 = -c.x * DUNE.wz + c.z * DUNE.wx, haze = smoothstep(1200, 9000, Math.hypot(u0 - F.uf, Math.max(0, Math.abs(v0 - DUNE.v) - L))) * 0.7;
     DUST.mat.emissive.copy(DUST.col).multiplyScalar(0.42 * lit).lerp(scene.fog.color, haze * 0.6); DUST.mat.color.setRGB(0.86, 0.6, 0.34).multiplyScalar(0.55 + 0.45 * lit).lerp(scene.fog.color, haze); DUST.mat.opacity = 0.82 * (1 - haze * 0.5);
-    { const uu = F.uf - 420, sh = DUST.sheet; sh.position.set(uu * DUNE.wx - DUNE.v * DUNE.wz, DUNE.base + 330, uu * DUNE.wz + DUNE.v * DUNE.wx); sh.rotation.set(0, -Math.atan2(DUNE.wz, DUNE.wx) + Math.PI / 2, 0); sh.scale.set(2 * L, 760, 1);
-      sh.material.uniforms.uCol.value.copy(DUST.mat.color).lerp(DUST.mat.emissive, 0.3); sh.material.uniforms.uA.value = 0.92 * F.env * (1 - haze * 0.5); }
+    { const uu = F.uf - 170, sh = DUST.sheet, U = sh.material.uniforms; sh.position.set(uu * DUNE.wx - DUNE.v * DUNE.wz, DUNE.base - 12, uu * DUNE.wz + DUNE.v * DUNE.wx); sh.rotation.set(0, -Math.atan2(DUNE.wz, DUNE.wx) + Math.PI / 2, 0); sh.scale.set(2 * L, 1150, 1);
+      U.uCol.value.copy(DUST.mat.color).lerp(DUST.mat.emissive, 0.3); U.uA.value = 0.92 * F.env * (1 - haze * 0.5); U.uSpk.value = smoothstep(0.02, 0.3, sunDir.y) * (1 - haze);
+      // its lightning: a bolt somewhere in it every second or two, and now and then one that comes down to the sand
+      if ((DUST.flT = (DUST.flT ?? 1) - dt) < 0) { DUST.flT = 0.5 + Math.random() * 2.4 * (1.4 - F.env); DUST.fl = 1.3; const fx = 0.12 + Math.random() * 0.76, lay = Math.floor(Math.random() * 3); U.uFlP.value.set(fx, 0.35 + Math.random() * 0.5, lay);
+        const vv = DUNE.v - (fx - 0.5) * 2 * L, bu = uu - [0, 420, 820][lay], bx = bu * DUNE.wx - vv * DUNE.wz, bz = bu * DUNE.wz + vv * DUNE.wx, bd = Math.hypot(bx - c.x, bz - c.z);
+        skyFlash = Math.max(skyFlash, 0.35 * F.env * smoothstep(6000, 800, bd));
+        if (bd < 3200 && Math.random() < 0.3 && state === 'play') strike(bx, Math.max(terrainAt(bx, bz), WATER), bz, 0.5); }
+      DUST.fl = (DUST.fl || 0) * Math.exp(-dt * 8) * (Math.random() < 0.82 ? 1 : 0.35); U.uFl.value = DUST.fl * F.env; }
     for (let i = 0; i < DUST.N; i++) {
       const row = i % 3, j = Math.floor(i / 3), h = wxHash(i, 3, 5), vv = DUNE.v + ((j + row * 0.33) / (per - 1) - 0.5) * 2 * L + (h - 0.5) * 120, uu = F.uf - 60 - row * 260 + Math.sin(time * 0.35 + i * 1.3) * 35;
       const s = (3.8 + 1.8 * h) * (1 - row * 0.12) * F.env * smoothstep(DUNE.R + 600, DUNE.R * 0.6, Math.abs(vv - DUNE.v)) * smoothstep(DUNE.R + 1500, DUNE.R, Math.abs(uu - DUNE.u)) + 0.001;
@@ -20286,7 +20493,7 @@ function updateDust(dt) {
     if (audio.emit) { const u = c.x * DUNE.wx + c.z * DUNE.wz, v = clamp(-c.x * DUNE.wz + c.z * DUNE.wx, DUNE.v - L, DUNE.v + L), uu = Math.min(F.uf, Math.max(u, F.uf - DUST.W)); audio.emit('dust:wall', 'storm', uu * DUNE.wx - v * DUNE.wz, DUNE.base + 120, uu * DUNE.wz + v * DUNE.wx, { ttl: 1, ref: 500, max: 5000, size: 1.5 * F.env }); }   // (the roar of it, from the nearest part of it)
   }
   // inside it
-  const g = over ? Math.max(terrainAt(c.x, c.z), WATER) : 0, want = over ? WX.dust * smoothstep(720, 420, c.y - g) : 0;   // (above five hundred metres or so the sky is clear)
+  const g = over ? Math.max(terrainAt(c.x, c.z), WATER) : 0, want = over ? WX.dust * smoothstep(1000, 700, c.y - g) : 0;   // (above eight hundred metres or so the sky is clear)
   DUST.k = lerp(DUST.k, want, damp(want > DUST.k ? 1.6 : 0.7, dt));
   const k = DUST.k; if (k < 0.01) return;
   scene.fog.near = lerp(scene.fog.near, 2, k); scene.fog.far = lerp(scene.fog.far, Math.min(scene.fog.far, 75), Math.min(1, k * 1.1));
@@ -20294,6 +20501,7 @@ function updateDust(dt) {
   skyMat.uniforms.mist.value = Math.max(skyMat.uniforms.mist.value, k * 0.97); skyMat.uniforms.mistCol.value.lerp(DUST.fc, Math.min(1, k * 1.3));
   const p = player, P = p.pos, air = p.form === 'phoenix' && !p.perch || p.form === 'human' && !p.grounded;
   for (let i = 0, n = Math.ceil(k * (TOUCH ? 6 : 15)); i < n; i++) emit(c.x + rnd(40) - WIND.x * 22, c.y + rnd(12), c.z + rnd(40) - WIND.z * 22, WIND.x * (42 + k * 30) + rnd(6), rnd(2), WIND.z * (42 + k * 30) + rnd(6), 0.55 + Math.random() * 0.5, [0.62, 0.45, 0.28], 0, 0.5 + Math.random() * 0.8);   // (sand, streaming past)
+  if (sunDir.y > 0.02) for (let i = 0, n = Math.ceil(k * (TOUCH ? 2 : 5)); i < n; i++) emit(c.x + rnd(30) - WIND.x * 18, c.y + rnd(10), c.z + rnd(30) - WIND.z * 18, WIND.x * (50 + k * 30) + rnd(8), rnd(3), WIND.z * (50 + k * 30) + rnd(8), 0.25 + Math.random() * 0.3, [1.0, 0.92, 0.82], 0, 0.22 + Math.random() * 0.25);   // (and grit, glinting as it goes by)
   if (state === 'play' && air && !p.cine && !p.sub) { P.x += WIND.x * 15 * k * dt; P.z += WIND.z * 15 * k * dt; if (p.form === 'phoenix') p.bank += Math.sin(time * 3.1) * Math.sin(time * 1.3) * k * 1.1 * dt; camShake = Math.max(camShake, 0.14 * k); }
   if (audio.emit) audio.emit('dust:in', 'wind', c.x + WIND.x * 30, c.y, c.z + WIND.z * 30, { ttl: 0.6, ref: 40, max: 400, size: 2 * k });
   if (k > 0.6 && state === 'play' && time - DUST.told > 300) { DUST.told = time; witness('was caught in a dust storm out on the sand sea and could not see a thing'); }
@@ -38098,6 +38306,7 @@ function czHex(s) { let c = czHexC.get(s); if (!c) { const n = parseInt(s.slice(
 // height in the fourth channel (the globe stands up out of it). Laid down a few rows a frame, from Olympus outward
 function czGlobeStart() { const T = COSMOS.tex; T.job = { j: 0 }; T.n = mapCells.over.size + WORLD.cells.over.size; T.at = performance.now(); }
 function czGlobeStep(budget) {
+  czGlobeWx();   // (and the weather over it)
   const T = COSMOS.tex, J = T.job; if (!J) return;
   const D = T.data, t0 = performance.now();
   while (J.j < CZ_TH && performance.now() - t0 < budget) {
@@ -38119,8 +38328,84 @@ function czGlobeH(n) {
   const D = COSMOS.tex.data, i = clamp(Math.floor((Math.atan2(n.x, n.z) / TAU_ + 0.5) * CZ_TW), 0, CZ_TW - 1), j = clamp(Math.floor(Math.acos(clamp(n.y, -1, 1)) / Math.PI * CZ_TH), 0, CZ_TH - 1);
   return D[(j * CZ_TW + i) * 4 + 3] / 255 * 2400;
 }
+// ── The weather over the globe, live. The same storms, rain, grey country, sand and fire the sky is made of down there
+//    (wxSky), painted a few at a time into a small picture (cover, storm, sand) that a shell of cloud just over the ground
+//    reads; the thunderstorms, the tornadoes and the fires passed to it as places, so the storms wind round and flash, the
+//    funnels show as bright tight whirls and the fires glow through their smoke. By the shared clock: what he sees from up
+//    here is what is going over the country now, and diving home he comes down into the clouds he saw.
+const CZ_WW = 128, CZ_WH = 64, CZW = { tex: null, data: null, i: 0, j: 0, mesh: null, u: null, t: 0, upT: 0, st: [], tw: [] };
+const CZ_WFS = () => `uniform sampler2D tWx; uniform float uTime; uniform vec3 uSun; uniform vec4 uSt[12], uTw[8], uFi[4]; varying vec3 vObj, vW, vN;
+  ${CZ_GLSL}
+  vec2 czTan(vec3 n, vec3 c) { vec3 b1 = normalize(cross(c, abs(c.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), b2 = cross(c, b1), e = n - c * dot(n, c); return vec2(dot(e, b1), dot(e, b2)) * ${CZ_RG.toFixed(1)}; }   // (metres across the ground round c)
+  void main() {
+    vec3 n = normalize(vObj), N = normalize(vN), V = normalize(cameraPosition - vW);
+    vec4 w = texture2D(tWx, vec2(atan(n.x, n.z) / 6.2831853 + 0.5, acos(clamp(n.y, -1.0, 1.0)) / 3.14159265));
+    float t = uTime, det = czN(n * 70.0 + vec3(t * 0.003, 0.0, t * 0.0012)) * 0.55 + czN(n * 230.0 + vec3(0.0, t * 0.005, 0.0)) * 0.3 + czN(n * 640.0 - vec3(t * 0.01)) * 0.15;
+    float cl = smoothstep(0.2, 0.62, w.r + (det - 0.5) * 0.55), hi = 0.0, fl = 0.0, tw = 0.0;
+    cl = max(cl, smoothstep(0.64, 0.82, czN(n * 230.0 + 9.0) * 0.65 + czN(n * 640.0 + 3.0) * 0.35) * 0.4);   // (fair-weather cumulus, scattered)
+    for (int i = 0; i < 12; i++) { vec4 s = uSt[i]; if (s.w <= 0.0) continue; if (dot(n, s.xyz) < 0.9) continue; float r = floor(s.w), k = fract(s.w); vec2 p = czTan(n, s.xyz); float dd = length(p); if (dd > r * 1.6) continue;
+      float sp = 0.5 + 0.5 * sin(atan(p.y, p.x) * 2.0 + log(dd + 60.0) * 3.2 - t * 0.12), body = k * smoothstep(r * 1.5, r * 0.25, dd);   // (wound round: a storm system)
+      cl = max(cl, body * (0.55 + 0.45 * sp) * (0.8 + 0.4 * det)); hi = max(hi, body * smoothstep(r * 0.8, 0.0, dd));
+      float h = fract(sin(float(i) * 91.7 + floor(t * 6.0) * 13.13) * 43758.5); vec2 fp = vec2(cos(h * 40.0), sin(h * 40.0)) * r * 0.55 * fract(h * 7.3);
+      fl += step(0.8, h) * k * exp(-pow(length(p - fp) / (r * 0.3), 2.0)) * (0.6 + 0.4 * sin(t * 47.0 + h * 9.0)); }   // (lightning, somewhere in it, now and then)
+    for (int i = 0; i < 8; i++) { vec4 s = uTw[i]; if (s.w <= 0.0) continue; if (dot(n, s.xyz) < 0.99) continue; vec2 p = czTan(n, s.xyz); float dd = length(p); if (dd > 1100.0) continue;
+      float arm = 0.5 + 0.5 * sin(atan(p.y, p.x) * 3.0 + log(dd + 20.0) * 5.0 - t * 1.6), e = s.w * smoothstep(1100.0, 0.0, dd);
+      cl = max(cl, e * (0.45 + 0.55 * arm)); tw = max(tw, e * (arm * 0.6 + smoothstep(160.0, 0.0, dd)));
+      fl += s.w * step(0.7, fract(sin(float(i) * 17.3 + floor(t * 9.0) * 7.7) * 43758.5)) * smoothstep(600.0, 0.0, dd); }
+    float du = smoothstep(0.04, 0.45, w.b + (czN(n * vec3(150.0, 40.0, 150.0) + t * 0.004) - 0.5) * 0.35), fi = 0.0, sm = 0.0;   // (sand: tan smears)
+    for (int i = 0; i < 4; i++) { vec4 s = uFi[i]; if (s.w <= 0.0) continue; vec2 p = czTan(n, s.xyz); float dd = length(p); fi = max(fi, s.w * smoothstep(420.0, 0.0, dd)); sm = max(sm, s.w * smoothstep(1500.0, 100.0, dd) * 0.6); }
+    float dl = dot(N, uSun), day = smoothstep(-0.12, 0.2, dl), lit = 0.05 + 1.05 * max(dl, 0.0) * day;
+    vec3 cc = vec3(0.95, 0.96, 0.99) * (lit + hi * 0.18 * day);
+    cc = mix(cc, vec3(0.5, 0.52, 0.6) * lit, w.g * 0.35 * (1.0 - hi));
+    vec3 dc = vec3(0.84, 0.6, 0.34) * (0.08 + 0.95 * max(dl, 0.0) * day);
+    vec3 col = mix(dc, cc, cl / max(cl + du * 0.8, 0.001));
+    float a = clamp(max(cl * 0.93, du * 0.72) + sm * 0.4, 0.0, 1.0);
+    col = mix(col, vec3(0.3, 0.29, 0.3) * lit, sm * (1.0 - cl));
+    float gl = step(0.993, czH(floor(n * 2600.0) + floor(t * 4.0))) * du * day;   // (the grit in it, glinting)
+    vec3 em = vec3(0.75, 0.82, 1.25) * fl * 2.4 + vec3(0.6, 0.45, 1.2) * tw * 0.7 + vec3(1.7, 0.7, 0.2) * fi * (1.3 - day * 0.6) + vec3(1.2, 1.0, 0.7) * gl * 1.5;
+    // an aurora in a ring round Olympus at the pole: green curtains going violet at their tops, brightest on the dark side
+    float th = acos(clamp(n.y, -1.0, 1.0)), az = atan(n.x, n.z), ring = th - 0.36 - 0.035 * sin(az * 5.0 + t * 0.05) - 0.02 * sin(az * 13.0 - t * 0.08);
+    float aur = exp(-ring * ring * 1800.0) * (0.3 + 0.7 * czN(vec3(az * 30.0, t * 0.1, 0.0))) * (0.2 + 0.8 * (1.0 - day));
+    em += mix(vec3(0.2, 1.0, 0.5), vec3(0.6, 0.35, 1.0), smoothstep(-0.02, 0.03, ring)) * aur * 0.9;
+    a = clamp(a * (1.0 + pow(1.0 - max(dot(N, V), 0.0), 2.0) * 0.6), 0.0, 1.0);
+    float ae = clamp(a + length(em) * 0.6, 0.0, 1.0);
+    gl_FragColor = vec4((col * a + em) / max(ae, 0.001), ae);
+  }`;
+function czWxInit(sys) {
+  const D = CZW.data = new Uint8Array(CZ_WW * CZ_WH * 4), T = CZW.tex = new THREE.DataTexture(D, CZ_WW, CZ_WH, THREE.RGBAFormat); T.magFilter = T.minFilter = THREE.LinearFilter; T.wrapS = THREE.RepeatWrapping; T.needsUpdate = true;
+  const V4 = n => Array.from({ length: n }, () => new THREE.Vector4());
+  CZW.u = { tWx: { value: T }, uTime: { value: 0 }, uSun: { value: CZ_SUN }, uSt: { value: V4(12) }, uTw: { value: V4(8) }, uFi: { value: V4(4) } };
+  CZW.mesh = new THREE.Mesh(COSMOS.geoHi, keepA(new THREE.ShaderMaterial({ transparent: true, depthWrite: false, vertexShader: CZ_VS, fragmentShader: CZ_WFS(), uniforms: CZW.u })));
+  CZW.mesh.scale.setScalar(CZ_RG + 700); CZW.mesh.renderOrder = 1; CZW.mesh.frustumCulled = false; sys.add(CZW.mesh);   // (at the height the clouds are, the mountain standing up through them)
+  czGlobeWx(0, 0);   // (a first coarse picture at once, a point in sixteen)
+}
+const _czwn = new THREE.Vector3(), _czwa = new THREE.Vector3(), _czwb = new THREE.Vector3();
+function czGlobeWx(budget = TOUCH ? 0.6 : 1.1, coarse = -1) {
+  if (!CZW.data) return;
+  const D = CZW.data, t0 = performance.now(), t = Date.now() / 1000;
+  if (coarse >= 0) {   // (all the rows at once, at a quarter of the width each, filled across)
+    for (let j = 0; j < CZ_WH; j += 4) { const d = (j + 2) / CZ_WH * Math.PI * CZ_RG; for (let i = 0; i < CZ_WW; i += 4) { const ph = (i + 2) / CZ_WW * Math.PI * 2 - Math.PI, o = wxSky(MOUNT.x + Math.sin(ph) * d, MOUNT.z + Math.cos(ph) * d);
+      for (let jj = j; jj < j + 4; jj++) for (let ii = i; ii < i + 4; ii++) { const q = (jj * CZ_WW + ii) * 4; D[q] = o.cover * 255; D[q + 1] = o.storm * 255; D[q + 2] = o.dust * 255; D[q + 3] = 255; } } }
+    CZW.tex.needsUpdate = true; return;
+  }
+  while (performance.now() - t0 < budget) {
+    const j = CZW.j, d = (j + 0.5) / CZ_WH * Math.PI * CZ_RG;
+    for (let n = 0; n < 16; n++) { const i = CZW.i, ph = (i + 0.5) / CZ_WW * Math.PI * 2 - Math.PI, o = wxSky(MOUNT.x + Math.sin(ph) * d, MOUNT.z + Math.cos(ph) * d), q = (j * CZ_WW + i) * 4;
+      D[q] = o.cover * 255; D[q + 1] = o.storm * 255; D[q + 2] = o.dust * 255; D[q + 3] = 255; CZW.i++; }
+    if (CZW.i >= CZ_WW) { CZW.i = 0; if (++CZW.j >= CZ_WH) CZW.j = 0; }
+  }
+  const now = performance.now(); if (now - CZW.upT > 400) { CZW.upT = now; CZW.tex.needsUpdate = true; }
+  CZW.u.uTime.value = t0z();
+  // the storms and their tornadoes, the fires: as places on the globe, a second at a time
+  if (now - CZW.t > 1000) { CZW.t = now;
+    const S = wxStorms(MOUNT.x, MOUNT.z, Math.PI * CZ_RG, CZW.st, t).sort((a, b) => b.s * b.r - a.s * a.r), U = CZW.u, tw = CZW.tw; tw.length = 0;
+    for (let i = 0; i < 12; i++) { const s = S[i], v = U.uSt.value[i]; if (!s || s.s < 0.02) { v.w = 0; continue; } czFrame(s.x, s.z, _czwn, _czwa, _czwb); v.set(_czwn.x, _czwn.y, _czwn.z, Math.floor(s.r) + Math.min(0.999, s.s)); }
+    for (const s of S) wxTwisters(s, tw, t); tw.sort((a, b) => b.k - a.k);
+    for (let i = 0; i < 8; i++) { const q = tw[i], v = U.uTw.value[i]; if (!q) { v.w = 0; continue; } czFrame(q.x, q.z, _czwn, _czwa, _czwb); v.set(_czwn.x, _czwn.y, _czwn.z, Math.max(0.05, q.k)); }
+    for (let i = 0; i < 4; i++) { const f = WXF.list[i], v = U.uFi.value[i]; if (!f) { v.w = 0; continue; } czFrame(f.x, f.z, _czwn, _czwa, _czwb); v.set(_czwn.x, _czwn.y, _czwn.z, f.k); } }
+}
 // a name for a world, from its seed
-const CZ_SYL = ['AR', 'THE', 'ON', 'I', 'PHO', 'LY', 'KRA', 'MOS', 'NE', 'TA', 'RI', 'DES', 'EU', 'KAL', 'XA', 'MNE', 'ZO', 'PER', 'SE', 'ORM', 'AI', 'TYR', 'HE', 'LIA', 'DRO', 'GE', 'NOS', 'SIA', 'KTE', 'BA'];
+const CZ_SYL =['AR', 'THE', 'ON', 'I', 'PHO', 'LY', 'KRA', 'MOS', 'NE', 'TA', 'RI', 'DES', 'EU', 'KAL', 'XA', 'MNE', 'ZO', 'PER', 'SE', 'ORM', 'AI', 'TYR', 'HE', 'LIA', 'DRO', 'GE', 'NOS', 'SIA', 'KTE', 'BA'];
 function czName(r) { let s = ''; const n = 2 + (r() < 0.45 ? 1 : 0); for (let i = 0; i < n; i++) s += CZ_SYL[Math.floor(r() * CZ_SYL.length)]; return s; }
 
 // the noise every world's face is made of (value noise, stacked a layer at a time; the last layer eased in, so a finer one never pops)
@@ -38156,7 +38441,9 @@ const CZ_FS = `
     else { float w = czF(p * 1.5, uOct); h = w * 0.3; col = mix(uA, uB, sin(n.y * 11.0 + w * 4.0) * 0.5 + 0.5); col = mix(col, uC, smoothstep(0.3, 0.5, czN(p * 5.0 + uTime * 0.05)) * 0.4); cloud = 0.5; }
     vec3 Nb = uAmp > 0.0 ? czBump(vW, N, h * uAmp * uScale * 2.5) : N, V = normalize(cameraPosition - vW);
     float d0 = dot(N, uSun), d = max(dot(Nb, uSun), 0.0), day = smoothstep(-0.15, 0.25, d0);
-    if (cloud > 0.0) { float cl = smoothstep(0.55, 0.8, czN(n * 5.0 + vec3(uTime * 0.01, 0.0, 0.0) + uSeed) * 0.65 + czN(n * 13.0 + uSeed) * 0.35) * cloud; col = mix(col, vec3(0.95), cl); spec *= 1.0 - cl; d = mix(d, max(d0, 0.0), cl); }
+    if (k < 2.5 || k > 3.5) cloud = max(cloud, uAtm * 0.4);   // (any world with air has weather going round it: bands of cloud, drawn out along its turning)
+    if (cloud > 0.0) { float cl = smoothstep(0.55, 0.8, czN(n * 5.0 + vec3(uTime * 0.01, 0.0, 0.0) + uSeed) * 0.65 + czN(n * 13.0 + uSeed) * 0.35) * cloud;
+      cl = max(cl, smoothstep(0.62, 0.86, czN(vec3(n.y * 7.0 + czN(n * 2.5 + uSeed) * 1.4, uTime * 0.003, uSeed.x)) * 0.7 + czN(n * vec3(26.0, 5.0, 26.0) + vec3(uTime * 0.02, 0.0, 0.0) + uSeed) * 0.3) * cloud * 0.75); col = mix(col, vec3(0.95), cl); spec *= 1.0 - cl; d = mix(d, max(d0, 0.0), cl); }
     vec3 c = col * (0.06 + 1.1 * d * day) + glow;
     if (spec > 0.0) c += vec3(1.0, 0.95, 0.85) * pow(max(dot(reflect(-uSun, Nb), V), 0.0), 40.0) * spec * day;
     c += uAtmC * pow(1.0 - max(dot(N, V), 0.0), 3.0) * uAtm * (0.15 + day);
@@ -38173,8 +38460,7 @@ const CZ_GFS = `uniform sampler2D tMap; uniform float uHk, uScale, uTime, uOct; 
     float sea = 1.0 - step(0.002, t.a), fine = czF(n * 900.0, uOct);
     vec3 col = t.rgb * (0.9 + 0.22 * fine * (1.0 - sea)), Nb = czBump(vW, N, (t.a * uHk + fine * 0.00004 * (1.0 - sea)) * uScale * 3.0), V = normalize(cameraPosition - vW);
     float d0 = dot(N, uSun), d = max(dot(Nb, uSun), 0.0), day = smoothstep(-0.12, 0.2, d0);
-    float cl = smoothstep(0.56, 0.82, czN(n * 6.0 + vec3(uTime * 0.006, 0.0, uTime * 0.002)) * 0.6 + czN(n * 17.0 + vec3(0.0, uTime * 0.004, 0.0)) * 0.4) * 0.85;
-    col = mix(col, vec3(0.94), cl); d = mix(d, max(d0, 0.0), cl);
+    float cl = 0.0;   // (its clouds are the live weather's, on a shell of their own: see CZ_WFS)
     vec3 c = col * (0.07 + 1.1 * d * day) + vec3(1.0, 0.95, 0.85) * pow(max(dot(reflect(-uSun, Nb), V), 0.0), 60.0) * sea * (1.0 - cl) * day * 0.9;
     c += vec3(0.35, 0.6, 1.0) * pow(1.0 - max(dot(N, V), 0.0), 3.0) * (0.12 + day * 0.9);
     gl_FragColor = vec4(c, 1.0);
@@ -38296,7 +38582,7 @@ function cosmosInit() {
   C.globe = new THREE.Mesh(new THREE.SphereGeometry(1, 256, 192), new THREE.ShaderMaterial({ vertexShader: CZ_GVS, fragmentShader: CZ_GFS,
     uniforms: { tMap: { value: C.tex.tex }, uHk: { value: 2400 / CZ_RG }, uScale: { value: CZ_RG }, uTime: C.uT, uOct: { value: 1 }, uSun: { value: CZ_SUN } } }));
   C.globe.scale.setScalar(CZ_RG); C.globe.frustumCulled = false; sys.add(C.globe);
-  C.gAtm = new THREE.Mesh(C.geoHi, czAtmMat('#6aa8ff')); C.gAtm.scale.setScalar(CZ_RG * 1.07); C.gAtm.renderOrder = 2; C.gAtm.frustumCulled = false; sys.add(C.gAtm);
+  C.gAtm = new THREE.Mesh(C.geoHi, czAtmMat('#6aa8ff')); C.gAtm.scale.setScalar(CZ_RG * 1.07); C.gAtm.renderOrder = 2; C.gAtm.frustumCulled = false; sys.add(C.gAtm); czWxInit(sys);
   C.rings = new THREE.Group(); C.rings.rotation.set(0.42, 0, 0.18); sys.add(C.rings);
   C.ringA = czRing(1.48, 3.3, 4401, ['#d8c6a0', '#b89a70', '#e8dcc0', '#9a8a78', '#c9a0a0', '#a0b8d0'], [[0.62, 0.03], [0.88, 0.008], [0.3, 0.012]]); C.ringA.scale.setScalar(CZ_RG); C.rings.add(C.ringA);
   C.ringB = czRing(3.7, 4.5, 9127, ['#a8c8f0', '#e0f0ff', '#7090c0', '#c0a0e8'], [[0.4, 0.05]]); C.ringB.scale.setScalar(CZ_RG); C.ringB.rotation.set(0.9, 0, -0.5); C.rings.add(C.ringB);
