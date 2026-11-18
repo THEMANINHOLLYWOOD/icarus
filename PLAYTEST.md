@@ -5,6 +5,7 @@
 ## Flying (the phoenix)
 - [ ] **W / S** climb and dive, **A / D** steer, **Space** beats the wings. Climbing costs speed and diving gives it back.
 - [ ] **Shift** goes faster. **Q / E** roll. Hold **W** and you go over the top in a loop.
+- [ ] **New, hyper:** hold **Shift** flying straight until it charges. Once you're in hyper you can let go and steer, climb, loop and turn as you like. Press **Shift** again to drop out (on a phone or gamepad, the boost). Diving at the ground still throws you out.
 - [ ] **/loop**, **/barrel**, **/immelmann** in the chat. Each trick plays by itself.
 - [ ] Fly up to the sun and level off. Your wings burn. Climb steeply instead and you break through into space.
 - [ ] **Space** low down lands. Tap **Space** by a lamp, a branch or a roof to perch there.

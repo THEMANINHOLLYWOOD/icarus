@@ -13350,17 +13350,17 @@ function hyperTick(dt, held, ax, pin, can) {
   H.at = time;
   if (!can) { if (H.on) hyperOff(''); H.c = 0; }
   else if (!H.on) { if (hard || !held) H.c = 0; else if (straight) H.c = Math.min(1, H.c + dt / HY_CHARGE); if (H.c >= 1) hyperGo(); }   // (not quite straight: it waits; a hard turn, or the fire let go: empty)
-  else { H.hard = hard ? H.hard + dt : 0; if (!held) hyperOff('release'); else if (H.hard > 0.2) hyperOff('turn'); }
+  else { H.hard = 0; if (!held) H.free = true; else if (H.free) hyperOff('again'); }   // (once it has him it is his: he goes where he likes in it, and the boost pressed again lets him out)
   H.k = lerp(H.k, H.on ? 1 : 0, damp(H.on ? 2 : 1.3, dt));
 }
 function hyperGo() {
-  const H = HY, p = player, K = birdK(); H.on = true; H.c = 0; H.hard = 0; H.onT = time;
+  const H = HY, p = player, K = birdK(); H.on = true; H.c = 0; H.hard = 0; H.onT = time; H.free = false;
   if (!COSMOS.on) shock(p.pos.x, p.pos.y, p.pos.z, H.col.set(hyHouse()).getHex(), 34 * PHX_S * K, 0.7);
   flash = Math.max(flash, 0.12); camShake = Math.max(camShake, 0.25); audio.sfx.whoosh?.(true);
-  if (!H.told) { H.told = true; toast(COSMOS.on ? 'HYPER · ACROSS THE DARK · LET GO TO SLOW' : XR.on ? 'HYPER · LET GO TO DROP OUT' : 'HYPER · LET GO TO DROP OUT · POINT UP FOR SPACE'); }
+  if (!H.told) { H.told = true; { const k = TOUCH || PAD.on ? 'BOOST' : 'SHIFT'; toast(COSMOS.on ? `HYPER · STEER ANYWHERE · ${k} AGAIN TO SLOW` : XR.on ? 'HYPER · STEER ANYWHERE · BOOST AGAIN TO DROP OUT' : `HYPER · STEER ANYWHERE · ${k} AGAIN TO DROP OUT · POINT UP FOR SPACE`); } }
 }
 function hyperOff(why) {
-  const H = HY, p = player; if (!H.on) return; H.on = false; H.c = 0; H.why = why;
+  const H = HY, p = player; if (!H.on) return; H.on = false; H.c = 0; H.why = why; H.free = false; if (why === 'again') audio.sfx.whoosh?.(false);
   if (why === 'ground') {   // (the ground coming: thrown out of it at once, the air braking him hard, before the pull-up has to do it alone)
     p.speed = Math.min(p.speed, 240); p.pitch = Math.max(p.pitch, 0.55); camShake = Math.max(camShake, 0.45);   // (and the nose thrown up)
     _v.copy(p.pos).addScaledVector(dir3, 12 * birdK()); shock(_v.x, _v.y, _v.z, 0xf4fbff, 30 * PHX_S * birdK(), 0.6); toast('OUT OF HYPER · THE GROUND'); }
@@ -13530,7 +13530,7 @@ function updatePhoenix(dt) {
   //  until he is back to it. With the fire on he wants the speed: it is spent going on, not up)
   const short = push - flyDrag(u) - FLY.turn, trim = PV || brk > 0.2 ? 0 : Math.asin(clamp(Math.min(0, short) + (u > 1 ? (boost ? 0 : 1) : short < 0 ? 1 : 0) * Vc / (gN * FLY.trimT) * (u - 1), -0.3, 0.22));
   FLY.stallK = lerp(FLY.stallK, diving || FLIP.over || brk > 0.2 || HY.on ? 0 : smoothstep(1.3, 1, u / FLY.stall), damp(6, dt));
-  hyperTick(dt, state === 'play' && (boosting() || PV && PILOT.thr > 0.86), ax, pin, state === 'play' && !MATCH.phase && !GODM.spent && p.flame > 0.05 && !FLIP.over && !p.riding && brk < 0.2 && realm === 'over');   // (see HY)
+  hyperTick(dt, state === 'play' && (boosting() || PV && PILOT.thr > 0.86), ax, pin, state === 'play' && !MATCH.phase && !GODM.spent && p.flame > 0.05 && !p.riding && brk < 0.2 && realm === 'over');   // (see HY: once in it, he can loop, roll and turn as he likes)
   const pivot = FLIP.over ? 0 : FLIP.hangT > 0 ? 1 : smoothstep(0.75, 1.25, elev) * smoothstep(55, 28, p.speed);   // straight up and slowing: a turn swings him round where he hangs (the stall turn)
   p.yaw += p.turn * (diving ? 0.85 : 1.25) * (1 + 2.6 * pivot) * (1 + 0.6 * brk) * dt;
   // S folds the wings and drops him out of the sky; W climbs, and climbing takes wingbeats
@@ -38497,6 +38497,7 @@ function czForm(to, quick = false) {
   czSuitBuild();
   const N = TOUCH ? 200 : 340, A = quick ? null : czCloud(from === 'human' ? human.group : phoenix.group, N);
   if (to === 'human') {
+    if (HY.on) hyperOff('form');
     p.form = 'human'; p.wings = true; p.wingOpen = 1; p.tumble = false; p.grounded = false; p.perch = false; p.takeoff = null; p.cine = null; p.ghost = null; p.morphT = 0; p.climb = null; p.vel.set(0, 0, 0);
     resetPose(); setBurn(0); if (human.group.parent !== C.scene) { CZS.hHome = human.group.parent; C.scene.add(human.group); }
     CZS.mp = null; czSuit(true); czManPose(1 / 60);
