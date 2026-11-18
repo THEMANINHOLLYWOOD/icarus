@@ -110,7 +110,7 @@ export class Crossing {
   say(x) { return this.send({ t: 'say', x: String(x).slice(0, 140) }); }
   dm(id, x) { return this.send({ t: 'dm', to: id, x: String(x).slice(0, 280) }); }
   ask(kind, m, ms = 6000) { return new Promise(res => { this.wait.set(kind, res); this.sendq(m); setTimeout(() => { if (this.wait.get(kind) === res) { this.wait.delete(kind); res({ err: 'timeout' }); } }, ms); }); }
-  async go(to, { pe = '', f } = {}) { return this.ask('tk', { t: 'go', to, pe, f }); }   // → { tk, vt } | { err }
+  async go(to, { pe = '', f, sp, sd } = {}) { return this.ask('tk', { t: 'go', to, pe, f, ...(sp && sd ? { sp, sd } : {}) }); }   // → { tk, vt } | { err }  (sp, sd: where they went across and which way, in the shared sky, so the other side has them come out there)
   async arrived() {   // the page was opened with #x=<ticket>: redeem it (once) for the passport
     const k = /^#x=([0-9a-f]{16})/.exec(location.hash); if (!k) return null;
     history.replaceState(null, '', location.pathname + location.search);   // (out of the address bar: it's spent either way)
@@ -176,8 +176,8 @@ export function untear(style, ms = 1400) {   // on arrival: start covered in the
   return { go: () => new Promise(res => { t0 = performance.now(); const step = now => { const k = Math.min(1, (now - t0) / ms), want = Math.floor(N * k * k); for (; done < want; done++) { const [i, j] = order[done]; g.clearRect(i * s, j * s, s, s); } if (k < 1) requestAnimationFrame(step); else { c.remove(); res(); } }; requestAnimationFrame(step); }) };
 }
 // the whole crossing, for a page: ticket, return point, tear, navigate
-export async function cross(X, to, { pe = '', f, ret } = {}) {
-  const r = await X.go(to, { pe, f });
+export async function cross(X, to, { pe = '', f, ret, sp, sd } = {}) {
+  const r = await X.go(to, { pe, f, sp, sd });
   if (!r.tk) return r;   // (closed, or no line: the page says so)
   if (to !== X.home && ret) saveReturn(X.home, ret);
   try { sessionStorage.setItem('x-tearfrom', WORLDS[X.world].style); } catch (e) {}

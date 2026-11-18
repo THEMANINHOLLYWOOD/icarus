@@ -39606,11 +39606,11 @@ function czRocks() {
 //    (The bodies are built in crossover/kit.js, loaded only when someone from there is to be drawn.)
 const XO_LAYER = 7, XO_PETS = ['murph', 'odie', 'batman', 'cali'], XO_LOOK = /^b[0-9a-f]{25}$/;
 Object.assign(XO, { on: false, M: null, K: null, kitP: null, X: null, pp: null, ppDone: false, booted: false, arrived: false, pet: '', lk: '',
-  B: new THREE.Vector3(24000, 18000, -16000), q: new THREE.Quaternion(), stad: null, sg: null, paintT: 0, pre: false, inside: false, graceT: 0, going: false, last: new THREE.Vector3(), lastOk: false,
+  B: new THREE.Vector3(24000, 18000, -16000).setLength(52000), q: new THREE.Quaternion(), k: 1, RI: 9500, /* (B: COSMIC's middle, out past the rings so nothing of ours stands in front of it) */ shipS: 1, sur: null, plT: 0, tags: [], stadLoading: false, stad: null, sg: null, paintT: 0, pre: false, inside: false, graceT: 0, going: false, last: new THREE.Vector3(), lastOk: false,
   meT: 0, meK: '', rtT: 4, admT: 0, panel: null, looking: false, skyT: 0, sky: new Map(), skyPx: 0, pxN: 0, me: null, tag: null, t: 0, hint: '' });
 const _xoV = new THREE.Vector3(), _xoW = new THREE.Vector3(), _xoU = new THREE.Vector3(), _xoF = new THREE.Vector3(), _xoQ = new THREE.Quaternion(), _xoM = new THREE.Matrix4();
 function xoKit() {   // (the bodies: only fetched when someone is to be drawn in them)
-  if (!XO.kitP) XO.kitP = import('/crossover/kit.js').then(K => { XO.K = K; return K; }).catch(e => { console.warn('[x] kit', e); XO.kitP = null; return null; });
+  if (!XO.kitP) XO.kitP = import('/crossover/kit.js?v=2').then(K => { XO.K = K; return K; }).catch(e => { console.warn('[x] kit', e); XO.kitP = null; return null; });
   return XO.kitP;
 }
 // a visitor's travel code: their own for this visit (kept in the tab, never put in place of this device's), and no journey saved under it
@@ -39693,8 +39693,12 @@ function xoToSpace(f, tries = 4) {
   if (p.form !== 'phoenix') toBird();
   p.perch = false; p.sub = null; p.cine = null; p.takeoff = null; p.perchGo = null;
   C.hy = true; cosmosEnter();
-  const out = _xoV.copy(XO.B).negate().normalize(), up = _xoU.set(0, 1, 0).applyQuaternion(XO.q);
-  C.pos.copy(XO.B).addScaledVector(out, (XO.stad ? XO.stad.R : 1500) * 0.95); czLook(C.q, out, up); C.v = 480; C.camOff = null;
+  // out of BRN's globe of ICARUS, so here just out of this world on the side it was flown into, facing it (the shared sky's way:
+  // their globe is this world, drawn small); with no word of where, on the side toward COSMIC
+  const sp = XO.pp && XO.pp.sp, n = _xoW.copy(XO.B).normalize();
+  if (sp) { const q = XO.M.fromShared(sp, [0, 0, 0], XO.B.toArray()); if (Math.hypot(...q) > 1) n.fromArray(q).normalize(); }
+  const up = _xoU.set(0, 1, 0); if (Math.abs(n.y) > 0.95) up.set(0, 0, 1);
+  C.pos.copy(n).multiplyScalar(CZ_RG * 1.7); czLook(C.q, _xoV.copy(n).negate(), up); C.v = 200; C.camOff = null;   // (a little way up, slow: time to take it in before the air has him)
   XO.graceT = 6; XO.inside = true; XO.lastOk = false;
   if (f === 'man') czForm('human', true);
 }
@@ -39746,40 +39750,83 @@ function xoDm(text) {   // a line typed to someone across (sendCh): true if it w
 const xoNamed = n => { n = String(n || '').toUpperCase().replace(/[^A-Z0-9 ]/g, ''); if (!XO.X || !n) return null; for (const c of XO.X.people.values()) if (c.w === 'brn' && cleanName(c.n).startsWith(n)) return c; return null; };
 
 // ── the stadium of COSMIC, out here: fixed in the dark by the rings, its screen turned toward home
+// COSMIC as it is (crossover/kit.js cosmicLoad: BRN's own stadium, baked), turned and sized by the shared sky, so that BRN's
+// ships, placed through the same sky, fly over the right seats: a point p of COSMIC (BRN metres round its middle) is here at
+// XO.B + XO.k · XO.q · p. The rooms on their ring and BRN's sun and planets round it, where they are today by the clock.
+function xoFrame(globe) {
+  const bas = ab => { const ex = ab.clone().normalize(), up = Math.abs(ex.y) > 0.95 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0), ez = new THREE.Vector3().crossVectors(ex, up).normalize(), ey = new THREE.Vector3().crossVectors(ez, ex); return new THREE.Matrix4().makeBasis(ex, ey, ez); };
+  const Mb = bas(new THREE.Vector3(...globe).negate()), Mi = bas(XO.B);   // (BRN: from ICARUS's globe to COSMIC's middle; here: from Olympus to it)
+  XO.q.setFromRotationMatrix(Mi.multiply(Mb.transpose())); XO.k = XO.B.length() / Math.hypot(...globe);
+}
+const xoAt = (p, out) => out.copy(p).applyQuaternion(XO.q).multiplyScalar(XO.k).add(XO.B);
 function xoStadium() {
-  const C = COSMOS, K = XO.K; if (XO.stad || !C.scene || !K || !XO.X) return;
-  const S = XO.stad = K.stadium(7), outer = XO.sg = new THREE.Group(); S.group.position.copy(S.mid).negate(); outer.add(S.group); outer.frustumCulled = false; C.scene.add(outer);
-  // (tipped toward home, so from the globe you look down into its bowl and see the screen over the rows; its screen faces that way too)
-  const t = _xoV.copy(XO.B).negate().normalize(), yp = _xoU.set(0, 1, 0).addScaledVector(t, -t.y).normalize(), ey = yp.multiplyScalar(0.7).addScaledVector(t, 0.7).normalize();
-  const ex = _xoF.copy(t).addScaledVector(ey, -t.dot(ey)).normalize(), ez = _xoW.crossVectors(ex, ey);
-  XO.q.setFromRotationMatrix(_xoM.makeBasis(ex, ey, ez));
+  const C = COSMOS, K = XO.K; if (XO.stad || XO.stadLoading || !C.scene || !K || !XO.X) return;
+  XO.stadLoading = true;
+  (K.cosmicLoad ? K.cosmicLoad('/crossover/') : Promise.reject(new Error('old kit'))).then(S => xoStadiumUp(S, true)).catch(e => { console.warn('[x] COSMIC as it is would not load: the stand-in', e); xoStadiumUp(K.stadium(7), false); });
+}
+function xoStadiumUp(S, real) {
+  const C = COSMOS, K = XO.K, outer = XO.sg = new THREE.Group(); XO.stad = S;
+  if (real) { xoFrame(S.meta.globe); outer.add(S.group); }
+  else {   // (the stand-in: tipped toward home, so from the globe you look down into its bowl and see the screen over the rows)
+    S.group.position.copy(S.mid).negate(); outer.add(S.group); XO.k = 1;
+    const t = _xoV.copy(XO.B).negate().normalize(), yp = _xoU.set(0, 1, 0).addScaledVector(t, -t.y).normalize(), ey = yp.multiplyScalar(0.7).addScaledVector(t, 0.7).normalize();
+    const ex = _xoF.copy(t).addScaledVector(ey, -t.dot(ey)).normalize(), ez = _xoW.crossVectors(ex, ey);
+    XO.q.setFromRotationMatrix(_xoM.makeBasis(ex, ey, ez));
+  }
+  XO.RI = S.R * XO.k; outer.frustumCulled = false; C.scene.add(outer);
+  { const b = new THREE.Box3().setFromObject(K.boxShip(K.SHIP_KINDS[0]).group), z = new THREE.Vector3(); b.getSize(z); XO.shipS = real ? XO.k * 15 / Math.max(1, z.x, z.y, z.z) : 1; }   // (their ships as big as they are over there)
+  if (real && K.cosmicSurrounds) {
+    const U = XO.sur = K.cosmicSurrounds(S.meta, S.ball);
+    for (const o of [...U.rooms.map(w => w.g), U.sun.g, ...U.planets.map(p => p.g)]) { o.frustumCulled = false; o.traverse(m => { m.frustumCulled = false; }); C.scene.add(o); }
+  }
   const tag = XO.tag = document.createElement('div'); tag.id = 'xoTag'; tag.style.cssText = 'position:fixed;left:0;top:0;transform:translate(-50%,-120%);pointer-events:none;font:11px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.18em;color:#f8d878;text-shadow:0 0 6px #000;white-space:nowrap;display:none;z-index:40;text-align:center';
   document.body.appendChild(tag);
+}
+// the rooms, the sun and its planets: each placed for itself (out here the far is drawn nearer, czK), and the nearest named
+const _xoL = new THREE.Vector3(-0.45, 0.5, -0.74).normalize(), _xoD = new THREE.Vector3(), _xoP = new THREE.Quaternion();
+function xoAround(dt) {
+  const U = XO.sur; if (!U) return;
+  const C = COSMOS, k = XO.k, show = !C.map.on && state === 'play', near = [];
+  if ((XO.plT -= dt) <= 0) { XO.plT = 1; U.place(); }
+  const put = (g, at, r) => { xoAt(at, _xoV); czPlace(g, _xoV, r * k, k); g.visible = !C.map.on; return _xoV.distanceTo(C.pos); };
+  for (const w of U.rooms) { const d = put(w.g, w.at, w.R); w.g.quaternion.copy(XO.q); if (d < 32000) near.push([d, w.at, w.n, w.kind === 'lobby' ? 'THE WAY INTO EVERY THEATER' : w.kind === 'wing' ? 'THE THEATERS PEOPLE MADE' : w.kind === 'room' ? 'A ROOM FROM THE FILMS' : w.kind === 'vinyl' ? 'THE TURNTABLE' : 'A THEATER · LIVE', w.R * 1.4]); }
+  { const d = put(U.sun.g, U.sun.at, U.sun.r); if (d < 260000) near.push([d, U.sun.at, 'THE SUN', 'BURNING STUDIO MUSIC’S', 260]); }
+  for (const p of U.planets) { const d = put(p.g, p.at, p.r); _xoD.subVectors(U.sun.at, p.at).normalize(); p.g.quaternion.copy(XO.q).multiply(_xoP.setFromUnitVectors(_xoL, _xoD)); if (d < 60000) near.push([d, p.at, p.name, p.name === 'EARTH' ? 'ASHBURN’S DOWN THERE' : '', p.r + 20]); }
+  // their names over the nearest few (the rest are little lights to fly to)
+  near.sort((a, b) => a[0] - b[0]);
+  for (let i = 0; i < 5; i++) {
+    let T = XO.tags[i]; if (!T) { T = XO.tags[i] = document.createElement('div'); T.style.cssText = 'position:fixed;left:0;top:0;transform:translate(-50%,-120%);pointer-events:none;font:10px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.16em;color:#ffb46a;text-shadow:0 0 6px #000;white-space:nowrap;display:none;z-index:39;text-align:center'; document.body.appendChild(T); }
+    const n = near[i]; let on = false;
+    if (n && show) { _xoW.copy(n[1]); _xoW.y += n[4]; xoAt(_xoW, _xoV); const kk = czK(_xoU.subVectors(_xoV, C.camPos).length()); _xoV.copy(_xoU).multiplyScalar(kk); C.cam.updateMatrixWorld(); _xoV.project(C.cam);
+      if (_xoV.z < 1 && Math.abs(_xoV.x) < 1.1 && Math.abs(_xoV.y) < 1.1) { on = true; T.style.left = ((_xoV.x * 0.5 + 0.5) * innerWidth).toFixed(0) + 'px'; T.style.top = ((-_xoV.y * 0.5 + 0.5) * innerHeight).toFixed(0) + 'px'; const t = `${n[2]}<br><small style="color:#9a9aa6">${n[3] ? n[3] + ' · ' : ''}${fmtDist(n[0])}</small>`; if (T._t !== t) { T._t = t; T.innerHTML = t; } } }
+    if (on) { if (T.style.display === 'none') T.style.display = ''; } else if (T.style.display !== 'none') T.style.display = 'none';
+  }
 }
 // every frame out in space, once he and the eye are placed (cosmosPlace)
 function xoCosmos(dt) {
   const C = COSMOS, X = XO.X;
   if (X && XO.K && !XO.stad) xoStadium();
-  if (XO.stad) xoDoor(dt);
+  if (XO.stad) { xoDoor(dt); xoAround(dt); }
   if (X) xoSkySend(dt);
   xoSkyers(dt);
   if (XO.vis) xoSelf(dt);
 }
 function xoDoor(dt) {
-  const C = COSMOS, S = XO.stad, X = XO.X, open = !!(X && X.st.open), R = S.R;
-  czPlace(XO.sg, XO.B, R, 1); XO.sg.quaternion.copy(XO.q); XO.sg.visible = true;
+  const C = COSMOS, S = XO.stad, X = XO.X, open = !!(X && X.st.open), R = XO.RI;
+  const sk = czPlace(XO.sg, XO.B, R, XO.k); XO.sg.quaternion.copy(XO.q); XO.sg.visible = !C.map.on;
+  if (S.crowd) S.crowd.material.size = Math.max(0.6, 0.55 * XO.k * sk);   // (a dot for everyone in a seat, a letter or so across up close)
   const d = C.pos.distanceTo(XO.B);
   if ((XO.paintT -= dt) <= 0 && d < 400000) { XO.paintT = 0.25; S.paint(time, open); }
   // its name over it, and how far
   { const T = XO.tag, k = czK(_xoV.subVectors(XO.B, C.camPos).length()); _xoV.multiplyScalar(k); C.cam.updateMatrixWorld(); _xoV.project(C.cam);
     const show = _xoV.z < 1 && Math.abs(_xoV.x) < 1.2 && Math.abs(_xoV.y) < 1.2 && !C.map.on && state === 'play';
     if (show) { T.style.display = ''; T.style.left = ((_xoV.x * 0.5 + 0.5) * innerWidth).toFixed(0) + 'px'; T.style.top = ((-_xoV.y * 0.5 + 0.5) * innerHeight).toFixed(0) + 'px';
-      const t = open ? `BURNING STUDIO MUSIC<br><small style="color:#bcbcbc">${d > R * 1.2 ? fmtDist(d - R * 0.5) + ' · ' : ''}${d < R * 6 ? 'FLY IN TO CROSS OVER' : 'ANOTHER WORLD'}</small>` : `BURNING STUDIO MUSIC<br><small style="color:#f87858">THE WAY IS CLOSED</small>`;
+      const t = open ? `BURNING STUDIO MUSIC<br><small style="color:#bcbcbc">${d > R * 1.2 ? fmtDist(d - R * 0.5) + ' · ' : ''}${d < R * 2.2 ? 'FLY IN TO CROSS OVER' : 'ANOTHER WORLD'}</small>` : `BURNING STUDIO MUSIC<br><small style="color:#f87858">THE WAY IS CLOSED</small>`;
       if (T._t !== t) { T._t = t; T.innerHTML = t; } }
     else if (T.style.display !== 'none') T.style.display = 'none'; }
   // near it: the other world is fetched ahead, and he is told how; into it, and across he goes
-  if (d < R * 6 && !XO.pre) { XO.pre = true; if (open) XO.M.prefetch('brn'); toast(open ? 'BURNING STUDIO MUSIC · FLY INTO ITS STADIUM TO CROSS OVER' : 'BURNING STUDIO MUSIC · THE WAY IS CLOSED'); }
-  else if (d > R * 9) XO.pre = false;
+  if (d < R * 2.2 && !XO.pre) { XO.pre = true; if (open) XO.M.prefetch('brn'); toast(open ? 'BURNING STUDIO MUSIC · FLY INTO ITS STADIUM TO CROSS OVER' : 'BURNING STUDIO MUSIC · THE WAY IS CLOSED'); }
+  else if (d > R * 3.2) XO.pre = false;
   if (XO.graceT > 0) XO.graceT -= dt;
   const r = R * 0.42; let hit = d < r;
   if (!hit && XO.lastOk) {   // (fast enough to go right through it between two frames: the line he flew along)
@@ -39793,7 +39840,8 @@ async function xoCross(home) {
   const f = player.form === 'phoenix' ? 'phoenix' : 'man';
   try { saveGame(); } catch {}
   toast(XO.vis ? 'HOME TO BURNING STUDIO MUSIC…' : 'CROSSING OVER TO BURNING STUDIO MUSIC…'); audio.sfx.whoosh?.(true);
-  const r = await M.cross(X, 'brn', { f, pe: XO.vis ? XO.pet : '', ret: XO.vis ? null : { at: 'cosmos', f } });
+  const C = COSMOS, B = XO.B.toArray(), sp = C.on ? M.toShared(C.pos.toArray(), [0, 0, 0], B) : undefined, sd = C.on ? M.dirToShared(_xoF.set(0, 0, -1).applyQuaternion(C.q).toArray(), [0, 0, 0], B) : undefined;   // (where he went in, so over there he comes out in the same place)
+  const r = await M.cross(X, 'brn', { f, pe: XO.vis ? XO.pet : '', ret: XO.vis ? null : { at: 'cosmos', f }, sp, sd });
   if (r && r.tk) return;
   if (XO.vis) { await M.tear('ascii', 'px'); location.href = M.worldUrl('brn') + '/'; return; }   // (no ticket to be had, but nobody is kept from their own world)
   XO.going = false; XO.graceT = 3;
@@ -39824,7 +39872,7 @@ function xoSkyBody(S, card) {
   if (S.kind === kind && S.body) return S.body;
   xoSkyDrop(S); S.kind = kind; const C = COSMOS, n = cleanName(card ? card.n : 'SOMEONE');
   let g = null, o = {};
-  if (kind === 'ship') { const L = K.SHIP_KINDS, h = [...S.id].reduce((a, c) => a + c.charCodeAt(0), 0); o = K.boxShip(L[h % L.length]); g = o.group; o.scale = 1; }
+  if (kind === 'ship') { const L = K.SHIP_KINDS, h = [...S.id].reduce((a, c) => a + c.charCodeAt(0), 0); o = K.boxShip(L[h % L.length]); g = o.group; o.scale = XO.shipS; }   // (as big as it is over there: COSMIC's here at its real size)
   else if (kind === 'xbird') { o = K.boxPhoenix(); o.helm.visible = true; g = o.group; o.scale = PHX_S; }
   else if (kind === 'xman') { o = K.boxPerson(K.lookFor(S.id + n)); o.dress(true); g = o.group; o.scale = 1; o.armL.rotation.z = -0.5; o.armR.rotation.z = 0.5; o.legL.rotation.x = 0.3; o.shinL.rotation.x = -0.4; }
   else {
@@ -39852,7 +39900,7 @@ function xoSkyers(dt) {
     if (S.pos.distanceToSquared(_xoV) > 4e8) S.pos.copy(_xoV); else S.pos.lerp(_xoV, damp(5, dt));
     const card = X.people.get(id); if (card && card.h === 'icarus' && card.w === 'icarus') { xoSkyHide(S); continue; }   // (one of ours, out here in our own space: drawn as everyone out here is, by czfStep, not twice)
     const o = xoSkyBody(S, card), g = o.g; g.visible = !C.map.on;
-    const s = czPlace(g, S.pos, 12, o.scale); S.ph += dt * (S.f === 'phoenix' ? 5 : 1.5);
+    const s = czPlace(g, S.pos, 12, S.kind === 'ship' ? XO.shipS : o.scale); S.ph += dt * (S.f === 'phoenix' ? 5 : 1.5);
     _xoU.copy(S.pos).normalize(); if (Math.abs(_xoU.dot(S.dir)) > 0.97) _xoU.set(0, 1, 0); czLook(g.quaternion, _xoF.copy(S.dir).normalize(), _xoU);
     if (o.wings && o.b) for (const w of o.wings) w.shoulder.rotation.z = -(0.15 + Math.sin(S.ph) * 0.55);
     if (S.kind === 'xbird') K.flap(o, S.ph);

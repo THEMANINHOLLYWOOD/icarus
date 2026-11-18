@@ -351,3 +351,102 @@ export function stadium(S = 7) {
   const mid = new THREE.Vector3(FX + rend * 0.55, ytop * 0.5, 0), R = Math.max(rend - FX * 0.2, SW * 0.6);
   return { group: root, screen: scr, paint, pads, mid, R, top: ytop, scrW: SW, scrH: SH };
 }
+
+// ---- COSMIC as it really is, for Icarus's space: BRN's own stadium, baked from its page (crossover/bake/cosmic-bake.js) into
+//      cosmic.bin + cosmic.json. In COSMIC's own coords (three.js, y up, BRN metres) round its middle, the stadium end of the
+//      shared sky; the page puts it there (scale and turn from the shared sky), so BRN's ships fly over the right seats.
+//      The stadium, the rock, the glow of its lights and the crowd in every seat, the screen with a picture of its own; round it,
+//      the rooms of the building floating on their ring; further out, BRN's sun and its planets, where they are today.
+//      Icarus's to draw: in letters, like the rest of its world (no visitor alpha).
+export async function cosmicLoad(base = '/crossover/') {
+  const bin = async () => {   // (zipped: a sixth of the size; unzipped here where the browser can, the whole file where it can't)
+    if (typeof DecompressionStream === 'function') { try { const r = await fetch(base + 'cosmic.bin.gz'); if (r.ok && r.body) return await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer(); } catch (e) {} }
+    return fetch(base + 'cosmic.bin').then(r => r.arrayBuffer());
+  };
+  const [meta, buf] = await Promise.all([fetch(base + 'cosmic.json').then(r => r.json()), bin()]);
+  if (buf.byteLength !== meta.bytes) throw new Error('cosmic.bin: ' + buf.byteLength + ' bytes, not ' + meta.bytes);
+  return cosmicBuild(meta, buf);
+}
+export function cosmicBuild(meta, buf) {
+  const M = mats(), root = new THREE.Group(), [lo, hi] = meta.box, Sx = meta.sections;
+  const un = (q, a) => lo[a] + ((q + 32768) / 65535) * (hi[a] - lo[a]);
+  const LIFT = 1.85;   // (COSMIC's own colours, lifted: out in Icarus's dark they would be nothing but black letters)
+  function part(sec, mat, lift = 1) {
+    if (!sec) return null;
+    const P = new Int16Array(buf, sec.pos, sec.n * 3), N = new Int8Array(buf, sec.nor, sec.n * 3), C = new Uint8Array(buf, sec.col, sec.n * 3);
+    const p = new Float32Array(sec.n * 3), n = new Float32Array(sec.n * 3), c = new Float32Array(sec.n * 3);
+    for (let i = 0; i < sec.n * 3; i++) { const a = i % 3; p[i] = un(P[i], a); n[i] = N[i] / 127; c[i] = Math.min(1, (C[i] / 255) * lift); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('normal', new THREE.BufferAttribute(n, 3)); g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    g.computeBoundingSphere(); const m = new THREE.Mesh(g, mat); m.frustumCulled = false; root.add(m); return m;
+  }
+  const solid = part(Sx.solid, M.world, LIFT), glow = part(Sx.glow, M.worldGlow, 1.2);
+  // the crowd: a dot of colour in each seat that has someone in it
+  let crowd = null;
+  if (Sx.seats) {
+    const s = Sx.seats, P = new Int16Array(buf, s.pos, s.n * 3), C = new Uint8Array(buf, s.col, s.n * 3), p = new Float32Array(s.n * 3), c = new Float32Array(s.n * 3);
+    for (let i = 0; i < s.n * 3; i++) { p[i] = un(P[i], i % 3); c[i] = Math.min(1, (C[i] / 255) * LIFT + 0.08); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    crowd = new THREE.Points(g, new THREE.PointsMaterial({ vertexColors: true, size: 0.9, sizeAttenuation: true })); crowd.frustumCulled = false; root.add(crowd);
+  }
+  // the screen: the baked quad, fitted with a picture of its own (the film's always on in COSMIC; shut, only the words)
+  let scr = null, paint = () => {};
+  if (Sx.screen && Sx.screen.n >= 6) {
+    const s = Sx.screen, P = new Int16Array(buf, s.pos, s.n * 3), v = []; for (let i = 0; i < s.n; i++) v.push(new THREE.Vector3(un(P[i * 3], 0), un(P[i * 3 + 1], 1), un(P[i * 3 + 2], 2)));
+    const lo3 = v.reduce((a, b) => a.clone().min(b)), hi3 = v.reduce((a, b) => a.clone().max(b)), mid = lo3.clone().add(hi3).multiplyScalar(0.5), sz = hi3.clone().sub(lo3);
+    const H = sz.y, W = Math.hypot(sz.x, sz.z), along = Math.atan2(sz.z, sz.x);   // (it stands upright: its width runs along x/z)
+    const e1 = v[1].clone().sub(v[0]), e2 = v[2].clone().sub(v[0]), nrm = e1.cross(e2).normalize();
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 116;
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+    scr = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(2.6, 2.6, 2.6), side: THREE.DoubleSide }));
+    scr.position.copy(mid).addScaledVector(nrm, 0.3); scr.lookAt(mid.clone().add(nrm)); root.add(scr);
+    let r = 7; const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647), pts = []; for (let i = 0; i < 60; i++) pts.push([rnd(), rnd(), rnd() * 3 + 1, rnd()]);
+    paint = (t, open) => {
+      const c = cv.getContext('2d'), w = cv.width, h = cv.height;
+      if (!open) { c.fillStyle = '#060608'; c.fillRect(0, 0, w, h); c.fillStyle = '#5a5a64'; c.font = 'bold 15px ui-monospace, Menlo, monospace'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('THE WAY IS CLOSED', w / 2, h / 2); tex.needsUpdate = true; return; }
+      const gr = c.createLinearGradient(0, 0, w, h); gr.addColorStop(0, `hsl(${(t * 12) % 360},70%,22%)`); gr.addColorStop(1, `hsl(${(t * 12 + 140) % 360},80%,30%)`); c.fillStyle = gr; c.fillRect(0, 0, w, h);
+      for (const [x, y, z, hh] of pts) { const X = (x * w + t * 9 * z) % w, Y = y * h; c.fillStyle = `hsl(${hh * 360},90%,70%)`; c.fillRect(X | 0, Y | 0, z | 0, z | 0); }
+      c.fillStyle = '#f8d878'; c.font = 'bold 17px ui-monospace, Menlo, monospace'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('BURNING STUDIO MUSIC', w / 2, h * 0.42);
+      c.fillStyle = '#ffffff'; c.font = '10px ui-monospace, Menlo, monospace'; c.fillText(Math.floor(t * 1.5) % 2 ? 'FLY IN · CROSS OVER' : 'COSMIC · NOW SHOWING', w / 2, h * 0.66);
+      tex.needsUpdate = true;
+    };
+    paint(0, true);
+  }
+  // COSMIC's own planet and moon, close by (what BRN's ships bump round)
+  const ball = (r, col, glowK = 0) => { const g = new THREE.SphereGeometry(r, 28, 18), n = g.attributes.position.count, cc = new Float32Array(n * 3), base = new THREE.Color(col), L = new THREE.Vector3(-0.45, 0.5, -0.74).normalize(), q = new THREE.Vector3();
+    for (let i = 0; i < n; i++) { q.fromBufferAttribute(g.attributes.normal, i); const l = Math.max(0, q.dot(L)), k = Math.min(1.3, 0.28 + glowK + Math.floor(l * 4) / 4 * 0.95), band = 0.9 + 0.1 * Math.sin(q.y * 9); cc[i * 3] = base.r * k * band; cc[i * 3 + 1] = base.g * k * band; cc[i * 3 + 2] = base.b * k * band; }
+    g.setAttribute('color', new THREE.BufferAttribute(cc, 3)); return new THREE.Mesh(g, M.worldGlow); };
+  for (const b of [meta.planet, meta.moon]) if (b) { const m = ball(b.r, b.col); m.position.fromArray(b.at); root.add(m); }
+  const R = Math.max(...hi.map((x, a) => Math.max(Math.abs(x), Math.abs(lo[a])))) * 0.62;
+  return { group: root, screen: scr, paint, mid: new THREE.Vector3(), R, top: hi[1], meta, solid, glow, crowd, ball };
+}
+// the rooms on their ring, and BRN's sun and its planets (js/orbit.js: where they are is the same in both worlds, by the clock)
+export const BRN_PLANETS = [
+  ['MERCURY', 9, 520, '#8a8580', 0.24], ['VENUS', 16, 760, '#e8c890', 0.62], ['EARTH', 17, 1020, '#2a6ad0', 1], ['MARS', 12, 1300, '#c0502a', 1.88],
+  ['JUPITER', 58, 1780, '#d8b890', 11.9], ['SATURN', 48, 2300, '#e0c890', 29.5, true], ['URANUS', 30, 2750, '#9ad8e0', 84], ['NEPTUNE', 29, 3150, '#3a64d8', 165],
+];
+export function cosmicSurrounds(meta, ball) {
+  const M = mats();
+  const rooms = (meta.worlds || []).map(w => {
+    const g = new THREE.Group(), R = w.R, B = new Boxes();
+    const rim = w.kind === 'lobby' ? '#ff6a1a' : w.kind === 'wing' ? '#9a7aff' : '#ff8a2a';
+    // a plinth with its rim lit, and the room's glow over it: a little world
+    const seg = 18; for (let i = 0; i < seg; i++) { const a0 = (i / seg) * Math.PI * 2, a1 = ((i + 1) / seg) * Math.PI * 2; B.quad([Math.cos(a0) * R, 0, Math.sin(a0) * R], [Math.cos(a1) * R, 0, Math.sin(a1) * R], [Math.cos(a1) * R * 0.86, -3, Math.sin(a1) * R * 0.86], [Math.cos(a0) * R * 0.86, -3, Math.sin(a0) * R * 0.86], [Math.cos(a0), 0.2, Math.sin(a0)], colOf('#3a3444').clone()); B.quad([0, 0.01, 0], [Math.cos(a1) * R, 0.01, Math.sin(a1) * R], [Math.cos(a0) * R, 0.01, Math.sin(a0) * R], [0, 0.01, 0], [0, 1, 0], colOf('#2a2632').clone()); }
+    g.add(B.mesh(M.world));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(R + 0.4, Math.max(0.8, R * 0.05), 4, 32), new THREE.MeshBasicMaterial({ color: rim })); ring.rotation.x = Math.PI / 2; ring.position.y = 0.6; g.add(ring);
+    const dome = ball(R * 0.5, '#ffb46a', 0.35); dome.position.y = R * 0.32; g.add(dome);
+    return { ...w, g, at: new THREE.Vector3(...w.at) };
+  });
+  const sun = new THREE.Mesh(new THREE.SphereGeometry(150, 32, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.0, 1.5) }));
+  const sunAt = new THREE.Vector3(...meta.sun), tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.08);
+  const planets = BRN_PLANETS.map(([name, r, orb, col, yr, rings], i) => {
+    const m = ball(r, col); const g = new THREE.Group(); g.add(m);
+    if (rings) { const rg = new THREE.Mesh(new THREE.RingGeometry(r * 1.35, r * 2.25, 40), new THREE.MeshBasicMaterial({ color: '#d8c090', side: THREE.DoubleSide })); rg.rotation.x = Math.PI / 2 + 0.47; g.add(rg); }
+    return { name, r, orb, yr, ph: i * 1.7 + 0.4, g, at: new THREE.Vector3() };
+  });
+  function place(now = Date.now()) {   // where each is today, round the middle (a year is ten minutes, as in COSMIC)
+    const days = now / 600000;
+    for (const p of planets) { const a = p.ph + (days / p.yr) * Math.PI * 2; p.at.set(Math.cos(a) * p.orb, 0, Math.sin(a) * p.orb).applyQuaternion(tilt).add(sunAt); p.g.children[0].rotation.y = days * 6; }
+  }
+  place();
+  return { rooms, sun: { g: sun, at: sunAt, r: 150 }, planets, place };
+}
