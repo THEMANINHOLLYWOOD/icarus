@@ -8592,7 +8592,7 @@ function updatePeers(dt) {
     const away = me !== P.realm || now - P.s.t > 15000 || MATCH.phase === 'live' && MATCH.roster.get(P.id)?.alive === false && !MATCH.roster.get(P.id)?.left || P.ghostAt > P.s.t;   // (out of the fight: gone until it is over; one who left it flies on, seen; a ghost watching one is not seen at all)
     const A = P.s.t ? avatarOf(P) : null; if (!A) continue;
     if (P.painted !== P.name) paintPeer(P);
-    if (away || SHUN.block.has(P.name)) { A.man.group.visible = A.bird.group.visible = false; P.label.style.display = 'none'; if (P.xr) xoPeer(P, A, dt); continue; }
+    if (away || SHUN.block.has(P.name)) { A.man.group.visible = A.bird.group.visible = false; P.label.style.display = 'none'; if (P.px || P.xr) xoPeer(P, A, dt); continue; }
     if (P.form === 'p' && state === 'play' && (P.flapT = (P.flapT ?? Math.random()) - dt) <= 0) {   // another bird's wings, from wherever it is: coming up behind, going over
       P.flapT = 0.5 + Math.random() * 0.3; const dd = P.pos.distanceTo(camera.position);
       if (dd < 170 && dd > 3) audio.at3(P.pos.x, P.pos.y, P.pos.z, () => audio.sfx.flap?.(0.55), { ref: 10, max: 180 });
@@ -39142,7 +39142,9 @@ async function xoStart() {
   const local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   if (local && !M.flagged() && !E.ticket && !E.visit) return;   // (on a test machine the line is not even asked about, unless ?x=1 says so)
   const w = await M.wanted(); if (!w.on) return;
-  if (!E.ticket && !E.visit) { const st = w.st || await M.state(); if (st.down) { setTimeout(() => xoStart().catch(() => {}), 9e4); return; } }   // (the line is down: the game as it was, and ask again later)
+  if (!E.ticket && !XO.X) { const st = w.st || await M.state(); if (st.down) {   // (the line is down: the game as it was, and ask again later; a visitor reloading is still one, from what the tab kept)
+    if (E.visit && !XO.ppDone) { XO.pp = E.visit; XO.ppDone = true; XO.vis = true; XO.pet = XO_PETS.includes(E.visit.pe) ? E.visit.pe : ''; XO.lk = XO_LOOK.test(E.visit.lk || '') ? E.visit.lk : ''; xoKit(); if (XO.booted) xoArrive(); }
+    setTimeout(() => xoStart().catch(() => {}), 9e4); return; } }
   if (XO.X) return;
   const X = XO.X = globalThis.ICX = new M.Crossing({ home: XO.vis ? 'brn' : 'icarus', world: 'icarus' });
   XO.on = true; xoWire(X); xoKit();
