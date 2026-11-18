@@ -24,6 +24,8 @@
 - [ ] **F1** opens the controls card. **?** asks Hermes how to do something.
 
 ## Places
+- [ ] **New, the table of the gods:** behind the thrones and the house of Zeus, the top of Olympus is now a broad snowfield on cliffs, about 300 m across and 240 m deep. The north lip where you leap is the same as before. Walk the Sacred Way south past the needle to the columns on the south rim, and the paved ring through twelve shrines, one per god, each in front of its own pillar. Step into one and it tells you whose it is and how much you have given.
+- [ ] **New, stars of the gods:** small lights in each god's colour go round over Olympus, high round the crown for the bird and low over the table where the man can walk into them. Take one (you can carry three) and bring it to that god's pillar or shrine. The pillar fills with their light from foot to crown for everyone, and the shrine's bowl burns. Every third star to the same god sets the whole pillar on fire with thunder. Your own god's star refills your fire. The wrong god's pillar won't take it.
 - [ ] **Crete:** the Labyrinth, Daedalus's tower, Minos's palace, the town and the harbour.
 - [ ] **The seas:** reefs, sunken statues, and water that changes with depth and weather.
 - [ ] **New, skimming:** over open sea you can come right down onto the water. Roll with **E** or **Q** and only that wingtip cuts the water: a blade of spray, a line in the water, steam, and the wing dragged up and back, turning you toward it. Belly down at speed (dive at it gently) and you skip like a stone. The tail leaves a thread, and the head dipped in hisses. Try it as the hawk (**/small**) and as a big bird too.
