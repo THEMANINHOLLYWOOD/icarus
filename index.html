@@ -13629,8 +13629,9 @@ function updatePhoenix(dt) {
   let ahead = Math.max(gAhead, WATER);
   if (HY.on && !PL.on) { const ax2 = p.pos.x + dir3.x * look * 0.5, az2 = p.pos.z + dir3.z * look * 0.5; treesNear(ax2, az2, 16 * birdK(), (g, ck, i, t) => { if (!t.fell && t.top > ahead) ahead = t.top; }); }   // (skimming in hyper: over the treetops, never through the trunks)
   // left alone he rides up over rising ground, as far as a bird can; folding his wings and diving, the ground is his to judge
-  if (!MOD.noclip && !plunge && !diving && ahead + 10 * birdK() + (HY.on ? 14 : p.speed * 0.12) > p.pos.y + dir3.y * look) {   // (in hyper he is let down low, to skim)   // (a bigger bird keeps further off the ground: its wings reach further down)
-    const need = clamp(Math.atan2(ahead + 14 - p.pos.y, look) + 0.12, 0.4, 0.85);
+  const seaAhead = gAhead < WATER - 2 && groundAt(p.pos.x, p.pos.z, p.pos.y) < WATER - 2 && realm === 'over' && !PL.on;   // (open water ahead and under him: he may come right down onto it, to skim it; it gives, see 'water gives')
+  if (!MOD.noclip && !plunge && !diving && ahead + (seaAhead && !HY.on ? waterFloor() - WATER - 0.5 : 10 * birdK() + (HY.on ? 14 : p.speed * 0.12)) > p.pos.y + dir3.y * look) {   // (in hyper he is let down low, to skim)   // (a bigger bird keeps further off the ground: its wings reach further down)
+    const need = seaAhead && !HY.on ? clamp(Math.atan2(waterFloor() + 1 - p.pos.y, look) + 0.05, 0.02, 0.35) : clamp(Math.atan2(ahead + 14 - p.pos.y, look) + 0.12, 0.4, 0.85);   // (over the sea, only enough to stay on it)
     if (!HY.on) p.rideK = 1;   // (and he works his wings for it: a climb has to be paid for — see FLY)
     if (p.pitch < need - 0.05 && !FLIP.over) p.pitch = lerp(p.pitch, need, damp(HY.on ? 8 : 3, dt));   // (in hyper the ground comes quicker: he answers it quicker)
     if (need > 0.6 && Math.abs(ax) < 0.2) {   // too steep to climb: he leans away along the slope, toward whichever side is lower
@@ -13669,7 +13670,7 @@ function updatePhoenix(dt) {
     p.pos.y = UNDER.ceil - 10; p.vy = Math.min(p.vy, 0);
   }
   // water gives: he skips along it. The ground does not.
-  const wet = gHere < WATER, floor = wet ? WATER + 5 : gHere + 2.4 * (0.5 + 0.5 * birdK());
+  const wet = gHere < WATER, floor = wet ? waterFloor() : gHere + 2.4 * (0.5 + 0.5 * birdK());
   if (p.pos.y < floor && !MOD.noclip) {
     const flat = gHere > terrainAt(p.pos.x, p.pos.z) + 0.5, e = 3;   // a roof, a floor, the turf of an island: level
     if (wet || flat) _n.set(0, 1, 0); else _n.set(terrainAt(p.pos.x - e, p.pos.z) - terrainAt(p.pos.x + e, p.pos.z), 2 * e, terrainAt(p.pos.x, p.pos.z - e) - terrainAt(p.pos.x, p.pos.z + e)).normalize();
@@ -18679,10 +18680,61 @@ function updateCaves(dt) {
     if (state === 'play' && !p.cine && d < S.R * 1.05 && P.y > UNDER.ceil - 52 && time > CAVE.cool) caveUp(S);
   }
 }
+// ── What of him is in the water. Low over the sea it is not all of him or nothing. Rolled over on a wing (E or Q), only that
+//    wingtip cuts it: a thin blade of spray off it, a line drawn in the water behind, and the water drags that wing up and back
+//    and turns him toward it. The belly laid on it at speed skips him off it like a stone, the sea thrown up both sides; the tail
+//    drawn through it leaves a thread; the head put in it hisses. Every reach and splash is the size of the bird it is (birdK).
+const SKP = { parts: null, t: {}, skipT: 0, n: 0 };
+const waterFloor = () => WATER + 1.5 + 3.5 * clamp(birdK(), 0.2, 1);   // (how low the air under him lets him come to the sea: a hawk nearly onto it; the great birds, whose bellies go into it)
+const _sk1 = new THREE.Vector3(), _sk2 = new THREE.Vector3();
+function skimParts(dt) {
+  const p = player; SKP.n = 0;
+  if (p.form !== 'phoenix' || p.cine || p.sub || p.perch || p.takeoff || state !== 'play' || COSMOS.on || PL.on) return;
+  const K = birdK(), alt = p.pos.y - WATER; if (alt > 14 * K + 8 || terrainAt(p.pos.x, p.pos.z) > WATER - 0.5) return;
+  const P = SKP.parts || (SKP.parts = [
+    { k: 'tipL', o: () => phoenix.wings[0].tip, r: 0.18, side: 1, wing: 0 }, { k: 'tipR', o: () => phoenix.wings[1].tip, r: 0.18, side: -1, wing: 1 },
+    { k: 'wristL', o: () => phoenix.wings[0].wrist, r: 0.32, side: 1, wing: 0 }, { k: 'wristR', o: () => phoenix.wings[1].wrist, r: 0.32, side: -1, wing: 1 },
+    { k: 'head', o: () => phoenix.head, r: 0.4, side: 0 }, { k: 'body', o: () => phoenix.group, r: 0.85, side: 0 }, { k: 'tail', o: null, r: 0.25, side: 0 }]);
+  const under = realm === 'under', spray = under ? [0.12, 0.3, 0.9] : [0.55, 0.65, 0.78], steam = [0.42, 0.43, 0.46], few = TOUCH ? 0.5 : 1, sp = p.speed || 0, fast = clamp(sp / 70, 0.3, 2.4);
+  phoenix.group.getWorldPosition(_sk2);
+  for (const q of P) {
+    if (q.o) q.o().getWorldPosition(_sk1); else { const t = phoenix.tails.find(t => !t.root && t.ok); if (!t) continue; _sk1.copy(t.nodes[t.N - 1]); }
+    const r = q.r * K * PHX_S, d = waterY(_sk1.x, _sk1.z) - _sk1.y, c = q.k === 'body' ? clamp((waterFloor() + 0.6 * K - p.pos.y) / (1.2 * K), 0, 1) + clamp((d + r) / (2 * r), 0, 1) * 0.5 : clamp((d + r) / (2 * r), 0, 1);
+    if (c <= 0) continue; SKP.n++;
+    const T = SKP.t[q.k] = (SKP.t[q.k] || 0) - dt;
+    if (q.wing !== undefined) {   // a wing in the water: a blade of spray off it, outward and back, and the water fighting it
+      const ox = _sk1.x - _sk2.x, oz = _sk1.z - _sk2.z, ol = Math.hypot(ox, oz) || 1, tip = q.k.startsWith('tip');
+      for (let i = 0, n = Math.ceil((tip ? 2 : 3) * c * fast * few); i < n; i++) {
+        const k = (4 + Math.random() * 8) * fast * Math.sqrt(K);
+        emit(_sk1.x + rnd(0.4 * K), waterY(_sk1.x, _sk1.z) + 0.2, _sk1.z + rnd(0.4 * K), ox / ol * k - dir3.x * sp * 0.15, (5 + Math.random() * 11) * fast * Math.sqrt(K) * (0.6 + c), oz / ol * k - dir3.z * sp * 0.15, 0.5 + Math.random() * 0.6, spray, -18, (0.5 + Math.random() * 0.7) * Math.max(0.35, K));
+      }
+      if (Math.random() < 0.3 * c * few) emit(_sk1.x, waterY(_sk1.x, _sk1.z) + 0.4, _sk1.z, rnd(1), 2 + Math.random() * 3, rnd(1), 0.9 + Math.random(), steam, 3.5, (0.8 + Math.random()) * Math.max(0.4, K));   // (fire in the water: it hisses)
+      if (T <= 0) { SKP.t[q.k] = tip ? 0.09 : 0.14; ripple(_sk1.x, _sk1.z, (tip ? 0.5 : 0.8) * (0.5 + c) * Math.max(0.4, Math.min(K, 2.5))); }
+      // the water drags that wing: it slows him, turns him toward it, and pushes the wing up and back, trembling
+      p.speed = Math.max(20, sp * (1 - dt * (tip ? 0.12 : 0.22) * c)); p.yaw += q.side * (tip ? 0.3 : 0.45) * c * dt;
+      const w = phoenix.wings[q.wing]; w.shoulder.rotation.z -= (tip ? 0.18 : 0.3) * c; w.root.rotation.y += (q.wing === 0 ? 1 : -1) * 0.2 * c; w.wrist.rotation.z += Math.sin(time * 38 + q.wing) * 0.05 * c;
+      if (T <= 0 && Math.random() < 0.25) audio.sfx.hiss?.(0.25 * c);
+    } else if (q.k === 'body') {   // the belly down on it: fast and shallow, he skips like a stone; slow, he only ploughs it
+      if (sp > 45 && c > 0.15 && time > SKP.skipT && (p.vy < -1 || p.pitch < -0.05 || c > 0.6)) {
+        SKP.skipT = time + 0.35;
+        for (let i = 0, n = Math.round(28 * few); i < n; i++) { const a = Math.random() * TAU_, k = (6 + Math.random() * 14) * Math.sqrt(K);
+          emit(_sk2.x + Math.cos(a) * 1.5 * K, WATER + 0.4, _sk2.z + Math.sin(a) * 1.5 * K, Math.cos(a) * k + dir3.x * sp * 0.3, (8 + Math.random() * 16) * Math.sqrt(K), Math.sin(a) * k + dir3.z * sp * 0.3, 0.7 + Math.random() * 0.6, spray, -18, (0.7 + Math.random()) * Math.max(0.4, K)); }
+        ripple(_sk2.x, _sk2.z, 1.6 * Math.max(0.5, Math.min(K, 2.5))); audio.sfx.splash?.(K > 1.5); camShake = Math.max(camShake, 0.12 * Math.min(K, 2));
+        if (!SKP.told) { SKP.told = true; toast('SKIPPED LIKE A STONE'); }
+      } else if (T <= 0) { SKP.t.body = 0.12; ripple(_sk2.x, _sk2.z, 1.1 * Math.max(0.5, Math.min(K, 2.5))); }
+    } else if (q.k === 'head') {   // his head in it: a burst of steam
+      if (T <= 0 && c > 0.3) { SKP.t.head = 0.25; for (let i = 0, n = Math.round(8 * few); i < n; i++) emit(_sk1.x + rnd(0.5 * K), WATER + 0.5, _sk1.z + rnd(0.5 * K), rnd(2), 3 + Math.random() * 5, rnd(2), 1 + Math.random(), steam, 4, (1 + Math.random()) * Math.max(0.4, K)); audio.sfx.hiss?.(0.4); }
+    } else if (q.k === 'tail') {   // the tail drawn through it: a thread of spray and a line in the water
+      if (Math.random() < 0.6 * few) emit(_sk1.x, WATER + 0.2, _sk1.z, -dir3.x * sp * 0.1 + rnd(1), (2 + Math.random() * 5) * Math.sqrt(K), -dir3.z * sp * 0.1 + rnd(1), 0.5 + Math.random() * 0.4, spray, -16, (0.4 + Math.random() * 0.4) * Math.max(0.35, K));
+      if (T <= 0) { SKP.t.tail = 0.16; ripple(_sk1.x, _sk1.z, 0.45 * Math.max(0.4, Math.min(K, 2.5))); }
+    }
+  }
+}
+setTimeout(() => { if (window.__icarus) Object.assign(window.__icarus, { SKP, skimParts, terrainAt }); }, 200);   // (tests: the water and the parts of him in it)
 function updateSkim(dt) {
   const p = player, W = waterMat.uniforms.uWake.value, u = waterMat.uniforms;
-  const fly = p.form === 'phoenix' && !p.cine && !p.sub && state === 'play', alt = p.pos.y - WATER;
-  const s = fly && alt < 30 && terrainAt(p.pos.x, p.pos.z) < WATER - 0.5 ? clamp(p.speed / 95, 0.4, 3.2) * smoothstep(30, 9, alt) : 0;   // (he does not have to touch it: the air under him is enough)
+  const fly = p.form === 'phoenix' && !p.cine && !p.sub && state === 'play', alt = p.pos.y - WATER, sk = clamp(birdK(), 0.35, 3);   // (sk: the size of the bird, for how near the air under it presses on the water, and how far it throws it)
+  const s = fly && alt < 30 * sk && terrainAt(p.pos.x, p.pos.z) < WATER - 0.5 ? clamp(p.speed / 95, 0.4, 3.2) * smoothstep(30 * sk, 9 * sk, alt) : 0;   // (he does not have to touch it: the air under him is enough)
   skim.s = s;
   const on = s > 0.02;
   if (on !== skim.was || on && (skim.t -= dt) <= 0) {   // lay down another point of the path; a break in it is a point with no strength
@@ -18700,7 +18752,7 @@ function updateSkim(dt) {
   if (on) {
     const under = realm === 'under', spray = under ? [0.12, 0.3, 0.9] : [0.5, 0.6, 0.72], rx = -dir3.z, rz = dir3.x;   // rx, rz: his right-hand side
     for (let i = 0, n = Math.ceil(s * 9); i < n; i++) {   // two sheets of spray, thrown out and up from where the air under him meets the water
-      const side = i & 1 ? 1 : -1, o = 2 + Math.random() * 5, k = (7 + Math.random() * 16) * Math.min(s, 2.4);
+      const side = i & 1 ? 1 : -1, o = (2 + Math.random() * 5) * sk, k = (7 + Math.random() * 16) * Math.min(s, 2.4) * Math.sqrt(sk);
       emit(p.pos.x + rx * side * o + rnd(2), WATER + 0.5, p.pos.z + rz * side * o + rnd(2), rx * side * k + dir3.x * p.speed * 0.25, (6 + Math.random() * 14) * Math.min(s, 2.6), rz * side * k + dir3.z * p.speed * 0.25, 0.6 + Math.random() * 0.8, spray, -18, 0.8 + Math.random() * 1.2);
     }
     for (let i = 0, n = Math.ceil(s * 4); i < n; i++)   // and a tail of it standing up behind him, as high as a house when he is going fast
@@ -32438,7 +32490,7 @@ function tick(dt) {
   if (dbgCam.on) { camera.position.copy(dbgCam.p); camera.up.set(0, 1, 0); camera.lookAt(dbgCam.l); camera.fov = dbgCam.fov; camera.updateProjectionMatrix(); }   // (a fixed lens, for tests)
   updatePalette(dt);
   updateClouds(dt);
-  updateSea(dt); updateSkim(dt); updateCaves(dt); updateFish(dt); updateDeep(dt); statsTick(dt); updateAreas(dt); updateGod(dt); globalThis.DAIMON?.update(dt); updateTron(dt); updateMatch(dt); updateGfly(dt); updateShore(); updateRivers(dt); updateStone(dt); updatePlaces(dt); updateDrift(dt); updateTear(dt); updatePools(dt);
+  updateSea(dt); updateSkim(dt); skimParts(dt); updateCaves(dt); updateFish(dt); updateDeep(dt); statsTick(dt); updateAreas(dt); updateGod(dt); globalThis.DAIMON?.update(dt); updateTron(dt); updateMatch(dt); updateGfly(dt); updateShore(); updateRivers(dt); updateStone(dt); updatePlaces(dt); updateDrift(dt); updateTear(dt); updatePools(dt);
   updateRings(dt); updateHouseBooms(dt);
   updateWorldLife(dt); updateLeaves(dt); updateLava(dt); updateEruptions(dt); updateCraters(dt); updateArena(dt); updateGrass(dt); updateFlowers(dt); updateWeather(dt); updateTwisters(dt); updateFire(dt); updateFlies(dt); updateFriends(dt); updatePantheon(dt); updateGusts(dt); updateHigh(dt);
   updateTemple(); updateCurrents(dt); updateDay(dt); updateStorm(dt); updateAir(dt); updateOthers(dt);

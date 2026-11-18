@@ -26,6 +26,7 @@
 ## Places
 - [ ] **Crete:** the Labyrinth, Daedalus's tower, Minos's palace, the town and the harbour.
 - [ ] **The seas:** reefs, sunken statues, and water that changes with depth and weather.
+- [ ] **New, skimming:** over open sea you can come right down onto the water. Roll with **E** or **Q** and only that wingtip cuts the water: a blade of spray, a line in the water, steam, and the wing dragged up and back, turning you toward it. Belly down at speed (dive at it gently) and you skip like a stone. The tail leaves a thread, and the head dipped in hisses. Try it as the hawk (**/small**) and as a big bird too.
 - [ ] **The Underworld:** the Styx and Charon's ferry, the dead (**Space** burns them back), blue lava and Tartarus.
 - [ ] **Weather:** tornadoes, dust storms, snow squalls, valley mist. Fly through them.
 - [ ] **Fire:** brush past trees as the phoenix and they catch. Your wings fan it.
