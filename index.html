@@ -1194,7 +1194,7 @@ const TIERS = [
   { name: 'ULTRA', rt: 0.85, cell: 2, viewR: 9, fog: 3400, far: 64000, shadows: 2048, glow: 0.7,  deco: 104, animals: 1,   clouds: 320, dpr: 2, dof: 1 },
 ];   // (viewR: how many 400 m squares of country are built in full round him. fog: how far he sees down among the hills. far: how far from up high — see FAR)
 // phones run the top tier too, on a budget a phone GPU can hold; if frames still drop it steps down quietly
-if (TOUCH && !VISION) { Object.assign(TIERS[2], { rt: 0.6, viewR: 7, fog: 2900, far: 30000, shadows: 0, deco: 72, clouds: 200, dpr: 2, cell: 2 }); Object.assign(TIERS[1], { rt: 0.5, far: 22000, shadows: 0, clouds: 160, cell: 2 }); Object.assign(TIERS[0], { far: 16000, cell: 3 }); }   // (a phone: letters a little bigger than a computer's, and finer than they were)
+if (TOUCH && !VISION) { Object.assign(TIERS[2], { rt: 0.6, viewR: 7, fog: 2900, far: 30000, shadows: 0, deco: 72, clouds: 200, dpr: 3, cell: 2 }); Object.assign(TIERS[1], { rt: 0.5, far: 22000, shadows: 0, clouds: 160, cell: 2, dpr: 3 }); Object.assign(TIERS[0], { far: 16000, cell: 3, dpr: 3 }); }   // (dpr 3: a phone's letters drawn on its own pixels, one to one, never stretched up from a smaller picture; the picture under them is held to its own budget, see PX_SCENE, so this costs only the last pass)   // (a phone: letters a little bigger than a computer's, and finer than they were)
 function detectTier() {
   try {
     const gl = document.createElement('canvas').getContext('webgl2');
@@ -2844,6 +2844,7 @@ function updateHeavens(dt) {
   HEAVEN.planets[0].rotation.y += dt * 0.05; HEAVEN.planets[1].rotation.y += dt * 0.04;
   skyMat.uniforms.uTime.value = time;
   skyMat.uniforms.uAur.value = AUR.k = k * (0.7 + 0.3 * smoothstep(0.1, 0.6, 0.5 + 0.5 * Math.sin(time * 0.017 + 1))) * (0.8 + 0.2 * high) * (1 - clamp(storm, 0, 1) * 0.8);   // (it swells and sinks through the night, and a storm hides it)
+  if (realm === 'over') { const top = smoothstep(SKY_LIMIT - 900, SKY_LIMIT + 700, camera.position.y); if (top > 0) skyMat.uniforms.uAur.value = Math.max(AUR.k, top * (0.45 + 0.4 * k)); }   // (up near the top of the sky it is there by day too: the edge of the dark)
   waterMat.uniforms.uAur.value = AUR.k;
   const M = HEAVEN.meteor;
   if (M.l.material.opacity > 0 || HEAVEN.mU < 1) {
@@ -3282,6 +3283,9 @@ const cloudKinds = [
     K.mesh = new THREE.InstancedMesh(K.geo, cloudMat, K.n); K.mesh.frustumCulled = false; K.mesh.renderOrder = 3; K.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     K.data = Array.from({ length: K.n }, () => ({ x: (r() - 0.5) * CLOUD_W, z: (r() - 0.5) * CLOUD_W, yk: r(), y: lerp(K.y[0], K.y[1], r()), s: lerp(K.s[0], K.s[1], r()),
       ox: 0, oy: 0, oz: 0, vx: 0, vy: 0, vz: 0, puff: 0, sa: 0, sv: 0, rot: K.high ? Math.atan2(-WIND.z, WIND.x) + (r() - 0.5) * 0.3 : r() * 6.28, spin: K.high ? 0 : (r() - 0.5) * 0.006, ph: r(), T: 110 + r() * 160, v: 7 + r() * 9 + (K.high ? 14 : 0) }));
+    // (each its own shade, set as it goes: dark under a storm, lit orange over a fire; and how much sky it is in, see updateClouds)
+    K.id = cloudKinds.indexOf(K); K.data.forEach((c, i) => { Object.assign(c, { ph0: c.ph, cov: 0.5, covT: 0.5, st: 0, stT: 0, fi: 0, fiT: 0, sT: i % 40 }); K.mesh.setColorAt(i, new THREE.Color(1, 1, 1)); });
+    K.mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
     scene.add(K.mesh);
   }
 }
@@ -3303,6 +3307,8 @@ scene.add(cloudSea);
 const wrapW = v => ((v + CLOUD_W / 2) % CLOUD_W + CLOUD_W) % CLOUD_W - CLOUD_W / 2;
 let cloudIn = 0, fogFar = tier.fog;
 const _cc = new THREE.Color(), WHITE_C = new THREE.Color(0xffffff);
+// (a veil laid over the picture that leaves its alpha alone: the picture's mark of who is who, and of the sky, is not disturbed)
+const keepA = m => Object.assign(m, { blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor });
 // What the bird does to a cloud he flies at: it is shouldered aside, dragged a little way after him, swells, turns, and
 // then, slowly, the wind puts it back.
 let trailT = 0;
@@ -3416,6 +3422,66 @@ function farStep(dt) {
   FAR.sky.copy(skyMat.uniforms.hor.value).lerp(skyMat.uniforms.mistCol.value, skyMat.uniforms.mist.value).lerp(scene.fog.color, c.y < WATER ? 1 : clamp(Math.max(WX.fog || 0, cloudIn), 0, 1));
   waterMat.uniforms.uFarSky.value.copy(FAR.sky);
 }
+const CLOUD_STORM = new THREE.Color(0.5, 0.53, 0.62), CLOUD_FIRE = new THREE.Color(1.35, 0.62, 0.38);
+// ── The sky over the clouds. Over every thunderstorm the shared weather has, its anvil: a dark tower going up out of the
+//    cloud and spreading flat and white at the top, kilometres across, going downwind with its storm. Higher, cirrus: long
+//    thin streaks combed out along the wind, thicker over bad weather. And near the top of the sky, where it starts to go
+//    dark, the jet stream: pale lanes of light going over fast, faint by day, glowing by night and brightest as the blue goes
+//    out of the sky above him. All by the clock everyone shares.
+const SKYL = { anv: null, st: [], t: 0, hi: null, cov: 0 }, SKYL_S = 16000;
+function updateSkyLayers(dt) {
+  const c = camera.position, over = realm === 'over' && state !== 'title' && state !== 'loading', t = Date.now() / 1000;
+  if (!SKYL.anv) {
+    const A = SKYL.anv = new THREE.InstancedMesh(cloudGeoOf(321, 14, [130, 6, 120], true), cloudMat, 16); A.frustumCulled = false; A.renderOrder = 3; A.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    for (let i = 0; i < 16; i++) A.setColorAt(i, WHITE_C); A.count = 0; scene.add(A);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([-1, 1, -1, 1, 1, -1, 1, 1, 1, -1, 1, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1], 3)); g.setIndex([0, 2, 1, 0, 3, 2, 4, 6, 5, 4, 7, 6]);   // (the jet's sheet first, then the cirrus under it)
+    SKYL.hi = new THREE.Mesh(g, keepA(new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
+      uniforms: { uCam: { value: new THREE.Vector3() }, uOff: { value: new THREE.Vector4() }, uY: { value: new THREE.Vector2(SUMMIT + 320, SKY_LIMIT + 260) }, uCov: { value: 0 }, uK: { value: new THREE.Vector2() }, uCol: { value: new THREE.Color() }, uWd: { value: new THREE.Vector2(WIND.x, WIND.z).normalize() } },
+      vertexShader: `uniform vec3 uCam; uniform vec2 uY; varying vec3 vW; varying float vL;
+        void main() { vL = position.y; vW = vec3(uCam.x + position.x * ${SKYL_S.toFixed(1)}, position.y < 0.5 ? uY.x : uY.y, uCam.z + position.z * ${SKYL_S.toFixed(1)}); gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0); }`,
+      fragmentShader: `uniform vec3 uCam, uCol; uniform vec4 uOff; uniform vec2 uK, uWd; uniform float uCov; varying vec3 vW; varying float vL;
+        float hs(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float ns(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hs(i), hs(i + vec2(1.0, 0.0)), f.x), mix(hs(i + vec2(0.0, 1.0)), hs(i + vec2(1.0, 1.0)), f.x), f.y); }
+        void main() { float r = length(vW.xz - uCam.xz) / ${SKYL_S.toFixed(1)}, fade = smoothstep(1.0, 0.5, r) * smoothstep(0.0, 0.04, abs(vW.y - uCam.y) / ${SKYL_S.toFixed(1)});
+          float u = dot(vW.xz, uWd), v = dot(vW.xz, vec2(-uWd.y, uWd.x)), a; vec3 c;
+          if (vL < 0.5) {   // cirrus: fields of it, streaks combed out along the wind with the fine hooks of ice in them
+            vec2 q = vec2((u - uOff.x) / 1700.0, v / 380.0), w = vec2(ns(q * 0.35 + 3.1), ns(q * 0.35 + 8.7));
+            float n = ns(q + w * 1.4) * 0.6 + ns(q * 2.3 + w) * 0.3 + ns(q * 6.0) * 0.1, hook = ns(vec2((u - uOff.x) / 700.0, v / 95.0) + w * 2.0);
+            a = smoothstep(0.55 - uCov * 0.22, 0.92, n) * (0.55 + 0.45 * hook) * smoothstep(0.32, 0.62, ns(vec2((u - uOff.x) / 9000.0, v / 7000.0)) + uCov * 0.45) * uK.x;
+            c = uCol * (0.85 + 0.3 * hook);
+          } else {   // the jet: lanes of it, and fast streaks going along them
+            vec2 q = vec2((u - uOff.z) / 5200.0, v / 950.0);
+            float lane = smoothstep(0.58, 0.82, ns(vec2(q.x * 0.12, q.y * 0.8 + 4.0))), streak = ns(vec2(q.x * 3.0, q.y * 13.0)), s3 = streak * streak * streak;
+            a = lane * (0.2 + 1.2 * s3) * uK.y;
+            c = mix(vec3(0.45, 0.85, 1.0), vec3(0.78, 0.5, 1.0), ns(q * 0.5 + 2.0)) * (0.7 + 0.8 * s3);
+          }
+          a *= fade; if (a < 0.008) discard;
+          gl_FragColor = vec4(c, min(a, 0.85)); }` })));
+    SKYL.hi.frustumCulled = false; SKYL.hi.renderOrder = 2; scene.add(SKYL.hi);
+  }
+  // the anvils, over the storms near enough to see
+  const A = SKYL.anv; let n = 0;
+  if (over) {
+    if ((SKYL.t -= dt) < 0) { SKYL.t = 1; wxStorms(c.x, c.z, 10000, SKYL.st, t); SKYL.st.sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z)); if (SKYL.st.length > 8) SKYL.st.length = 8; }
+    for (const S of SKYL.st) {
+      wxStormNow(S, t); if (S.s <= 0.02) continue;
+      const k = S.s, s = S.r * 1.25 / 130 * (0.35 + 0.65 * k), rot = Math.atan2(-WIND.z, WIND.x);
+      _mat.compose(_p.set(S.x + WIND.x * S.r * 0.3, 1400 + S.h1 * 240, S.z + WIND.z * S.r * 0.3), _q.setFromAxisAngle(UP, rot + S.h2 * 0.6), _s.set(s, s * 0.3, s * 0.8)); A.setMatrixAt(n, _mat); A.setColorAt(n, _cc.setRGB(1.06, 1.06, 1.1)); n++;
+      _mat.compose(_p.set(S.x, 360, S.z), _q.setFromAxisAngle(UP, S.h1 * 6), _s.set(s * 0.42, s * 1.9 * k, s * 0.42)); A.setMatrixAt(n, _mat); A.setColorAt(n, _cc.copy(CLOUD_STORM).multiplyScalar(0.92)); n++;
+    }
+  }
+  A.count = n; if (n) { A.instanceMatrix.needsUpdate = true; A.instanceColor.needsUpdate = true; }
+  // the cirrus and the jet
+  const H = SKYL.hi; H.visible = over;
+  if (over) {
+    const U = H.material.uniforms, top = smoothstep(SKY_LIMIT - 1100, SKY_LIMIT + 300, c.y), lit = clamp(pal.hemiI / 1.45, 0.12, 1.05), w = WX.want;
+    if (w) SKYL.cov = lerp(SKYL.cov, clamp(Math.max(w.grey, w.rain, w.thunder, w.squall), 0, 1), damp(0.2, dt));
+    U.uCam.value.copy(c); U.uOff.value.set((t * 32) % 200000, 0, (t * 85) % 200000, 0); U.uCov.value = SKYL.cov;
+    U.uK.value.set(0.85 * (1 - 0.6 * WX.fog) * (1 - cloudIn), (0.3 + 0.55 * pal.stars + 0.9 * Math.max(top, COSMOS.up)) * (1 - clamp(storm, 0, 1) * 0.5));
+    U.uCol.value.copy(pal.sun).lerp(WHITE_C, 0.55).multiplyScalar(lit * (0.7 + 0.3 * Math.min(1, WX.light))).lerp(pal.hor, 0.15);
+    H.renderOrder = c.y > U.uY.value.x ? 4 : 2;
+  }
+}
 function updateClouds(dt) {
   if (SIZ.k > 0) {
     if ((SIZ.t -= dt) < 0) { SIZ.t = 0.2; audio.sfx.sizzle?.(Math.min(1, SIZ.k * 0.5)); }
@@ -3431,25 +3497,33 @@ function updateClouds(dt) {
   // the line he has flown these last two seconds, for the clouds to open along
   if ((trailT -= dt) <= 0) { trailT = 0.2; const last = cloudTrail.pop(); cloudTrail.unshift(last); cloudTrail[1].set(pl.pos.x, pl.pos.y, pl.pos.z, flying ? time : -1); }
   cloudTrail[0].set(pl.pos.x, pl.pos.y, pl.pos.z, flying ? time : -1);
+  // (where each one is, and where in its life, goes by the clock everyone shares: the same clouds over the same hills for
+  // everyone, drifting on the same wind; each builds where the weather is wet and thins where it is fine: see wxSky)
+  const wt = Date.now() / 1000 - 1.7e9, ck = damp(0.35, dt), over = realm === 'over';
   for (const K of cloudKinds) {
     K.mesh.visible = !(under && K.high);
     if (!K.mesh.visible) continue;
     for (let i = 0; i < K.n; i++) {
       const c = K.data[i];
-      c.ph += dt / c.T;
-      if (c.ph >= 1) { c.ph -= 1; c.x += (Math.random() - 0.5) * 900; c.z += (Math.random() - 0.5) * 900; }   // it forms again somewhere else
-      const env = smoothstep(0, 0.2, c.ph) * smoothstep(1, 0.78, c.ph), d = time * c.v;
-      const x = cx + wrapW(c.x + WIND.x * d - cx), z = cz + wrapW(c.z + WIND.z * d - cz);
+      const cyc = wt / c.T + c.ph0, n = Math.floor(cyc), jx = (wxHash(i, n, K.id * 31 + 5) - 0.5) * 1800, jz = (wxHash(i, n, K.id * 31 + 6) - 0.5) * 1800;   // it forms again somewhere else
+      c.ph = cyc - n;
+      const env = smoothstep(0, 0.2, c.ph) * smoothstep(1, 0.78, c.ph), d = wt * c.v;
+      const x = cx + wrapW(c.x + jx + WIND.x * d - cx), z = cz + wrapW(c.z + jz + WIND.z * d - cz);
       if (c.heat) c.heat = Math.max(0, c.heat - dt * 0.04);   // (it gathers again, slowly)
-      const y = under ? WATER + 10 + c.yk * 60 : c.y, s = c.s * (0.2 + 0.8 * env) * (1 + c.puff * 0.3) * (1 - 0.6 * (c.heat || 0)) * (under ? 1 : 1 + 0.4 * WX.storm), sy = (under ? 0.2 : K.sy) * (0.8 + 0.2 * env);   // (in wet weather they build)
+      if (over && --c.sT < 0) { c.sT = 40 + (i % 13); const o = wxSky(x, z); c.covT = o.cover; c.stT = o.storm; c.fiT = wxFireK(x, z); }
+      c.cov = lerp(c.cov, c.covT, ck); c.st = lerp(c.st, c.stT, ck); c.fi = lerp(c.fi, c.fiT, ck);
+      const wet = under ? 1 : lerp(0.55, 1.35, c.cov) * (K.id === 2 ? lerp(0.6, 1.45, c.st) : 1);   // (in wet weather they build; the towers most under a storm)
+      const y = under ? WATER + 10 + c.yk * 60 : c.y, s = c.s * (0.2 + 0.8 * env) * (1 + c.puff * 0.3) * (1 - 0.6 * (c.heat || 0)) * wet, sy = (under ? 0.2 : K.sy) * (0.8 + 0.2 * env) * (1 + c.st * 0.25);
       shove(c, x + c.ox, y + c.oy + 7 * s * sy, z + c.oz, 36 * s + 30, dt);
       _mat.compose(_p.set(x + c.ox, y + c.oy, z + c.oz), _q.setFromAxisAngle(UP, c.rot + time * c.spin + c.sa), _s.set(s, s * sy, s));
       K.mesh.setMatrixAt(i, _mat);
+      _cc.setRGB(1, 1, 1).lerp(CLOUD_STORM, c.st * 0.8).lerp(CLOUD_FIRE, c.fi * 0.75); K.mesh.setColorAt(i, _cc);
       const qx = (cx - x) / (30 * s), qy = (cam.y - y - 7 * s * sy) / (10 * s * sy + 3), qz = (cz - z) / (30 * s), q = qx * qx + qy * qy + qz * qz;
       if (q < 1) inside = Math.max(inside, (1 - q) * (under ? 0.5 : 1));
     }
-    K.mesh.instanceMatrix.needsUpdate = true;
+    K.mesh.instanceMatrix.needsUpdate = true; K.mesh.instanceColor.needsUpdate = true;
   }
+  updateSkyLayers(dt);
   const md = Math.hypot(cx - MOUNT.x, cz - MOUNT.z);
   cloudSea.visible = !under && md < 9000;
   if (cloudSea.visible) {
@@ -5646,7 +5720,8 @@ function lettersSet(i, say) { FIT.user = i === null ? null : clamp(i, 0, CELLS.l
 // what the machine is asked to fill: never more than it can, however big the window is made. The letters are cheap; it is
 // the picture under them and the page itself that cost, and neither needs more than this to be as sharp as the glass.
 const PX_PAGE = [4.2e6, 8.4e6, 15e6], PX_SCENE = [1.5e6, 2.8e6, 4.5e6];
-const fitDpr = () => Math.max(1, Math.min(devicePixelRatio || 1, tier.dpr, Math.sqrt(PX_PAGE[tierIdx] / Math.max(1, innerWidth * innerHeight))));
+let DPRC = 9;   // (how fine the page may be drawn, lowered if frames drop: see adaptQuality)
+const fitDpr = () => Math.max(1, Math.min(devicePixelRatio || 1, tier.dpr, DPRC, Math.sqrt(PX_PAGE[tierIdx] / Math.max(1, innerWidth * innerHeight))));
 // ── The interface is written into the picture. With the letters on, the world is a grid of characters; the strip, its
 //    pictures, the word in the corner, what the game has to say and the names of places are typed into that same grid,
 //    a character to a cell, and go through everything the picture goes through (the glow, the afterimage). One small
@@ -5715,7 +5790,7 @@ function resize() {
   const dpr = renderer.getPixelRatio();
   renderer.setSize(w, h);
   camera.aspect = w / h; camera.updateProjectionMatrix();
-  const sc0 = asciiOn ? rtScale : Math.min(1, rtScale * 1.6), sc = sc0 * Math.min(1, Math.sqrt((asciiOn ? PX_SCENE[tierIdx] : 8.4e6) / Math.max(1, w * dpr * sc0 * h * dpr * sc0)));
+  const sc0 = asciiOn ? rtScale : Math.min(1, rtScale * 1.6), sc = sc0 * Math.min(1, Math.sqrt((asciiOn ? PX_SCENE[tierIdx] : TOUCH ? 3.2e6 : 8.4e6) / Math.max(1, w * dpr * sc0 * h * dpr * sc0)));
   rt.setSize(Math.max(4, Math.floor(w * dpr * sc)), Math.max(4, Math.floor(h * dpr * sc)));
   { const bw = Math.max(4, Math.floor(w * dpr * sc / 4)), bh = Math.max(4, Math.floor(h * dpr * sc / 4)); blurA.setSize(bw, bh); blurB.setSize(bw, bh); }
   postMat.uniforms.uRes.value.set(w * dpr, h * dpr);
@@ -5735,7 +5810,7 @@ function applyTier(i, announce, persist = true) {
   tierIdx = i; tier = TIERS[i];
   if (persist) try { localStorage.setItem('icarus.tier', i); } catch {}
   rtScale = tier.rt; cellIdx = tier.cell; VIEW_R = tier.viewR; fogFar = scene.fog.far = tier.fog * (realm === 'under' ? 0.85 : 1);
-  renderer.setPixelRatio(Math.min(devicePixelRatio, tier.dpr));
+  renderer.setPixelRatio(fitDpr());
   const sh = tier.shadows > 0;
   if (sh !== renderer.shadowMap.enabled) scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => m.needsUpdate = true); });
   renderer.shadowMap.enabled = sh; sun.castShadow = sh;
@@ -8404,6 +8479,7 @@ function gotState(m) {
   if (pt !== (P.patron || '')) { P.patron = pt; paintPeer(P); }
   if (first || P.pos.distanceToSquared(_v.set(x, y, z)) > 400 * 400) { P.pos.set(x, y, z); P.yaw = P.yawT; }
   P.crete = !!m.c; if (P.crete) newcomerSeen(P);   // (still in the opening, on Crete: anyone who has been through it can go and watch)
+  czfHeard(P, m);   // (out in space: where, and any gate they lit)
 }
 // Someone new has begun. For everyone who has already come down on Olympus, one line at the top of the screen says so; a
 // click on it (or the word "watch") and the gods carry them to Crete — each to a place of their own in the air round the
@@ -8471,7 +8547,7 @@ function netSend(dt) {
   const v = p.form === 'phoenix' ? _v.copy(dir3).multiplyScalar(p.speed) : _v.copy(p.vel);
   const yaw = p.form === 'phoenix' ? p.yaw : human.group.rotation.y;
   const fc = FACE.on ? faceCode() : '';   // (his face, if the camera is reading it: a change of expression is worth telling, even standing still)
-  const L = NET.lastSent, moved = !L || L.f !== f || L.fc !== fc || Math.hypot(p.pos.x - L.x, p.pos.y - L.y, p.pos.z - L.z) > 0.6 || Math.abs(wrapAngle(yaw - L.yaw)) > 0.15;
+  const L = NET.lastSent, inCz = COSMOS.on && !PL.on, moved = inCz || !L || L.f !== f || L.fc !== fc || Math.hypot(p.pos.x - L.x, p.pos.y - L.y, p.pos.z - L.z) > 0.6 || Math.abs(wrapAngle(yaw - L.yaw)) > 0.15;
   if (!moved && L && performance.now() - L.t < 4000) { NET.sendT = 0.25; return; }
   NET.sendT = 1 / rate;
   const r1 = q => Math.round(q * 10) / 10, r2 = q => Math.round(q * 100) / 100;
@@ -8480,7 +8556,8 @@ function netSend(dt) {
   // (out on a world in space: to anyone, where he left the sky, standing still there, which is what those out in space look
   //  like; and to those who know of the worlds, which one, and where on it: pl, pn, pp, pv)
   const E = PL.on && COSMOS.exit, P0 = E ? _woV.set(E.x, E.y, E.z) : p.pos, pl = E ? { pl: PL.B.id, pn: PL.name, pp: [r1(p.pos.x - PL_O), r1(p.pos.y), r1(p.pos.z - PL_O)], pv: [r1(v.x), r1(v.y), r1(v.z)] } : null;
-  NET.ch.send({ type: 'broadcast', event: 's', payload: { i: NET.id, n: heroName, p: [r1(P0.x), r1(P0.y), r1(P0.z)], v: E ? [0, 0, 0] : [r1(v.x), r1(v.y), r1(v.z)], ...pl,
+  const cz = inCz ? { cz: [Math.round(COSMOS.pos.x), Math.round(COSMOS.pos.y), Math.round(COSMOS.pos.z)], cq: [r2(COSMOS.q.x), r2(COSMOS.q.y), r2(COSMOS.q.z), r2(COSMOS.q.w)], cv: Math.round(COSMOS.v), cg: czdSent() } : null;   // (out in space: where in it, which way, how fast; and any gate he has just lit: see czfHeard)
+  NET.ch.send({ type: 'broadcast', event: 's', payload: { i: NET.id, n: heroName, p: [r1(P0.x), r1(P0.y), r1(P0.z)], v: E ? [0, 0, 0] : [r1(v.x), r1(v.y), r1(v.z)], ...pl, ...cz,
     ...(p.form === 'phoenix' ? (([a, b, c]) => ({ y: r2(a), pi: r2(b), b: r2(c) }))(flipNet(p)) : { y: r2(yaw), pi: r2(p.pitch || 0), b: r2(p.bank || 0) }), f, r: realm === 'under' ? 1 : 0, gm: GODM.on ? 1 : undefined, sm: SMALL.want < 1 ? 1 : undefined, bk: BIG.k && BIG.k < bigName(heroName) - 0.5 && !BIG.anim ? Math.round(BIG.k * 10) / 10 : undefined, fa: FAC.tag || undefined, rd: XR.on && XR.mode === 'rider' && p.form === 'phoenix' ? 1 : undefined, gf: GFLY.on ? [GFLY.g.id, Math.round(GFLY.B.pos.x), Math.round(GFLY.B.pos.y), Math.round(GFLY.B.pos.z)] : undefined, ma: MATCH.phase === 'live' && MATCH.me.alive ? MATCH.id : undefined, ts, tp, m: LIVE.on ? 1 : undefined, tk: LIVE.on && LIVE.tk ? LIVE.tk : undefined, g: p.grounded ? 1 : 0, w: r2(p.form === 'human' ? (a => a > 0.5 ? a : 0)((Math.abs(human.armL.rotation.z) + Math.abs(human.armR.rotation.z)) / 2) : p.wingF || 0), pt: PATRON.id || undefined, fc: fc || undefined,
     sk: XO.vis ? 'px' : undefined, pe: XO.vis && XO.pet || undefined, lk: XO.vis && XO.lk || undefined,   // (a visitor from BURNING STUDIO MUSIC: their style, their pet, their look)
     vk: VK.pub || undefined } });   // (in every one: someone just arrived has it at once, before anyone else can claim this id)
@@ -20181,6 +20258,7 @@ function wxAt(x, z) {
 }
 function updateWeather(dt) {
   if ((WX.olyT -= dt) < 0) WX.olyT = 0;
+  if (realm === 'over') wxFires(dt);
   WX.god = WX.god.filter(q => time < q.until);
   if ((WX.sampleT -= dt) < 0 || !WX.want) { WX.sampleT = 0.25; WX.want = realm === 'over' ? wxAt(player.pos.x, player.pos.z) : { thunder: 0, rain: 0, grey: 0, bright: 0, mist: 0, waves: 0, gold: 0, dust: 0, squall: 0 }; }
   const w = WX.want, k = damp(0.35, dt);
@@ -20222,13 +20300,13 @@ function twisterMesh() {
     const s = new THREE.CylinderGeometry(1, 1, 1, 28, 8, true).translate(0, 0.5, 0), Q = s.attributes.position;   // (the skirt: wide at the ground, drawing in as it rises)
     for (let i = 0; i < Q.count; i++) { const y = Q.getY(i), r = 1 - 0.55 * y + 0.2 * y * y; Q.setX(i, Q.getX(i) * r); Q.setZ(i, Q.getZ(i) * r); }
     TW.geo = g; TW.sgeo = s;
-    TW.mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uCol: { value: new THREE.Color(0.1, 0.105, 0.125) }, uFoot: { value: new THREE.Color(0.4, 0.33, 0.25) }, uSk: { value: 0 }, uK: { value: 1 } },
+    TW.mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uCol: { value: new THREE.Color(0.075, 0.08, 0.1) }, uFoot: { value: new THREE.Color(0.4, 0.33, 0.25) }, uSk: { value: 0 }, uK: { value: 1 }, uFl: { value: 0 } },
       vertexShader: `uniform float uTime, uSk; varying vec2 vU;
         void main() { vU = uv; vec3 p = position; float h = p.y, a = uTime * 0.9 + h * 5.0, bend = h * (1.0 - h * 0.6);
           if (uSk < 0.5) { p.x += (sin(a) * 0.05 + sin(uTime * 0.31 + h * 2.0) * 0.035) * bend; p.z += cos(a * 0.8) * 0.05 * bend; }   // (the rope sways and snakes)
           p.xz *= 1.0 + (0.07 * sin(h * 26.0 - uTime * 7.0 + uv.x * 18.85) * (1.0 - h * 0.5)) * (1.0 - uSk) + uSk * 0.14 * sin(uv.x * 37.7 + uTime * 3.0 + h * 9.0);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
-      fragmentShader: `uniform float uTime, uSk, uK; uniform vec3 uCol, uFoot; varying vec2 vU;
+      fragmentShader: `uniform float uTime, uSk, uK, uFl; uniform vec3 uCol, uFoot; varying vec2 vU;
         float hsh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float ns(vec2 p, float W) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); float a = mod(i.x, W), b = mod(i.x + 1.0, W);   // (wrapped round the funnel: no seam)
           return mix(mix(hsh(vec2(a, i.y)), hsh(vec2(b, i.y)), f.x), mix(hsh(vec2(a, i.y + 1.0)), hsh(vec2(b, i.y + 1.0)), f.x), f.y); }
@@ -20236,48 +20314,106 @@ function twisterMesh() {
           float a; vec3 c;
           if (uSk > 0.5) { a = (0.4 + 0.45 * s + 0.15 * s2) * smoothstep(0.0, 0.08, vU.y) * (1.0 - smoothstep(0.2, 1.0, vU.y)) * 0.9; c = uFoot * (0.55 + 0.8 * s); }
           else { a = min(1.0, 0.86 + 0.24 * s) * smoothstep(0.0, 0.02, vU.y) * (1.0 - smoothstep(0.9, 1.0, vU.y)); c = mix(uFoot, uCol, smoothstep(0.0, 0.16, vU.y)) * (0.45 + 0.8 * s) * (0.85 + 0.3 * s2); }
+          if (uSk < 0.5) {   // (the light in it: a core going up it, threads of lightning crawling round it, all of it flaring when it strikes)
+            float r = ns(vec2(vU.x * 23.0 - uTime * 5.0, vU.y * 60.0 - uTime * 14.0), 23.0), arc = smoothstep(0.04, 0.0, abs(r - 0.5)) * step(0.6, s2) * smoothstep(0.03, 0.12, vU.y) * (1.0 - smoothstep(0.7, 0.92, vU.y));
+            float band = pow(ns(vec2(vU.x * 7.0 + uTime * 2.2, vU.y * 18.0 - uTime * 5.0), 7.0), 4.0) * smoothstep(0.04, 0.2, vU.y) * (1.0 - smoothstep(0.6, 0.9, vU.y));
+            c += mix(vec3(0.42, 0.26, 1.0), vec3(0.35, 0.95, 1.0), s) * band * (0.55 + 1.2 * uFl) + vec3(0.85, 0.9, 1.0) * arc * (0.45 + 1.6 * uFl);
+            if (a * uK < 0.45) discard; a = 1.0; }
           gl_FragColor = vec4(c, a * uK); }` });
+    keepA(TW.mat);
     // the wreckage going round it: stones, earth, splintered wood
     TW.deb = new THREE.InstancedMesh(G.rock, new THREE.MeshLambertMaterial({ color: 0x3e352b }), TW_DEB); TW.deb.frustumCulled = false; TW.deb.count = 0; scene.add(TW.deb);
     TW.dd = Array.from({ length: TW_DEB }, () => ({ h: Math.random(), a: Math.random() * 6.28, rk: Math.random(), w: 0.35 + Math.random() * 0.8, s: 0.5 + Math.random() * Math.random() * 3.5, ph: Math.random() * 6.28 }));
   }
-  const mk = (geo, sk) => { const mat = TW.mat.clone(); mat.uniforms.uTime = TW.mat.uniforms.uTime; mat.uniforms.uSk.value = sk; const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.renderOrder = 3; scene.add(m); return m; };
-  return [mk(TW.geo, 0), mk(TW.sgeo, 1)];
+  if (!TW.wgeo) twisterParts();
+  const mk = (geo, sk) => { const mat = TW.mat.clone(); mat.uniforms.uTime = TW.mat.uniforms.uTime; mat.uniforms.uSk.value = sk; mat.depthWrite = !sk; const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.renderOrder = 3; scene.add(m); return m; };
+  const mk2 = (geo, M, ro) => { const mat = M.clone(); mat.uniforms.uTime = TW.mat.uniforms.uTime; const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.renderOrder = ro; scene.add(m); return m; };
+  return [mk(TW.geo, 0), mk(TW.sgeo, 1), mk2(TW.wgeo, TW.wmat, 3), mk2(TW.rgeo, TW.rmat, 4)];
+}
+// What makes it more than a rope of cloud (besides the light in the funnel itself: see TW.mat): the wall cloud it
+// hangs from, a slow wheel half a kilometre across with arms wound into it, lit from inside when the lightning goes; and
+// round its foot, rings of dust and grit thrown out flat and going round, glinting where the sun catches them.
+function twisterParts() {
+  const NS = `float hsh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float ns(vec2 p, float W) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); float a = mod(i.x, W), b = mod(i.x + 1.0, W);
+      return mix(mix(hsh(vec2(a, i.y)), hsh(vec2(b, i.y)), f.x), mix(hsh(vec2(a, i.y + 1.0)), hsh(vec2(b, i.y + 1.0)), f.x), f.y); }`;
+  // the wall cloud: a disc, sagging in the middle, turning
+  { const g = new THREE.RingGeometry(0.03, 1, 64, 8).rotateX(-Math.PI / 2), P = g.attributes.position;
+    for (let i = 0; i < P.count; i++) { const r = Math.hypot(P.getX(i), P.getZ(i)); P.setY(i, -0.16 * (1 - r) * (1 - r) + 0.05 * r * r); }
+    TW.wgeo = g; }
+  TW.wmat = keepA(new THREE.ShaderMaterial({ transparent: true, depthWrite: true, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uK: { value: 0 }, uFl: { value: 0 }, uFlP: { value: new THREE.Vector2() }, uCol: { value: new THREE.Color(0.2, 0.21, 0.25) }, uLit: { value: new THREE.Color(0.6, 0.62, 0.68) } },
+    vertexShader: `uniform float uTime; varying vec2 vP; void main() { vP = position.xz; vec3 p = position; p.y += 0.03 * sin(atan(p.z, p.x) * 5.0 + uTime * 0.4 + length(p.xz) * 9.0); gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
+    fragmentShader: `uniform float uTime, uK, uFl; uniform vec2 uFlP; uniform vec3 uCol, uLit; varying vec2 vP; ${NS}
+      void main() { float r = length(vP), a = atan(vP.y, vP.x) / 6.2831853 + 0.5;
+        float sw = a + uTime * 0.035 / (r + 0.25) + log(r + 0.02) * 0.35;   // (wound in: the inside going round faster)
+        float s = ns(vec2(sw * 18.0, r * 7.0 - uTime * 0.08), 18.0) * 0.65 + ns(vec2(sw * 48.0, r * 19.0), 48.0) * 0.35, arm = 0.5 + 0.5 * sin(sw * 6.2831853 * 4.0);
+        float al = uK * smoothstep(1.0, 0.55, r + (s - 0.5) * 0.3) * (0.55 + 0.35 * s + 0.2 * arm);
+        if (al < 0.3) discard;
+        float fl = uFl * exp(-dot(vP - uFlP, vP - uFlP) * 9.0);
+        vec3 c = mix(uCol, uLit, smoothstep(0.35, 1.0, r) * s) * (0.7 + 0.6 * s) + vec3(0.35, 0.3, 0.7) * smoothstep(0.25, 0.0, r) * 0.5 + vec3(0.85, 0.9, 1.3) * (fl * 2.2 + uFl * 0.25);
+        gl_FragColor = vec4(c, min(1.0, al)); }` }));
+  // the rings round the foot: three flat bands, one above another, each its own speed
+  { const acc = { pos: [], nor: [], col: [] };
+    [[0.02, 1, 0], [0.09, 0.78, 1], [0.2, 0.55, 2]].forEach(([y, s, L]) => { _mat.compose(_p.set(0, y, 0), _q.identity(), _s.set(s, 1, s)); addGeo(acc, new THREE.RingGeometry(0.45, 1, 48, 1).rotateX(-Math.PI / 2).toNonIndexed(), _mat, [L, 0, 0]); });
+    TW.rgeo = accToGeo(acc); }
+  TW.rmat = keepA(new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, vertexColors: true, uniforms: { uTime: { value: 0 }, uK: { value: 0 }, uFoot: { value: new THREE.Color() }, uSun: { value: 1 } },
+    vertexShader: `varying vec3 vP; varying float vL; void main() { vL = color.r; vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform float uTime, uK, uSun; uniform vec3 uFoot; varying vec3 vP; varying float vL; ${NS}
+      void main() { float r = length(vP.xz) / (1.0 - vL * 0.22 - vL * vL * 0.11), a = atan(vP.z, vP.x) / 6.2831853 + 0.5 + uTime * (0.11 + 0.07 * vL) / max(r, 0.4);
+        float n = ns(vec2(a * 30.0, r * 9.0 + vL * 3.0), 30.0) * 0.7 + ns(vec2(a * 90.0, r * 23.0), 90.0) * 0.3;
+        float al = uK * smoothstep(0.5, 0.85, n) * smoothstep(0.45, 0.6, r) * smoothstep(1.0, 0.8, r) * (0.8 - vL * 0.2);
+        float gl = step(0.975, hsh(floor(vec2(a * 400.0, r * 40.0)) + floor(uTime * 8.0))) * uSun;   // (grit, catching the sun)
+        if (al + gl * uK < 0.02) discard;
+        gl_FragColor = vec4(uFoot * (0.75 + 0.6 * n) + vec3(1.3, 1.1, 0.75) * gl * 1.4, min(1.0, al + gl * uK)); }` }));
+}
+// the parts of one, put where it is now
+function twisterDress(T, g, H, Rk, foot, k, wet, dt) {
+  if ((T.flT = (T.flT ?? 1) - dt) < 0) { T.flT = 0.25 + Math.random() * (k > 0.6 ? 1.6 : 3.5); T.fl = 1.2; T.flP = [rnd(0.6), rnd(0.6)]; if (Math.random() < 0.5) skyFlash = Math.max(skyFlash, 0.45 * k * smoothstep(5000, 600, Math.hypot(T.x - camera.position.x, T.z - camera.position.z))); }   // (its lightning)
+  T.fl = (T.fl || 0) * Math.exp(-dt * 10) * (Math.random() < 0.8 ? 1 : 0.3);
+  const lit = clamp(pal.hemiI / 1.45, 0.25, 1.1);
+  T.m.material.uniforms.uFl.value = T.fl;
+  const wr = Rk * 2.1; T.wall.position.set(T.x, g + H * 0.985, T.z); T.wall.scale.set(wr, wr, wr); const W = T.wall.material.uniforms;
+  W.uK.value = smoothstep(0, 0.5, k); W.uFl.value = T.fl; W.uFlP.value.set(T.flP?.[0] || 0, T.flP?.[1] || 0); W.uCol.value.setRGB(0.17, 0.18, 0.22).multiplyScalar(0.5 + 0.6 * lit); W.uLit.value.copy(pal.cloud).lerp(WHITE_C, 0.3).multiplyScalar(0.55 * lit);
+  const rr = foot * 5.2; T.ring.position.set(T.x, g, T.z); T.ring.scale.set(rr, H * 0.9, rr); const R = T.ring.material.uniforms;
+  R.uK.value = k * 0.85; R.uFoot.value.setRGB(...(wet ? [0.6, 0.68, 0.76] : [0.5, 0.41, 0.3])).multiplyScalar(0.6 + 0.5 * lit); R.uSun.value = smoothstep(0.02, 0.25, sunDir.y);
 }
 function twisterSpawn(x, z) {
-  const [m, sk] = twisterMesh();
-  const T = { id: ++TW.n, x, z, a: Math.random() * 6.28, t: 0, life: 100 + Math.random() * 60, R: 480 + Math.random() * 240, H: 1050 + Math.random() * 400, m, sk, sT: 0, told: false, inT: 0, out: 0 };
+  const [m, sk, wall, ring] = twisterMesh();
+  const T = { id: ++TW.n, x, z, a: Math.random() * 6.28, t: 0, life: 100 + Math.random() * 60, R: 480 + Math.random() * 240, H: 1050 + Math.random() * 400, m, sk, wall, ring, k: 0, sT: 0, told: false, inT: 0, out: 0 };
   TW.list.push(T); return T;
 }
-function twisterDrop(T) { for (const m of [T.m, T.sk]) { scene.remove(m); m.material.dispose(); } }
+function twisterDrop(T) { for (const m of [T.m, T.sk, T.wall, T.ring]) { scene.remove(m); m.material.dispose(); } }
 function updateTwisters(dt) {
   const p = player;
   if (realm !== 'over') { for (const T of TW.list) twisterDrop(T); TW.list.length = 0; if (TW.deb) TW.deb.count = 0; return; }
-  const far = Math.hypot(p.pos.x - MOUNT.x, p.pos.z - MOUNT.z) > 3000, want = !far || state !== 'play' ? 0 : WX.thunder > 0.5 ? 2 : WX.storm > 0.6 ? 1 : 0;
-  if ((TW.t -= dt) < 0) {
-    TW.t = 5 + Math.random() * 9;
-    if (TW.list.length < want) {   // (a long way off, and somewhere he can see it: it is too big to come up on anyone unseen)
-      const a = Math.atan2(dir3.z, dir3.x) + rnd(1.1), d = 1500 + Math.random() * 1200, x = p.pos.x + Math.cos(a) * d, z = p.pos.z + Math.sin(a) * d;
-      if (Math.hypot(x - MOUNT.x, z - MOUNT.z) > 3400 && !TW.list.some(o => Math.hypot(o.x - x, o.z - z) < 1500)) { twisterSpawn(x, z); toast('A TORNADO'); } }
-  }
+  // the tornadoes are the storms' (wxTwisterAt): the ones near enough to see are made, the ones gone or out of sight let go
+  const tn = Date.now() / 1000;
+  if ((TW.t -= dt) < 0) { TW.t = 0.5; const c = camera.position; wxStorms(c.x, c.z, 7000, TW.st || (TW.st = []), tn); const C = []; for (const S of TW.st) wxTwisters(S, C, tn);
+    for (let i = TW.list.length - 1; i >= 0; i--) { const T = TW.list[i]; if (T.key && !C.some(q => q.key === T.key)) { twisterDrop(T); TW.list.splice(i, 1); } }
+    for (const q of C) if (!TW.list.some(T => T.key === q.key)) Object.assign(twisterSpawn(q.x, q.z), { key: q.key, S: q.S, j: q.j, R: q.R, H: q.H, life: 1e9 }); }
   if (!TW.list.length) { if (TW.deb) TW.deb.count = 0; return; }
   TW.mat.uniforms.uTime.value = time;
   for (let i = TW.list.length - 1; i >= 0; i--) {
     const T = TW.list[i]; T.t += dt;
-    if (T.t > T.life || Math.hypot(T.x - MOUNT.x, T.z - MOUNT.z) < 2900) { twisterDrop(T); TW.list.splice(i, 1); continue; }
-    T.a += rnd(0.7) * dt; T.x += (WIND.x * 9 + Math.cos(T.a) * 8) * dt; T.z += (WIND.z * 9 + Math.sin(T.a) * 8) * dt;
-    const g = Math.max(terrainAt(T.x, T.z), WATER), k = smoothstep(0, 8, T.t) * smoothstep(T.life, T.life - 10, T.t), wet = g <= WATER + 0.5, H = T.H * (0.3 + 0.7 * k), Rk = T.R * (0.25 + 0.75 * k);
-    T.g = g; T.k = k;
+    if (T.key) { if (!wxTwisterAt(wxStormNow(T.S, tn), T.j, tn, T)) { twisterDrop(T); TW.list.splice(i, 1); continue; } }
+    else {   // (one put down by hand: it walks with the wind on its own, and lives its own life)
+      if (T.t > T.life || Math.hypot(T.x - MOUNT.x, T.z - MOUNT.z) < 2900) { twisterDrop(T); TW.list.splice(i, 1); continue; }
+      T.a += rnd(0.7) * dt; T.x += (WIND.x * 9 + Math.cos(T.a) * 8) * dt; T.z += (WIND.z * 9 + Math.sin(T.a) * 8) * dt; T.k = smoothstep(0, 8, T.t) * smoothstep(T.life, T.life - 10, T.t); }
+    const g = Math.max(terrainAt(T.x, T.z), WATER), k = T.k, wet = g <= WATER + 0.5, H = T.H * (0.3 + 0.7 * k), Rk = T.R * (0.25 + 0.75 * k);
+    T.g = g;
+    if (!T.seen && k > 0.3 && state === 'play' && Math.hypot(T.x - player.pos.x, T.z - player.pos.z) < 3500) { T.seen = true; toast('A TORNADO'); }
     T.m.position.set(T.x, g - 4, T.z); T.m.scale.set(Rk, H, Rk); T.m.material.uniforms.uK.value = smoothstep(0, 0.3, k);
     const foot = Rk * 0.075, sr = foot * (2.4 + 0.3 * Math.sin(time * 0.7 + T.id)), sh = 120 + 40 * k;
     T.sk.position.set(T.x, g - 3, T.z); T.sk.scale.set(sr, sh, sr); T.sk.material.uniforms.uK.value = k;
     T.sk.material.uniforms.uFoot.value.setRGB(...(wet ? [0.62, 0.7, 0.78] : [0.44, 0.36, 0.27])); T.m.material.uniforms.uFoot.value.copy(T.sk.material.uniforms.uFoot.value);
+    twisterDress(T, g, H, Rk, foot, k, wet, dt);
     const cd2 = (camera.position.x - T.x) ** 2 + (camera.position.z - T.z) ** 2;
     if (cd2 < 2500 * 2500) for (let j = 0, n = TOUCH ? 3 : 7; j < n; j++) {   // what it is tearing up: dust (or spray), whirled up and out
       const b = Math.random() * 6.28, r = foot * (0.6 + Math.random() * 1.8), up = Math.random();
       emit(T.x + Math.cos(b) * r, g + up * up * 90, T.z + Math.sin(b) * r, -Math.sin(b) * 45 + Math.cos(b) * 8, 10 + Math.random() * 24, Math.cos(b) * 45 + Math.sin(b) * 8, 1.4 + Math.random(), wet ? [0.8, 0.9, 1] : [0.5, 0.44, 0.36], 6, 2 + Math.random() * 3);
     }
     const dx = p.pos.x - T.x, dz = p.pos.z - T.z, d = Math.hypot(dx, dz) || 1, alt = p.pos.y - g, hf = clamp(alt / H, 0, 1), core = twR(hf) * Rk;
+    if (!wet && d < core + 260 && alt < 260) WX.dust = Math.max(WX.dust, 0.7 * k * smoothstep(core + 260, core, d));   // (what it lifts off dry ground is all round him)
     if (audio.emit) audio.emit('tw:' + T.id, 'twister', T.x, g + 90, T.z, { ttl: 1.2, ref: 260, max: 3600, size: 1 + k * 1.5 });
     if ((T.sT -= dt) < 0 && d < 3000) { T.sT = 1.1; audio.at3(T.x, g + 90, T.z, () => audio.sfx.twister?.(k), { ref: 240, max: 3200 }); }
     if (state !== 'play' || alt < -5 || alt > H * 1.06 || d > core + 700) continue;
@@ -20316,6 +20452,47 @@ function godWeather(g, sky) {
 }
 // someone new in the world: Zeus greets them the only way he knows
 function joinStorm() { WX.olyT = 50; WX.sampleT = 0; }
+// ── The weather everyone shares, as places. The thunderstorms wxAt is made of, each where it is now (going downwind on the
+//    clock), how big, and how far on in its life; the tornadoes a grown one puts down (which, and where, from the clock too,
+//    so two people a world apart see the same funnel walk the same field); the sky's cover at a point, that the clouds build
+//    or thin by; and where the forest is burning, for the clouds over it to take the glow. The globe seen from space is
+//    painted from the same numbers (czGlobeWx), so coming down out of the dark he comes down into the clouds he saw.
+const WX_T = 7000, WX_V = 7, _wxs = { cover: 0, storm: 0, dust: 0 };
+function wxStorms(x, z, R, out, t = Date.now() / 1000) {
+  out.length = 0; const ox = WIND.x * WX_V * t, oz = WIND.z * WX_V * t;
+  const a0 = Math.floor((x - R - ox) / WX_T) - 1, a1 = Math.floor((x + R - ox) / WX_T) + 1, b0 = Math.floor((z - R - oz) / WX_T) - 1, b1 = Math.floor((z + R - oz) / WX_T) + 1;
+  for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) for (let k = 0; k < 6; k++) {
+    const h4 = wxHash(a, b, k + 150); if (WX_KINDS[Math.floor(h4 * 997) % WX_KINDS.length] !== 'thunder') continue;
+    const S = { a, b, k, h1: wxHash(a, b, k), h2: wxHash(a, b, k + 50), h4, r: 900 + wxHash(a, b, k + 100) * 1500, x: 0, z: 0, life: 0, s: 0, cyc: 0 };
+    wxStormNow(S, t); if (S.life <= 0.02 || Math.abs(S.x - x) > R || Math.abs(S.z - z) > R) continue;
+    S.cyc = Math.floor((t / (420 + h4 * 600) + S.h1 * 40) / (Math.PI * 2)); out.push(S);
+  }
+  return out;
+}
+function wxStormNow(S, t) { S.x = (S.a + S.h1) * WX_T + WIND.x * WX_V * t; S.z = (S.b + S.h2) * WX_T + WIND.z * WX_V * t; S.life = Math.sin(t / (420 + S.h4 * 600) + S.h1 * 40); S.s = smoothstep(0, 0.35, S.life); return S; }
+// tornado j of a grown storm, now (into o: x, z, k); false if it has none, or not now
+function wxTwisterAt(S, j, t, o) {
+  if (S.life < 0.4) return false;
+  const h = wxHash(S.a * 13 + j, S.b + S.cyc * 7, S.k + 300); if (h > 0.42) return false;
+  const ang = h * 40 + t * (0.0025 + 0.002 * j) * (h > 0.21 ? 1 : -1), rr = S.r * (0.25 + 0.3 * wxHash(S.a, S.b, S.k + 310 + j)) * (0.75 + 0.25 * Math.sin(t * 0.013 + h * 17));
+  o.x = S.x + Math.cos(ang) * rr + Math.sin(t * 0.031 + h * 9) * 60; o.z = S.z + Math.sin(ang) * rr + Math.cos(t * 0.027 + h * 5) * 60;   // (it wanders round under its storm)
+  if (Math.hypot(o.x - MOUNT.x, o.z - MOUNT.z) < 3400) return false;
+  o.k = smoothstep(0.4, 0.62, S.life); o.R = 480 + h * 570; o.H = 1050 + wxHash(S.a, S.b, S.k + 320 + j) * 400; return true;
+}
+function wxTwisters(S, out, t) { for (let j = 0; j < 2; j++) { const o = { key: `${S.a},${S.b},${S.k},${S.cyc},${j}`, S, j }; if (wxTwisterAt(S, j, t, o)) out.push(o); } return out; }
+// how much cloud the sky has over a point, how much of it is storm, how much sand is up
+function wxSky(x, z, o = _wxs) {
+  const w = wxAt(x, z); o.cover = clamp(Math.max(w.grey * 0.85, w.rain, w.thunder, w.mist * 0.55, w.squall * 0.85, w.waves * 0.6) - w.bright * 0.35, 0, 1);
+  o.storm = Math.max(w.thunder, w.squall * 0.6); o.dust = w.dust; return o;
+}
+// where the country is burning: the trees alight, gathered into a few fires
+const WXF = { list: [], t: 0 };
+function wxFires(dt) {
+  if ((WXF.t -= dt) > 0) return; WXF.t = 1;
+  const m = new Map(); for (const b of BLAZE.list) if (b.t < F_BLACK) { const k = Math.round(b.x / 700) * 100000 + Math.round(b.z / 700); let c = m.get(k); if (!c) m.set(k, c = { x: 0, z: 0, n: 0 }); c.x += b.x; c.z += b.z; c.n++; }
+  WXF.list = [...m.values()].sort((a, b) => b.n - a.n).slice(0, 4).map(c => ({ x: c.x / c.n, z: c.z / c.n, n: c.n, k: Math.min(1, c.n / 12) }));
+}
+function wxFireK(x, z) { let k = 0; for (const f of WXF.list) k = Math.max(k, f.k * smoothstep(1100, 200, Math.hypot(x - f.x, z - f.z))); return k; }
 
 // ───────────────────────── the air over the land: dust, squalls, valley mist, and the water going round ─────────────────────────
 // What the weather knows about the ground under it, a kilometre square at a time (worked out once, kept): how high it is,
@@ -20356,26 +20533,59 @@ function updateDust(dt) {
   if (show && !DUST.mesh) {
     DUST.mat = cloudMaterial({ color: 0xd6a066, emissive: 0x5a3818, opacity: 0.62, fog: false });   // (it is seen from a long way off: it hazes by its own rule, below)
     DUST.mesh = new THREE.InstancedMesh(cloudGeoOf(313, 10, [120, 46, 70], false), DUST.mat, DUST.N); DUST.mesh.frustumCulled = false; DUST.mesh.renderOrder = 3; DUST.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(DUST.mesh);
-    // and behind the heaps the body of it, one sheet the width of the sand with a torn, boiling top, so there is no daylight through the wall
-    DUST.sheet = new THREE.Mesh(new THREE.PlaneGeometry(1, 1, 1, 1), new THREE.ShaderMaterial({ transparent: true, depthWrite: true, side: THREE.DoubleSide, uniforms: { uTime: worldFx.uTime, uCol: { value: new THREE.Color() }, uA: { value: 0.9 } },
-      vertexShader: `varying vec2 vU; void main() { vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `uniform float uTime, uA; uniform vec3 uCol; varying vec2 vU;
-        float hs(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-        float ns(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hs(i), hs(i + vec2(1.0, 0.0)), f.x), mix(hs(i + vec2(0.0, 1.0)), hs(i + vec2(1.0, 1.0)), f.x), f.y); }
-        void main() { float n = ns(vec2(vU.x * 26.0 + uTime * 0.05, vU.y * 2.5 - uTime * 0.2)) * 0.6 + ns(vec2(vU.x * 80.0 - uTime * 0.1, vU.y * 7.0 - uTime * 0.5)) * 0.4;
-          float top = 0.62 + 0.3 * ns(vec2(vU.x * 18.0 + uTime * 0.03, uTime * 0.05));
-          float a = uA * smoothstep(top, top - 0.25, vU.y + n * 0.12) * smoothstep(0.0, 0.08, vU.x) * smoothstep(1.0, 0.92, vU.x);
-          if (a < uA * 0.4) discard;   // (a solid body with a torn top: what is behind it is behind it, outlines and all)
-          gl_FragColor = vec4(uCol * (0.75 + 0.45 * n) * mix(0.8, 1.1, vU.y), min(1.0, a * 1.15)); }` }));
-    DUST.sheet.frustumCulled = false; DUST.sheet.renderOrder = 2; scene.add(DUST.sheet);
+    // and behind the heaps the body of it, towering: three walls one behind another, each higher than the one in front, rolling
+    // and swirling each at its own pace, the back ones going from rust to violet at the top; a lid of boiling dust over the
+    // whole depth of it, so from above it is a body and not a fence; lightning going off inside it; and the grit in its face
+    // glinting in the sun. (One mesh: the walls are x across the sand, y up as a share of its height, z metres back from its face)
+    { const P = [], U = [], L = [], I = []; const quad = (z0, z1, y0, y1, l, nx, nz) => { for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) { const u = i / nx, v = j / nz; P.push(u - 0.5, l < 3 ? lerp(y0, y1, v) : y0, l < 3 ? z0 : lerp(z0, z1, v)); U.push(u, v); L.push(l); }
+        const b = P.length / 3 - (nx + 1) * (nz + 1); for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const a = b + j * (nx + 1) + i; I.push(a, a + nx + 1, a + 1, a + 1, a + nx + 1, a + nx + 2); } };
+      quad(-150, -1450, 0.7, 0, 3, 24, 6); quad(-820, 0, 0, 1, 2, 24, 1); quad(-420, 0, 0, 0.86, 1, 24, 1); quad(0, 0, 0, 0.64, 0, 24, 1);   // (drawn back to front)
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setAttribute('aL', new THREE.Float32BufferAttribute(L, 1)); g.setIndex(I);
+      DUST.sheet = new THREE.Mesh(g, keepA(new THREE.ShaderMaterial({ transparent: true, depthWrite: true, side: THREE.DoubleSide, uniforms: { uTime: worldFx.uTime, uCol: { value: new THREE.Color() }, uA: { value: 0.9 }, uFl: { value: 0 }, uFlP: { value: new THREE.Vector3() }, uSpk: { value: 0 } },
+        vertexShader: `uniform float uTime; attribute float aL; varying vec2 vU; varying float vL;
+          void main() { vU = uv; vL = aL; vec3 p = position;
+            if (aL > 2.5) p.y += 0.07 * sin(p.x * 21.0 + uTime * 0.21) * sin(p.z * 0.006 - uTime * 0.15) + 0.04 * sin(p.x * 57.0 - uTime * 0.4);   // (the lid heaves)
+            else p.z += (30.0 + aL * 25.0) * sin(p.x * 23.0 + uTime * 0.3 + aL * 1.7) * uv.y;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
+        fragmentShader: `uniform float uTime, uA, uFl, uSpk; uniform vec3 uCol, uFlP; varying vec2 vU; varying float vL;
+          float hs(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+          float ns(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hs(i), hs(i + vec2(1.0, 0.0)), f.x), mix(hs(i + vec2(0.0, 1.0)), hs(i + vec2(1.0, 1.0)), f.x), f.y); }
+          void main() { float L = vL, a; vec3 c;
+            if (L < 2.5) {
+              vec2 q = vec2(vU.x * (34.0 - L * 7.0), vU.y * (3.2 + L));
+              float wn = ns(q * 0.6 + vec2(uTime * (0.06 + L * 0.02), -uTime * 0.1 + L)) * 6.2832; vec2 w = vec2(cos(wn), sin(wn));   // (the rolls in it, turning over)
+              float n = ns(q + w * 1.3 + vec2(uTime * 0.04, -uTime * 0.22)) * 0.62 + ns(q * 2.9 + w * 0.9 - vec2(uTime * 0.12, uTime * 0.45)) * 0.38;
+              float top = 0.8 + 0.17 * ns(vec2(vU.x * 15.0 + L * 3.1 + uTime * 0.03, uTime * 0.05 + L));
+              a = uA * smoothstep(top, top - 0.2, vU.y + (n - 0.5) * 0.22) * smoothstep(0.0, 0.07, vU.x) * smoothstep(1.0, 0.93, vU.x) * (L < 0.5 ? 1.0 : 0.88);
+              c = uCol * (0.4 + 0.85 * n) * mix(0.62, 1.2, vU.y) * (1.0 - L * 0.13);
+              c = mix(c, c * vec3(0.78, 0.55, 1.08) + vec3(0.05, 0.02, 0.09), smoothstep(0.35, 1.0, vU.y) * (0.25 + L * 0.25));
+              vec2 d = (vU - uFlP.xy) * vec2(16.0, 2.2); float on = 1.0 - step(0.5, abs(L - uFlP.z));
+              float jag = abs(vU.x - uFlP.x - (sin(vU.y * 47.0 + uFlP.x * 90.0) * 0.6 + sin(vU.y * 131.0) * 0.4) * 0.012);
+              c += vec3(0.85, 0.75, 1.35) * uFl * (on * (exp(-dot(d, d)) * 1.8 + smoothstep(0.003, 0.0, jag) * step(vU.y, uFlP.y) * 3.5) + 0.22);   // (lightning in it: the bolt, and the dust round it lit)
+              float gl = step(0.988, hs(floor(vec2(vU.x * 700.0 + uTime * 25.0, vU.y * 140.0 - uTime * 9.0)) + floor(uTime * 7.0))) * uSpk * (1.0 - L * 0.3);   // (grit catching the light)
+              c += vec3(1.3, 1.05, 0.7) * gl * 1.6;
+            } else {
+              vec2 q = vec2(vU.x * 24.0, vU.y * 5.0); float n = ns(q + vec2(uTime * 0.05, -uTime * 0.09)) * 0.6 + ns(q * 3.1 - uTime * 0.14) * 0.4;
+              a = uA * 0.9 * smoothstep(0.0, 0.07, vU.x) * smoothstep(1.0, 0.93, vU.x) * smoothstep(0.0, 0.08, vU.y) * smoothstep(1.0, 0.7, vU.y) * smoothstep(0.22, 0.5, n);
+              c = uCol * (0.75 + 0.55 * n) + vec3(0.6, 0.5, 1.0) * uFl * 0.35;
+            }
+            if (a < uA * 0.4) discard;   // (a solid body with a torn top: what is behind it is behind it, outlines and all)
+            gl_FragColor = vec4(c, min(1.0, a * 1.25)); }` })));
+      DUST.sheet.frustumCulled = false; DUST.sheet.renderOrder = 2; scene.add(DUST.sheet); }
   }
   if (DUST.mesh) DUST.mesh.visible = DUST.sheet.visible = show;
   if (show) {
     const L = DUNE.R + 500, per = DUST.N / 3, lit = clamp(pal.hemiI / 1.45, 0.2, 1.1) * (0.6 + 0.4 * Math.min(1, WX.light));
     const u0 = c.x * DUNE.wx + c.z * DUNE.wz, v0 = -c.x * DUNE.wz + c.z * DUNE.wx, haze = smoothstep(1200, 9000, Math.hypot(u0 - F.uf, Math.max(0, Math.abs(v0 - DUNE.v) - L))) * 0.7;
     DUST.mat.emissive.copy(DUST.col).multiplyScalar(0.42 * lit).lerp(scene.fog.color, haze * 0.6); DUST.mat.color.setRGB(0.86, 0.6, 0.34).multiplyScalar(0.55 + 0.45 * lit).lerp(scene.fog.color, haze); DUST.mat.opacity = 0.82 * (1 - haze * 0.5);
-    { const uu = F.uf - 420, sh = DUST.sheet; sh.position.set(uu * DUNE.wx - DUNE.v * DUNE.wz, DUNE.base + 330, uu * DUNE.wz + DUNE.v * DUNE.wx); sh.rotation.set(0, -Math.atan2(DUNE.wz, DUNE.wx) + Math.PI / 2, 0); sh.scale.set(2 * L, 760, 1);
-      sh.material.uniforms.uCol.value.copy(DUST.mat.color).lerp(DUST.mat.emissive, 0.3); sh.material.uniforms.uA.value = 0.92 * F.env * (1 - haze * 0.5); }
+    { const uu = F.uf - 170, sh = DUST.sheet, U = sh.material.uniforms; sh.position.set(uu * DUNE.wx - DUNE.v * DUNE.wz, DUNE.base - 12, uu * DUNE.wz + DUNE.v * DUNE.wx); sh.rotation.set(0, -Math.atan2(DUNE.wz, DUNE.wx) + Math.PI / 2, 0); sh.scale.set(2 * L, 1150, 1);
+      U.uCol.value.copy(DUST.mat.color).lerp(DUST.mat.emissive, 0.3); U.uA.value = 0.92 * F.env * (1 - haze * 0.5); U.uSpk.value = smoothstep(0.02, 0.3, sunDir.y) * (1 - haze);
+      // its lightning: a bolt somewhere in it every second or two, and now and then one that comes down to the sand
+      if ((DUST.flT = (DUST.flT ?? 1) - dt) < 0) { DUST.flT = 0.5 + Math.random() * 2.4 * (1.4 - F.env); DUST.fl = 1.3; const fx = 0.12 + Math.random() * 0.76, lay = Math.floor(Math.random() * 3); U.uFlP.value.set(fx, 0.35 + Math.random() * 0.5, lay);
+        const vv = DUNE.v - (fx - 0.5) * 2 * L, bu = uu - [0, 420, 820][lay], bx = bu * DUNE.wx - vv * DUNE.wz, bz = bu * DUNE.wz + vv * DUNE.wx, bd = Math.hypot(bx - c.x, bz - c.z);
+        skyFlash = Math.max(skyFlash, 0.35 * F.env * smoothstep(6000, 800, bd));
+        if (bd < 3200 && Math.random() < 0.3 && state === 'play') strike(bx, Math.max(terrainAt(bx, bz), WATER), bz, 0.5); }
+      DUST.fl = (DUST.fl || 0) * Math.exp(-dt * 8) * (Math.random() < 0.82 ? 1 : 0.35); U.uFl.value = DUST.fl * F.env; }
     for (let i = 0; i < DUST.N; i++) {
       const row = i % 3, j = Math.floor(i / 3), h = wxHash(i, 3, 5), vv = DUNE.v + ((j + row * 0.33) / (per - 1) - 0.5) * 2 * L + (h - 0.5) * 120, uu = F.uf - 60 - row * 260 + Math.sin(time * 0.35 + i * 1.3) * 35;
       const s = (3.8 + 1.8 * h) * (1 - row * 0.12) * F.env * smoothstep(DUNE.R + 600, DUNE.R * 0.6, Math.abs(vv - DUNE.v)) * smoothstep(DUNE.R + 1500, DUNE.R, Math.abs(uu - DUNE.u)) + 0.001;
@@ -20386,7 +20596,7 @@ function updateDust(dt) {
     if (audio.emit) { const u = c.x * DUNE.wx + c.z * DUNE.wz, v = clamp(-c.x * DUNE.wz + c.z * DUNE.wx, DUNE.v - L, DUNE.v + L), uu = Math.min(F.uf, Math.max(u, F.uf - DUST.W)); audio.emit('dust:wall', 'storm', uu * DUNE.wx - v * DUNE.wz, DUNE.base + 120, uu * DUNE.wz + v * DUNE.wx, { ttl: 1, ref: 500, max: 5000, size: 1.5 * F.env }); }   // (the roar of it, from the nearest part of it)
   }
   // inside it
-  const g = over ? Math.max(terrainAt(c.x, c.z), WATER) : 0, want = over ? WX.dust * smoothstep(720, 420, c.y - g) : 0;   // (above five hundred metres or so the sky is clear)
+  const g = over ? Math.max(terrainAt(c.x, c.z), WATER) : 0, want = over ? WX.dust * smoothstep(1000, 700, c.y - g) : 0;   // (above eight hundred metres or so the sky is clear)
   DUST.k = lerp(DUST.k, want, damp(want > DUST.k ? 1.6 : 0.7, dt));
   const k = DUST.k; if (k < 0.01) return;
   scene.fog.near = lerp(scene.fog.near, 2, k); scene.fog.far = lerp(scene.fog.far, Math.min(scene.fog.far, 75), Math.min(1, k * 1.1));
@@ -20394,6 +20604,7 @@ function updateDust(dt) {
   skyMat.uniforms.mist.value = Math.max(skyMat.uniforms.mist.value, k * 0.97); skyMat.uniforms.mistCol.value.lerp(DUST.fc, Math.min(1, k * 1.3));
   const p = player, P = p.pos, air = p.form === 'phoenix' && !p.perch || p.form === 'human' && !p.grounded;
   for (let i = 0, n = Math.ceil(k * (TOUCH ? 6 : 15)); i < n; i++) emit(c.x + rnd(40) - WIND.x * 22, c.y + rnd(12), c.z + rnd(40) - WIND.z * 22, WIND.x * (42 + k * 30) + rnd(6), rnd(2), WIND.z * (42 + k * 30) + rnd(6), 0.55 + Math.random() * 0.5, [0.62, 0.45, 0.28], 0, 0.5 + Math.random() * 0.8);   // (sand, streaming past)
+  if (sunDir.y > 0.02) for (let i = 0, n = Math.ceil(k * (TOUCH ? 2 : 5)); i < n; i++) emit(c.x + rnd(30) - WIND.x * 18, c.y + rnd(10), c.z + rnd(30) - WIND.z * 18, WIND.x * (50 + k * 30) + rnd(8), rnd(3), WIND.z * (50 + k * 30) + rnd(8), 0.25 + Math.random() * 0.3, [1.0, 0.92, 0.82], 0, 0.22 + Math.random() * 0.25);   // (and grit, glinting as it goes by)
   if (state === 'play' && air && !p.cine && !p.sub) { P.x += WIND.x * 15 * k * dt; P.z += WIND.z * 15 * k * dt; if (p.form === 'phoenix') p.bank += Math.sin(time * 3.1) * Math.sin(time * 1.3) * k * 1.1 * dt; camShake = Math.max(camShake, 0.14 * k); }
   if (audio.emit) audio.emit('dust:in', 'wind', c.x + WIND.x * 30, c.y, c.z + WIND.z * 30, { ttl: 0.6, ref: 40, max: 400, size: 2 * k });
   if (k > 0.6 && state === 'play' && time - DUST.told > 300) { DUST.told = time; witness('was caught in a dust storm out on the sand sea and could not see a thing'); }
@@ -31677,6 +31888,7 @@ function adaptQuality(dt) {
   const avg = perf.t / perf.n; perf.t = perf.n = 0;
   if (avg < 1 / 42) return;
   if (rtScale > tier.rt * 0.72) { rtScale = Math.max(0.28, rtScale - 0.08); resize(); }
+  else if (renderer.getPixelRatio() > 2.05) { DPRC = 2; resize(); }   // (then the page a little coarser, before a whole tier goes)
   else if (tierIdx > 0) applyTier(tierIdx - 1, false, false);
 }
 
@@ -38196,6 +38408,7 @@ function czHex(s) { let c = czHexC.get(s); if (!c) { const n = parseInt(s.slice(
 // height in the fourth channel (the globe stands up out of it). Laid down a few rows a frame, from Olympus outward
 function czGlobeStart() { const T = COSMOS.tex; T.job = { j: 0 }; T.n = mapCells.over.size + WORLD.cells.over.size; T.at = performance.now(); }
 function czGlobeStep(budget) {
+  czGlobeWx();   // (and the weather over it)
   const T = COSMOS.tex, J = T.job; if (!J) return;
   const D = T.data, t0 = performance.now();
   while (J.j < CZ_TH && performance.now() - t0 < budget) {
@@ -38217,8 +38430,84 @@ function czGlobeH(n) {
   const D = COSMOS.tex.data, i = clamp(Math.floor((Math.atan2(n.x, n.z) / TAU_ + 0.5) * CZ_TW), 0, CZ_TW - 1), j = clamp(Math.floor(Math.acos(clamp(n.y, -1, 1)) / Math.PI * CZ_TH), 0, CZ_TH - 1);
   return D[(j * CZ_TW + i) * 4 + 3] / 255 * 2400;
 }
+// ── The weather over the globe, live. The same storms, rain, grey country, sand and fire the sky is made of down there
+//    (wxSky), painted a few at a time into a small picture (cover, storm, sand) that a shell of cloud just over the ground
+//    reads; the thunderstorms, the tornadoes and the fires passed to it as places, so the storms wind round and flash, the
+//    funnels show as bright tight whirls and the fires glow through their smoke. By the shared clock: what he sees from up
+//    here is what is going over the country now, and diving home he comes down into the clouds he saw.
+const CZ_WW = 128, CZ_WH = 64, CZW = { tex: null, data: null, i: 0, j: 0, mesh: null, u: null, t: 0, upT: 0, st: [], tw: [] };
+const CZ_WFS = () => `uniform sampler2D tWx; uniform float uTime; uniform vec3 uSun; uniform vec4 uSt[12], uTw[8], uFi[4]; varying vec3 vObj, vW, vN;
+  ${CZ_GLSL}
+  vec2 czTan(vec3 n, vec3 c) { vec3 b1 = normalize(cross(c, abs(c.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), b2 = cross(c, b1), e = n - c * dot(n, c); return vec2(dot(e, b1), dot(e, b2)) * ${CZ_RG.toFixed(1)}; }   // (metres across the ground round c)
+  void main() {
+    vec3 n = normalize(vObj), N = normalize(vN), V = normalize(cameraPosition - vW);
+    vec4 w = texture2D(tWx, vec2(atan(n.x, n.z) / 6.2831853 + 0.5, acos(clamp(n.y, -1.0, 1.0)) / 3.14159265));
+    float t = uTime, det = czN(n * 70.0 + vec3(t * 0.003, 0.0, t * 0.0012)) * 0.55 + czN(n * 230.0 + vec3(0.0, t * 0.005, 0.0)) * 0.3 + czN(n * 640.0 - vec3(t * 0.01)) * 0.15;
+    float cl = smoothstep(0.2, 0.62, w.r + (det - 0.5) * 0.55), hi = 0.0, fl = 0.0, tw = 0.0;
+    cl = max(cl, smoothstep(0.64, 0.82, czN(n * 230.0 + 9.0) * 0.65 + czN(n * 640.0 + 3.0) * 0.35) * 0.4);   // (fair-weather cumulus, scattered)
+    for (int i = 0; i < 12; i++) { vec4 s = uSt[i]; if (s.w <= 0.0) continue; if (dot(n, s.xyz) < 0.9) continue; float r = floor(s.w), k = fract(s.w); vec2 p = czTan(n, s.xyz); float dd = length(p); if (dd > r * 1.6) continue;
+      float sp = 0.5 + 0.5 * sin(atan(p.y, p.x) * 2.0 + log(dd + 60.0) * 3.2 - t * 0.12), body = k * smoothstep(r * 1.5, r * 0.25, dd);   // (wound round: a storm system)
+      cl = max(cl, body * (0.55 + 0.45 * sp) * (0.8 + 0.4 * det)); hi = max(hi, body * smoothstep(r * 0.8, 0.0, dd));
+      float h = fract(sin(float(i) * 91.7 + floor(t * 6.0) * 13.13) * 43758.5); vec2 fp = vec2(cos(h * 40.0), sin(h * 40.0)) * r * 0.55 * fract(h * 7.3);
+      fl += step(0.8, h) * k * exp(-pow(length(p - fp) / (r * 0.3), 2.0)) * (0.6 + 0.4 * sin(t * 47.0 + h * 9.0)); }   // (lightning, somewhere in it, now and then)
+    for (int i = 0; i < 8; i++) { vec4 s = uTw[i]; if (s.w <= 0.0) continue; if (dot(n, s.xyz) < 0.99) continue; vec2 p = czTan(n, s.xyz); float dd = length(p); if (dd > 1100.0) continue;
+      float arm = 0.5 + 0.5 * sin(atan(p.y, p.x) * 3.0 + log(dd + 20.0) * 5.0 - t * 1.6), e = s.w * smoothstep(1100.0, 0.0, dd);
+      cl = max(cl, e * (0.45 + 0.55 * arm)); tw = max(tw, e * (arm * 0.6 + smoothstep(160.0, 0.0, dd)));
+      fl += s.w * step(0.7, fract(sin(float(i) * 17.3 + floor(t * 9.0) * 7.7) * 43758.5)) * smoothstep(600.0, 0.0, dd); }
+    float du = smoothstep(0.04, 0.45, w.b + (czN(n * vec3(150.0, 40.0, 150.0) + t * 0.004) - 0.5) * 0.35), fi = 0.0, sm = 0.0;   // (sand: tan smears)
+    for (int i = 0; i < 4; i++) { vec4 s = uFi[i]; if (s.w <= 0.0) continue; vec2 p = czTan(n, s.xyz); float dd = length(p); fi = max(fi, s.w * smoothstep(420.0, 0.0, dd)); sm = max(sm, s.w * smoothstep(1500.0, 100.0, dd) * 0.6); }
+    float dl = dot(N, uSun), day = smoothstep(-0.12, 0.2, dl), lit = 0.05 + 1.05 * max(dl, 0.0) * day;
+    vec3 cc = vec3(0.95, 0.96, 0.99) * (lit + hi * 0.18 * day);
+    cc = mix(cc, vec3(0.5, 0.52, 0.6) * lit, w.g * 0.35 * (1.0 - hi));
+    vec3 dc = vec3(0.84, 0.6, 0.34) * (0.08 + 0.95 * max(dl, 0.0) * day);
+    vec3 col = mix(dc, cc, cl / max(cl + du * 0.8, 0.001));
+    float a = clamp(max(cl * 0.93, du * 0.72) + sm * 0.4, 0.0, 1.0);
+    col = mix(col, vec3(0.3, 0.29, 0.3) * lit, sm * (1.0 - cl));
+    float gl = step(0.993, czH(floor(n * 2600.0) + floor(t * 4.0))) * du * day;   // (the grit in it, glinting)
+    vec3 em = vec3(0.75, 0.82, 1.25) * fl * 2.4 + vec3(0.6, 0.45, 1.2) * tw * 0.7 + vec3(1.7, 0.7, 0.2) * fi * (1.3 - day * 0.6) + vec3(1.2, 1.0, 0.7) * gl * 1.5;
+    // an aurora in a ring round Olympus at the pole: green curtains going violet at their tops, brightest on the dark side
+    float th = acos(clamp(n.y, -1.0, 1.0)), az = atan(n.x, n.z), ring = th - 0.36 - 0.035 * sin(az * 5.0 + t * 0.05) - 0.02 * sin(az * 13.0 - t * 0.08);
+    float aur = exp(-ring * ring * 1800.0) * (0.3 + 0.7 * czN(vec3(az * 30.0, t * 0.1, 0.0))) * (0.2 + 0.8 * (1.0 - day));
+    em += mix(vec3(0.2, 1.0, 0.5), vec3(0.6, 0.35, 1.0), smoothstep(-0.02, 0.03, ring)) * aur * 0.9;
+    a = clamp(a * (1.0 + pow(1.0 - max(dot(N, V), 0.0), 2.0) * 0.6), 0.0, 1.0);
+    float ae = clamp(a + length(em) * 0.6, 0.0, 1.0);
+    gl_FragColor = vec4((col * a + em) / max(ae, 0.001), ae);
+  }`;
+function czWxInit(sys) {
+  const D = CZW.data = new Uint8Array(CZ_WW * CZ_WH * 4), T = CZW.tex = new THREE.DataTexture(D, CZ_WW, CZ_WH, THREE.RGBAFormat); T.magFilter = T.minFilter = THREE.LinearFilter; T.wrapS = THREE.RepeatWrapping; T.needsUpdate = true;
+  const V4 = n => Array.from({ length: n }, () => new THREE.Vector4());
+  CZW.u = { tWx: { value: T }, uTime: { value: 0 }, uSun: { value: CZ_SUN }, uSt: { value: V4(12) }, uTw: { value: V4(8) }, uFi: { value: V4(4) } };
+  CZW.mesh = new THREE.Mesh(COSMOS.geoHi, keepA(new THREE.ShaderMaterial({ transparent: true, depthWrite: false, vertexShader: CZ_VS, fragmentShader: CZ_WFS(), uniforms: CZW.u })));
+  CZW.mesh.scale.setScalar(CZ_RG + 700); CZW.mesh.renderOrder = 1; CZW.mesh.frustumCulled = false; sys.add(CZW.mesh);   // (at the height the clouds are, the mountain standing up through them)
+  czGlobeWx(0, 0);   // (a first coarse picture at once, a point in sixteen)
+}
+const _czwn = new THREE.Vector3(), _czwa = new THREE.Vector3(), _czwb = new THREE.Vector3();
+function czGlobeWx(budget = TOUCH ? 0.6 : 1.1, coarse = -1) {
+  if (!CZW.data) return;
+  const D = CZW.data, t0 = performance.now(), t = Date.now() / 1000;
+  if (coarse >= 0) {   // (all the rows at once, at a quarter of the width each, filled across)
+    for (let j = 0; j < CZ_WH; j += 4) { const d = (j + 2) / CZ_WH * Math.PI * CZ_RG; for (let i = 0; i < CZ_WW; i += 4) { const ph = (i + 2) / CZ_WW * Math.PI * 2 - Math.PI, o = wxSky(MOUNT.x + Math.sin(ph) * d, MOUNT.z + Math.cos(ph) * d);
+      for (let jj = j; jj < j + 4; jj++) for (let ii = i; ii < i + 4; ii++) { const q = (jj * CZ_WW + ii) * 4; D[q] = o.cover * 255; D[q + 1] = o.storm * 255; D[q + 2] = o.dust * 255; D[q + 3] = 255; } } }
+    CZW.tex.needsUpdate = true; return;
+  }
+  while (performance.now() - t0 < budget) {
+    const j = CZW.j, d = (j + 0.5) / CZ_WH * Math.PI * CZ_RG;
+    for (let n = 0; n < 16; n++) { const i = CZW.i, ph = (i + 0.5) / CZ_WW * Math.PI * 2 - Math.PI, o = wxSky(MOUNT.x + Math.sin(ph) * d, MOUNT.z + Math.cos(ph) * d), q = (j * CZ_WW + i) * 4;
+      D[q] = o.cover * 255; D[q + 1] = o.storm * 255; D[q + 2] = o.dust * 255; D[q + 3] = 255; CZW.i++; }
+    if (CZW.i >= CZ_WW) { CZW.i = 0; if (++CZW.j >= CZ_WH) CZW.j = 0; }
+  }
+  const now = performance.now(); if (now - CZW.upT > 400) { CZW.upT = now; CZW.tex.needsUpdate = true; }
+  CZW.u.uTime.value = t0z();
+  // the storms and their tornadoes, the fires: as places on the globe, a second at a time
+  if (now - CZW.t > 1000) { CZW.t = now;
+    const S = wxStorms(MOUNT.x, MOUNT.z, Math.PI * CZ_RG, CZW.st, t).sort((a, b) => b.s * b.r - a.s * a.r), U = CZW.u, tw = CZW.tw; tw.length = 0;
+    for (let i = 0; i < 12; i++) { const s = S[i], v = U.uSt.value[i]; if (!s || s.s < 0.02) { v.w = 0; continue; } czFrame(s.x, s.z, _czwn, _czwa, _czwb); v.set(_czwn.x, _czwn.y, _czwn.z, Math.floor(s.r) + Math.min(0.999, s.s)); }
+    for (const s of S) wxTwisters(s, tw, t); tw.sort((a, b) => b.k - a.k);
+    for (let i = 0; i < 8; i++) { const q = tw[i], v = U.uTw.value[i]; if (!q) { v.w = 0; continue; } czFrame(q.x, q.z, _czwn, _czwa, _czwb); v.set(_czwn.x, _czwn.y, _czwn.z, Math.max(0.05, q.k)); }
+    for (let i = 0; i < 4; i++) { const f = WXF.list[i], v = U.uFi.value[i]; if (!f) { v.w = 0; continue; } czFrame(f.x, f.z, _czwn, _czwa, _czwb); v.set(_czwn.x, _czwn.y, _czwn.z, f.k); } }
+}
 // a name for a world, from its seed
-const CZ_SYL = ['AR', 'THE', 'ON', 'I', 'PHO', 'LY', 'KRA', 'MOS', 'NE', 'TA', 'RI', 'DES', 'EU', 'KAL', 'XA', 'MNE', 'ZO', 'PER', 'SE', 'ORM', 'AI', 'TYR', 'HE', 'LIA', 'DRO', 'GE', 'NOS', 'SIA', 'KTE', 'BA'];
+const CZ_SYL =['AR', 'THE', 'ON', 'I', 'PHO', 'LY', 'KRA', 'MOS', 'NE', 'TA', 'RI', 'DES', 'EU', 'KAL', 'XA', 'MNE', 'ZO', 'PER', 'SE', 'ORM', 'AI', 'TYR', 'HE', 'LIA', 'DRO', 'GE', 'NOS', 'SIA', 'KTE', 'BA'];
 function czName(r) { let s = ''; const n = 2 + (r() < 0.45 ? 1 : 0); for (let i = 0; i < n; i++) s += CZ_SYL[Math.floor(r() * CZ_SYL.length)]; return s; }
 
 // the noise every world's face is made of (value noise, stacked a layer at a time; the last layer eased in, so a finer one never pops)
@@ -38254,7 +38543,9 @@ const CZ_FS = `
     else { float w = czF(p * 1.5, uOct); h = w * 0.3; col = mix(uA, uB, sin(n.y * 11.0 + w * 4.0) * 0.5 + 0.5); col = mix(col, uC, smoothstep(0.3, 0.5, czN(p * 5.0 + uTime * 0.05)) * 0.4); cloud = 0.5; }
     vec3 Nb = uAmp > 0.0 ? czBump(vW, N, h * uAmp * uScale * 2.5) : N, V = normalize(cameraPosition - vW);
     float d0 = dot(N, uSun), d = max(dot(Nb, uSun), 0.0), day = smoothstep(-0.15, 0.25, d0);
-    if (cloud > 0.0) { float cl = smoothstep(0.55, 0.8, czN(n * 5.0 + vec3(uTime * 0.01, 0.0, 0.0) + uSeed) * 0.65 + czN(n * 13.0 + uSeed) * 0.35) * cloud; col = mix(col, vec3(0.95), cl); spec *= 1.0 - cl; d = mix(d, max(d0, 0.0), cl); }
+    if (k < 2.5 || k > 3.5) cloud = max(cloud, uAtm * 0.4);   // (any world with air has weather going round it: bands of cloud, drawn out along its turning)
+    if (cloud > 0.0) { float cl = smoothstep(0.55, 0.8, czN(n * 5.0 + vec3(uTime * 0.01, 0.0, 0.0) + uSeed) * 0.65 + czN(n * 13.0 + uSeed) * 0.35) * cloud;
+      cl = max(cl, smoothstep(0.62, 0.86, czN(vec3(n.y * 7.0 + czN(n * 2.5 + uSeed) * 1.4, uTime * 0.003, uSeed.x)) * 0.7 + czN(n * vec3(26.0, 5.0, 26.0) + vec3(uTime * 0.02, 0.0, 0.0) + uSeed) * 0.3) * cloud * 0.75); col = mix(col, vec3(0.95), cl); spec *= 1.0 - cl; d = mix(d, max(d0, 0.0), cl); }
     vec3 c = col * (0.06 + 1.1 * d * day) + glow;
     if (spec > 0.0) c += vec3(1.0, 0.95, 0.85) * pow(max(dot(reflect(-uSun, Nb), V), 0.0), 40.0) * spec * day;
     c += uAtmC * pow(1.0 - max(dot(N, V), 0.0), 3.0) * uAtm * (0.15 + day);
@@ -38271,8 +38562,7 @@ const CZ_GFS = `uniform sampler2D tMap; uniform float uHk, uScale, uTime, uOct; 
     float sea = 1.0 - step(0.002, t.a), fine = czF(n * 900.0, uOct);
     vec3 col = t.rgb * (0.9 + 0.22 * fine * (1.0 - sea)), Nb = czBump(vW, N, (t.a * uHk + fine * 0.00004 * (1.0 - sea)) * uScale * 3.0), V = normalize(cameraPosition - vW);
     float d0 = dot(N, uSun), d = max(dot(Nb, uSun), 0.0), day = smoothstep(-0.12, 0.2, d0);
-    float cl = smoothstep(0.56, 0.82, czN(n * 6.0 + vec3(uTime * 0.006, 0.0, uTime * 0.002)) * 0.6 + czN(n * 17.0 + vec3(0.0, uTime * 0.004, 0.0)) * 0.4) * 0.85;
-    col = mix(col, vec3(0.94), cl); d = mix(d, max(d0, 0.0), cl);
+    float cl = 0.0;   // (its clouds are the live weather's, on a shell of their own: see CZ_WFS)
     vec3 c = col * (0.07 + 1.1 * d * day) + vec3(1.0, 0.95, 0.85) * pow(max(dot(reflect(-uSun, Nb), V), 0.0), 60.0) * sea * (1.0 - cl) * day * 0.9;
     c += vec3(0.35, 0.6, 1.0) * pow(1.0 - max(dot(N, V), 0.0), 3.0) * (0.12 + day * 0.9);
     gl_FragColor = vec4(c, 1.0);
@@ -38394,7 +38684,7 @@ function cosmosInit() {
   C.globe = new THREE.Mesh(new THREE.SphereGeometry(1, 256, 192), new THREE.ShaderMaterial({ vertexShader: CZ_GVS, fragmentShader: CZ_GFS,
     uniforms: { tMap: { value: C.tex.tex }, uHk: { value: 2400 / CZ_RG }, uScale: { value: CZ_RG }, uTime: C.uT, uOct: { value: 1 }, uSun: { value: CZ_SUN } } }));
   C.globe.scale.setScalar(CZ_RG); C.globe.frustumCulled = false; sys.add(C.globe);
-  C.gAtm = new THREE.Mesh(C.geoHi, czAtmMat('#6aa8ff')); C.gAtm.scale.setScalar(CZ_RG * 1.07); C.gAtm.renderOrder = 2; C.gAtm.frustumCulled = false; sys.add(C.gAtm);
+  C.gAtm = new THREE.Mesh(C.geoHi, czAtmMat('#6aa8ff')); C.gAtm.scale.setScalar(CZ_RG * 1.07); C.gAtm.renderOrder = 2; C.gAtm.frustumCulled = false; sys.add(C.gAtm); czWxInit(sys);
   C.rings = new THREE.Group(); C.rings.rotation.set(0.42, 0, 0.18); sys.add(C.rings);
   C.ringA = czRing(1.48, 3.3, 4401, ['#d8c6a0', '#b89a70', '#e8dcc0', '#9a8a78', '#c9a0a0', '#a0b8d0'], [[0.62, 0.03], [0.88, 0.008], [0.3, 0.012]]); C.ringA.scale.setScalar(CZ_RG); C.rings.add(C.ringA);
   C.ringB = czRing(3.7, 4.5, 9127, ['#a8c8f0', '#e0f0ff', '#7090c0', '#c0a0e8'], [[0.4, 0.05]]); C.ringB.scale.setScalar(CZ_RG); C.ringB.rotation.set(0.9, 0, -0.5); C.rings.add(C.ringB);
@@ -38418,6 +38708,7 @@ function cosmosInit() {
     C.trail.pts.frustumCulled = false; S.add(C.trail.pts); }
   // him, on the map of the heavens
   C.me = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.2, 0.4) })); C.me.visible = false; S.add(C.me);
+  czdInit(S);   // (the drifts of stone, the wreckage, the lanterns, the gates: see CZD)
   czUI();
   renderer.compileAsync?.(S, C.cam).catch(() => {});   // (its programs made ahead, while he is still climbing)
 }
@@ -38468,7 +38759,7 @@ function cosmosEnter() {
   { const hx = -Math.sin(p.yaw), hz = -Math.cos(p.yaw), e = clamp(p.pitch, 0.25, 0.7); _czf.copy(_czv).multiplyScalar(hx).addScaledVector(_czw, hz).normalize().multiplyScalar(Math.cos(e)).addScaledVector(_czu, Math.sin(e)).normalize(); }   // (the way he was heading, climbing: never straight up, so his top is always the world's)
   czLook(C.q, _czf, _czu); C.revealT = 4; C.v = Math.max(300, p.speed * 2); C.pv = 0; C.camOff = null; C.on = true; C.lift = false; C.fadeT = 0; C.veil = 1; postMat.uniforms.uVeilCol.value.copy(CZ_VEIL); postMat.uniforms.uVeil.value = 1; C.cell = ''; C.nearB = null;
   C.home = phoenix.group.parent; C.scene.add(phoenix.group); phoenix.group.visible = true; trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
-  for (const T of C.trail.at) T.age = 9; czDress(true);
+  for (const T of C.trail.at) T.age = 9; czdReset(); czDress(true);
   document.body.classList.add('cosmos'); czBar(true);
   SESSION.spaceTold = true;   // (he has found the way: no telling him how to break through again)
   if (!C.saidHow) { C.saidHow = true; toast(TOUCH ? 'SPACE · ◎ FOR THE MAP OF THE HEAVENS · DIVE BACK TO GO HOME' : 'SPACE · M FOR THE MAP OF THE HEAVENS · DIVE BACK INTO THE AIR TO GO HOME'); }
@@ -38483,7 +38774,7 @@ function cosmosLeave(quiet = false) {
   czgLeave(quiet, C.entry);   // (his god does not come down with him)
   czDress(false);   // (out of the suit; and if he was the man, the air takes him back into the bird)
   (C.home || scene).add(phoenix.group); C.home = null; trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
-  document.body.classList.remove('cosmos'); czBar(false); C.rocks.count = 0;
+  document.body.classList.remove('cosmos'); czBar(false); C.rocks.count = 0; czdReset(); for (const B of [...CZN.pool, ...CZF.pool]) B.bird.group.visible = false;
   if (quiet) return;
   const E = C.exit; czFrame(E.x, E.z, _czu, _czv, _czw); _czf.set(0, 0, -1).applyQuaternion(C.q);
   const dx = _czf.dot(_czv), dz = _czf.dot(_czw), yaw = Math.hypot(dx, dz) > 0.05 ? Math.atan2(-dx, -dz) : E.yaw;
@@ -38719,12 +39010,13 @@ function cosmosFly(dt) {
   { const B = C.nearB, c = B ? B.pos : _cz0; _czv.subVectors(C.pos, c).normalize(); const s = _czv.dot(f); _czw.copy(_czv).addScaledVector(f, -s);
     if (_czw.lengthSq() > 0.04) { _czw.normalize(); const a = Math.atan2(_czv.crossVectors(u, _czw).dot(f), u.dot(_czw)); C.q.premultiply(_czq.setFromAxisAngle(f, a * damp(0.9, dt) * (1 - Math.min(1, Math.abs(ax) * 1.5)))); } }
   C.q.normalize();
-  const hk = HY.on ? 1 + 15 * smoothstep(1500, 30000, C.dNear) : 1;   // (not near a world: it would be through it before he could turn)
-  const base = (boost ? 320 : 150) * MOD.speed * (1 + 0.15 * perks.swift) * (man ? 0.6 : 1), want = Math.min(base * (1 + Math.max(0, C.dNear) / 700) * hk, HY.on ? 5e7 : 3e6);
+  const dW = C.dWorld ?? C.dNear, hk = HY.on ? 1 + 15 * smoothstep(1500, 30000, dW) : 1;   // (not near a world: it would be through it before he could turn. Only the worlds hold hyper back; the stones it goes through)
+  const base = (boost ? 320 : 150) * MOD.speed * (1 + 0.15 * perks.swift) * (man ? 0.6 : 1), want0 = Math.min(base * (1 + Math.max(0, HY.on ? dW : C.dNear) / 700) * hk, HY.on ? 5e7 : 3e6);
+  const want = HY.on && CZD.dField < 3000 ? Math.min(want0, 2600 + Math.max(0, CZD.dField) * 4) : want0;   // (in among the stones, hyper smashes through them at a speed the eye can still follow)
   C.v = lerp(C.v, M ? 0 : want, damp(want < C.v || M ? 4 : HY.on ? 1.1 : 0.45, dt));   // (slow to gather speed, quick to shed it near a world)
   f.set(0, 0, -1).applyQuaternion(C.q);
-  C.pos.addScaledVector(f, C.v * dt);
-  if (C.nearB && C.nearD < C.nearB.R * 3) C.pos.add(C.nearB.dp);   // (carried along with the world he is near)
+  CZD.prev.copy(C.pos); C.pos.addScaledVector(f, C.v * dt);
+  if (C.nearB && C.nearD < C.nearB.R * 3) { C.pos.add(C.nearB.dp); CZD.prev.add(C.nearB.dp); }   // (carried along with the world he is near)
   if (!M) { czEntry(dt, f); if (PL.pend) return; }   // (diving at a world: into its air, see czEntry)
   // the ground of any world holds him off
   const P = C.pos, gl = P.length();
@@ -38733,6 +39025,7 @@ function cosmosFly(dt) {
     if (gl < floor) { P.copy(_czv).multiplyScalar(floor); czSlide(_czv); }
     C.homeIn = !M && f.dot(_czv) < -0.05 ? smoothstep(CZ_ALT + 450, CZ_ALT - 250, gl - CZ_RG) : 0; }
   for (const B of C.bodies) { _czv.subVectors(P, B.pos); const d = _czv.length(), floor = B.R * (1 + CZ_AMP[B.kind] * 0.7) + 25; if (d < floor && d > 1) { _czv.divideScalar(d); P.copy(B.pos).addScaledVector(_czv, floor); if (C.entry?.B !== B) czSlide(_czv); } }   // (going in through its air, he is held at the top of it and not turned)
+  czdHit(dt, CZD.prev);   // (the stones of the drifts: see czdHit)
   // the wings: beating as he climbs or hurries, folded back at a great speed
   p.speed = clamp(C.v, 40, 300); p.bank = lerp(p.bank, p.turn * 0.75, damp(3, dt)); p.pitch = 0; heat = 0; p.danger = 0; p.skyT = 0; p.flame = Math.min(1, p.flame + dt * 0.02);
   if (man) { p.vel.set(0, 0, 0); return; }   // (the man is posed where he is placed: see czManPose)
@@ -38755,7 +39048,7 @@ function cosmosFrame(dt) {
   if (dn < nd) { nb = null; nd = dn; }
   C.nearB = nb; C.nearD = nb ? C.pos.distanceTo(nb.pos) : C.pos.length();
   { _czv.copy(C.pos).applyQuaternion(_czq.copy(C.rings.quaternion).invert()); const rr = Math.hypot(_czv.x, _czv.z) / CZ_RG; C.ringY = _czv.y; C.ringR = rr; C.ringL.copy(_czv);
-    C.dNear = Math.min(nd, rr > 1.45 && rr < 3.32 ? Math.abs(_czv.y) + 30 : 1e12); }
+    C.dWorld = Math.min(nd, rr > 1.45 && rr < 3.32 ? Math.abs(_czv.y) + 30 : 1e12); C.dNear = Math.min(C.dWorld, CZD.dDeb, Math.max(0, CZD.dField) + 150); }   // (and the stones of the drifts: he slows among them as near a world)
   C.rush = lerp(C.rush, smoothstep(300, 30000, C.v), damp(3, dt));
   C.entryK = czEntryLook(); czVeil(dt);
   cosmosCam(dt);
@@ -38792,11 +39085,11 @@ function czGlobeHs(n) {
 function czSafe(p, m) {
   for (const B of COSMOS.bodies) { _czs.subVectors(p, B.pos); const d = _czs.length(), fl = B.R * (1 + CZ_AMP[B.kind] * 0.7) + m; if (d < fl && d > 1e-6) p.copy(B.pos).addScaledVector(_czs, fl / d); }
   const g = p.length(); if (g < CZ_RG + 2400 + m && g > 1e-6) { _czs.copy(p).divideScalar(g); const fl = CZ_RG + czGlobeHs(_czs) + m; if (g < fl) p.multiplyScalar(fl / g); }
-  return p;
+  return czdSafe(p, m);   // (and out of the stones of the drifts)
 }
 // whether the eye there would be in a world, or in the sheet of a ring (the globe's two, and the near world's)
 function czIn(p, m) {
-  const C = COSMOS;
+  const C = COSMOS; if (czdIn(p, m)) return true;   // (in a stone of a drift)
   for (const B of C.bodies) if (p.distanceTo(B.pos) < B.R * (1 + CZ_AMP[B.kind] * 0.7) + m) return true;
   const g = p.length(); if (g < CZ_RG + 2400 + m) { _czs.copy(p).divideScalar(g || 1); if (g < CZ_RG + czGlobeHs(_czs) + m) return true; }
   if (czRingIn(C.ringA, _cz0, CZ_RG, p) || czRingIn(C.ringB, _cz0, CZ_RG, p)) return true;
@@ -38808,6 +39101,7 @@ function czRingIn(R, c, s, p) {
 }
 // whether a world stands between two points
 function czHid(a, b) {
+  if (czdHid(a, b)) return true;   // (a big stone of a drift in the way)
   for (const B of COSMOS.bodies) if (czSeg(a, b, B.pos, B.R)) return true;
   return czSeg(a, b, _cz0, CZ_RG + 200);
 }
@@ -38999,7 +39293,7 @@ function cosmosCam(dt) {
     if (cinema.on && !(C.revealT > 0)) {
       const S = czCine(dt, f, u, r, cd), cut = S.cut || first; S.cut = false;
       S.upW.normalize(); if (cut) { if (first) C.camN = (C.camN || 0) + 1; C.camOff = (C.camOff || V3()).copy(_czv); cam.fov = S.fov * fovK(); S.upS.copy(S.upW); } else { C.camOff.lerp(_czv, damp(S.rate, dt)); cam.fov = lerp(cam.fov, S.fov * fovK(), damp(S.frate, dt)); czTurn(S.upS, S.upW, damp(4, dt), 1.6 * dt, f); }
-      C.camPos.copy(C.pos).add(C.camOff); czSafe(C.camPos, 6 * K); czShake(C.camPos, r, u, S.shake * cd * 0.006 * (1 + HY.k));
+      C.camPos.copy(C.pos).add(C.camOff); czSafe(C.camPos, 6 * K); czShake(C.camPos, r, u, S.shake * cd * 0.006 * (1 + HY.k) + CZD.jolt * cd * 0.05);
       S.blk = czHid(C.camPos, C.pos) ? S.blk + dt : 0;
       _czw.subVectors(C.pos, C.camPos).addScaledVector(f, S.lead).normalize(); czUp(up, _czw, S.upS, cut ? S.upS : prev);
       if (!cut) { czTurn(prev, up, damp(8, dt), 2 * dt, _czw); czUp(up, _czw, prev, prev); }   // (the frame never rolls faster than that, whatever he does)
@@ -39011,7 +39305,7 @@ function cosmosCam(dt) {
     const d = cd * (1 + 0.3 * k) * (1 + 0.7 * L);
     _czv.copy(f).multiplyScalar(-d).addScaledVector(u, d * lerp(0.3, 0.2, k)).applyAxisAngle(u, camYawOff);
     let fov = Math.min(118, (68 + 24 * k + 6 * C.rush + HY.k * 14 + (C.entryK || 0) * 8) * fovK()), fr = 2.4;
-    up.copy(u); lead = cd * (0.33 + 0.5 * k); pr = lerp(3.5, 6.5, k); qr = lerp(6, 10, k); shake = (smoothstep(0.6, 1, k) * 0.5 + HY.k) * cd * 0.004;
+    up.copy(u); lead = cd * (0.33 + 0.5 * k); pr = lerp(3.5, 6.5, k); qr = lerp(6, 10, k); shake = (smoothstep(0.6, 1, k) * 0.5 + HY.k) * cd * 0.004 + CZD.jolt * cd * 0.05;
     if (C.revealT > 0) {   // just out of the air: the eye stands back over him and looks down past him at the world falling away (and in its last breath comes round behind him, so the chase takes over from it without a swing)
       C.revealT -= dt; const e = smoothstep(4, 1.5, C.revealT), b = smoothstep(0, 1.4, C.revealT); _czw.copy(C.pos).normalize();
       _czs.copy(_czw).multiplyScalar(1.25).addScaledVector(f, -1).normalize().multiplyScalar(cd * (1.3 + 2.2 * e)); _czv.lerp(_czs, b);
@@ -39058,7 +39352,7 @@ function cosmosPlace(dt) {
   // him
   czPlaceBody(false); czMorphStep(dt); if (player.form === 'human') czManPose(dt); else czBirdWings(dt); _czv.subVectors(C.pos, C.camPos);
   C.me.visible = M; if (M) { const d = _czv.length(), k = czK(d); C.me.position.copy(_czv).multiplyScalar(k); C.me.scale.setScalar(d * k * 0.018); C.me.quaternion.copy(C.q); }
-  czTrail(dt); czRocks(); xoCosmos(dt);   // (and the way to BURNING STUDIO MUSIC, and whoever is out here from either world)
+  czTrail(dt); czRocks(); czdDraw(dt); cznStep(dt); xoCosmos(dt);   // (and the way to BURNING STUDIO MUSIC, and whoever is out here from either world)
 }
 const t0z = () => (Date.now() / 1000) % 100000;   // (the rings go round by the shared clock too)
 // sparks off him, left hanging where he passed
@@ -39350,7 +39644,8 @@ function xoSkyers(dt) {
     if (!X.skyers.has(id) || now - S.t > 20000) { xoSkyDrop(S); XO.sky.delete(id); continue; }
     const age = Math.min(1, (now - S.t) / 1000); _xoV.copy(S.tgt).addScaledVector(S.vel, age);
     if (S.pos.distanceToSquared(_xoV) > 4e8) S.pos.copy(_xoV); else S.pos.lerp(_xoV, damp(5, dt));
-    const card = X.people.get(id), o = xoSkyBody(S, card), g = o.g; g.visible = !C.map.on;
+    const card = X.people.get(id); if (card && card.h === 'icarus' && card.w === 'icarus') { xoSkyHide(S); continue; }   // (one of ours, out here in our own space: drawn as everyone out here is, by czfStep, not twice)
+    const o = xoSkyBody(S, card), g = o.g; g.visible = !C.map.on;
     const s = czPlace(g, S.pos, 12, o.scale); S.ph += dt * (S.f === 'phoenix' ? 5 : 1.5);
     _xoU.copy(S.pos).normalize(); if (Math.abs(_xoU.dot(S.dir)) > 0.97) _xoU.set(0, 1, 0); czLook(g.quaternion, _xoF.copy(S.dir).normalize(), _xoU);
     if (o.wings && o.b) for (const w of o.wings) w.shoulder.rotation.z = -(0.15 + Math.sin(S.ph) * 0.55);
@@ -39472,6 +39767,634 @@ function xoTick(dt) {
   if (XO.vis && !COSMOS.on) xoSelf(dt);   // (out in space it is done once he has been placed there: see xoCosmos)
   postMat.uniforms.uVisOn.value = XO.vis || XO.pxN > 0 || XO.skyPx > 0 ? 1 : 0; XO.pxN = 0;
 }
+// ── The wilds between the worlds. Out past the air the dark is not empty. Drifts of stone hang in it, from grit to
+//    moonlets, walled into rooms like a maze: each wall a sheet of rocks with doorways through it and gaps a bird can
+//    thread, the rooms between them the lanes. In among the stones turns the wreckage of fliers who came to grief out
+//    here (temple columns, statues, chariot wheels, snapped wings and their feathers), and over the place where anyone
+//    really fell, down in the world, the wreck of their wings drifts with their name on it. Every drift is where its seed
+//    puts it, the same for everyone; only the rooms near him are made, and only as many stones are drawn as the machine
+//    can bear. Big stones hold him off as a world does, and he slides along them; small ones are knocked aside, and grit
+//    burns up as the bird goes through it; in hyper he goes straight through all of it. Near a drift he slows the way he
+//    does near a world, so it can be threaded. Lanterns stand on the bigger stones and all along the six ways out from
+//    home, and phoenixes are everywhere: up and down the ways, round the worlds, resting by the lanterns. Anyone else out
+//    here is seen, and the gates hung in the drifts' rooms light up for everyone when anyone flies through one.
+const CZD_CM = 1400, CZD_FC = 40000, CZD_PS = TOUCH ? 95 : 70;   // (a room, across; the cells drifts are dealt out in; the grit's)
+const CZD_V = TOUCH ? { xl: 4200, l: 1600, m: 650, s: 150, w: 1700, g: 6500, far: 30000 } : { xl: 7000, l: 2300, m: 950, s: 210, w: 2700, g: 9000, far: 45000 };   // (how far each size is drawn)
+const CZD_N = TOUCH ? { hi: 520, lo: 420, pb: 170, wk: 36, sh: 24, sp: 260, far: 90, dust: 160 } : { hi: 1300, lo: 950, pb: 360, wk: 80, sh: 48, sp: 520, far: 170, dust: 320 };   // (and how many at most)
+const CZD = { prev: new THREE.Vector3(), built: false, fields: [], far: [], fT: 0, fc: new Map(), belts: new Map(), reefs: null, faces: new Map(), act: [], key: '', gen: 0, st: new Map(), near: [], nearN: 0, dDeb: 1e9, dField: 1e9, inF: null, told: new Set(),
+  lit: new Map(), mine: [], gates: [], gN: 0, jolt: 0, waveT: 0, hitT: 0, burnT: 0, way: null, grave: null, graveN: -1, graveL: [], shN: [], wn: [0, 0, 0, 0, 0, 0], sp: null, waves: [], hyT: 0 };
+const _cd1 = new THREE.Vector3(), _cd2 = new THREE.Vector3(), _cd3 = new THREE.Vector3(), _cdq = new THREE.Quaternion(), _cdq2 = new THREE.Quaternion(), _cdC = new THREE.Color();
+const _czdRingQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.42, 0, 0.18)), _czdRingQi = _czdRingQ.clone().invert();   // (the globe's rings lie so: see cosmosInit)
+const CZD_ZQ = new THREE.Quaternion(), CZD_Y = new THREE.Vector3(0, 1, 0), CZD_Z = new THREE.Vector3(0, 0, 1);
+// the colours of the stones (grey, basalt, rust, pale, ice, ember-veined) and of the wreckage (marble, bronze, char), and anyone's god's
+const CZD_COL = [[0.56, 0.52, 0.47], [0.33, 0.31, 0.31], [0.62, 0.42, 0.31], [0.78, 0.75, 0.68], [0.62, 0.76, 0.92], [0.72, 0.38, 0.22], [1, 1, 1], [0.95, 0.72, 0.4], [1.1, 0.85, 0.7]];
+const czdColOf = hex => { const k = 'c' + hex; let i = CZD_COL.findIndex(c => c.k === k); if (i < 0) { _cdC.set(hex); const c = [_cdC.r * 1.4, _cdC.g * 1.4, _cdC.b * 1.4]; c.k = k; i = CZD_COL.push(c) - 1; } return i; };
+// a hash of five integers, and a stream of numbers from it (mulberry32 without a closure: many of these a frame)
+const czdH = (a, b, c, d, e) => { let h = (a ^ 0x2c9277b5) >>> 0; h = Math.imul(h ^ (b | 0), 0x85ebca6b); h = Math.imul(h ^ h >>> 13 ^ (c | 0), 0xc2b2ae35); h = Math.imul(h ^ h >>> 16 ^ (d | 0), 0x27d4eb2f); h = Math.imul(h ^ h >>> 15 ^ (e | 0), 0x165667b1); return (h ^ h >>> 16) >>> 0; };
+let _czdS = 0; const czdSeed = h => { _czdS = h | 0; };
+const czdR = () => { _czdS = _czdS + 0x6D2B79F5 | 0; let t = Math.imul(_czdS ^ _czdS >>> 15, 1 | _czdS); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+// a drift: a cloud of rooms between the worlds, or a belt of them round a world (B), going round with it
+function czdNew(id, kind, seed, R, c, B, R0, H) {
+  czdSeed(seed);
+  const F = { id, kind, seed, R, R0: R0 || 0, H: H || 0, B: B || null, c: c || new THREE.Vector3(), Q: new THREE.Quaternion(), Qi: new THREE.Quaternion(), ph: [czdR() * 6.3, czdR() * 6.3, czdR() * 6.3], col: Math.floor(czdR() * 6), gates: null, name: '' };
+  if (B) F.Q.setFromEuler(_e.set(B.tilt || 0, 0, (B.tilt || 0) * 0.5)); else F.Q.setFromAxisAngle(_cd1.set(czdR() - 0.5, czdR() - 0.5, czdR() - 0.5).normalize(), czdR() * TAU_);
+  F.Qi.copy(F.Q).invert(); F.name = B ? `THE BELT OF ${B.name}` : `THE DRIFT OF ${czName(mulberry32(seed))}`;
+  return F;
+}
+const czdC = F => F.B ? F.B.pos : F.c;
+// somewhere a drift can be: out of home's air and clear of its rings, off the paths the moons go round on
+function czdClear(c, R) {
+  if (c.length() < CZ_RG + CZ_ALT + R + 3000) return false;
+  _cd2.copy(c).applyQuaternion(_czdRingQi); const rr = Math.hypot(_cd2.x, _cd2.z); if (rr > CZ_RG * 1.3 - R && rr < CZ_RG * 4.7 + R && Math.abs(_cd2.y) < R + 2500) return false;
+  for (const B of COSMOS.near) { const O = B.orbit, a = c.dot(O.e1), b = c.dot(O.e2); if (Math.hypot(Math.hypot(a, b) - O.r, Math.sqrt(Math.max(0, c.lengthSq() - a * a - b * b))) < R + B.R * 2.5 + 3000) return false; }
+  return true;
+}
+// the drifts dealt out round home and its moons, one cell at a time (more of them near home)
+function czdCloud(i, j, k) {
+  const key = i + ',' + j + ',' + k; if (CZD.fc.has(key)) return CZD.fc.get(key);
+  let F = null; czdSeed(czdH(0xf1e1d, i, j, k, 7));
+  const x = (i + 0.2 + czdR() * 0.6) * CZD_FC, y = (j + 0.2 + czdR() * 0.6) * CZD_FC, z = (k + 0.2 + czdR() * 0.6) * CZD_FC, R = 3500 + czdR() * 5500, p = czdR(), d = Math.hypot(x, y, z);
+  if (d < 420000 && p < (d < 100000 ? 0.6 : 0.4) && czdClear(_cd3.set(x, y, z), R)) F = czdNew('f' + key, 'cloud', czdH(0xf1e1d, i, j, k, 8), R, new THREE.Vector3(x, y, z));
+  CZD.fc.set(key, F); return F;
+}
+// the reefs: smaller drifts in a shell a few kilometres over home's air, so the dark is full of stone the moment he is out
+function czdReefs() {
+  if (CZD.reefs) return CZD.reefs; const L = CZD.reefs = [];
+  for (let n = 0; n < 48; n++) { czdSeed(czdH(0x4eef, n, 1, 2, 3)); const y = 1 - 2 * (n + 0.5) / 48, rr = Math.sqrt(1 - y * y), th = n * 2.39996, keep = czdR() < 0.6, R = 2200 + czdR() * 2400, D = CZ_RG + CZ_ALT + 4200 + czdR() * 5500;
+    const c = new THREE.Vector3(Math.cos(th) * rr, y, Math.sin(th) * rr).multiplyScalar(D + R); if (keep && czdClear(c, R)) L.push(czdNew('r' + n, 'cloud', czdH(0x4eef, n, 0, 0, 1), R, c)); }
+  return L;
+}
+// a belt round a world, for some of them (not the ringed, nor the giants of gas): rooms in a broad flat band, going round with it
+function czdBelt(B) {
+  if (CZD.belts.has(B.id)) return CZD.belts.get(B.id);
+  czdSeed(czdH(B.seed, 0xbe17, 0, 0, 3)); let F = null;
+  if (!B.ring && B.kind !== 3 && czdR() < 0.45) F = czdNew('b' + String(B.id).toLowerCase().replace(/[^0-9a-z,\-]/g, ''), 'belt', czdH(B.seed, 0xbe17, 1, 0, 3), B.R * (2.75 + czdR() * 0.25), null, B, B.R * 1.85, B.R * (0.3 + czdR() * 0.1));
+  CZD.belts.set(B.id, F); return F;
+}
+// how much of the drift is at a point of its own (unturned) frame, 0..1, its edge ragged
+function czdMask(F, x, y, z) {
+  if (F.kind === 'belt') { const r = Math.hypot(x, z), w = (F.R - F.R0) * 0.5; return smoothstep(w, w * 0.55, Math.abs(r - (F.R + F.R0) * 0.5)) * smoothstep(F.H, F.H * 0.5, Math.abs(y)); }
+  const P = F.ph, wob = 1 + 0.2 * Math.sin(x / 1300 + P[0]) * Math.sin(y / 1100 + P[1]) * Math.sin(z / 1700 + P[2]);
+  return smoothstep(F.R, F.R * 0.62, Math.hypot(x, y, z) * wob);
+}
+// how far a point is from a drift (less than nothing, inside it)
+function czdDist(F, P) {
+  const c = czdC(F); if (F.kind !== 'belt') return P.distanceTo(c) - F.R;
+  _cd1.subVectors(P, c).applyQuaternion(F.Qi); return Math.max(Math.abs(Math.hypot(_cd1.x, _cd1.z) - (F.R + F.R0) / 2) - (F.R - F.R0) / 2, Math.abs(_cd1.y) - F.H);
+}
+// the drifts near him (now and then): the cells round him, the reefs, the belts of the worlds near
+function czdFields() {
+  const C = COSMOS, P = C.pos, L = CZD.fields, FA = CZD.far, V = CZD_V.xl + 800, VF = CZD_V.far; L.length = 0; FA.length = 0;
+  const ci = Math.floor(P.x / CZD_FC), cj = Math.floor(P.y / CZD_FC), ck = Math.floor(P.z / CZD_FC);
+  if (P.length() < 470000) for (let k = -1; k <= 1; k++) for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const F = czdCloud(ci + i, cj + j, ck + k); if (F && czdDist(F, P) < VF) FA.push(F); }
+  if (P.length() < CZ_RG * 4 + VF) for (const F of czdReefs()) if (czdDist(F, P) < VF) FA.push(F);
+  for (const B of C.bodies) { if (B.pos.distanceToSquared(P) > (B.R * 4 + VF) ** 2) continue; const F = czdBelt(B); if (F && czdDist(F, P) < VF) FA.push(F); }
+  for (const F of FA) if (czdDist(F, P) < V) L.push(F);   // (the near ones are made room by room; the far ones are only a likeness: see czdFar)
+  let df = 1e9, inF = null; for (const F of L) { const d = czdDist(F, P); if (d < df) { df = d; inF = F; } }
+  CZD.dField = df; const was = CZD.inF; CZD.inF = df < 0 ? inF : null;
+  if (CZD.inF && CZD.inF !== was) czdEnterField(CZD.inF);
+  if (CZD.fc.size > 600) CZD.fc.clear(); if (CZD.belts.size > 300) CZD.belts.clear();
+}
+function czdEnterField(F) {
+  czdGatesOf(F); if (CZD.told.has(F.id) || state !== 'play') return; CZD.told.add(F.id);
+  const n = F.gates.length, lit = F.gates.filter(G => czdLitNow(G.key)).length, k = TOUCH || PAD.on ? 'BOOST' : 'SHIFT';
+  toast(`${F.name}${n ? ` · ${lit}/${n} GATES LIT` : ''}`); if (CZD.told.size === 1) setTimeout(() => COSMOS.on && toast(`A MAZE OF STONE · FLY THE GATES · ${k} FOR HYPER SMASHES THROUGH`), 2600);
+}
+// a wall of a room: the low side, along axis a, of room i,j,k. Most sides are open; a wall is a sheet of stones, waved a
+// little, with doorways through it (and some only half built). Its biggest stones are made at once, the rest when near.
+function czdFace(F, a, i, j, k) {
+  const key = F.id + '|' + a + ',' + i + ',' + j + ',' + k; let fc = CZD.faces.get(key); if (fc !== undefined) return fc;
+  fc = null; const CM = CZD_CM, h = czdH(F.seed, a, i, j, k);
+  const x = (i + (a === 0 ? 0 : 0.5)) * CM, y = (j + (a === 1 ? 0 : 0.5)) * CM, z = (k + (a === 2 ? 0 : 0.5)) * CM;
+  czdSeed(h);
+  if (czdR() < 0.46 && (czdMask(F, x, y, z) > 0.02 || F.kind !== 'belt' && Math.hypot(x, y, z) < F.R * 1.25 + CM)) {
+    _cd1.set(x, y, z).applyQuaternion(F.Q);
+    fc = { key, h, F, a, i, j, k, ox: _cd1.x, oy: _cd1.y, oz: _cd1.z, holes: [], wv: [czdR() * 6.3, czdR() * 6.3, 40 + czdR() * 110], brk: czdR() < 0.22 ? czdR() * 50 : -1, xl: [], l: null, m: null, w: null, sh: [] };
+    const nh = czdR() < 0.15 ? 0 : czdR() < 0.55 ? 1 : 2;
+    for (let q = 0; q < nh; q++) fc.holes.push((0.22 + czdR() * 0.56) * CM, (0.22 + czdR() * 0.56) * CM, 210 + czdR() * 230);
+    czdSeed(h ^ 0x51); const nx = czdR() < 0.5 ? 1 : czdR() < 0.35 ? 2 : 0;
+    for (let q = 0; q < nx; q++) { const u = (0.15 + czdR() * 0.7) * CM, v = (0.15 + czdR() * 0.7) * CM, s = 110 + czdR() * czdR() * 170, shr = czdR() < 0.42;
+      czdRock(fc, fc.xl, u, v, s, (czdR() - 0.5) * 120, czdCol(F), 0.05, shr); }
+  }
+  CZD.faces.set(key, fc); if (CZD.faces.size > 9000) CZD.faces.clear();
+  return fc;
+}
+const czdCol = F => (F.col + (czdR() < 0.72 ? 0 : 1 + Math.floor(czdR() * 5))) % 6;
+// the face's (u, v) and a little off it, in the drift's own frame
+function czdLocal(fc, u, v, n, out) {
+  const CM = CZD_CM, w = fc.wv; n += w[2] * Math.sin(u / 520 + w[0]) * Math.cos(v / 610 + w[1]);
+  if (fc.a === 0) out.set(fc.i * CM + n, fc.j * CM + u, fc.k * CM + v); else if (fc.a === 1) out.set(fc.i * CM + u, fc.j * CM + n, fc.k * CM + v); else out.set(fc.i * CM + u, fc.j * CM + v, fc.k * CM + n);
+  return out;
+}
+function czdHole(fc, u, v, pad) { const H = fc.holes; for (let q = 0; q < H.length; q += 3) { const r = H[q + 2] + pad; if ((u - H[q]) ** 2 + (v - H[q + 1]) ** 2 < r * r) return true; } return fc.brk >= 0 && Math.sin(u / 300 + fc.brk) * Math.cos(v / 260 + fc.brk * 0.7) < -0.25; }
+// one stone onto a face's list (13 numbers: where from the drift's middle, its size, the axis it turns on, how fast, where
+// it starts, its shape, its colour); shr: a lantern shrine on top of it, which holds it still
+function czdRock(fc, A, u, v, s, nj, col, spin, shr) {
+  const F = fc.F; czdLocal(fc, u, v, nj, _cd1); const m = czdMask(F, _cd1.x, _cd1.y, _cd1.z), keep = czdR() < m * 1.15;
+  const ax = czdR() - 0.5, ay = czdR() - 0.5, az = czdR() - 0.5, w = (czdR() - 0.5) * spin, a0 = czdR() * TAU_, sx = 0.78 + czdR() * 0.4, sy = 0.7 + czdR() * 0.4, sz = 0.78 + czdR() * 0.4;
+  if (!keep || czdHole(fc, u, v, s * 0.6)) return false;
+  _cd1.applyQuaternion(F.Q); const l = Math.hypot(ax, ay, az) || 1;
+  if (shr) {   // (still, square to the drift, with the little temple on its crown)
+    A.push(_cd1.x, _cd1.y, _cd1.z, s, 0, 0, 0, 0, 0, 1, 0.78, 1, col);
+    const up = _cd2.set(0, 1, 0).applyQuaternion(F.Q), top = s * 0.78 * CZD.topY, sc = 7 + s * 0.035; _cdq.setFromUnitVectors(CZD_Y, up);
+    fc.sh.push(_cd1.x + up.x * top, _cd1.y + up.y * top, _cd1.z + up.z * top, _cdq.x, _cdq.y, _cdq.z, _cdq.w, sc, up.x, up.y, up.z, (fc.h >>> 3) & 7);
+  } else A.push(_cd1.x, _cd1.y, _cd1.z, s, ax / l, ay / l, az / l, w, a0, sx, sy, sz, col);
+  return true;
+}
+// the rest of a face, the first time it is near enough: its middling stones, its house-sized ones, and any wreckage on it
+function czdFill(fc, tier) {
+  const F = fc.F, CM = CZD_CM;
+  if (tier === 1) { fc.l = []; czdSeed(fc.h ^ 0x52); const G = CM / 5;
+    for (let b = 0; b < 5; b++) for (let a = 0; a < 5; a++) { if (czdR() < 0.18) { czdR(); czdR(); czdR(); continue; } const u = (a + 0.1 + czdR() * 0.8) * G, v = (b + 0.1 + czdR() * 0.8) * G, s = 38 + czdR() * czdR() * 115; czdRock(fc, fc.l, u, v, s, (czdR() - 0.5) * 90, czdCol(F), 0.12, false); } }
+  else if (tier === 2) { fc.m = []; czdSeed(fc.h ^ 0x53); const G = CM / 11;
+    for (let b = 0; b < 11; b++) for (let a = 0; a < 11; a++) { if (czdR() < 0.2) { czdR(); czdR(); czdR(); continue; } const u = (a + czdR()) * G, v = (b + czdR()) * G, s = 6 + czdR() * czdR() * 25; czdRock(fc, fc.m, u, v, s, (czdR() - 0.5) * 70, czdCol(F), 0.4, false); } }
+  else { fc.w = []; czdSeed(fc.h ^ 0x54); if (czdR() > 0.3) return;
+    const u = (0.2 + czdR() * 0.6) * CM, v = (0.2 + czdR() * 0.6) * CM, main = [0, 1, 3, 4, 2][Math.floor(czdR() * 5)], ms = [[9, 16], [7, 12], [10, 9], [8, 15], [7, 12]][main];
+    czdWreck(fc, u, v, (czdR() - 0.5) * 120, main, ms[0] + czdR() * ms[1], main === 4 ? 7 : main === 2 ? 8 : 6);
+    for (let q = 0, n = 2 + Math.floor(czdR() * 4); q < n; q++) czdWreck(fc, u + (czdR() - 0.5) * 110, v + (czdR() - 0.5) * 110, (czdR() - 0.5) * 140, 5, 3 + czdR() * 3.5, 8);
+    if (czdR() < 0.4) czdWreck(fc, u + (czdR() - 0.5) * 80, v + (czdR() - 0.5) * 80, (czdR() - 0.5) * 100, 2, 7 + czdR() * 6, 8); }
+}
+function czdWreck(fc, u, v, nj, kind, s, col) {
+  czdLocal(fc, u, v, nj, _cd1).applyQuaternion(fc.F.Q); const ax = czdR() - 0.5, ay = czdR() - 0.5, az = czdR() - 0.5, l = Math.hypot(ax, ay, az) || 1;
+  fc.w.push(_cd1.x, _cd1.y, _cd1.z, s, ax / l, ay / l, az / l, (czdR() - 0.5) * 0.45, czdR() * TAU_, 1, 1, 1, col, kind);
+}
+// the gates of a drift: in the middle of some of its rooms, hung square to one of its ways through
+function czdGatesOf(F) {
+  if (F.gates) return F.gates; const G = F.gates = [], CM = CZD_CM, nx = Math.ceil(F.R / CM) + 1, ny = F.kind === 'belt' ? Math.ceil(F.H / CM) + 1 : nx;
+  for (let k = -nx; k < nx && G.length < 14; k++) for (let j = -ny; j < ny && G.length < 14; j++) for (let i = -nx; i < nx && G.length < 14; i++) {
+    const h = czdH(F.seed, 9, i, j, k); if (h % 1000 > 170) continue;
+    czdSeed(h); const x = (i + 0.5) * CM + (czdR() - 0.5) * 300, y = (j + 0.5) * CM + (czdR() - 0.5) * 300, z = (k + 0.5) * CM + (czdR() - 0.5) * 300; if (czdMask(F, x, y, z) < 0.6) continue;
+    const a = Math.floor(czdR() * 3), n = new THREE.Vector3(a === 0 ? 1 : 0, a === 1 ? 1 : 0, a === 2 ? 1 : 0).applyQuaternion(F.Q);
+    G.push({ key: `${F.id}:${i},${j},${k}`, F, o: new THREE.Vector3(x, y, z).applyQuaternion(F.Q), n, q: new THREE.Quaternion().setFromUnitVectors(CZD_Z, n), R: 44 + czdR() * 22, flash: 0 });
+  }
+  return G;
+}
+const czdLitNow = key => { const L = CZD.lit.get(key); return !!L && performance.now() - L.t < 900000; };   // (a gate stays lit a quarter of an hour)
+// the rooms near him in the drifts near him: which walls are near enough to draw, nearest first (only when he has moved to another room)
+function czdStream() {
+  const C = COSMOS, P = C.pos, CM = CZD_CM, NR = Math.ceil(CZD_V.xl / CM); let key = '';
+  for (const F of CZD.fields) { _cd1.subVectors(P, czdC(F)).applyQuaternion(F.Qi); key += F.id + ':' + Math.floor(_cd1.x / CM) + ',' + Math.floor(_cd1.y / CM) + ',' + Math.floor(_cd1.z / CM) + ';'; }
+  if (key === CZD.key) return; CZD.key = key;
+  const A = CZD.act; A.length = 0;
+  for (const F of CZD.fields) {
+    _cd1.subVectors(P, czdC(F)).applyQuaternion(F.Qi); const ri = Math.floor(_cd1.x / CM), rj = Math.floor(_cd1.y / CM), rk = Math.floor(_cd1.z / CM);
+    for (let k = rk - NR; k <= rk + NR; k++) for (let j = rj - NR; j <= rj + NR; j++) for (let i = ri - NR; i <= ri + NR; i++) for (let a = 0; a < 3; a++) {
+      const fx = (i + (a === 0 ? 0 : 0.5)) * CM - _cd1.x, fy = (j + (a === 1 ? 0 : 0.5)) * CM - _cd1.y, fz = (k + (a === 2 ? 0 : 0.5)) * CM - _cd1.z, d = Math.hypot(fx, fy, fz);
+      if (d > CZD_V.xl + CM * 0.72) continue; const fc = czdFace(F, a, i, j, k); if (fc) A.push(fc);
+    }
+  }
+  A.sort((p, q) => ((czdC(p.F).x + p.ox - P.x) ** 2 + (czdC(p.F).y + p.oy - P.y) ** 2 + (czdC(p.F).z + p.oz - P.z) ** 2) - ((czdC(q.F).x + q.ox - P.x) ** 2 + (czdC(q.F).y + q.oy - P.y) ** 2 + (czdC(q.F).z + q.oz - P.z) ** 2));
+}
+const czdNI = g => g.index ? g.toNonIndexed() : g;
+// a lump of stone: every corner pushed in or out by its own amount, the same wherever that corner is repeated
+function czdRockGeo(detail, seed) {
+  const g = czdNI(new THREE.IcosahedronGeometry(1, detail)), p = g.attributes.position, r = mulberry32(seed), bumps = new Map();
+  let top = 0, tn = 0;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = `${x.toFixed(3)},${y.toFixed(3)},${z.toFixed(3)}`; let b = bumps.get(k); if (b == null) { b = 0.8 + r() * 0.38; bumps.set(k, b); }
+    p.setXYZ(i, x * b, y * b * 0.92, z * b); if (y > 0.85) { top += y * b * 0.92; tn++; } }
+  g.computeVertexNormals(); g.userData.top = tn ? top / tn : 0.9; return g;
+}
+// the wreckage, each piece a shape of its own about 1 across: a column drum, a capital, a snapped wing, a statue's head, a
+// chariot wheel, a loose feather
+function czdWreckGeos() {
+  const cyl = czdNI(new THREE.CylinderGeometry(1, 1, 1, 12, 1)), cyl6 = czdNI(new THREE.CylinderGeometry(1, 1, 1, 6, 1)), bx = czdNI(new THREE.BoxGeometry(1, 1, 1)), ball = czdNI(new THREE.IcosahedronGeometry(1, 1)), tor = czdNI(new THREE.TorusGeometry(1, 0.08, 6, 26));
+  const put = (A, g, x, y, z, sx, sy, sz, rx, ry, rz, c) => { _mat.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(rx, ry, rz)), _s.set(sx, sy, sz)); addGeo(A, g, _mat, c); };
+  const MB = [0.86, 0.84, 0.78], MD = [0.7, 0.68, 0.62], BR = [0.8, 0.55, 0.26], CH = [0.14, 0.06, 0.05], EM = [1.7, 0.5, 0.1], GO = [2.0, 1.3, 0.4], out = [];
+  { const A = newAcc(); put(A, cyl, 0, 0, 0, 0.34, 1.7, 0.34, 0, 0, 0, MB); put(A, cyl, 0.05, 1.0, 0.02, 0.3, 0.3, 0.3, 0.35, 0, 0.2, MD); put(A, cyl, 0, -0.95, 0, 0.4, 0.14, 0.4, 0, 0, 0, MD);
+    for (let i = 0; i < 6; i++) { const a = i / 6 * TAU_; put(A, bx, Math.cos(a) * 0.33, 0, Math.sin(a) * 0.33, 0.035, 1.6, 0.035, 0, -a, 0, MD); } out.push(A); }   // (a drum of a column, fluted, the top of it broken off at a slant)
+  { const A = newAcc(); put(A, bx, 0, 0.32, 0, 1.0, 0.16, 1.0, 0, 0, 0, MB); put(A, cyl, 0, 0.12, 0, 0.44, 0.24, 0.44, 0, 0, 0, MB); put(A, cyl, 0, -0.32, 0, 0.32, 0.66, 0.32, 0, 0, 0, MD);
+    for (const s of [-1, 1]) put(A, cyl, s * 0.5, 0.22, 0, 0.12, 0.9, 0.12, Math.PI / 2, 0, 0, MD); out.push(A); }   // (a capital, its scrolls)
+  { const A = newAcc(); put(A, cyl6, 0, 0, 0, 0.05, 1.7, 0.05, 0, 0, Math.PI / 2, CH);
+    for (let i = 0; i < 10; i++) { const x = -0.8 + i * 0.17, L = 0.5 + i * 0.07 - (i > 7 ? (i - 7) * 0.25 : 0), tw = (i - 5) * 0.05; put(A, bx, x, 0, L * 0.35, 0.13, 0.02, L * 0.7, 0, tw, 0, CH); put(A, bx, x + Math.sin(tw) * L * 0.5, 0, L * 0.85, 0.11, 0.02, L * 0.35, 0, tw, 0, i % 3 ? EM : GO); }
+    out.push(A); }   // (a wing, snapped at the shoulder, its feathers charred and still burning at the tips)
+  { const A = newAcc(); put(A, ball, 0, 0.3, 0, 0.4, 0.5, 0.44, 0, 0, 0, MB); put(A, bx, 0, 0.26, -0.44, 0.08, 0.16, 0.1, 0.2, 0, 0, MB); put(A, ball, 0, 0.62, 0.04, 0.42, 0.22, 0.44, 0, 0, 0, MD);
+    put(A, cyl, 0, -0.18, 0, 0.17, 0.34, 0.17, 0, 0, 0, MB); put(A, bx, 0, -0.5, 0.02, 0.95, 0.38, 0.5, 0.1, 0, 0.12, MD); out.push(A); }   // (a statue's head and shoulders, broken off its body)
+  { const A = newAcc(); put(A, tor, 0, 0, 0, 1, 1, 1, 0, 0, 0, BR); put(A, cyl, 0, 0, 0, 0.17, 0.32, 0.17, Math.PI / 2, 0, 0, BR);
+    for (let i = 0; i < 8; i++) put(A, bx, 0, 0, 0, 0.06, 1.9, 0.06, 0, 0, i / 8 * Math.PI, i === 3 ? CH : BR); out.push(A); }   // (a chariot wheel, a spoke burnt through)
+  { const A = newAcc(); put(A, bx, 0, 0, 0, 0.03, 0.03, 1.1, 0, 0, 0, GO); put(A, bx, 0.08, 0, 0.05, 0.16, 0.012, 0.9, 0, 0.08, 0, EM); put(A, bx, -0.08, 0, 0.05, 0.16, 0.012, 0.9, 0, -0.08, 0, EM); put(A, bx, 0, 0, 0.5, 0.2, 0.012, 0.25, 0, 0, 0, GO); out.push(A); }   // (a feather, glowing)
+  return out.map(accToGeo);
+}
+// a lantern shrine: a round step, four columns, a roof; the flame is a light over it
+function czdShrineGeo() {
+  const cyl = czdNI(new THREE.CylinderGeometry(1, 1, 1, 10, 1)), cone = czdNI(new THREE.ConeGeometry(1, 1, 4, 1)), A = newAcc(), MB = [0.9, 0.87, 0.8], GO = [1.5, 1.05, 0.45];
+  const put = (g, x, y, z, sx, sy, sz, ry, c) => { _mat.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(0, ry, 0)), _s.set(sx, sy, sz)); addGeo(A, g, _mat, c); };
+  put(cyl, 0, 0.05, 0, 1, 0.16, 1, 0, MB); put(cyl, 0, 0.18, 0, 0.82, 0.1, 0.82, 0, MB);
+  for (let i = 0; i < 4; i++) { const a = i / 4 * TAU_ + Math.PI / 4; put(cyl, Math.cos(a) * 0.62, 0.75, Math.sin(a) * 0.62, 0.07, 1.05, 0.07, 0, MB); }
+  put(cyl, 0, 1.33, 0, 0.86, 0.1, 0.86, 0, GO); put(cone, 0, 1.6, 0, 0.95, 0.45, 0.95, Math.PI / 4, MB);
+  return accToGeo(A);
+}
+// the six ways out from home, lit along their length; and the wrecks of anyone who really fell, over where they fell
+const CZD_WAYS = 6, CZD_WAYL = 37;
+function czdWays() {
+  const D = CZD; if (D.way) return D.way;
+  const F = { id: 'way', c: new THREE.Vector3(), Q: new THREE.Quaternion(), Qi: new THREE.Quaternion(), kind: 'way' }, fc = { key: 'way', h: 0x7a7, F, a: 0, i: 0, j: 0, k: 0, ox: 0, oy: 0, oz: 0, xl: [], l: [], m: [], w: [], sh: [], dirs: [], lan: [] };
+  czdSeed(0x3a75);
+  for (let w = 0; w < CZD_WAYS; w++) {
+    const dir = new THREE.Vector3(czdR() - 0.5, (czdR() - 0.5) * 1.4, czdR() - 0.5).normalize(), side = new THREE.Vector3().crossVectors(dir, Math.abs(dir.y) < 0.9 ? CZD_Y : CZD_Z).normalize(), up = new THREE.Vector3().crossVectors(side, dir);
+    fc.dirs.push({ dir, side, up, col: Object.values(PATRONS)[w * 2 % Object.keys(PATRONS).length][0] });
+    for (let n = 0; n < CZD_WAYL; n++) { const D0 = 24000 + n * 7000, s = 16 + czdR() * 14, x = dir.x * D0 + side.x * (czdR() - 0.5) * 500, y = dir.y * D0 + up.y * (czdR() - 0.5) * 500 + side.y * (czdR() - 0.5) * 300, z = dir.z * D0 + side.z * (czdR() - 0.5) * 500;
+      fc.xl.push(x, y, z, s, 0, 0, 0, 0, 0, 1, 0.78, 1, 1); const top = s * 0.78 * D.topY, sc = 6.5; _cdq.setFromUnitVectors(CZD_Y, up);
+      fc.sh.push(x + up.x * top, y + up.y * top, z + up.z * top, _cdq.x, _cdq.y, _cdq.z, _cdq.w, sc, up.x, up.y, up.z, n & 7); fc.lan.push(x + up.x * (top + sc * 1.45), y + up.y * (top + sc * 1.45), z + up.z * (top + sc * 1.45)); }
+  }
+  D.way = fc; return fc;
+}
+function czdGraves() {
+  const D = CZD, M = WORLD.marks; if (D.grave && D.graveN === M.length) return D.grave; D.graveN = M.length;
+  const fc = D.grave = { key: 'grave', h: 0x6a7e, F: czdWays().F, a: 0, i: 0, j: 0, k: 0, ox: 0, oy: 0, oz: 0, xl: [], l: [], m: [], w: [], sh: [] }; D.graveL = [];
+  const E = COSMOS.exit, seen = new Set(), L = M.filter(m => m.k === 'fall').sort((a, b) => E ? Math.hypot(a.x - E.x, a.z - E.z) - Math.hypot(b.x - E.x, b.z - E.z) : 0);
+  for (const m of L) {
+    if (D.graveL.length >= 28) break; const k = Math.round(m.x / 40) + ',' + Math.round(m.z / 40); if (seen.has(k)) continue; seen.add(k);
+    czFrame(m.x, m.z, _cd1, _cd2, _cd3); czdSeed(m.s ^ 0x9a7e); const alt = CZ_RG + CZ_ALT + 1300 + czdR() * 2600, col = czdColOf(PATRONS[m.g]?.[0] || '#ff8a3a');
+    const x = _cd1.x * alt + _cd2.x * (czdR() - 0.5) * 900 + _cd3.x * (czdR() - 0.5) * 900, y = _cd1.y * alt + _cd2.y * (czdR() - 0.5) * 900 + _cd3.y * (czdR() - 0.5) * 900, z = _cd1.z * alt + _cd2.z * (czdR() - 0.5) * 900 + _cd3.z * (czdR() - 0.5) * 900;
+    const W = (kind, s, dx, dy, dz, c) => { const ax = czdR() - 0.5, ay = czdR() - 0.5, az = czdR() - 0.5, l = Math.hypot(ax, ay, az) || 1; fc.w.push(x + dx, y + dy, z + dz, s, ax / l, ay / l, az / l, (czdR() - 0.5) * 0.35, czdR() * TAU_, 1, 1, 1, c, kind); };
+    W(2, 9 + czdR() * 4, 0, 0, 0, col); W(2, 7 + czdR() * 3, (czdR() - 0.5) * 30, (czdR() - 0.5) * 30, (czdR() - 0.5) * 30, col);
+    for (let q = 0; q < 5; q++) W(5, 2.5 + czdR() * 2.5, (czdR() - 0.5) * 70, (czdR() - 0.5) * 70, (czdR() - 0.5) * 70, q % 2 ? col : 8);
+    D.graveL.push({ x, y, z, n: m.n || 'SOMEONE', c: PATRONS[m.g]?.[0] || '#ffb070' });
+  }
+  return fc;
+}
+// the meshes, made with the rest of space
+function czdInit(S) {
+  const D = CZD; if (D.built) return; D.built = true;
+  const g1 = czdRockGeo(1, 71), g0 = czdRockGeo(0, 72); D.topY = g1.userData.top;
+  const mk = (geo, mat, n) => { const M = new THREE.InstancedMesh(geo, mat, n); M.count = 0; M.frustumCulled = false; M.instanceMatrix.setUsage(THREE.DynamicDrawUsage); M.setColorAt(0, _cdC.setRGB(1, 1, 1)); M.instanceColor.setUsage(THREE.DynamicDrawUsage); S.add(M); return M; };
+  const rm = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), wm = new THREE.MeshLambertMaterial({ vertexColors: true });
+  D.hi = mk(g1, rm, CZD_N.hi + CZD_N.far); D.lo = mk(g0, rm, CZD_N.lo); D.pb = mk(g0, rm, CZD_N.pb);
+  D.wk = czdWreckGeos().map((g, i) => mk(g, wm, i === 5 ? CZD_N.wk * 2 : CZD_N.wk));
+  D.sh = mk(czdShrineGeo(), wm, CZD_N.sh);
+  D.gate = mk(new THREE.TorusGeometry(1, 0.07, 6, 48), new THREE.MeshBasicMaterial({ toneMapped: false }), 40);
+  const pts = (n, size) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    const P = new THREE.Points(g, new THREE.PointsMaterial({ size, sizeAttenuation: false, vertexColors: true, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending })); P.frustumCulled = false; g.setDrawRange(0, 0); S.add(P); return P; };
+  D.lan = pts(CZD_WAYS * CZD_WAYL + CZD_N.sh + 8, 4); D.dots = pts(120, 3); D.dust = pts(CZD_N.dust * 3, 2);
+  { const n = CZD_N.sp; D.sp = { pts: pts(n, 3), P: new Float64Array(n * 3), V: new Float32Array(n * 3), A: new Float32Array(n), L: new Float32Array(n), Cl: new Float32Array(n * 3), i: 0 }; D.sp.A.fill(9); }
+  for (let i = 0; i < 4; i++) { const m = new THREE.Mesh(new THREE.RingGeometry(0.62, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+    m.frustumCulled = false; m.visible = false; S.add(m); D.waves.push({ m, p: new THREE.Vector3(), q: new THREE.Quaternion(), t: 9, T: 0.6, R: 60 }); }
+  czdWays();
+}
+// a spark (world position, velocity, life, colour), and a ring of shock going out from a point square to a way
+function czdSpark(x, y, z, vx, vy, vz, life, r, g, b) {
+  const S = CZD.sp; if (!S) return; const i = S.i = (S.i + 1) % S.A.length, j = i * 3;
+  S.P[j] = x; S.P[j + 1] = y; S.P[j + 2] = z; S.V[j] = vx; S.V[j + 1] = vy; S.V[j + 2] = vz; S.A[i] = 0; S.L[i] = life; S.Cl[j] = r; S.Cl[j + 1] = g; S.Cl[j + 2] = b;
+}
+function czdBurst(x, y, z, n, sp, vx = 0, vy = 0, vz = 0, hot = 1) {
+  n = Math.min(n, TOUCH ? 40 : 90);
+  for (let i = 0; i < n; i++) { const a = Math.random() * TAU_, c = Math.random() * 2 - 1, s = Math.sqrt(1 - c * c), v = sp * (0.3 + Math.random() * 0.9), w = Math.random();
+    czdSpark(x, y, z, Math.cos(a) * s * v + vx, c * v + vy, Math.sin(a) * s * v + vz, 0.5 + Math.random() * 1.1, 2.6 * hot, (0.8 + w * 1.2) * hot, (0.15 + w * w * 0.8) * hot); }
+}
+function czdWave(p, n, R, T, hex) {
+  const W = CZD.waves.reduce((a, b) => a.t / a.T > b.t / b.T ? a : b); W.p.copy(p); W.q.setFromUnitVectors(CZD_Z, n); W.t = 0; W.T = T; W.R = R; W.m.material.color.setHex(hex).multiplyScalar(2.4);
+}
+// ── every frame: the stones near him drawn (the nearest first, as many as the machine bears), and the ones close by kept
+//    for the knocks and for the eye
+const _CZX = { cx: 0, cy: 0, cz: 0, px: 0, py: 0, pz: 0, fx: 0, fy: 0, fz: -1, t: 0, Q: null, st: null };
+function czdPut(M, i, x, y, z, qx, qy, qz, qw, sx, sy, sz) {
+  const e = M.instanceMatrix.array, o = i * 16, x2 = qx + qx, y2 = qy + qy, z2 = qz + qz, xx = qx * x2, xy = qx * y2, xz = qx * z2, yy = qy * y2, yz = qy * z2, zz = qz * z2, wx = qw * x2, wy = qw * y2, wz = qw * z2;
+  e[o] = (1 - (yy + zz)) * sx; e[o + 1] = (xy + wz) * sx; e[o + 2] = (xz - wy) * sx; e[o + 3] = 0;
+  e[o + 4] = (xy - wz) * sy; e[o + 5] = (1 - (xx + zz)) * sy; e[o + 6] = (yz + wx) * sy; e[o + 7] = 0;
+  e[o + 8] = (xz + wy) * sz; e[o + 9] = (yz - wx) * sz; e[o + 10] = (1 - (xx + yy)) * sz; e[o + 11] = 0;
+  e[o + 12] = x; e[o + 13] = y; e[o + 14] = z; e[o + 15] = 1;
+}
+const czdTint = (M, i, c, k = 1) => { const a = M.instanceColor.array, o = i * 3; a[o] = c[0] * k; a[o + 1] = c[1] * k; a[o + 2] = c[2] * k; };
+const czdId = (fc, q, tier) => (fc.h + Math.imul(q + 1, 0x9e3779b1) + tier * 104729) >>> 0;
+function czdNear(fc, tier, q, s, ox, oy, oz, kind) {
+  const D = CZD; let E = D.near[D.nearN]; if (!E) E = D.near[D.nearN] = {};
+  D.nearN++; E.fc = fc; E.F = fc.F; E.tier = tier; E.id = czdId(fc, q, tier); E.s = s; E.ox = ox; E.oy = oy; E.oz = oz; E.kind = kind; E.gone = false;
+}
+// one list of a face's stones (or wreckage: kind in the 14th place) into a mesh; returns how many of the mesh are used now
+function czdRun(fc, A, stride, M, slot, max, view, tier, wk) {
+  const X = _CZX, st = X.st, n = A.length / stride, v2 = view * view;
+  for (let q = 0, o = 0; q < n; q++, o += stride) {
+    let ox = A[o], oy = A[o + 1], oz = A[o + 2], S = null; const s = A[o + 3];
+    if (st) { S = st.get(czdId(fc, q, tier)); if (S) { if (S.k === 1) continue; ox += S.dx; oy += S.dy; oz += S.dz; } }
+    const px = X.px + ox, py = X.py + oy, pz = X.pz + oz, nr = s + (s > 20 ? 900 : 450);
+    if (px * px + py * py + pz * pz < nr * nr && CZD.nearN < 400) czdNear(fc, tier, q, s, ox, oy, oz, wk ? A[o + 13] : -1);
+    const rx = X.cx + ox, ry = X.cy + oy, rz = X.cz + oz, d2 = rx * rx + ry * ry + rz * rz;
+    if (d2 > v2 || rx * X.fx + ry * X.fy + rz * X.fz < -s * 1.4) continue;
+    const d = Math.sqrt(d2); if (s < 12 && d < s + 2.5) continue;   // (right on the lens)
+    const M2 = wk ? M[A[o + 13]] : M, sl = wk ? CZD.wn[A[o + 13]] : slot; if (sl >= (wk ? M2.instanceMatrix.count : max)) continue;
+    const k = d - s < 900 ? 1 : lerp(1, czK(d), smoothstep(900, 2600, d - s)), fade = smoothstep(view, view * 0.82, d);
+    let qx, qy, qz, qw; const ax = A[o + 4], ay = A[o + 5], az = A[o + 6];
+    if (ax === 0 && ay === 0 && az === 0) { qx = X.Q.x; qy = X.Q.y; qz = X.Q.z; qw = X.Q.w; }
+    else { const ang = (A[o + 8] + A[o + 7] * X.t + (S ? S.sp * (X.t - S.t) : 0)) * 0.5, sn = Math.sin(ang); qx = ax * sn; qy = ay * sn; qz = az * sn; qw = Math.cos(ang); }
+    const sk = s * k * fade; czdPut(M2, sl, rx * k, ry * k, rz * k, qx, qy, qz, qw, sk * A[o + 9], sk * A[o + 10], sk * A[o + 11]); czdTint(M2, sl, CZD_COL[A[o + 12]]);
+    if (wk) CZD.wn[A[o + 13]]++; else slot++;
+  }
+  return slot;
+}
+// the grit: everywhere a little, in a drift a lot, made afresh round him every frame from where it is (never kept)
+function czdGrit(M, max) {
+  const C = COSMOS, D = CZD, P = C.pos, PS = CZD_PS, V = CZD_V.s, n = Math.ceil(V / PS), X = _CZX, st = X.st, home = (CZ_RG + CZ_ALT + 300) ** 2, t = X.t;
+  const ci = Math.floor(P.x / PS), cj = Math.floor(P.y / PS), ck = Math.floor(P.z / PS), FL = D.fields.filter(F => czdDist(F, P) < V + 50); let slot = 0;
+  for (let k = ck - n; k <= ck + n; k++) for (let j = cj - n; j <= cj + n; j++) for (let i = ci - n; i <= ci + n; i++) {
+    const h = czdH(0x9eb, i, j, k, 0); czdSeed(h);
+    for (let c = 0; c < 2; c++) {
+      const x = (i + czdR()) * PS, y = (j + czdR()) * PS, z = (k + czdR()) * PS, pick = czdR(), s = 0.35 + czdR() ** 3 * 3.6, ax = czdR() - 0.5, ay = czdR() - 0.5, az = czdR() - 0.5, col = Math.floor(czdR() * 6);
+      let dens = 0.06; for (const F of FL) { _cd1.set(x, y, z).sub(czdC(F)).applyQuaternion(F.Qi); dens = Math.max(dens, 0.06 + czdMask(F, _cd1.x, _cd1.y, _cd1.z) * 0.8); }
+      if (pick > dens || x * x + y * y + z * z < home) continue;
+      const id = (h + c * 0x51ed27) >>> 0; let S = null, dx = 0, dy = 0, dz = 0; if (st) { S = st.get(id); if (S) { if (S.k === 1) continue; dx = S.dx; dy = S.dy; dz = S.dz; } }
+      const px = x + dx - P.x, py = y + dy - P.y, pz = z + dz - P.z;
+      if (px * px + py * py + pz * pz < (s + 70) ** 2 && D.nearN < 400) { czdNear(D.gfc, 3, 0, s, x + dx, y + dy, z + dz, -1); D.near[D.nearN - 1].id = id; }
+      const rx = x + dx - C.camPos.x, ry = y + dy - C.camPos.y, rz = z + dz - C.camPos.z, d2 = rx * rx + ry * ry + rz * rz;
+      if (d2 > V * V || rx * X.fx + ry * X.fy + rz * X.fz < -s || slot >= max || d2 < (s + 2.5) ** 2) continue;
+      const l = Math.hypot(ax, ay, az) || 1, ang = (pick * 40 + t * (0.6 + pick) + (S ? S.sp * (t - S.t) : 0)) * 0.5, sn = Math.sin(ang), sk = s * smoothstep(V, V * 0.7, Math.sqrt(d2));
+      czdPut(M, slot, rx, ry, rz, ax / l * sn, ay / l * sn, az / l * sn, Math.cos(ang), sk, sk * 0.8, sk); czdTint(M, slot, CZD_COL[col], 0.9); slot++;
+    }
+  }
+  return slot;
+}
+function czdDraw(dt) {
+  const C = COSMOS, D = CZD, X = _CZX; if (!D.built) return;
+  const off = C.map.on;
+  for (const M of [D.hi, D.lo, D.pb, D.sh, D.gate, ...D.wk]) M.visible = !off; D.lan.visible = D.dots.visible = D.dust.visible = !off; D.sp.pts.visible = !off;
+  if ((D.fT -= dt) <= 0) { D.fT = 0.35; czdFields(); }
+  D.nearN = 0; if (off) { D.hi.count = D.lo.count = D.pb.count = D.sh.count = D.gate.count = 0; for (const M of D.wk) M.count = 0; return; }
+  czdStream();
+  _cd1.set(0, 0, -1).applyQuaternion(C.camQ); X.fx = _cd1.x; X.fy = _cd1.y; X.fz = _cd1.z; X.t = time; X.st = D.st.size ? D.st : null;
+  if (!D.gfc) D.gfc = { h: 0, F: { c: _cz0, B: null, Q: CZD_ZQ } };
+  let hi = 0, lo = 0, gen = 0; D.wn.fill(0); D.shN.length = 0; let sh = 0, ln = 0;
+  const LA = D.lan.geometry.attributes.position.array, LC = D.lan.geometry.attributes.color.array, lanMax = LA.length / 3;
+  const P = C.pos, shrine = (fc) => {   // (its little temples, and their flames)
+    const A = fc.sh; for (let o = 0; o < A.length; o += 12) {
+      const rx = X.cx + A[o], ry = X.cy + A[o + 1], rz = X.cz + A[o + 2], d = Math.hypot(rx, ry, rz), sc = A[o + 7];
+      if (d < CZD_V.xl * 0.7 && sh < CZD_N.sh && rx * X.fx + ry * X.fy + rz * X.fz > -sc * 3) { const k = d - sc < 900 ? 1 : lerp(1, czK(d), smoothstep(900, 2600, d - sc)); czdPut(D.sh, sh, rx * k, ry * k, rz * k, A[o + 3], A[o + 4], A[o + 5], A[o + 6], sc * k, sc * k, sc * k); czdTint(D.sh, sh, CZD_COL[6]); sh++; }
+      if (fc !== D.way && ln < lanMax) { const ux = A[o + 8], uy = A[o + 9], uz = A[o + 10], f = sc * 1.45, k = czK(d), fl = 0.85 + 0.15 * Math.sin(time * 7 + o) * Math.sin(time * 3.1 + o * 0.7); LA[ln * 3] = (rx + ux * f) * k; LA[ln * 3 + 1] = (ry + uy * f) * k; LA[ln * 3 + 2] = (rz + uz * f) * k; LC[ln * 3] = 2.4 * fl; LC[ln * 3 + 1] = 1.5 * fl; LC[ln * 3 + 2] = 0.5 * fl; ln++; }
+      if (d < 2600) D.shN.push({ x: czdC(fc.F).x + A[o], y: czdC(fc.F).y + A[o + 1], z: czdC(fc.F).z + A[o + 2], ux: A[o + 8], uy: A[o + 9], uz: A[o + 10], sc, d, n: A[o + 11], id: fc.h + o });
+    } };
+  const at = fc => { const c = czdC(fc.F); X.cx = c.x - C.camPos.x; X.cy = c.y - C.camPos.y; X.cz = c.z - C.camPos.z; X.px = c.x - P.x; X.py = c.y - P.y; X.pz = c.z - P.z; X.Q = fc.F.Q; };
+  // the ways, and the wrecks of the fallen, wherever they are
+  for (const fc of [D.way, czdGraves()]) { at(fc); hi = czdRun(fc, fc.xl, 13, D.hi, hi, CZD_N.hi, CZD_V.xl * 0.75, 0, false); czdRun(fc, fc.w, 14, D.wk, 0, 0, CZD_V.w, 4, true); shrine(fc); }
+  // the walls of the rooms, nearest first: their biggest stones far off, the middling ones nearer, the house-sized near
+  for (const fc of D.act) {
+    at(fc); const d = Math.hypot(X.cx + fc.ox, X.cy + fc.oy, X.cz + fc.oz) - CZD_CM * 0.72;
+    hi = czdRun(fc, fc.xl, 13, D.hi, hi, CZD_N.hi, CZD_V.xl, 0, false); shrine(fc);
+    if (d < CZD_V.l) { if (!fc.l) { if (gen > (TOUCH ? 6 : 14)) continue; gen++; czdFill(fc, 1); } hi = czdRun(fc, fc.l, 13, D.hi, hi, CZD_N.hi, CZD_V.l, 1, false); }
+    if (d < CZD_V.w) { if (!fc.w) { if (gen > (TOUCH ? 6 : 14)) continue; gen++; czdFill(fc, 3); } czdRun(fc, fc.w, 14, D.wk, 0, 0, CZD_V.w, 4, true); }
+    if (d < CZD_V.m) { if (!fc.m) { if (gen > (TOUCH ? 4 : 10)) continue; gen++; czdFill(fc, 2); } lo = czdRun(fc, fc.m, 13, D.lo, lo, CZD_N.lo, CZD_V.m, 2, false); }
+  }
+  D.hi.count = czdFar(hi); D.lo.count = lo; D.sh.count = sh; D.pb.count = czdGrit(D.pb, CZD_N.pb);
+  D.wk.forEach((M, i) => { M.count = D.wn[i]; });
+  for (const M of [D.hi, D.lo, D.pb, D.sh, ...D.wk]) { M.instanceMatrix.needsUpdate = true; M.instanceColor.needsUpdate = true; }
+  // the lanterns of the six ways, seen from far off as lines of lights going out into the dark
+  { const W = D.way.lan; for (let o = 0; o < W.length && ln < lanMax; o += 3) { const rx = W[o] - C.camPos.x, ry = W[o + 1] - C.camPos.y, rz = W[o + 2] - C.camPos.z, d = Math.hypot(rx, ry, rz); if (d > 160000) continue;
+      const k = czK(d), fl = (0.8 + 0.2 * Math.sin(time * 5 + o)) * (0.45 + 0.55 * smoothstep(160000, 30000, d)); LA[ln * 3] = rx * k; LA[ln * 3 + 1] = ry * k; LA[ln * 3 + 2] = rz * k; LC[ln * 3] = 2.6 * fl; LC[ln * 3 + 1] = 1.55 * fl; LC[ln * 3 + 2] = 0.55 * fl; ln++; } }
+  D.lan.geometry.setDrawRange(0, ln); D.lan.geometry.attributes.position.needsUpdate = true; D.lan.geometry.attributes.color.needsUpdate = true;
+  czdGateDraw(); czdFx(dt);
+  // the names of the fallen, over their wreckage when he is near it
+  for (const G of D.graveL) { _cd1.set(G.x - C.camPos.x, G.y - C.camPos.y, G.z - C.camPos.z); const d = _cd1.length(); if (d > 700) continue; _cd1.multiplyScalar(czK(d)).project(C.cam); if (_cd1.z < 1 && Math.abs(_cd1.x) < 0.95 && Math.abs(_cd1.y) < 0.9) inkNow(`${G.n} FELL HERE`, { sx: _cd1.x * 0.5 + 0.5, sy: 0.46 - _cd1.y * 0.5 }, G.c); }
+}
+// the drifts from far off: a likeness of each, its biggest stones where its seed puts them (shrinking away as the real ones
+// come up, as he nears it) and a haze of dust in its shape
+function czdFarMake(F) {
+  czdSeed(F.seed ^ 0xfa7); const A = F.far = [], U = F.dust = [], N = CZD_N.far, ext = F.kind === 'belt' ? F.R : F.R * 1.2, ey = F.kind === 'belt' ? F.H : ext;
+  for (let t = 0; t < N * 6 && (A.length < N * 13 || U.length < CZD_N.dust * 3); t++) {
+    const x = (czdR() * 2 - 1) * ext, y = (czdR() * 2 - 1) * ey, z = (czdR() * 2 - 1) * ext, m = czdMask(F, x, y, z), s = 110 + czdR() * czdR() * 210, ax = czdR() - 0.5, ay = czdR() - 0.5, az = czdR() - 0.5, l = Math.hypot(ax, ay, az) || 1, col = czdCol(F);
+    if (m < 0.35) continue; _cd1.set(x, y, z).applyQuaternion(F.Q);
+    if (A.length < N * 13 && czdR() < 0.5) A.push(_cd1.x, _cd1.y, _cd1.z, s, ax / l, ay / l, az / l, 0.04, czdR() * TAU_, 1, 0.8, 1, col); else if (U.length < CZD_N.dust * 3) U.push(_cd1.x, _cd1.y, _cd1.z);
+  }
+}
+function czdFar(slot) {
+  const C = COSMOS, D = CZD, cp = C.camPos, V0 = CZD_V.xl * 0.6, V1 = CZD_V.xl * 0.95, max = CZD_N.hi + CZD_N.far, DA = D.dust.geometry.attributes.position.array, DC = D.dust.geometry.attributes.color.array; let dn = 0;
+  for (const F of D.far) { if (!F.far) czdFarMake(F); const c = czdC(F), cx = c.x - cp.x, cy = c.y - cp.y, cz = c.z - cp.z, A = F.far, U = F.dust, dc = Math.hypot(cx, cy, cz), hz = smoothstep(CZD_V.far, CZD_V.far * 0.6, dc) * smoothstep(F.R * 0.3, F.R * 1.3, dc);
+    for (let o = 0; o < A.length && slot < max; o += 13) { const rx = cx + A[o], ry = cy + A[o + 1], rz = cz + A[o + 2], d = Math.hypot(rx, ry, rz), s = A[o + 3]; if (d < V0 || d > CZD_V.far) continue;
+      const k = lerp(1, czK(d), smoothstep(900, 2600, d - s)), sk = s * k * smoothstep(V0, V1, d) * smoothstep(CZD_V.far, CZD_V.far * 0.8, d), ang = (A[o + 8] + A[o + 7] * time) * 0.5, sn = Math.sin(ang);
+      czdPut(D.hi, slot, rx * k, ry * k, rz * k, A[o + 4] * sn, A[o + 5] * sn, A[o + 6] * sn, Math.cos(ang), sk, sk * 0.8, sk); czdTint(D.hi, slot, CZD_COL[A[o + 12]]); slot++; }
+    if (hz > 0.01) for (let o = 0; o < U.length && dn < CZD_N.dust * 3; o += 3) { const rx = cx + U[o], ry = cy + U[o + 1], rz = cz + U[o + 2], k = czK(Math.hypot(rx, ry, rz)), b = 0.42 * hz;
+      DA[dn * 3] = rx * k; DA[dn * 3 + 1] = ry * k; DA[dn * 3 + 2] = rz * k; DC[dn * 3] = b; DC[dn * 3 + 1] = b * 0.85; DC[dn * 3 + 2] = b * 0.7; dn++; }
+  }
+  D.dust.geometry.setDrawRange(0, dn); D.dust.geometry.attributes.position.needsUpdate = true; D.dust.geometry.attributes.color.needsUpdate = true;
+  return slot;
+}
+// the gates: dim bronze, or alight (for a quarter of an hour, for everyone) once anyone has flown through
+function czdGateDraw() {
+  const C = COSMOS, D = CZD, M = D.gate; let n = 0; D.gates.length = 0;
+  for (const F of D.fields) { czdGatesOf(F); const c = czdC(F);
+    for (const G of F.gates) { D.gates.push(G); const rx = c.x + G.o.x - C.camPos.x, ry = c.y + G.o.y - C.camPos.y, rz = c.z + G.o.z - C.camPos.z, d = Math.hypot(rx, ry, rz); if (d > CZD_V.g || n >= 40) continue;
+      const k = d - G.R < 900 ? 1 : lerp(1, czK(d), smoothstep(900, 2600, d - G.R)), lit = czdLitNow(G.key), pulse = lit ? 0.85 + 0.15 * Math.sin(time * 3 + G.R) : 1, f = G.flash = Math.max(0, G.flash - 1 / 60);
+      czdPut(M, n, rx * k, ry * k, rz * k, G.q.x, G.q.y, G.q.z, G.q.w, G.R * k * (1 + f * 0.25), G.R * k * (1 + f * 0.25), G.R * k * (1 + f * 0.25));
+      czdTint(M, n, lit ? [2.8 * pulse + f * 2, 1.8 * pulse + f * 2, 0.6 * pulse + f] : [0.5, 0.34, 0.18]); n++;
+      if (lit && d < 1500 && Math.random() < 0.25) { const a = Math.random() * TAU_; _cd2.set(Math.cos(a) * G.R, Math.sin(a) * G.R, 0).applyQuaternion(G.q); czdSpark(c.x + G.o.x + _cd2.x, c.y + G.o.y + _cd2.y, c.z + G.o.z + _cd2.z, G.n.x * 6, G.n.y * 6, G.n.z * 6, 1.2, 2.4, 1.5, 0.4); } } }
+  M.count = n; M.instanceMatrix.needsUpdate = true; M.instanceColor.needsUpdate = true;
+}
+// the sparks and the rings of shock, the stones knocked aside drifting off, the burnt and the smashed coming back in time
+function czdFx(dt) {
+  const C = COSMOS, D = CZD, S = D.sp, PA = S.pts.geometry.attributes.position.array, CA = S.pts.geometry.attributes.color.array; let n = 0;
+  for (let i = 0; i < S.A.length; i++) { if (S.A[i] >= S.L[i]) continue; S.A[i] += dt; const j = i * 3, k = Math.max(0, 1 - S.A[i] / S.L[i]);
+    S.P[j] += S.V[j] * dt; S.P[j + 1] += S.V[j + 1] * dt; S.P[j + 2] += S.V[j + 2] * dt; const rx = S.P[j] - C.camPos.x, ry = S.P[j + 1] - C.camPos.y, rz = S.P[j + 2] - C.camPos.z;
+    if (rx * rx + ry * ry + rz * rz > 9e6) continue; PA[n * 3] = rx; PA[n * 3 + 1] = ry; PA[n * 3 + 2] = rz; CA[n * 3] = S.Cl[j] * k; CA[n * 3 + 1] = S.Cl[j + 1] * k * k; CA[n * 3 + 2] = S.Cl[j + 2] * k * k * k; n++; }
+  S.pts.geometry.setDrawRange(0, n); S.pts.geometry.attributes.position.needsUpdate = true; S.pts.geometry.attributes.color.needsUpdate = true;
+  for (const W of D.waves) { W.t += dt; const u = W.t / W.T; W.m.visible = u < 1 && !C.map.on; if (!W.m.visible) continue; const e = 1 - (1 - u) * (1 - u) * (1 - u);
+    W.m.position.subVectors(W.p, C.camPos); W.m.quaternion.copy(W.q); W.m.scale.setScalar(W.R * (0.15 + 0.85 * e)); W.m.material.opacity = (1 - u) * 0.9; }
+  D.jolt = Math.max(0, D.jolt - dt * 2.2);
+  if (D.st.size) { const t = time; for (const [id, Q] of D.st) { if (Q.k === 2) { Q.dx += Q.vx * dt; Q.dy += Q.vy * dt; Q.dz += Q.vz * dt; Q.vx *= 1 - dt * 0.05; Q.vy *= 1 - dt * 0.05; Q.vz *= 1 - dt * 0.05; } if (t - Q.t > (Q.k === 1 ? 90 : 45)) D.st.delete(id); } }
+  // in hyper, in among the stones: the air he is not in still breaks round him, a cone of fire about his beak
+  if (HY.on && D.dField < 300 && !C.map.on) { const f = _cd1.set(0, 0, -1).applyQuaternion(C.q), K = birdK();
+    for (let i = 0; i < (TOUCH ? 3 : 6); i++) { const a = Math.random() * TAU_, r = (3 + Math.random() * 5) * K; _cd2.set(Math.cos(a) * r, Math.sin(a) * r, -6 * K).applyQuaternion(C.q);
+      czdSpark(C.pos.x + _cd2.x, C.pos.y + _cd2.y, C.pos.z + _cd2.z, f.x * C.v * 0.9 + _cd2.x * 4, f.y * C.v * 0.9 + _cd2.y * 4, f.z * C.v * 0.9 + _cd2.z * 4, 0.12 + Math.random() * 0.1, 2.6, 1.4, 0.5); } }
+}
+// ── him among them (from cosmosFly, after he has moved from a to where he is): the big ones hold him off and he slides along
+//    them, the small ones are knocked aside, grit burns up in the bird's fire; in hyper everything in his way is smashed.
+//    And how near the nearest stone is, which slows him the way a world does.
+function czdHit(dt, a) {
+  const C = COSMOS, D = CZD, P = C.pos, man = player.form === 'human', K = man ? 0.9 : birdK(), br = (man ? 1.1 : 3) * K, hy = HY.on, f = _cd3.set(0, 0, -1).applyQuaternion(C.q);
+  const sx = P.x - a.x, sy = P.y - a.y, sz = P.z - a.z, sl = sx * sx + sy * sy + sz * sz; let dd = 1e9;
+  { let df = 1e9; for (const F of D.fields) df = Math.min(df, czdDist(F, P)); D.dField = df; }   // (how far the nearest drift is, every frame: it slows him as he comes at one)
+  for (let i = 0; i < D.nearN; i++) {
+    const E = D.near[i]; if (E.gone) continue; const c = czdC(E.F), x = c.x + E.ox, y = c.y + E.oy, z = c.z + E.oz, rr = E.s * (E.kind >= 0 ? 0.8 : 0.9) + br;
+    const t = sl > 1e-9 ? clamp(((x - a.x) * sx + (y - a.y) * sy + (z - a.z) * sz) / sl, 0, 1) : 1, qx = a.x + sx * t - x, qy = a.y + sy * t - y, qz = a.z + sz * t - z, dist = Math.sqrt(qx * qx + qy * qy + qz * qz);
+    if (E.s >= 8) { const surf = Math.hypot(P.x - x, P.y - y, P.z - z) - E.s * 0.9; if (surf < dd) dd = surf; }   // (what slows him is the stones that would stop him, not the grit)
+    if (dist >= rr) continue;
+    E.gone = true;
+    if (hy) { czdSmash(E, x, y, z, f); continue; }
+    if (E.s < 8) { if (!man && (E.s < 2.4 || E.tier === 3 && E.s < 3.2)) czdBurn(E, x, y, z, f); else czdKnock(E, x, y, z, f, K); continue; }
+    // a big one: held off at its face, sliding along it (straight at it, he is thrown back a little and the eye jolts)
+    E.gone = false; _cd2.set(P.x - x, P.y - y, P.z - z); let L = _cd2.length(); if (L < 1e-3) { _cd2.copy(f).negate(); L = 1; } _cd2.divideScalar(L);
+    const into = f.dot(_cd2); P.set(x, y, z).addScaledVector(_cd2, rr + 0.4);
+    if (into < -0.15 && time - D.hitT > 0.18) { D.hitT = time; const hard = into < -0.65; C.v *= hard ? 0.55 : 0.92; D.jolt = Math.max(D.jolt, hard ? 0.7 : 0.25);
+      czdBurst(P.x - _cd2.x * br, P.y - _cd2.y * br, P.z - _cd2.z * br, hard ? 40 : 14, hard ? 40 : 22, _cd2.x * 10, _cd2.y * 10, _cd2.z * 10);
+      if (hard) { czdWave(_cd1.set(P.x - _cd2.x * br, P.y - _cd2.y * br, P.z - _cd2.z * br), _cd2, 22 * K, 0.45, 0xffd090); audio.sfx.thud?.(); } else audio.sfx.nearMiss?.(); }
+    else if (Math.random() < 0.5) czdSpark(P.x - _cd2.x * br, P.y - _cd2.y * br, P.z - _cd2.z * br, _cd2.x * 15 + rnd(8), _cd2.y * 15 + rnd(8), _cd2.z * 15 + rnd(8), 0.6, 2.6, 1.3, 0.4);   // (skimming it: fire off the stone)
+    czSlide(_cd2);
+  }
+  D.dDeb = D.dField < 0 ? Math.min(dd, 620) : dd;   // (inside a drift, never as if out in the open: the rooms are threaded at a speed that can be read)
+  czdGatePass(a, P);
+}
+const czdState = (E, k, o) => { const S = Object.assign({ k, t: time, dx: 0, dy: 0, dz: 0, vx: 0, vy: 0, vz: 0, sp: 0 }, o); CZD.st.set(E.id, S); return S; };
+function czdKnock(E, x, y, z, f, K) {   // (knocked out of his way, tumbling, carried off along it a little)
+  const C = COSMOS, old = CZD.st.get(E.id), v = C.v * 0.35 + 25; _cd2.set(x - C.pos.x, y - C.pos.y, z - C.pos.z).normalize();
+  czdState(E, 2, { dx: old ? old.dx : 0, dy: old ? old.dy : 0, dz: old ? old.dz : 0, vx: _cd2.x * v + f.x * C.v * 0.25, vy: _cd2.y * v + f.y * C.v * 0.25, vz: _cd2.z * v + f.z * C.v * 0.25, sp: 2 + Math.random() * 3 });
+  czdBurst(x - _cd2.x * E.s, y - _cd2.y * E.s, z - _cd2.z * E.s, player.form === 'human' ? 4 : 10, 14, f.x * C.v * 0.3, f.y * C.v * 0.3, f.z * C.v * 0.3, player.form === 'human' ? 0.6 : 1);
+  if (E.s > 4) { CZD.jolt = Math.max(CZD.jolt, 0.12); audio.sfx.clack?.(); }
+}
+function czdBurn(E, x, y, z, f) {   // (grit, through the bird: gone up in sparks)
+  const C = COSMOS; czdState(E, 1); czdBurst(x, y, z, 6 + Math.round(E.s * 5), 12 + E.s * 6, f.x * C.v * 0.6, f.y * C.v * 0.6, f.z * C.v * 0.6);
+  if (time - CZD.burnT > 0.25) { CZD.burnT = time; audio.sfx.sizzle?.(); }
+}
+function czdSmash(E, x, y, z, f) {   // (in hyper: through it, and it goes to pieces in a ring of shock and a fountain of sparks)
+  const C = COSMOS, D = CZD; czdState(E, 1);
+  czdBurst(x, y, z, 14 + Math.round(Math.min(E.s, 120) * 0.8), 50 + Math.min(E.s, 150) * 2, f.x * Math.min(C.v, 3000) * 0.12, f.y * Math.min(C.v, 3000) * 0.12, f.z * Math.min(C.v, 3000) * 0.12, 1.2);
+  for (let i = 0; i < Math.min(30, 6 + E.s * 0.3); i++) { const a = Math.random() * TAU_, r = E.s * (0.4 + Math.random() * 0.6); _cd2.set(Math.cos(a), Math.sin(a), 0).applyQuaternion(_cdq.setFromUnitVectors(CZD_Z, f)); czdSpark(x + _cd2.x * r, y + _cd2.y * r, z + _cd2.z * r, _cd2.x * (60 + E.s * 2.5), _cd2.y * (60 + E.s * 2.5), _cd2.z * (60 + E.s * 2.5), 0.9 + Math.random() * 0.6, 2.2, 2.0, 1.6); }   // (and a ring of white-hot pieces flung out square to his way)
+  if (time - D.waveT > 0.09 || E.s > 40) { D.waveT = time; czdWave(_cd1.set(x, y, z), f, Math.max(45, E.s * 3.2), 0.75 + Math.min(E.s, 200) / 300, E.s > 40 ? 0xfff0c0 : parseInt(hyHouse().slice(1), 16) || 0xffb060); }
+  D.jolt = Math.max(D.jolt, E.s > 40 ? 0.9 : 0.3); if (E.s > 40) { flash = Math.max(flash, 0.1); audio.sfx.boom?.(); } else if (time - D.hitT > 0.12) { D.hitT = time; audio.sfx.crack?.(); }
+}
+// through a gate: lit, for everyone (told in what he sends: see netSend)
+function czdGatePass(a, P) {
+  for (const G of CZD.gates) { const c = czdC(G.F), gx = c.x + G.o.x, gy = c.y + G.o.y, gz = c.z + G.o.z, n = G.n;
+    const da = (a.x - gx) * n.x + (a.y - gy) * n.y + (a.z - gz) * n.z, db = (P.x - gx) * n.x + (P.y - gy) * n.y + (P.z - gz) * n.z; if (da * db > 0 || da === db) continue;
+    const t = da / (da - db), hx = a.x + (P.x - a.x) * t - gx, hy = a.y + (P.y - a.y) * t - gy, hz = a.z + (P.z - a.z) * t - gz; if (hx * hx + hy * hy + hz * hz > G.R * G.R * 1.1) continue;
+    czdGateLight(G, heroName, true); }
+}
+function czdGateLight(G, by, mine) {
+  const D = CZD, now = performance.now(), was = czdLitNow(G.key), c = czdC(G.F); D.lit.set(G.key, { t: now, by });
+  if (mine) { D.mine = D.mine.filter(m => now - m.t < 8000 && m.k !== G.key); D.mine.push({ k: G.key, t: now }); }
+  G.flash = 1; const near = COSMOS.pos.distanceTo(_cd1.set(c.x + G.o.x, c.y + G.o.y, c.z + G.o.z)) < 4000;
+  if (near) for (let i = 0; i < (TOUCH ? 30 : 60); i++) { const a = i / (TOUCH ? 30 : 60) * TAU_; _cd2.set(Math.cos(a) * G.R, Math.sin(a) * G.R, 0).applyQuaternion(G.q); czdSpark(_cd1.x + _cd2.x, _cd1.y + _cd2.y, _cd1.z + _cd2.z, _cd2.x * 0.6 + G.n.x * 20, _cd2.y * 0.6 + G.n.y * 20, _cd2.z * 0.6 + G.n.z * 20, 1.4, 2.8, 1.9, 0.6); }
+  if (was && !mine) return;
+  const L = G.F.gates || [], lit = L.filter(g => czdLitNow(g.key)).length;
+  if (mine || near) { audio.sfx.chime?.(); toast(lit === L.length && L.length ? `EVERY GATE OF ${G.F.name} IS ALIGHT${mine ? '' : ` · ${by} LIT THE LAST`}` : `${mine ? 'A GATE LIT' : `${by} LIT A GATE`} · ${lit}/${L.length} · ${G.F.name}`); }
+  if (lit === L.length && L.length && (mine || near)) { flash = Math.max(flash, 0.2); for (const g of L) { g.flash = 1; czdWave(_cd2.set(c.x + g.o.x, c.y + g.o.y, c.z + g.o.z), g.n, g.R * 4, 1.4, 0xffe0a0); } }
+}
+// what he sends: the gates he has just lit; what he hears: anyone's (lit for him too, wherever the gate is)
+const czdSent = () => { const now = performance.now(); CZD.mine = CZD.mine.filter(m => now - m.t < 8000); return CZD.mine.length ? CZD.mine.map(m => m.k) : undefined; };
+function czdGateHeard(key, P) {
+  const L = CZD.lit.get(key); if (L && performance.now() - L.t < 8000) return;
+  const G = CZD.gates.find(g => g.key === key); if (G) czdGateLight(G, P.name, false); else CZD.lit.set(key, { t: performance.now(), by: P.name });
+}
+// the eye kept out of the stones, and whether a stone is in the way of it (see czSafe, czIn, czHid)
+function czdSafe(p, m) {
+  const D = CZD; for (let i = 0; i < D.nearN; i++) { const E = D.near[i]; if (E.gone || E.s < 4) continue; const c = czdC(E.F), r = E.s * 1.02 + m; _cd2.set(p.x - c.x - E.ox, p.y - c.y - E.oy, p.z - c.z - E.oz); const d = _cd2.length(); if (d < r && d > 1e-6) p.addScaledVector(_cd2, (r - d) / d); }
+  return p;
+}
+function czdIn(p, m) {
+  const D = CZD; for (let i = 0; i < D.nearN; i++) { const E = D.near[i]; if (E.gone || E.s < 4) continue; const c = czdC(E.F), r = E.s * 1.02 + m; if ((p.x - c.x - E.ox) ** 2 + (p.y - c.y - E.oy) ** 2 + (p.z - c.z - E.oz) ** 2 < r * r) return true; }
+  return false;
+}
+function czdHid(a, b) {
+  const D = CZD; for (let i = 0; i < D.nearN; i++) { const E = D.near[i]; if (E.gone || E.s < 25) continue; const c = czdC(E.F); if (czSeg(a, b, _cd2.set(c.x + E.ox, c.y + E.oy, c.z + E.oz), E.s * 0.85)) return true; }
+  return false;
+}
+function czdReset() {   // (in or out of space: nothing of the last time left hanging)
+  const D = CZD; D.nearN = 0; D.key = ''; D.fT = 0; D.dDeb = D.dField = 1e9; D.inF = null; D.jolt = 0; if (!D.built) return;
+  D.sp.A.fill(9); for (const W of D.waves) { W.t = 9; W.m.visible = false; } for (const M of [D.hi, D.lo, D.pb, D.sh, D.gate, ...D.wk]) M.count = 0;
+  D.lan.geometry.setDrawRange(0, 0); D.dots.geometry.setDrawRange(0, 0); D.dust.geometry.setDrawRange(0, 0); D.sp.pts.geometry.setDrawRange(0, 0);
+}
+
+// ── The phoenixes of space: a civilization of them. Up and down the six ways out from home in ones and in flocks, round
+//    home over its air and round each of its moons, going between the moons, circling the drifts, and resting by the
+//    lanterns on the stones. Where each is comes from the clock everyone shares, so everyone sees the same birds in the same
+//    places. The nearest few are drawn whole, with the same wings as any bird; the rest are sparks of their colour.
+const CZN = { defs: null, pool: [], list: [], n: 0, made: 0 };
+const CZN_FULL = TOUCH ? 5 : 8, CZN_NEAR = TOUCH ? 700 : 1000;
+const czTri = x => 1 - Math.abs(1 - 2 * (x - Math.floor(x)));   // (there and back: 0..1..0)
+function cznDefs() {
+  if (CZN.defs) return CZN.defs; const L = CZN.defs = [], W = czdWays(), cols = Object.values(PATRONS).map(p => p[0]); czdSeed(0xb12d5);
+  const col = () => czdR() < 0.25 ? '#ffb24a' : cols[Math.floor(czdR() * cols.length)];
+  for (let w = 0; w < CZD_WAYS; w++) for (let g = 0; g < 2; g++) L.push({ k: 'way', w, v: 380 + czdR() * 520, ph: czdR() * 1e4, n: g ? 1 : 1 + Math.floor(czdR() * 3), col: col() });
+  const orb = (B, r) => { const ax = new THREE.Vector3(czdR() - 0.5, czdR() * 1.5 + 0.2, czdR() - 0.5).normalize(), e1 = new THREE.Vector3().crossVectors(ax, Math.abs(ax.x) < 0.9 ? _czX : CZD_Y).normalize(), e2 = new THREE.Vector3().crossVectors(ax, e1);
+    L.push({ k: 'orb', B, r, e1, e2, ax, w: (220 + czdR() * 260) / r * (czdR() < 0.5 ? -1 : 1), ph: czdR() * TAU_, n: czdR() < 0.35 ? 2 : 1, col: col() }); };
+  for (let i = 0; i < 3; i++) orb(null, CZ_RG + CZ_ALT + 900 + czdR() * 2600);
+  for (const B of COSMOS.near) orb(B, B.R * (1.6 + czdR() * 0.7));
+  for (let i = 0; i < 3; i++) { const a = COSMOS.near[Math.floor(czdR() * 9)], b = COSMOS.near[Math.floor(czdR() * 9)]; if (a && b && a !== b) L.push({ k: 'fer', A: a, B: b, T: 240 + czdR() * 240, ph: czdR(), n: 2, col: col() }); }
+  return L;
+}
+function cznItem(id, x, y, z, fx, fy, fz, ux, uy, uz, col, rest, sp) {
+  let E = CZN.list[CZN.n]; if (!E) E = CZN.list[CZN.n] = { p: new THREE.Vector3(), f: new THREE.Vector3(), u: new THREE.Vector3() };
+  CZN.n++; E.id = id; E.p.set(x, y, z); E.f.set(fx, fy, fz); E.u.set(ux, uy, uz); E.col = col; E.rest = rest; E.sp = sp; E.d = 0; return E;
+}
+// where each of them is now, from the shared clock
+function cznWhere() {
+  const C = COSMOS, t = Date.now() / 1000, W = czdWays(); CZN.n = 0;
+  const flock = (id, def, x, y, z, f, u, sp) => { const s = _cd2.crossVectors(f, u); for (let m = 0; m < def.n; m++) { const b = m * 16, sd = m ? (m % 2 ? 1 : -1) * Math.ceil(m / 2) * 11 : 0, h = Math.sin(t * 0.9 + m * 1.7) * 3;
+    cznItem(id * 8 + m, x - f.x * b + s.x * sd + u.x * h, y - f.y * b + s.y * sd + u.y * h, z - f.z * b + s.z * sd + u.z * h, f.x, f.y, f.z, u.x, u.y, u.z, def.col, false, sp); } };
+  cznDefs().forEach((def, i) => {
+    if (def.k === 'way') { const Wd = W.dirs[def.w], L = (CZD_WAYL - 1) * 7000, u0 = czTri((t * def.v + def.ph) / (2 * L)), u1 = czTri((t * def.v + def.ph + def.v * 0.1) / (2 * L)), D0 = 24000 + u0 * L, sg = u1 >= u0 ? 1 : -1;
+      _cd1.copy(Wd.dir).multiplyScalar(sg); const lat = Math.sin(i * 1.7) * 160; flock(i, def, Wd.dir.x * D0 + Wd.up.x * 90 + Wd.side.x * lat, Wd.dir.y * D0 + Wd.up.y * 90 + Wd.side.y * lat, Wd.dir.z * D0 + Wd.up.z * 90 + Wd.side.z * lat, _cd1, Wd.up, def.v); }
+    else if (def.k === 'orb') { const c = def.B ? def.B.pos : _cz0, a = def.ph + t * def.w, ca = Math.cos(a), sa = Math.sin(a), sg = Math.sign(def.w);
+      _cd1.copy(def.e2).multiplyScalar(ca * sg).addScaledVector(def.e1, -sa * sg); _cd3.copy(def.e1).multiplyScalar(ca).addScaledVector(def.e2, sa);
+      flock(i, def, c.x + _cd3.x * def.r, c.y + _cd3.y * def.r, c.z + _cd3.z * def.r, _cd1, _cd3, Math.abs(def.w) * def.r); }
+    else if (def.k === 'fer') { const u = smoothstep(0, 1, czTri(t / def.T + def.ph)), u1 = smoothstep(0, 1, czTri((t + 0.2) / def.T + def.ph)), A = def.A.pos, B = def.B.pos, arc = Math.sin(Math.PI * u) * A.distanceTo(B) * 0.12;
+      _cd3.subVectors(B, A); const L = _cd3.length() || 1; _cd3.divideScalar(L); _cd2.crossVectors(_cd3, CZD_Y).normalize(); const up = _cd2.cross(_cd3).normalize().clone();
+      const x = A.x + (B.x - A.x) * u + up.x * arc, y = A.y + (B.y - A.y) * u + up.y * arc, z = A.z + (B.z - A.z) * u + up.z * arc; _cd1.copy(_cd3).multiplyScalar(u1 >= u ? 1 : -1);
+      flock(i, def, x, y, z, _cd1, up, L / def.T * 2); }
+  });
+  // round the drifts near him, two each, just outside them
+  for (const F of CZD.fields) { if (F.kind === 'belt') continue; czdSeed(F.seed ^ 0x77); const c = czdC(F);
+    for (let q = 0; q < 2; q++) { const r = F.R * (1.06 + czdR() * 0.12), w = (180 + czdR() * 200) / r * (q ? -1 : 1), a = czdR() * TAU_ + t * w; _cd3.set(czdR() - 0.5, czdR() - 0.5, czdR() - 0.5).normalize(); const e1 = _cd2.crossVectors(_cd3, CZD_Y).normalize().clone(), e2 = new THREE.Vector3().crossVectors(_cd3, e1);
+      const ca = Math.cos(a), sa = Math.sin(a), sg = Math.sign(w); cznItem(90000 + (F.seed % 9000) * 2 + q, c.x + (e1.x * ca + e2.x * sa) * r, c.y + (e1.y * ca + e2.y * sa) * r, c.z + (e1.z * ca + e2.z * sa) * r, (e2.x * ca - e1.x * sa) * sg, (e2.y * ca - e1.y * sa) * sg, (e2.z * ca - e1.z * sa) * sg, e1.x * ca + e2.x * sa, e1.y * ca + e2.y * sa, e1.z * ca + e2.z * sa, Object.values(PATRONS)[(F.seed + q) % 13]?.[0] || '#ffb24a', false, Math.abs(w) * r); } }
+  // and on the stones: by some of the lanterns near him, one resting, wings folded, looking out
+  let nr = 0; for (const S of CZD.shN.sort((a, b) => a.d - b.d)) { if (nr >= 3) break; if (S.n % 3) continue; nr++; _cd1.set(S.uy, S.uz, S.ux).cross(_cd2.set(S.ux, S.uy, S.uz)).normalize();
+    const off = S.sc * 0.2; cznItem(200000 + (S.id % 100000), S.x + S.ux * (S.sc * 1.55 + 1.2) + _cd1.x * off, S.y + S.uy * (S.sc * 1.55 + 1.2) + _cd1.y * off, S.z + S.uz * (S.sc * 1.55 + 1.2) + _cd1.z * off, _cd1.x, _cd1.y, _cd1.z, S.ux, S.uy, S.uz, '#ffb24a', true, 0); }
+}
+// a bird for the pool: the same as anyone's, its own fire to be tinted
+function cznBird() {
+  const bird = makePhoenix(); bird.light.intensity = 0; bird.group.remove(bird.light);
+  const who = { value: 1 }, fire = makeFireMat(0xffffff, 0.9, null, who), cape = heroMask(peerCape.clone(), who);
+  bird.group.traverse(o => { if (o.isMesh && o.material === capeMat) o.material = cape; else if (o.isMesh && o.material === fireMat) o.material = fire; });
+  bird.group.visible = false; bird.group.scale.setScalar(PHX_S); COSMOS.scene.add(bird.group);
+  return { bird, fire, cape, who, id: -1, col: '', last: new THREE.Vector3(), q: new THREE.Quaternion(), bank: 0, flapT: Math.random() * 4 };
+}
+function cznStep(dt) {
+  const C = COSMOS, D = CZD; if (!D.built) return;
+  cznWhere();
+  const L = CZN.list, n = CZN.n, cp = C.camPos, pool = CZN.pool, off = C.map.on;
+  for (let i = 0; i < n; i++) L[i].d = L[i].p.distanceTo(cp);
+  // the nearest few, drawn whole (a bird keeps the one it has while it is still near)
+  const want = []; for (let i = 0; i < n; i++) if (L[i].d < CZN_NEAR) want.push(L[i]); want.sort((a, b) => a.d - b.d); want.length = Math.min(want.length, CZN_FULL);
+  const ids = new Set(want.map(E => E.id)); for (const B of pool) if (B.id >= 0 && !ids.has(B.id)) { B.id = -1; B.bird.group.visible = false; }
+  for (const E of want) { let B = pool.find(b => b.id === E.id); if (!B) { B = pool.find(b => b.id < 0); if (!B && pool.length < CZN_FULL && CZN.made++ % 2 === 0) { B = cznBird(); pool.push(B); } if (!B) continue; B.id = E.id; B.fresh = true; } E.B = B; B.E = E; }
+  const DA = D.dots.geometry.attributes.position.array, DC = D.dots.geometry.attributes.color.array; let dn = 0;
+  for (let i = 0; i < n; i++) { const E = L[i]; if (E.B && E.B.id === E.id) continue; if (E.d > 70000 || dn >= 100) continue; _cd1.subVectors(E.p, cp); const k = czK(E.d); _cdC.set(E.col); const b = 1.7 * (0.35 + 0.65 * smoothstep(70000, 15000, E.d));
+    DA[dn * 3] = _cd1.x * k; DA[dn * 3 + 1] = _cd1.y * k; DA[dn * 3 + 2] = _cd1.z * k; DC[dn * 3] = _cdC.r * b + 0.3; DC[dn * 3 + 1] = _cdC.g * b + 0.2; DC[dn * 3 + 2] = _cdC.b * b; dn++; }
+  for (let i = 0; i < n; i++) L[i].B = null;
+  for (const B of pool) { if (B.id < 0) continue; const E = B.E, G = B.bird.group;
+    G.visible = !off; if (off) continue;
+    if (B.col !== E.col) { B.col = E.col; B.fire.userData.tint.value.set(E.col); B.cape.color.set(E.col).multiplyScalar(0.55); B.cape.emissive.set(E.col).multiplyScalar(0.22); }
+    _cd1.subVectors(E.p, cp); const jump = B.fresh || _cd1.distanceTo(B.last) > 25; B.last.copy(_cd1); G.position.copy(_cd1);
+    czLook(_cdq, E.f, E.u); const turn = B.fresh ? 0 : 2 * Math.asin(clamp(_cdq2.copy(B.q).invert().multiply(_cdq).y, -1, 1)) / Math.max(dt, 1e-3);
+    B.bank = lerp(B.bank, E.rest ? 0 : clamp(-turn * 0.6, -0.8, 0.8), damp(2, dt)); if (B.fresh) B.q.copy(_cdq); else B.q.slerp(_cdq, damp(3, dt));
+    G.quaternion.copy(B.q).multiply(_cdq2.setFromAxisAngle(_czZ, B.bank)); G.scale.setScalar(PHX_S * (E.rest ? 0.9 : 1));
+    const beat = !E.rest && ((B.flapT -= dt) < 0 ? (B.flapT < -1.4 ? (B.flapT = 2 + Math.random() * 4, false) : true) : false);
+    birdWings(B, B.bird, B.fire, dt, 0, beat ? 10 : 0, E.rest ? 0 : 90, beat ? 0.25 : 0, B.bank, 0, E.rest ? 0 : 0.2, E.rest ? 1 : 0);
+    updateTails(dt, jump, B.bird); B.fresh = false;
+    if (!E.rest && Math.random() < 0.3) czdSpark(E.p.x - E.f.x * 6 + rnd(1.5), E.p.y - E.f.y * 6 + rnd(1.5), E.p.z - E.f.z * 6 + rnd(1.5), -E.f.x * 8, -E.f.y * 8, -E.f.z * 8, 0.8, 2.2, 1.0, 0.3); }
+  czfStep(dt, DA, DC, dn);
+}
+
+// ── Friends out here. Anyone else in space says where they are in it (see netSend: cz, cq, cv) and is seen: a bird in their
+//    own colour with their name beside it, or, far off, a spark of it with their name and how far.
+const CZF = { pool: [] };
+function czfStep(dt, DA, DC, dn) {
+  const C = COSMOS, now = performance.now(), cp = C.camPos, list = [], off = C.map.on;
+  if (NET.peers.size && !aloneNow()) for (const P of NET.peers.values()) {
+    const Z = P.cz; if (!Z || now - Z.t > 6000 || P.npc || SHUN.block.has(P.name)) continue;
+    if (P.px && XO.looking) continue;   // (a visitor from BURNING STUDIO MUSIC: drawn in their own 8-bit by the crossing's sky, xoSkyers)
+    const age = Math.min(1.5, (now - Z.t) / 1000); _cd1.set(0, 0, -1).applyQuaternion(Z.q); _cd2.copy(Z.p).addScaledVector(_cd1, Z.v * age);
+    if (!P.czp || P.czp.distanceTo(_cd2) > Math.max(3000, Z.v * 2)) { P.czp = (P.czp || new THREE.Vector3()).copy(_cd2); P.czq = (P.czq || new THREE.Quaternion()).copy(Z.q); }
+    else { P.czp.lerp(_cd2, damp(6, dt)); P.czq.slerp(Z.q, damp(5, dt)); }
+    P.czd = P.czp.distanceTo(cp); list.push(P);
+  }
+  list.sort((a, b) => a.czd - b.czd);
+  const pool = CZF.pool; for (const B of pool) B.used = false;
+  list.forEach((P, i) => {
+    const near = i < 6 && P.czd < 4000 && !off; let B = pool.find(b => b.id === P.id);
+    if (near && !B) { B = pool.find(b => !b.id || !list.includes(NET.peers.get(b.id))); if (!B && pool.length < 6) { B = cznBird(); pool.push(B); } if (B) { B.id = P.id; B.fresh = true; } }
+    if (near && B) { B.used = true; const G = B.bird.group; G.visible = true; const css = P.css || '#bfe6ff';
+      if (B.col !== css) { B.col = css; B.fire.userData.tint.value.set(css); B.cape.color.set(css).multiplyScalar(0.55); B.cape.emissive.set(css).multiplyScalar(0.22); B.who.value = P.av ? whoAlpha(P.av.slot) : 1; }
+      _cd1.subVectors(P.czp, cp); const jump = B.fresh || _cd1.distanceTo(B.last) > 25; B.last.copy(_cd1); const k = P.czd < 900 ? 1 : lerp(1, czK(P.czd), smoothstep(900, 2600, P.czd)); G.position.copy(_cd1).multiplyScalar(k); G.quaternion.copy(P.czq);
+      G.scale.setScalar(PHX_S * (P.bk || bigName(P.name)) * k); const v = P.cz.v;
+      birdWings(B, B.bird, B.fire, dt, 0, v < 400 ? 8 : 0, Math.min(v, 300), v < 400 ? 0.25 : 0, 0, 0, P.wing ?? 0.2, 0); updateTails(dt, jump, B.bird); B.fresh = false; }
+    else if (!off && dn < 120 && P.czd < 400000) { _cd1.subVectors(P.czp, cp); const k = czK(P.czd); _cdC.set(P.css || '#bfe6ff'); DA[dn * 3] = _cd1.x * k; DA[dn * 3 + 1] = _cd1.y * k; DA[dn * 3 + 2] = _cd1.z * k; DC[dn * 3] = _cdC.r * 2.4; DC[dn * 3 + 1] = _cdC.g * 2.4; DC[dn * 3 + 2] = _cdC.b * 2.4; dn++; }
+    if (!off && i < 8) { _cd1.subVectors(P.czp, cp).multiplyScalar(czK(P.czd)).project(C.cam); if (_cd1.z < 1 && Math.abs(_cd1.x) < 0.95 && Math.abs(_cd1.y) < 0.9) inkNow(P.czd > 300 ? `${P.name} · ${fmtDist(P.czd)}` : P.name, { sx: _cd1.x * 0.5 + 0.5, sy: 0.46 - _cd1.y * 0.5 }, P.css || '#bfe6ff'); }
+  });
+  for (const B of pool) if (!B.used) { B.bird.group.visible = false; if (B.id && !list.some(P => P.id === B.id)) B.id = ''; }
+  CZD.dots.geometry.setDrawRange(0, dn); CZD.dots.geometry.attributes.position.needsUpdate = true; CZD.dots.geometry.attributes.color.needsUpdate = true;
+}
+// what someone else in space has said of where they are in it
+function czfHeard(P, m) {
+  if (!Array.isArray(m.cz) || m.cz.length !== 3 || !Array.isArray(m.cq) || m.cq.length !== 4 || ![...m.cz, ...m.cq].every(x => typeof x === 'number' && Number.isFinite(x))) { P.cz = null; return; }
+  const q = new THREE.Quaternion(num(m.cq[0], -1, 1), num(m.cq[1], -1, 1), num(m.cq[2], -1, 1), num(m.cq[3], -1, 1)); if (q.lengthSq() < 0.5) { P.cz = null; return; } q.normalize();
+  P.cz = { p: new THREE.Vector3(num(m.cz[0], -2e9, 2e9), num(m.cz[1], -2e9, 2e9), num(m.cz[2], -2e9, 2e9)), q, v: num(m.cv, 0, 6e7), t: performance.now() };
+  if (Array.isArray(m.cg)) for (const k of m.cg.slice(0, 4)) if (typeof k === 'string' && /^[a-z0-9,:\-]{3,48}$/.test(k)) czdGateHeard(k, P);
+}
 
 // drawn in place of the world (and the dip into the dark and out again at either end of the way up)
 function cosmosPresent() {
@@ -39584,7 +40507,8 @@ function czUI() {
 function czBar(on) {
   const C = COSMOS, el = C.barEl; if (!el) return;
   el.classList.toggle('on', on && !C.map.on); if (!on) return;
-  const km = Math.max(0, (C.pos.length() - CZ_RG) / 1000), B = C.nearB, near = C.entry ? `INTO THE AIR OF ${C.entry.B.name}` : B && C.nearD < B.R * 8 ? `NEAR ${B.name} · ${CZ_SAY[B.kind]}${C.nearD < B.R * 2.5 ? ' · DIVE AT IT TO GO DOWN' : ''}` : C.ringR > 1.45 && C.ringR < 3.3 && Math.abs(C.ringY || 1e9) < 3000 ? 'IN THE RINGS' : '';
+  const DF = CZD.inF, drift = DF ? `${DF.name}${DF.gates?.length ? ` · ${DF.gates.filter(G => czdLitNow(G.key)).length}/${DF.gates.length} GATES LIT` : ''}` : '';
+  const km = Math.max(0, (C.pos.length() - CZ_RG) / 1000), B = C.nearB, near = C.entry ? `INTO THE AIR OF ${C.entry.B.name}` : drift ? drift : B && C.nearD < B.R * 8 ? `NEAR ${B.name} · ${CZ_SAY[B.kind]}${C.nearD < B.R * 2.5 ? ' · DIVE AT IT TO GO DOWN' : ''}` : C.ringR > 1.45 && C.ringR < 3.3 && Math.abs(C.ringY || 1e9) < 3000 ? 'IN THE RINGS' : '';
   el.firstChild.textContent = `IN SPACE · ${km < 100 ? km.toFixed(1) : Math.round(km).toLocaleString()} KM OUT · ${C.found.size} WORLDS FOUND`;
   el.children[1].textContent = near || (TOUCH ? 'dive back into the air to go home' : 'M · the map of the heavens · dive back into the air to go home');
   if (C.map.on) czMapText();
@@ -39603,7 +40527,7 @@ addEventListener('keydown', e => {
   else if (['KeyH', 'KeyX', 'KeyR', 'KeyF', 'KeyB', 'KeyL', 'KeyK'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); }
 }, true);
 addEventListener('keyup', e => { COSMOS.map.keys[e.code] = false; }, true);
-setTimeout(() => { if (window.__icarus) Object.assign(window.__icarus, { COSMOS, cosmosOpen, cosmosEnter, cosmosLeave, cosmosMap, cosmosStep, czFrame, czCell, czOrbit, czDial, czZoom, czFocus, CZ_TOP, CZ_RG, CZG, czgWant, czgStart, czgEnd, czgSay, czgFacts, czgLines }); }, 200);
+setTimeout(() => { if (window.__icarus) Object.assign(window.__icarus, { COSMOS, cosmosOpen, cosmosEnter, cosmosLeave, cosmosMap, cosmosStep, czFrame, czCell, czOrbit, czDial, czZoom, czFocus, CZ_TOP, CZ_RG, CZD, CZN, CZF, czdFields, czdCloud, czdReefs, czdGatesOf, czdGateLight, czdDist, czdMask, czfHeard, HY, hyperGo, hyperOff, CZG, czgWant, czgStart, czgEnd, czgSay, czgFacts, czgLines }); }, 200);
 // ── The first time out. The first time he breaks through the top of the sky, the god he chose comes up through it with him,
 //    in the shape the gods take to fly (a great bird of their own fire, their name in its feathers), and shows him round: out
 //    over the world, past one of its moons, to a world he could go down to. It leans him the way it is going and never takes
@@ -40247,7 +41171,7 @@ function cosmosResume(B) {
   C.pos.copy(B.pos).addScaledVector(_czv, B.R * 1.12 + 500);
   _czf.copy(_czv).multiplyScalar(0.75).addScaledVector(_czw, 0.66).normalize(); czLook(C.q, _czf, _czv);
   C.revealT = 0; C.v = 320; C.pv = 0; C.camOff = null; C.on = true; C.hy = true; C.fadeT = 0; C.veil = 1; postMat.uniforms.uVeilCol.value.setRGB(0.004, 0.006, 0.016); postMat.uniforms.uVeil.value = 1; C.nearB = B; C.entry = null; C.cool = 0;
-  C.home = phoenix.group.parent; C.scene.add(phoenix.group); phoenix.group.visible = true; for (const T of C.trail.at) T.age = 9;
+  C.home = phoenix.group.parent; C.scene.add(phoenix.group); phoenix.group.visible = true; for (const T of C.trail.at) T.age = 9; czdReset();
   p.form = 'phoenix'; czDress(true); p.perch = false; p.sub = null;
   document.body.classList.add('cosmos'); czBar(true); audio.sfx.whoosh?.(true);
 }

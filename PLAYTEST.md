@@ -29,6 +29,7 @@
 - [ ] **New, skimming:** over open sea you can come right down onto the water. Roll with **E** or **Q** and only that wingtip cuts the water: a blade of spray, a line in the water, steam, and the wing dragged up and back, turning you toward it. Belly down at speed (dive at it gently) and you skip like a stone. The tail leaves a thread, and the head dipped in hisses. Try it as the hawk (**/small**) and as a big bird too.
 - [ ] **The Underworld:** the Styx and Charon's ferry, the dead (**Space** burns them back), blue lava and Tartarus.
 - [ ] **Weather:** tornadoes, dust storms, snow squalls, valley mist. Fly through them.
+- [ ] **New, live weather:** storms are places on a shared clock (everyone sees the same one), with tornadoes, anvil clouds, high cirrus and towering dust walls. From space, the home globe shows the same live clouds and storms.
 - [ ] **Fire:** brush past trees as the phoenix and they catch. Your wings fan it.
 - [ ] **Birds:** eleven kinds. Flocks land and take off. Fly close and they catch fire, fall, and you can eat the roast.
 
@@ -39,6 +40,8 @@
 - [ ] **New:** in space the bird wears a glass helmet. Its wings are held out like sails with a slow wave down them, and **Space** is one long rowing stroke that leaves a ring of sparks behind.
 - [ ] **New:** press **Q** in space (on a phone, the **THE MAN** button) and the bird breaks into a swarm of blocks that settle into the man, in a white space suit with a glass helmet (your face inside) and his wings still on. Drifting, he floats with arms up and knees bent; going (**Shift**), he lies out flat and the jets on his pack glow blue. **Q** again turns him back into the bird. Diving home or into a world as the man turns you back into the bird.
 - [ ] Hold **S** to dive back at the home globe. You fade back into the sky.
+- [ ] **New, space has life:** drifts of rocks, from grit to moonlets, walled into mazes with doorways between home and its moons and round some worlds. Big rocks push you off; small ones get knocked aside or burn up. In hyper you smash straight through. Look for wrecks (columns, statue heads, burnt wings), and named wrecks where real players fell. Six lantern-lit lanes run out from home, phoenix flocks fly them, and gates in the drifts light up for everyone when anyone flies through.
+- [ ] **New, friends in space:** other players in space show up as birds in their own colour with their names.
 - [ ] In space, **M** opens the map of the heavens: drag it, pinch it, pick a world.
 - [ ] Dive at any world. **New:** the screen fills with the colour of its sky, and the world comes up out of the mist.
 - [ ] Try all nine:
@@ -81,6 +84,7 @@
 
 ## Devices (never tested on real hardware, so worth a look)
 - [ ] **Phone:** touch and tilt, the one ICARUS menu button, two fingers to blow wind.
+- [ ] **New, phone sharpness:** letters are drawn on the phone's own pixels (3x on most phones), so everything should look crisper. If it gets choppy, it drops back to 2x by itself.
 - [ ] **Gamepad.**
 - [ ] **Vision Pro:** hand gestures and voice.
 - [ ] **With friends:** real multiplayer, fights and planets together.
