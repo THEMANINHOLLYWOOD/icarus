@@ -20,7 +20,7 @@ export const ASKS = ['edit', 'command', 'question', 'plan', 'tool'];
 export const LIMITS = {
   name: 24, task: 160, thought: 320, say: 600, target: 240, summary: 240, detail: 4000, question: 400,
   note: 4000, noteKey: 80, notes: 400, plan: 12, planItem: 120, files: 160, branches: 16, feed: 240, inbox: 40,
-  agents: 64, tokens: 32, options: 6, option: 60,
+  agents: 64, tokens: 32, options: 6, option: 60, sites: 24, personas: 64, ownerFiles: 2400, anchors: 8, approvals: 200,
 };
 
 export const clip = (s, n) => (typeof s === 'string' ? s : s == null ? '' : String(s)).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').trim().slice(0, n);
@@ -36,7 +36,7 @@ export function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79
 // Names for agents that have not given one. A daimon, to the Greeks, was the spirit that attends a person: these are theirs.
 export const NAMES = ['ATLAS', 'CALLIOPE', 'ORION', 'THALIA', 'CASTOR', 'IRIS', 'LYRA', 'MENTOR', 'NYX', 'PHOEBE', 'ZEPHYR', 'ECHO', 'HELIOS', 'CLIO', 'TALOS',
   'SELENE', 'TYCHE', 'AURA', 'EOS', 'PAN', 'ARGUS', 'DELIA', 'KLEIO', 'MUSE', 'ARIEL', 'CYGNUS', 'DORIS', 'EUDORA', 'GALENE', 'HEBE', 'IANTHE', 'KORE'];
-export const cleanName = n => String(n || '').toUpperCase().replace(/[^A-Z0-9 ._-]/g, '').replace(/\s+/g, ' ').trim().slice(0, LIMITS.name);
+export const cleanName = n => String(n || '').slice(0, 200).toUpperCase().replace(/[^A-Z0-9 ._-]/g, '').replace(/\s+/g, ' ').trim().slice(0, LIMITS.name);
 export function nameFor(id, taken = new Set()) {
   const h = hash32(id);
   for (let i = 0; i < NAMES.length; i++) { const n = NAMES[(h + i) % NAMES.length]; if (!taken.has(n)) return n; }
@@ -48,7 +48,7 @@ export const hueFor = (id, i = 0) => HUES[(hash32(id) + i) % HUES.length];
 
 // "src/hub/core.js" → "core.js"; a command → its first words
 export const baseName = p => String(p || '').split(/[\\/]/).filter(Boolean).pop() || '';
-export const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'scratch';
+export const slug = s => String(s || '').slice(0, 200).toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'scratch';
 
 // How a tool of Claude Code's (or anything named like one) is drawn. Other agents name the kind themselves.
 export function kindOfTool(tool, input = {}) {

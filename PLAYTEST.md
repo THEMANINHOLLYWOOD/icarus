@@ -34,6 +34,8 @@
 - [ ] Climb steeply out of the top of the sky, holding W. Near the top the sky holds you in the climb and you are in space in under 10 s. The world becomes a globe below you, with rings and moons.
 - [ ] **New, first trip only:** your chosen god comes up beside you as a bird and leads you past a moon to a world you could dive into. It talks about what you did on Olympus. Type or speak to it. Steer away and it waits.
 - [ ] **New:** press **C** in space for the film camera. Slow, it skims a world's surface; fast, it pulls out to long lenses against the stars. It cuts when a world comes up or goes by, when you cross the rings, and when you dive into a world.
+- [ ] **New:** in space the bird wears a glass helmet. Its wings are held out like sails with a slow wave down them, and **Space** is one long rowing stroke that leaves a ring of sparks behind.
+- [ ] **New:** press **Q** in space (on a phone, the **THE MAN** button) and the bird breaks into a swarm of blocks that settle into the man, in a white space suit with a glass helmet (your face inside) and his wings still on. Drifting, he floats with arms up and knees bent; going (**Shift**), he lies out flat and the jets on his pack glow blue. **Q** again turns him back into the bird. Diving home or into a world as the man turns you back into the bird.
 - [ ] Hold **S** to dive back at the home globe. You fade back into the sky.
 - [ ] In space, **M** opens the map of the heavens: drag it, pinch it, pick a world.
 - [ ] Dive at any world. **New:** the screen fills with the colour of its sky, and the world comes up out of the mist.
@@ -69,6 +71,10 @@
 
 ## Cameras
 - [ ] **C** cinematic camera (chase, wing mount, IMAX wide). Director mode: describe a shot by voice or text.
+- [ ] **New:** in the cinematic camera, the bird's wings and body break out over the black bars, as if coming out of the screen.
+
+## The map
+- [ ] **New:** on the flat map the **3D** button (top right), the title and the place names are clearly visible. **R** or the button switches between flat and 3D, both ways, on desktop and phone.
 - [ ] **F**, outside a fight, opens the photo camera. Photos go to the album.
 
 ## Devices (never tested on real hardware, so worth a look)

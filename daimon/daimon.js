@@ -46,6 +46,7 @@ export function connect({ hub, key, name = '', fetch: f = (...a) => globalThis.f
       case 'gone': state.agents.delete(ev.agentId); break;
       case 'site':
         if (ev.site) state.sites.set(ev.site.id, siteIn(ev.site));
+        else if (ev.gone) state.sites.delete(ev.gone);
         else if (ev.delta) { const d = ev.delta; let s = state.sites.get(d.id);
           if (!s) { s = { id: d.id, repo: d.repo, main: d.main, firstAt: ev.t, lastAt: ev.t, ok: 0, fail: 0, commits: 0, branches: new Map() }; state.sites.set(d.id, s); }
           s.main = d.main; s.lastAt = ev.t;
@@ -68,7 +69,7 @@ export function connect({ hub, key, name = '', fetch: f = (...a) => globalThis.f
       try {
         ctl = new AbortController();
         const c = await f(`${hub}/v1/owner/claim`, { method: 'POST', headers: H({ 'Content-Type': 'application/json' }), body: JSON.stringify({ name }), signal: ctl.signal });
-        if (!c.ok) { const j = await c.json().catch(() => ({})); throw Object.assign(new Error(j.error || `the hub said ${c.status}`), { fatal: c.status === 400 || c.status === 401 }); }
+        if (!c.ok) { const j = await c.json().catch(() => ({})); throw Object.assign(new Error(j.error || `the hub said ${c.status}`), { fatal: [400, 401, 403, 404].includes(c.status) }); }
         const res = await f(`${hub}/v1/stream`, { headers: H({ Accept: 'text/event-stream' }), signal: ctl.signal });
         if (!res.ok || !res.body) throw new Error(`the hub said ${res.status}`);
         for await (const { type, data } of events(res)) {

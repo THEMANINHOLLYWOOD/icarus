@@ -17,6 +17,9 @@ import { typed, spoken, HELP } from './commands.js';
 
 const LS = { get: k => { try { return localStorage.getItem('daimon.' + k); } catch { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem('daimon.' + k) : localStorage.setItem('daimon.' + k, v); } catch {} } };
 const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+// The hub everyone's agents meet at when the game is played on the internet (a player may name another: /agents hub URL).
+// Empty until there is one; a host can also give its own (host.hub).
+const HOSTED = 'https://daimon-hub.fly.dev';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const short = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const STATUS_COL = { idle: '#8a8474', thinking: '#ffd27a', working: '#7dff3a', waiting: '#ff8a3a', blocked: '#ff5a4a', done: '#bfe6ff', offline: '#555' };
@@ -46,7 +49,9 @@ const CSS = `
 
 export function start(host) {
   const WID = host.world || 'icarus';   // (which world this is, to the hub: where the Works stand is kept for each world apart)
-  const T = host.THREE, cfg = { hub: LS.get('hub') || '', on: LS.get('on') !== '0', demo: LS.get('demo') === '1', list: LS.get('list') !== '0' };
+  const T = host.THREE, cfg = { hub: LS.get('hub') || '', on: LS.get('on') ? LS.get('on') === '1' : LOCAL || !!LS.get('hub') || LS.get('demo') === '1', demo: LS.get('demo') === '1', list: LS.get('list') !== '0' };
+  const HUB = () => cfg.hub || (LOCAL ? 'http://localhost:4747' : String(host.hub || HOSTED).replace(/\/+$/, ''));   // (on the internet nobody is connected until they ask: /agents)
+  const turnOn = () => { cfg.on = true; LS.set('on', '1'); };
   let world = null, L = null, stale = true, root = null, anchor = null, more = false, sel = null, t = 0, built = false, connecting = false;
   const agents = new Map(), homes = new Map(), sites = new Map(), fx = [], _v = new T.Vector3(), _w = new T.Vector3(), UP = new T.Vector3(0, 1, 0);
   const say = (line, who = '') => host.say(who, who ? line : String(line).toUpperCase(), who ? '' : 'sys');
@@ -369,9 +374,11 @@ export function start(host) {
   async function panelLink() {
     sel = null; $panel.className = 'on'; $panel.innerHTML = '<span class="x" data-x>✕</span><h2>LINK AN AGENT</h2><p class="dim">making a token…</p>';
     $panel.onclick = e => { if (e.target.dataset.x !== undefined) closePanel(); if (e.target.tagName === 'CODE') navigator.clipboard?.writeText(e.target.textContent).then(() => say('copied')); };
-    try { const tk = await world.mint('icarus'); navigator.clipboard?.writeText(`${tk.connect.link} --claude`).catch(() => {});
+    try { const tk = await world.mint('icarus'), away = tk.connect.first === 'claude', first = away ? tk.connect.claude : `${tk.connect.link} --claude`;
+      navigator.clipboard?.writeText(first).catch(() => {});
       $panel.innerHTML = `<span class="x" data-x>✕</span><h2>LINK AN AGENT</h2><p class="dim">Agents that carry this token are yours, on any device you play from. Click a line to copy it; the first is on your clipboard already. Paste it in a terminal.</p>` +
-        `<h3>Claude Code</h3><code>${esc(tk.connect.link)} --claude</code><h3>Claude Code · the MCP server only</h3><code>${esc(tk.connect.claude)}</code><h3>Any other agent that speaks MCP</h3><code>${esc(JSON.stringify(tk.connect.json))}</code>`;
+        (away ? `<h3>Claude Code</h3><code>${esc(tk.connect.claude)}</code><h3>Any other agent that speaks MCP</h3><code>${esc(JSON.stringify(tk.connect.json))}</code><h3>Every Claude Code session, by itself · from a copy of daimon</h3><code>${esc(tk.connect.link)} --claude</code>`
+          : `<h3>Claude Code</h3><code>${esc(tk.connect.link)} --claude</code><h3>Claude Code · the MCP server only</h3><code>${esc(tk.connect.claude)}</code><h3>Any other agent that speaks MCP</h3><code>${esc(JSON.stringify(tk.connect.json))}</code>`);
       say('a link is on your clipboard · paste it in a terminal');
     } catch (e) { $panel.innerHTML = `<span class="x" data-x>✕</span><h2>LINK AN AGENT</h2><p>${esc(e.message)}</p>`; }
   }
@@ -392,7 +399,7 @@ export function start(host) {
   async function boot(announce = false) {
     if (world || connecting || !cfg.on) return; connecting = true;
     try {
-      const hub = cfg.hub || (LOCAL ? 'http://localhost:4747' : '');
+      const hub = HUB();
       if (!hub) { if (announce) say('daimons · no hub is set · /agents hub URL (on your own machine: run "daimon hub", then /agents hub http://localhost:4747)'); return; }
       // A page on the internet reaching a hub on the player's own machine: the browser asks the player first (Chrome's
       // "local network access"), and holds the request until they answer. So say what the question is, and wait for it.
@@ -421,10 +428,10 @@ export function start(host) {
     const low = arg.toLowerCase(), [w0, w1] = arg.split(/\s+/);
     if (['agents', 'daimons', 'daimon'].includes(c)) {
       if (low === 'off') { cfg.on = false; LS.set('on', '0'); shut(); say('daimons · off'); return true; }
-      if (low === 'on' || low === 'connect') { cfg.on = true; LS.set('on', null); boot(true); return true; }
-      if (w0?.toLowerCase() === 'hub') { if (!w1) { say(`daimons · hub: ${cfg.hub || (LOCAL ? 'http://localhost:4747 (the default here)' : 'none')}`); return true; } cfg.hub = /^https?:\/\//.test(w1) ? w1.replace(/\/+$/, '') : ''; LS.set('hub', cfg.hub || null); cfg.on = true; LS.set('on', null); shut(); boot(true); return true; }
-      if (low === 'demo' || low === 'demo off') { cfg.demo = low === 'demo'; LS.set('demo', cfg.demo ? '1' : null); cfg.on = true; LS.set('on', null); shut(); boot(true); say(cfg.demo ? 'daimons · the demo\'s agents (run: daimon demo)' : 'daimons · your own agents'); return true; }
-      if (!world) { boot(true); return true; }
+      if (low === 'on' || low === 'connect') { turnOn(); boot(true); return true; }
+      if (w0?.toLowerCase() === 'hub') { if (!w1) { say(`daimons · hub: ${HUB() || 'none'}${cfg.hub ? ' · /agents hub default to go back' : ''}`); return true; } cfg.hub = /^https?:\/\//.test(w1) ? w1.replace(/\/+$/, '') : ''; LS.set('hub', cfg.hub || null); turnOn(); shut(); boot(true); return true; }
+      if (low === 'demo' || low === 'demo off') { cfg.demo = low === 'demo'; LS.set('demo', cfg.demo ? '1' : null); turnOn(); shut(); boot(true); say(cfg.demo ? `daimons · the demo's agents${LOCAL ? ' (run: daimon demo)' : ' · /agents demo off for your own'}` : 'daimons · your own agents'); return true; }
+      if (!world) { turnOn(); boot(true).then(() => { if (world && low === 'link') panelLink(); }); return true; }
       if (!arg) { run('who'); say('/agents help · link · here · ahead · go · hide · off'); return true; }
       if (low === 'help' || low === '?') { ['/agents link · here · ahead METRES · go · hide|show · hub URL · demo · off', '/a NAME words (or /a words, to all) · /yes · /no why · /bless NAME minutes · /share A B · /send task', 'enter approves · \\ denies · I looks closer · Y speaks to them', ...HELP.slice(2)].forEach(l => say(l)); return true; }
       if (low === 'link') { panelLink(); return true; }

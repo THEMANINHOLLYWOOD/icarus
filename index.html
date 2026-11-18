@@ -6938,12 +6938,13 @@ function turnBird() {
   return true;
 }
 function turnForm(to) {   // (to: 'human', 'bird', or nothing for whichever he is not)
+  if (COSMOS.on) return czForm(to === 'human' ? 'human' : to === 'bird' ? 'phoenix' : player.form === 'human' ? 'phoenix' : 'human');   // (out in space: see czForm)
   const bird = player.form === 'phoenix'; if (to && (to === 'bird') === bird) return false;
   return bird ? turnMan() : turnBird();
 }
 // the one thing on the screen for it: where he could change on the spot (a bird on a perch; the man it turned into), a small
 // word to press, with its key. And the things that are his only for a while are let go of here
-const turnShown = () => { const p = player; if (!turnOk()) return ''; if (p.form === 'phoenix') return p.perch && !p.takeoff ? 'THE MAN' : ''; return p.grounded && flags.morphed && story.phase !== 'summit' && story.phase !== 'leap' && !titleDue() && (ROOST.on || time - (p.turnedT ?? -99) < 30) ? 'THE BIRD' : ''; };
+const turnShown = () => { const p = player; if (COSMOS.on) return state === 'play' && !COSMOS.map.on ? (p.form === 'phoenix' ? 'THE MAN' : 'THE BIRD') : ''; if (!turnOk()) return ''; if (p.form === 'phoenix') return p.perch && !p.takeoff ? 'THE MAN' : ''; return p.grounded && flags.morphed && story.phase !== 'summit' && story.phase !== 'leap' && !titleDue() && (ROOST.on || time - (p.turnedT ?? -99) < 30) ? 'THE BIRD' : ''; };
 function turnTick(dt) {
   const p = player; roostTick();
   if (p.armsOut > 0 && (p.form !== 'human' || !p.grounded || state !== 'play' || p.swim || p.climb || Math.hypot(p.vel.x, p.vel.z) > 1.2)) p.armsOut = Math.max(0, p.armsOut - dt / 0.35);   // (his arms come down as he walks off)
@@ -32411,8 +32412,8 @@ function tick(dt) {
   if (state === 'play' || state === 'talk') {
     if (player.ferry || player.mount) heat = 0;   // (in the boat, or on a god's back: he is carried)
     else if (player.cine) updateCine(dt);
+    else if (COSMOS.on) cosmosFly(dt);   // (out in space, bird or man)
     else if (player.form === 'human') { heat = lerp(heat, 0, damp(3, dt)); updateHuman(dt); }
-    else if (COSMOS.on) cosmosFly(dt);   // (out in space)
     else if (BIRD.auto && birdStep(dt)) {}   // (the bird has the air)
     else updatePhoenix(dt);
     if (state === 'play') updateStory(dt);
@@ -38077,7 +38078,7 @@ const COSMOS = { on: false, up: 0, cool: 0, fadeT: 0, built: false, told: false,
   dNear: 1e9, beatT: 0, ringL: new THREE.Vector3(), ringR: 0, ringY: 1e9, tex: { data: null, tex: null, job: null, upT: 0, at: -1e9, n: -1 }, map: { on: false, piv: new THREE.Vector3(), q: new THREE.Quaternion(), d: 600, td: 60000, pid: 'me', keys: {}, hits: [] }, hudT: 0, trail: null };
 const _czC = new THREE.Color(), _czv = new THREE.Vector3(), _czw = new THREE.Vector3(), _czf = new THREE.Vector3(), _czu = new THREE.Vector3(), _czq = new THREE.Quaternion(), _czm = new THREE.Matrix4(), _cz0 = new THREE.Vector3(), _czX = new THREE.Vector3(1, 0, 0), _czY = new THREE.Vector3(0, 1, 0), _czZ = new THREE.Vector3(0, 0, 1);
 // whether the way up is open to him now
-function cosmosOpen() { const p = player; return (!!MOD.admin && GODM.on || COSMOS.hy) && realm === 'over' && !PL.on && !XR.on && p.form === 'phoenix' && !p.cine && !p.sub && !p.perch && !p.mount && !p.ferry; }
+function cosmosOpen() { const p = player; return (!!MOD.admin && GODM.on || COSMOS.hy) && realm === 'over' && !PL.on && !XR.on && (p.form === 'phoenix' || COSMOS.on && p.form === 'human') && !p.cine && !p.sub && !p.perch && !p.mount && !p.ferry; }
 // past a few kilometres, nearer and smaller in proportion (everything out to the end of space fits in twice that)
 const czK = d => d <= CZ_D0 ? 1 : CZ_D0 * (2 - CZ_D0 / d) / d;
 // where a place in the world is on the globe: as far from the pole as it is from Olympus, in the same direction. The unit
@@ -38369,7 +38370,7 @@ function cosmosEnter() {
   { const hx = -Math.sin(p.yaw), hz = -Math.cos(p.yaw), e = clamp(p.pitch, 0.25, 0.7); _czf.copy(_czv).multiplyScalar(hx).addScaledVector(_czw, hz).normalize().multiplyScalar(Math.cos(e)).addScaledVector(_czu, Math.sin(e)).normalize(); }   // (the way he was heading, climbing: never straight up, so his top is always the world's)
   czLook(C.q, _czf, _czu); C.revealT = 4; C.v = Math.max(300, p.speed * 2); C.pv = 0; C.camOff = null; C.on = true; C.lift = false; C.fadeT = 0; C.veil = 1; postMat.uniforms.uVeilCol.value.copy(CZ_VEIL); postMat.uniforms.uVeil.value = 1; C.cell = ''; C.nearB = null;
   C.home = phoenix.group.parent; C.scene.add(phoenix.group); phoenix.group.visible = true; trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
-  for (const T of C.trail.at) T.age = 9;
+  for (const T of C.trail.at) T.age = 9; czDress(true);
   document.body.classList.add('cosmos'); czBar(true);
   SESSION.spaceTold = true;   // (he has found the way: no telling him how to break through again)
   if (!C.saidHow) { C.saidHow = true; toast(TOUCH ? 'SPACE · ◎ FOR THE MAP OF THE HEAVENS · DIVE BACK TO GO HOME' : 'SPACE · M FOR THE MAP OF THE HEAVENS · DIVE BACK INTO THE AIR TO GO HOME'); }
@@ -38382,6 +38383,7 @@ function cosmosLeave(quiet = false) {
   const C = COSMOS, p = player; if (!C.on) return;
   C.on = false; C.hy = false; if (C.map.on) cosmosMap(false);   // (hy: who came up in hyper comes down under the sky limit like anyone)
   czgLeave(quiet, C.entry);   // (his god does not come down with him)
+  czDress(false);   // (out of the suit; and if he was the man, the air takes him back into the bird)
   (C.home || scene).add(phoenix.group); C.home = null; trailRib.key = null; phoenix.tails.forEach(tl => tl.ok = false);
   document.body.classList.remove('cosmos'); czBar(false); C.rocks.count = 0;
   if (quiet) return;
@@ -38393,13 +38395,222 @@ function cosmosLeave(quiet = false) {
   C.cool = 6; C.fadeT = 0; C.up = 1; C.homeIn = 0; C.veil = 1; postMat.uniforms.uVeilCol.value.copy(CZ_VEIL); postMat.uniforms.uVeil.value = 1;
   audio.sfx.whoosh?.(false);
 }
+// ── Dressed for the dark. Out in space he is the same, bird or man, but the man wears a suit for it: white and padded at the
+//    joints, a pack of air on his back with two jets under it, gloves and boots, and a bubble of glass over his head with his own
+//    face in it and his curls pressed under it, his father's wings still strapped to his arms. The bird wears a bubble of glass
+//    too. Q (or the button, or saying so) changes one into the other out there as it does in the world: the old body comes apart
+//    into a swarm of blocks that whirl round him and settle into the new one. And both move as things move with nothing to push
+//    on: the bird's wings held out like sails with a slow wave running down them, a beat one long stroke rowing at the dark; the
+//    man, drifting, hangs as a body hangs with nothing to hold it (arms floating up, knees bent), and going, lies out along the way
+//    he goes with his wings working and the jets of his pack lit.
+const CZS = { built: false, on: false, hide: [], suit: [], birdHelm: null, birdRing: null, glass: null, mo: null, mesh: null, bw: null, mp: null, hHome: null, told: false, ring: 0 };
+const _cs1 = new THREE.Vector3(), _cs2 = new THREE.Vector3(), _csq = new THREE.Quaternion(), _csq2 = new THREE.Quaternion(), _csC = new THREE.Color(), _csM = new THREE.Matrix4(), _csS = new THREE.Vector3();
+function czGlassMat() {
+  const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false,
+    uniforms: { uSun: { value: new THREE.Vector3(0, 1, 0) }, uTint: { value: new THREE.Color(0.55, 0.76, 1.0) }, uTime: worldFx.uTime },
+    vertexShader: `varying vec3 vN, vV, vP; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vP = position; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform vec3 uSun, uTint; uniform float uTime; varying vec3 vN, vV, vP;
+      void main(){ vec3 n = normalize(vN); float f = pow(1.0 - abs(dot(n, vV)), 2.2); vec3 h = normalize(uSun + vV); float nh = max(dot(n, h), 0.0), s = pow(nh, 120.0), s2 = pow(nh, 16.0);
+        float band = smoothstep(0.92, 1.0, sin(vP.y * 11.0 + vP.x * 5.0 - uTime * 0.7)) * 0.07;   // (a gleam that slides over the glass)
+        gl_FragColor = vec4(uTint * (0.05 + f * 0.85 + band) + vec3(1.0, 0.97, 0.9) * (s * 2.4 + s2 * 0.1), clamp(0.05 + f * 0.6 + s * 0.9 + band, 0.0, 0.95)); }` });
+  // (only the colour is laid over what is under it: the picture's mark of what is his is left alone, so his face in it is still his)
+  m.blending = THREE.CustomBlending; m.blendSrc = THREE.SrcAlphaFactor; m.blendDst = THREE.OneMinusSrcAlphaFactor; m.blendSrcAlpha = THREE.ZeroFactor; m.blendDstAlpha = THREE.OneFactor;
+  return m;
+}
+function czSuitBuild() {
+  if (CZS.built) return; CZS.built = true; const H = human, keep = new Set();
+  const T = (c, o) => heroMask(new THREE.MeshToonMaterial({ color: c, gradientMap: TOON_RAMP, ...o }));
+  const white = T(0xe9ecef), pad = T(0xc4cad1), grey = T(0x7b8590), dark = T(0x2c323a), gold = T(0xd9a441, { emissive: 0x2a1800 });
+  const lamp = new THREE.MeshBasicMaterial({ color: 0x8fe6ff, toneMapped: false }), red = new THREE.MeshBasicMaterial({ color: 0xff5a3a, toneMapped: false }), glass = CZS.glass = czGlassMat();
+  const add = (geo, mat, par, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); par.add(m); CZS.suit.push(m); keep.add(m); return m; };
+  const sph = (r, a = 14, b = 10) => new THREE.SphereGeometry(r, a, b);
+  // the body: padded, a ring at the neck that the helmet locks to, the pack of air and its two jets, a box of dials on the chest
+  add(tube([[0, -0.2, 0], [0, -0.08, 0], [0, 0.06, 0], [0, 0.22, 0], [0, 0.38, 0], [0, 0.5, 0], [0, 0.6, 0]], [0.2, 0.2, 0.2, 0.22, 0.25, 0.235, 0.15], 16, null, 0.8, 1), white, H.chest);
+  { const r = add(new THREE.TorusGeometry(0.15, 0.04, 8, 20), grey, H.chest, 0, 0.6, 0); r.rotation.x = Math.PI / 2; }
+  add(new THREE.BoxGeometry(0.4, 0.5, 0.18), white, H.chest, 0, 0.3, 0.27);
+  for (const y of [0.04, 0.56]) add(new THREE.BoxGeometry(0.42, 0.06, 0.2), grey, H.chest, 0, y, 0.27);
+  CZS.jets = [-1, 1].map(s => add(new THREE.CylinderGeometry(0.035, 0.05, 0.1, 8), dark, H.chest, s * 0.12, -0.02, 0.3));
+  add(new THREE.BoxGeometry(0.18, 0.11, 0.07), grey, H.chest, 0, 0.32, -0.2);
+  add(sph(0.014, 6, 4), lamp, H.chest, -0.05, 0.34, -0.24); add(sph(0.014, 6, 4), red, H.chest, 0.05, 0.34, -0.24);
+  add(new THREE.BoxGeometry(0.07, 0.05, 0.014), gold, H.chest, 0.16, 0.45, -0.17);   // (a patch on the shoulder, gold: a flame)
+  add(sph(0.2), white, H.rig, 0, -0.02, 0).scale.set(1.05, 0.8, 0.85);
+  { const b = add(new THREE.TorusGeometry(0.2, 0.03, 6, 18), grey, H.rig, 0, 0.12, 0); b.rotation.x = Math.PI / 2; b.scale.y = 0.85; }
+  // arms: padded sleeves, a ring at the wrist, gloves
+  for (const [up, fo, ha] of [[H.armL, H.foreL, H.handL], [H.armR, H.foreR, H.handR]]) {
+    add(sph(0.11), white, up);
+    add(tube([[0, 0, 0], [0, -0.1, 0], [0, -0.2, 0], [0, -0.31, 0]], [0.095, 0.09, 0.085, 0.075], 10), white, up);
+    add(sph(0.076), pad, fo);
+    add(tube([[0, 0, 0], [0, -0.1, 0], [0, -0.2, 0], [0, -0.27, 0]], [0.075, 0.075, 0.068, 0.064], 10), white, fo);
+    { const r = add(new THREE.TorusGeometry(0.068, 0.018, 6, 14), grey, fo, 0, -0.26, 0); r.rotation.x = Math.PI / 2; }
+    add(sph(0.05), grey, ha, 0, -0.045, -0.004).scale.set(0.85, 1.35, 1.2);
+    add(sph(0.025), grey, ha, 0, -0.03, -0.04);
+  }
+  // legs: padded, the knees padded harder, boots
+  for (const [th, sh, ft] of [[H.legL, H.shinL, H.footL], [H.legR, H.shinR, H.footR]]) {
+    add(tube([[0, 0.03, 0], [0, -0.12, 0], [0, -0.28, 0], [0, -0.44, 0]], [0.125, 0.12, 0.105, 0.09], 12), white, th);
+    add(sph(0.088), pad, sh, 0, 0, -0.01);
+    add(tube([[0, 0, 0], [0, -0.12, 0], [0, -0.28, 0], [0, -0.38, 0]], [0.09, 0.09, 0.083, 0.08], 12), white, sh);
+    add(new THREE.CylinderGeometry(0.085, 0.09, 0.12, 12), grey, sh, 0, -0.38, 0);
+    add(sph(0.08), dark, ft, 0, -0.045, -0.04).scale.set(1, 0.75, 1.9);
+  }
+  // the helmet: glass, his face behind it, a gold rim where it locks on, and a lamp at the temple
+  { const h = add(sph(0.27, 28, 20), glass, H.head, 0, 0.1, -0.01); h.renderOrder = 3; h.userData.glass = true; }
+  { const r = add(new THREE.TorusGeometry(0.2, 0.026, 6, 22), gold, H.head, 0, -0.1, 0); r.rotation.x = Math.PI / 2 + 0.1; }
+  add(sph(0.02, 6, 4), lamp, H.head, 0.17, 0.08, -0.14);
+  // a dark line round every solid piece of it, as round the rest of him
+  for (const m of CZS.suit.slice()) if (!m.userData.glass && !(m.material instanceof THREE.MeshBasicMaterial)) { const k = new THREE.Mesh(m.geometry, INK); k.userData.ink = true; k.castShadow = false; m.add(k); }
+  // what the suit is worn over: everything of him but his head (his face is in the glass), his wings and the tail he has in the sea
+  const under = o => { for (let q = o; q; q = q.parent) { if (q === H.head || q === H.wings || q === H.tail?.root) return true; if (q === H.rig) return false; } return false; };
+  H.rig.traverse(o => { if (o.isMesh && !keep.has(o) && !o.userData.ink && !under(o)) CZS.hide.push(o); });
+  // the bird's: a bubble of glass over its head and beak, a gold ring at the throat
+  { const b = CZS.birdHelm = new THREE.Mesh(sph(0.72, 28, 20), glass); b.position.set(0, 0.64, -0.8); b.renderOrder = 3; phoenix.head.add(b);
+    const r = CZS.birdRing = new THREE.Mesh(new THREE.TorusGeometry(0.41, 0.05, 6, 24), gold); r.position.set(0, 0.15, -0.45); r.rotation.x = -2.19; phoenix.head.add(r); }
+  for (const m of CZS.suit) m.visible = false; CZS.birdHelm.visible = CZS.birdRing.visible = false;
+}
+function czSuit(on) {
+  czSuitBuild(); CZS.on = on; const H = human;
+  for (const m of CZS.suit) m.visible = on; for (const m of CZS.hide) m.visible = !on;
+  CZS.birdHelm.visible = CZS.birdRing.visible = on;
+  if (!on) { H.fineOn = true; H.cape.visible = H.scarf.visible = true; }   // (all of him back; the near-or-far check takes the fine work away again if he is far)
+}
+// into space, and out of it: dressed for it; and out of it, always the bird again (the air takes the man back into the fire)
+function czDress(on) {
+  if (!on) {
+    if (player.form === 'human') czForm('phoenix', true);
+    CZS.mo = null; if (CZS.mesh) CZS.mesh.visible = false;
+    if (CZS.hHome) { CZS.hHome.add(human.group); CZS.hHome = null; }
+    human.group.scale.setScalar(MAN_SCALE); human.group.rotation.set(0, player.yaw || 0, 0); resetPose(); setManWings(0, 0, 0, 0, 0);
+  }
+  CZS.bw = null; czSuit(on);
+}
+// points over a body as it stands in space, in his own frame (from where he is, along the way he faces)
+function czCloud(G, N) {
+  const C = COSMOS, out = new Float32Array(N * 3); modelCloud(G, N, out, true);
+  _cs2.subVectors(C.pos, C.camPos); _csq.copy(C.q).invert(); const R = G === phoenix.group ? 9 * birdK() : 8;
+  for (let i = 0; i < N; i++) { const j = i * 3; _cs1.set(out[j] - _cs2.x, out[j + 1] - _cs2.y, out[j + 2] - _cs2.z).applyQuaternion(_csq); if (_cs1.length() > R) _cs1.setLength(R * Math.random()); out[j] = _cs1.x; out[j + 1] = _cs1.y; out[j + 2] = _cs1.z; }
+  return out;
+}
+// the other body, out in space (quick: at once, with nothing to see, as when the air takes him back)
+function czForm(to, quick = false) {
+  const C = COSMOS, p = player, from = p.form === 'human' ? 'human' : 'phoenix'; to = to === 'human' ? 'human' : 'phoenix';
+  if (from === to) return true; if (!quick && (state !== 'play' || CZS.mo || C.map.on)) return !!CZS.mo;
+  czSuitBuild();
+  const N = TOUCH ? 200 : 340, A = quick ? null : czCloud(from === 'human' ? human.group : phoenix.group, N);
+  if (to === 'human') {
+    p.form = 'human'; p.wings = true; p.wingOpen = 1; p.tumble = false; p.grounded = false; p.perch = false; p.takeoff = null; p.cine = null; p.ghost = null; p.morphT = 0; p.climb = null; p.vel.set(0, 0, 0);
+    resetPose(); setBurn(0); if (human.group.parent !== C.scene) { CZS.hHome = human.group.parent; C.scene.add(human.group); }
+    CZS.mp = null; czSuit(true); czManPose(1 / 60);
+  } else { p.form = 'phoenix'; p.wings = false; p.ghost = null; p.morphT = 0; p.cine = null; p.flame = Math.max(p.flame, 0.6); CZS.bw = null; setManWings(0, 0, 0, 0, 0); }
+  if (quick) { CZS.mo = null; return true; }
+  czPlaceBody(true);
+  const B = czCloud(to === 'human' ? human.group : phoenix.group, N);
+  CZS.mo = { t: 0, T: 1.15, from, to, A, B, N, d: Float32Array.from({ length: N }, () => Math.random() * 0.3), s: Float32Array.from({ length: N }, () => 0.5 + Math.random()) };
+  czPlaceBody(false);
+  flash = Math.max(flash, 0.16); audio.sfx.morph?.(); audio.sfx.whoosh?.(to === 'human');
+  if (!CZS.told) { CZS.told = true; toast(to === 'human' ? (TOUCH ? 'IN YOUR SUIT · THE BIRD BUTTON TO BURN BACK' : 'IN YOUR SUIT · Q TO BURN BACK INTO THE BIRD') : 'THE BIRD AGAIN'); }
+  return true;
+}
+// him, where the eye sees him: the bird about its breast, the man about his hips, turned the way he faces; and while he is
+// changing, the old body going as the new one comes (full: the new one whole, to take its shape from)
+function czPlaceBody(full) {
+  const C = COSMOS, p = player, man = p.form === 'human', mo = CZS.mo, M = C.map.on && C.map.d >= 3000;
+  _cs2.subVectors(C.pos, C.camPos);
+  const G = phoenix.group; G.position.copy(_cs2); G.quaternion.copy(C.q).multiply(_czq.setFromAxisAngle(_czZ, p.bank));
+  const Hg = human.group; Hg.quaternion.copy(C.q).multiply(_czq.setFromAxisAngle(_czZ, p.bank * 0.5)); _cs1.set(0, -MAN_SCALE, 0).applyQuaternion(Hg.quaternion); Hg.position.copy(_cs2).add(_cs1);
+  let kB = man ? 0 : 1, kH = man ? 1 : 0;
+  if (mo && !full) { const u = mo.t / mo.T, out = 1 - smoothstep(0.04, 0.42, u), inn = backOut(smoothstep(0.55, 1, u)); if (mo.from === 'human') { kH = out; kB = inn; } else { kB = out; kH = inn; } }
+  G.visible = kB > 0.002 && !M; Hg.visible = kH > 0.002 && !M && Hg.parent === C.scene;
+  G.scale.setScalar(PHX_S * birdK() * (1 + 0.15 * perks.wings) * Math.max(0.001, kB));
+  Hg.scale.setScalar(MAN_SCALE * Math.max(0.001, kH));
+  if (CZS.on) for (const m of CZS.hide) m.visible = false;   // (the near-or-far check would put the fine work of him back under the suit)
+  if (CZS.glass) CZS.glass.uniforms.uSun.value.copy(CZ_SUN).normalize().applyQuaternion(_csq2.copy(C.camQ).invert());
+}
+// the change itself: blocks from the old body, whirled about him, into the new
+function czMorphStep(dt) {
+  const mo = CZS.mo, C = COSMOS; let M = CZS.mesh;
+  if (!mo) { if (M) M.visible = false; return; }
+  if (!M) { M = CZS.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ toneMapped: false }), 360); M.frustumCulled = false; M.instanceMatrix.setUsage(THREE.DynamicDrawUsage); M.setColorAt(0, _csC.setRGB(1, 1, 1)); M.instanceColor.setUsage(THREE.DynamicDrawUsage); }
+  if (M.parent !== C.scene) C.scene.add(M);
+  mo.t += dt; const U = mo.t / mo.T; if (U >= 1) { CZS.mo = null; M.visible = false; return; }
+  M.visible = !C.map.on; M.count = mo.N; _cs2.subVectors(C.pos, C.camPos);
+  const toMan = mo.to === 'human', K = birdK(), sA = mo.from === 'human' ? 0.07 : 0.2 * K, sB = toMan ? 0.07 : 0.2 * K;
+  const cA = mo.from === 'human' ? [1.5, 1.6, 1.8] : [2.2, 0.75, 0.16], cB = toMan ? [1.5, 1.6, 1.8] : [2.2, 0.75, 0.16];
+  for (let i = 0; i < mo.N; i++) {
+    const u = clamp((U - mo.d[i]) / 0.68, 0, 1), e = u * u * u * (u * (u * 6 - 15) + 10), j = i * 3, b = Math.sin(Math.PI * e), sp = mo.s[i];
+    const x = lerp(mo.A[j], mo.B[j], e), y = lerp(mo.A[j + 1], mo.B[j + 1], e), z = lerp(mo.A[j + 2], mo.B[j + 2], e);
+    const bul = 1 + b * 0.6 * sp, a = b * 2.4 * sp * (i & 1 ? 1 : -1), ca = Math.cos(a), sa = Math.sin(a);
+    _cs1.set((x * ca - y * sa) * bul, (x * sa + y * ca) * bul, z * (1 + b * 0.3)).applyQuaternion(C.q).add(_cs2);
+    _csq.copy(C.q).multiply(_csq2.setFromAxisAngle(_czZ, a * 2 + i));
+    _csM.compose(_cs1, _csq, _csS.setScalar(lerp(sA, sB, e) * (0.5 + 0.9 * Math.sin(Math.PI * u)))); M.setMatrixAt(i, _csM);
+    const g = 1 + Math.sin(Math.PI * u) * 1.4; M.setColorAt(i, _csC.setRGB(lerp(cA[0], cB[0], e) * g, lerp(cA[1], cB[1], e) * g, lerp(cA[2], cB[2], e) * g));
+  }
+  M.instanceMatrix.needsUpdate = true; M.instanceColor.needsUpdate = true;
+}
+// a stroke of the wings, out there: up and forward, down and back hard, and the long glide out of it (b: how far through, 0..1)
+function czStroke(b, big) {
+  if (b < 0) return [0, 0, 0]; const e = x => x * x * (3 - 2 * x);
+  if (b < 0.3) { const u = e(b / 0.3); return [0.95 * big * u, -0.35 * u, 0.4 * u]; }
+  if (b < 0.62) { const u = e((b - 0.3) / 0.32); return [lerp(0.95 * big, -0.75 * big, u), lerp(-0.35, 0.45, u), lerp(0.4, 0, u)]; }
+  const u = e((b - 0.62) / 0.38); return [lerp(-0.75 * big, 0, u), lerp(0.45, 0, u), 0];
+}
+// where a world going by is, for his eyes: turned toward it while it is near and not behind him
+function czLookAt(S, dt) {
+  const C = COSMOS, B = C.nearB; let y = 0, x = 0;
+  if (B && C.nearD < B.R * 4) { _cs1.subVectors(B.pos, C.pos).applyQuaternion(_csq.copy(C.q).invert()); const l = _cs1.length() || 1, w = smoothstep(-0.3, 0.3, -_cs1.z / l) * smoothstep(B.R * 4, B.R * 1.6, C.nearD);
+    y = clamp(Math.atan2(-_cs1.x, -_cs1.z), -1, 1) * w; x = clamp(Math.atan2(_cs1.y, Math.hypot(_cs1.x, _cs1.z)), -0.6, 0.6) * w; }
+  S.ly = lerp(S.ly || 0, y, damp(1.8, dt)); S.lx = lerp(S.lx || 0, x, damp(1.8, dt));
+}
+// the bird's wings in space, over whatever the wings would have done in the air (eased in as he comes out, so nothing jumps)
+function czBirdWings(dt) {
+  const C = COSMOS, p = player, S = CZS.bw || (CZS.bw = { t: 0, k: 0 });
+  S.t += dt; S.k = Math.min(1, S.k + dt / 0.8); const t = S.t, K = S.k * (CZS.mo ? 0 : 1) + (CZS.mo ? S.k : 0);
+  const b = C.beatT > 0 ? 1 - C.beatT / 0.9 : -1, tuck = HY.on ? 1 : smoothstep(1500, 40000, C.v), near = C.nearB ? smoothstep(C.nearB.R * 3, C.nearB.R * 1.15, C.nearD) : 0, live = 1 - Math.min(1, tuck * 1.2);
+  const [sf, ss, sfo] = czStroke(b, 1 - tuck * 0.7);
+  for (let i = 0; i < 2; i++) {
+    const w = phoenix.wings[i], inn = Math.max(0, i ? -p.turn : p.turn), out = Math.max(0, i ? p.turn : -p.turn), ph = t * 1.25 + i * 0.3;
+    const f = 0.1 + near * 0.12 + live * 0.13 * Math.sin(ph) + sf - inn * 0.25 + out * 0.12 + C.pv * 0.15;
+    const fold = 0.04 + tuck * 0.6 + sfo + inn * 0.5, wE = live * 0.1 * Math.sin(ph - 0.9), wW = live * 0.13 * Math.sin(ph - 1.8);
+    const sweep = tuck * 0.95 + ss + inn * 0.15 - near * 0.1, tw = C.pv * 0.3 + (out - inn) * 0.12, st = 1 + 0.07 * live;
+    const L = (o, k, v) => { o[k] = lerp(o[k], v, K); };
+    L(w.shoulder.rotation, 'z', -f); L(w.shoulder.rotation, 'x', tw); L(w.elbow.rotation, 'z', -fold - wE); L(w.wrist.rotation, 'z', -fold * 0.6 - wW);
+    L(w.root.rotation, 'y', sweep * (i === 0 ? 1 : -1)); L(w.elbow.rotation, 'y', sweep * 0.35); L(w.wrist.rotation, 'y', sweep * 0.5 + fold * 0.3); L(w.shoulder.scale, 'x', st);
+  }
+  czLookAt(S, dt); const hd = phoenix.head; hd.rotation.y = lerp(hd.rotation.y, S.ly, K); hd.rotation.x = lerp(hd.rotation.x, S.lx, K);
+}
+// the man in space: drifting, the body as it hangs with nothing to hold it; going, out along the way he goes, the wings working
+function czManPose(dt) {
+  const C = COSMOS, p = player, H = human, S = CZS.mp || (CZS.mp = { t: 0, pr: 0, w: 0 });
+  S.t += dt; const t = S.t, go = boosting() || C.beatT > 0, fast = smoothstep(260, 2500, C.v);
+  S.pr = lerp(S.pr, Math.max(fast, go ? 0.85 : 0), damp(1.5, dt));
+  const b = C.beatT > 0 ? 1 - C.beatT / 0.9 : -1;
+  S.w = lerp(S.w, Math.max(go ? 0.75 : 0, b >= 0 ? 1 : 0, fast * 0.6), damp(3, dt));
+  const pr = S.pr, n = 1 - pr, W = S.w, br = Math.sin(t * 1.1) * 0.03, sway = Math.sin(t * 0.37), tuck = smoothstep(2500, 30000, C.v) * 0.75;
+  H.rig.position.set(0, 1.0, 0);
+  H.rig.rotation.set(lerp(-0.22, -1.4, pr) + Math.sin(t * 0.5) * 0.05 * n + C.pv * 0.2, sway * 0.07 * n - p.turn * 0.2, -p.turn * 0.35 + Math.sin(t * 0.43 + 1) * 0.05 * n);
+  H.chest.rotation.set(br - C.pv * 0.1, -p.turn * 0.15, 0);
+  czLookAt(S, dt); H.head.rotation.set(0.95 * pr - 0.05 * n + br * 0.5 + S.lx * 0.6, -p.turn * 0.45 + S.ly * 0.8, 0);
+  // the wings: held out and breathing, drawn half in as he drifts; a stroke rows him on; in a turn the inside one folds
+  const [sf, ss, sfo] = czStroke(b, 1 - tuck * 0.6), live = 1 - tuck, wave = Math.sin(t * 1.25) * 0.1 * live, inL = Math.max(0, p.turn), inR = Math.max(0, -p.turn);
+  const rest = lerp(0.38, 0.05, Math.max(W, pr));
+  setManWingsLR(0.12 + sf + wave - inL * 0.2 + inR * 0.1, 0.12 + sf + wave - inR * 0.2 + inL * 0.1, rest + tuck * 0.6 + sfo + inL * 0.45, rest + tuck * 0.6 + sfo + inR * 0.45,
+    tuck * 0.85 + ss, tuck * 0.85 + ss, 1, 0, { e: Math.sin(t * 1.25 - 0.9) * 0.08 * live, w: Math.sin(t * 1.25 - 1.8) * 0.1 * live, tL: C.pv * 0.2, tR: C.pv * 0.2 });
+  // his arms: floating up in front, elbows bent, drifting; along the wings (where the straps are) when they work
+  const aX = lerp(0.75, 0.05, W), aZ = lerp(0.42, 1.55 + sf * 0.45 - tuck * 1.1, W), fX = lerp(1.05, 0.15 + sfo * 0.8 + tuck * 0.8, W);
+  H.armL.rotation.set(aX + br, 0, -aZ); H.armR.rotation.set(aX - br, 0, aZ); H.foreL.rotation.set(fX, 0, 0); H.foreR.rotation.set(fX, 0, 0);
+  // his legs: knees bent, drifting; out straight behind him, kicking a little as the jets go
+  const kick = go ? Math.sin(t * 6) * 0.16 * pr : 0;
+  H.legL.rotation.set(lerp(0.5, 0.04, pr) + kick + Math.sin(t * 0.7) * 0.05 * n, 0, 0.06); H.legR.rotation.set(lerp(0.4, 0.0, pr) - kick + Math.sin(t * 0.7 + 1) * 0.05 * n, 0, -0.06);
+  H.shinL.rotation.set(lerp(-0.85, -0.1, pr) - Math.max(0, kick) * 0.6, 0, 0); H.shinR.rotation.set(lerp(-0.7, -0.14, pr) - Math.max(0, -kick) * 0.6, 0, 0);
+  H.footL.rotation.set(lerp(0.2, 0.55, pr), 0, 0); H.footR.rotation.set(lerp(0.2, 0.55, pr), 0, 0);
+}
 // flying in space (in place of updatePhoenix): he turns and climbs about himself, his wings come level with whatever world
 // he is nearest, and the further he is from any of them the faster he goes — slow enough to skim one, fast enough to cross
 // the dark between them in a few breaths. Their surfaces hold him off: he slides along them.
 function cosmosFly(dt) {
   const C = COSMOS, p = player, M = C.map.on;
   const [ax, pin] = M || state !== 'play' ? [0, 0] : axes(), boost = !M && (boosting() || C.beatT > 0);
-  hyperTick(dt, !M && state === 'play' && boosting(), ax, pin, !M && state === 'play' && !MATCH.phase);   // (hyper out here: the dark between the worlds crossed in moments)
+  const man = p.form === 'human';
+  hyperTick(dt, !M && state === 'play' && boosting() && !man, ax, pin, !M && state === 'play' && !MATCH.phase);   // (hyper out here: the dark between the worlds crossed in moments; the fire's, not the man's)
   C.beatT = Math.max(0, C.beatT - dt);
   p.turn = lerp(p.turn, -ax, damp(4, dt)); C.pv = lerp(C.pv, pin, damp(4, dt));
   C.q.multiply(_czq.setFromAxisAngle(_czY, p.turn * 1.15 * dt)).multiply(_czq.setFromAxisAngle(_czX, C.pv * 1.3 * dt));
@@ -38410,7 +38621,7 @@ function cosmosFly(dt) {
     if (_czw.lengthSq() > 0.04) { _czw.normalize(); const a = Math.atan2(_czv.crossVectors(u, _czw).dot(f), u.dot(_czw)); C.q.premultiply(_czq.setFromAxisAngle(f, a * damp(0.9, dt) * (1 - Math.min(1, Math.abs(ax) * 1.5)))); } }
   C.q.normalize();
   const hk = HY.on ? 1 + 15 * smoothstep(1500, 30000, C.dNear) : 1;   // (not near a world: it would be through it before he could turn)
-  const base = (boost ? 320 : 150) * MOD.speed * (1 + 0.15 * perks.swift), want = Math.min(base * (1 + Math.max(0, C.dNear) / 700) * hk, HY.on ? 5e7 : 3e6);
+  const base = (boost ? 320 : 150) * MOD.speed * (1 + 0.15 * perks.swift) * (man ? 0.6 : 1), want = Math.min(base * (1 + Math.max(0, C.dNear) / 700) * hk, HY.on ? 5e7 : 3e6);
   C.v = lerp(C.v, M ? 0 : want, damp(want < C.v || M ? 4 : HY.on ? 1.1 : 0.45, dt));   // (slow to gather speed, quick to shed it near a world)
   f.set(0, 0, -1).applyQuaternion(C.q);
   C.pos.addScaledVector(f, C.v * dt);
@@ -38425,12 +38636,13 @@ function cosmosFly(dt) {
   for (const B of C.bodies) { _czv.subVectors(P, B.pos); const d = _czv.length(), floor = B.R * (1 + CZ_AMP[B.kind] * 0.7) + 25; if (d < floor && d > 1) { _czv.divideScalar(d); P.copy(B.pos).addScaledVector(_czv, floor); if (C.entry?.B !== B) czSlide(_czv); } }   // (going in through its air, he is held at the top of it and not turned)
   // the wings: beating as he climbs or hurries, folded back at a great speed
   p.speed = clamp(C.v, 40, 300); p.bank = lerp(p.bank, p.turn * 0.75, damp(3, dt)); p.pitch = 0; heat = 0; p.danger = 0; p.skyT = 0; p.flame = Math.min(1, p.flame + dt * 0.02);
+  if (man) { p.vel.set(0, 0, 0); return; }   // (the man is posed where he is placed: see czManPose)
   flyWings(dt, { boost, dive: 0, climb: clamp(Math.abs(C.pv), 0, 1) * 0.6, tuck: smoothstep(1500, 40000, C.v) * 0.8, flutter: 0, pull: 0 });
 }
 // sliding along a surface whose outward normal is n: what was going into it goes along it
 function czSlide(n) { const f = _czf.set(0, 0, -1).applyQuaternion(COSMOS.q), into = f.dot(n); if (into >= 0) return; _czw.copy(f).addScaledVector(n, -into * 1.15).normalize(); COSMOS.q.premultiply(_czq.setFromUnitVectors(f, _czw)); }
 // a wingbeat (Space, or a tap): a burst of speed
-function cosmosBeat() { const C = COSMOS; C.beatT = 0.9; C.v *= 1.25; WR.beat = 1; audio.sfx.flap?.(1); }
+function cosmosBeat() { const C = COSMOS; if (C.beatT > 0.45) return; C.beatT = 0.9; C.v *= player.form === 'human' ? 1.18 : 1.25; WR.beat = 1; CZS.ring = 1; audio.sfx.flap?.(1); }   // (one stroke at a time: a long one, out here)
 // the frame in space: the worlds moved on, the eye placed, everything put where the eye sees it
 function cosmosFrame(dt) {
   const C = COSMOS, p = player, t = Date.now() / 1000; C.uT.value = time;
@@ -38683,7 +38895,7 @@ function cosmosCam(dt) {
     M.piv.lerp(T, damp(4, dt)); M.d = Math.exp(lerp(Math.log(M.d), Math.log(M.td), damp(5, dt)));
     C.camPos.set(0, 0, M.d).applyQuaternion(M.q).add(M.piv); C.camQ.copy(M.q); cam.fov = 50;
   } else {
-    const K = 1 + (birdK() - 1) * 0.6, cd = phxDist * K, k = C.ck, L = C.clag, up = _czh, prev = _czo.set(0, 1, 0).applyQuaternion(C.camQ);
+    const K = (1 + (birdK() - 1) * 0.6) * (player.form === 'human' ? 0.42 : 1), cd = phxDist * K, k = C.ck, L = C.clag, up = _czh, prev = _czo.set(0, 1, 0).applyQuaternion(C.camQ);
     let lead, pr, qr, shake, first = !C.camOff || !cinema.on && !!C.cs?.live && !(C.revealT > 0);   // (the film camera put away: straight back behind him, a cut)
     if (cinema.on && !(C.revealT > 0)) {
       const S = czCine(dt, f, u, r, cd), cut = S.cut || first; S.cut = false;
@@ -38714,6 +38926,7 @@ function cosmosCam(dt) {
     C.camPos.copy(C.pos).add(C.camOff); czSafe(C.camPos, 5 * K); czShake(C.camPos, r, u, shake);
     _czw.copy(f).multiplyScalar(lead).add(C.pos).sub(C.camPos).normalize(); czLook(_czq, _czw, czUp(up, _czw, up, first ? up : prev)); C.camQ.slerp(_czq, first ? 1 : damp(qr, dt));
   }
+  if (window.__icarus?.czCam) window.__icarus.czCam(C, cam);   // (tests only: look from wherever a test says)
   cam.quaternion.copy(C.camQ); cam.position.set(0, 0, 0); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
 }
 // put a thing where the eye sees it: relative to the eye, and (past CZ_D0, and not when the eye is down near it) nearer and
@@ -38744,7 +38957,7 @@ function cosmosPlace(dt) {
   // the points of light
   { const A = C.dotAt, D = C.dots.geometry.attributes.position; for (let i = 0; i < C.dotN; i++) { _czw.set(A[i][0], A[i][1], A[i][2]); _czv.subVectors(_czw, C.camPos); const k = czK(_czv.length()); D.setXYZ(i, _czv.x * k, _czv.y * k, _czv.z * k); } D.needsUpdate = true; C.dots.material.size = M ? 5 : 3; }
   // him
-  const G = phoenix.group; _czv.subVectors(C.pos, C.camPos); G.position.copy(_czv); G.quaternion.copy(C.q).multiply(_czq.setFromAxisAngle(_czZ, player.bank)); G.visible = !M || C.map.d < 3000;
+  czPlaceBody(false); czMorphStep(dt); if (player.form === 'human') czManPose(dt); else czBirdWings(dt); _czv.subVectors(C.pos, C.camPos);
   C.me.visible = M; if (M) { const d = _czv.length(), k = czK(d); C.me.position.copy(_czv).multiplyScalar(k); C.me.scale.setScalar(d * k * 0.018); C.me.quaternion.copy(C.q); }
   czTrail(dt); czRocks();
 }
@@ -38752,9 +38965,16 @@ const t0z = () => (Date.now() / 1000) % 100000;   // (the rings go round by the 
 // sparks off him, left hanging where he passed
 function czTrail(dt) {
   const C = COSMOS, T = C.trail, P = T.pts.geometry.attributes.position, Q = T.pts.geometry.attributes.color, f = _czf.set(0, 0, -1).applyQuaternion(C.q);
-  for (let k = 0; k < 2; k++) { const a = T.at[T.i = (T.i + 1) % T.at.length]; a.p.copy(C.pos).addScaledVector(f, -3 * birdK() - Math.random() * 4).add(_czw.set(rnd(1.5), rnd(1.5), rnd(1.5))); a.age = 0; }
+  const man = player.form === 'human', jet = man && (boosting() || C.beatT > 0);
+  if (man) { const u = _czu.set(0, 1, 0).applyQuaternion(C.q), pr = CZS.mp ? CZS.mp.pr : 0;   // (the man: only the two jets of his pack, lit blue while he is going)
+    for (let k = 0; k < (jet ? 3 : Math.random() < 0.15 ? 1 : 0); k++) { const a = T.at[T.i = (T.i + 1) % T.at.length]; a.p.copy(C.pos).addScaledVector(f, -0.6 - 0.5 * pr - Math.random() * (jet ? 1.6 : 0.4)).addScaledVector(u, 0.35 * pr - 0.5 * (1 - pr)).add(_czw.set(rnd(0.2), rnd(0.2), rnd(0.2))); a.age = jet ? 0 : 0.8; a.m = 1; } }
+  else for (let k = 0; k < 2; k++) { const a = T.at[T.i = (T.i + 1) % T.at.length]; a.p.copy(C.pos).addScaledVector(f, -3 * birdK() - Math.random() * 4).add(_czw.set(rnd(1.5), rnd(1.5), rnd(1.5))); a.age = 0; a.m = 0; }
+  if (CZS.ring) {   // a wingbeat out here leaves a ring of sparks hanging where it was, square to the way he was going
+    const R = (man ? 3.2 : 5.5 * birdK()) * CZS.ring, u = _czu.set(0, 1, 0).applyQuaternion(C.q), r = _czr.crossVectors(f, u); CZS.ring = 0;
+    for (let k = 0; k < 22; k++) { const a = T.at[T.i = (T.i + 1) % T.at.length], th = k / 22 * TAU_; a.p.copy(C.pos).addScaledVector(f, man ? -1 : -2 * birdK()).addScaledVector(u, Math.cos(th) * R).addScaledVector(r, Math.sin(th) * R); a.age = 0.2; a.m = man ? 1 : 2; } }
   for (let i = 0; i < T.at.length; i++) { const a = T.at[i]; a.age += dt; const k = Math.max(0, 1 - a.age / 1.6); _czv.subVectors(a.p, C.camPos);
-    if (k <= 0 || _czv.lengthSq() > 4e6) { P.setXYZ(i, 0, 0, -1e5); continue; } P.setXYZ(i, _czv.x, _czv.y, _czv.z); Q.setXYZ(i, 2.4 * k, (1.2 + GODM.k) * k * k, 0.3 * k * k * k); }
+    if (k <= 0 || _czv.lengthSq() > 4e6) { P.setXYZ(i, 0, 0, -1e5); continue; } P.setXYZ(i, _czv.x, _czv.y, _czv.z);
+    if (a.m === 1) Q.setXYZ(i, 0.6 * k * k, 1.4 * k, 2.6 * k); else if (a.m === 2) Q.setXYZ(i, 2.6 * k, 1.6 * k, 0.6 * k * k); else Q.setXYZ(i, 2.4 * k, (1.2 + GODM.k) * k * k, 0.3 * k * k * k); }
   P.needsUpdate = true; Q.needsUpdate = true; T.pts.visible = !C.map.on;
 }
 // in among the rings: the stones they are made of, each where its seed puts it (the same for everyone), as many as the band is thick
@@ -38900,7 +39120,8 @@ addEventListener('keydown', e => {
   if (state !== 'play') return;
   if (e.code === 'KeyM') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) cosmosMap(true); }
   else if (e.code === 'Space') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) cosmosBeat(); }
-  else if (['KeyH', 'KeyQ', 'KeyX', 'KeyR', 'KeyF', 'KeyB', 'KeyL', 'KeyK'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); }
+  else if (e.code === 'KeyQ') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) czForm(player.form === 'human' ? 'phoenix' : 'human'); }   // (the other body, out here too: the man in his suit)
+  else if (['KeyH', 'KeyX', 'KeyR', 'KeyF', 'KeyB', 'KeyL', 'KeyK'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); }
 }, true);
 addEventListener('keyup', e => { COSMOS.map.keys[e.code] = false; }, true);
 setTimeout(() => { if (window.__icarus) Object.assign(window.__icarus, { COSMOS, cosmosOpen, cosmosEnter, cosmosLeave, cosmosMap, cosmosStep, czFrame, czCell, czOrbit, czDial, czZoom, czFocus, CZ_TOP, CZ_RG, CZG, czgWant, czgStart, czgEnd, czgSay, czgFacts, czgLines }); }, 200);
@@ -39548,7 +39769,7 @@ function cosmosResume(B) {
   _czf.copy(_czv).multiplyScalar(0.75).addScaledVector(_czw, 0.66).normalize(); czLook(C.q, _czf, _czv);
   C.revealT = 0; C.v = 320; C.pv = 0; C.camOff = null; C.on = true; C.hy = true; C.fadeT = 0; C.veil = 1; postMat.uniforms.uVeilCol.value.setRGB(0.004, 0.006, 0.016); postMat.uniforms.uVeil.value = 1; C.nearB = B; C.entry = null; C.cool = 0;
   C.home = phoenix.group.parent; C.scene.add(phoenix.group); phoenix.group.visible = true; for (const T of C.trail.at) T.age = 9;
-  p.form = 'phoenix'; p.perch = false; p.sub = null;
+  p.form = 'phoenix'; czDress(true); p.perch = false; p.sub = null;
   document.body.classList.add('cosmos'); czBar(true); audio.sfx.whoosh?.(true);
 }
 // (the menu's way off a world: up out of its air at once, as the bird)
