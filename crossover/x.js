@@ -214,8 +214,8 @@ async function gateGo(X, to, tk) {
   const gotP = new Promise(r => { GATE.got = () => { got = true; r(); }; }), inP = new Promise(r => { GATE.inn = () => { inn = true; r(); }; });
   const send = () => { try { f.contentWindow.postMessage({ t: 'x-go', tk }, originOf(to)); } catch (e) {} };
   send(); const iv = setInterval(() => { if (!got) send(); }, 500);
-  let cover = null; const cv = setTimeout(() => { cover = tear(WORLDS[X.world].style, WORLDS[to].style, 900); }, GATE.ready ? 3500 : 600);   // (not up yet: cover, as the old way does, while it gets there)
-  await Promise.race([inP, new Promise(r => setTimeout(r, GATE.ready ? 60000 : 90000))]);   // (a slow machine can take twenty seconds and more from its title out into space)
+  let cover = null; const cv = setTimeout(() => { cover = tear(WORLDS[X.world].style, WORLDS[to].style, 900); }, 3500);   // (taking a while: cover, as the old way does, while it gets them there)
+  await Promise.race([inP, new Promise(r => setTimeout(r, 60000))]);   // (a slow machine can take twenty seconds and more from its title out into space)
   clearInterval(iv); clearTimeout(cv);
   if (!inn || GATE.f !== f) { GATE.going = false; if (!got) gateDrop(); return false; }
   f.style.zIndex = '2147483647'; f.style.pointerEvents = 'auto'; f.style.opacity = '1'; f.removeAttribute('aria-hidden'); f.tabIndex = 0;
@@ -297,7 +297,7 @@ export async function cross(X, to, { pe = '', f, ret, sp, sd } = {}) {
   let r = await X.go(to, { pe, f, sp, sd });
   if (!r.tk) return r;   // (closed, or no line: the page says so)
   if (to !== X.home && ret) saveReturn(X.home, ret);
-  if (GATE.f && GATE.to === to) {   // (the other world's already loaded behind this one: a fade, no page load)
+  if (GATE.f && GATE.to === to && GATE.ready && to !== X.home) {   // (the other world's loaded behind this one and has said it could take them: a fade, no page load. Never for going home: home is its own page, with its own things)
     if (await gateGo(X, to, r.tk)) return { ...r, gate: 1 };
     r = await X.go(to, { pe, f, sp, sd }); if (!r.tk) return r;   // (it didn't take them in time: a fresh ticket, the old way)
   }
