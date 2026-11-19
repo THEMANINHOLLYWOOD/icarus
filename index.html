@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>/* THE CROSSING: loaded ahead, in a frame behind BURNING STUDIO MUSIC (?xw=1): put away, as a hidden tab is, till someone flies in (crossover/x.js wakes it) */ try { if (self !== top && /[?&]xw=1(&|$)/.test(location.search)) { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); } } catch (e) {}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#05070d">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1097,6 +1098,7 @@ try {
   // (a ticket is redeemed before the game starts, so this is only a first guess: someone of ours with a way back saved is
   //  coming home; anyone else holding a ticket is a visitor. A visitor reloading the page is still one.)
   E.guess = E.ticket ? (ret ? 'home' : 'visit') : E.visit ? 'visit' : '';
+  E.warm = !!XM.WARM; if (E.warm) { E.ticket = true; E.guess = 'visit'; }   // (loaded ahead behind BURNING STUDIO MUSIC: a visitor, whose ticket comes when they fly in)
 } catch (e) {}
 </script>
 <script type="module">
@@ -39679,6 +39681,7 @@ function xoHold(fn) {
   if (!E) return go();
   const p = xoStart().catch(e => console.warn('[x]', e));
   if (!E.ticket && !E.visit) return go();   // (nobody arriving: the line can come up while the title does)
+  if (E.warm) return go();   // (loaded ahead: the world is built now, while they are still over there; they're placed when they fly in)
   p.finally(go); setTimeout(go, 9000);   // (a ticket is waited for, but not for long)
 }
 function xoSaveKey() {
@@ -39700,6 +39703,10 @@ async function xoStart() {
   if (XO.X) return;
   const X = XO.X = globalThis.ICX = new M.Crossing({ home: XO.vis ? 'brn' : 'icarus', world: 'icarus' });
   XO.on = true; xoWire(X); xoKit();
+  M.gateHooks({ home: m => {   // (back from BURNING STUDIO MUSIC in the frame over this page: out of its world's sky here, where he flew out of theirs)
+    XO.going = false; XO.pp = { h: 'icarus', sp: m.sp, sd: m.sd };
+    xoWhenPlay(() => { xoToSpace(m.f === 'man' ? 'man' : 'phoenix'); toast('HOME AGAIN · ICARUS'); });
+  } });
   let pp = null;
   if (E.ticket) pp = await X.arrived(); else if (E.visit) pp = X.visit();
   XO.pp = pp; XO.ppDone = true;
@@ -39721,7 +39728,10 @@ function xoWire(X) {
 }
 // the game is up (the title showing): a visitor is taken straight out into space by the stadium, as if they had just flown out of it; one
 // of ours coming home is put back where they crossed
-function xoBooted() { XO.booted = true; if (XO.ppDone || !XO.E || !XO.E.ticket) xoArrive(); }
+function xoBooted() {
+  XO.booted = true; if (XO.ppDone || !XO.E || !XO.E.ticket) xoArrive();
+  if (XO.E && XO.E.warm) { xoKit(); setTimeout(() => XO.M.gateReady(), 1500); }   // (loaded ahead: ready for whoever flies in)
+}
 function xoArrive() {
   if (XO.arrived) return; XO.arrived = true;
   const E = XO.E, uncover = () => { const L = E && E.land; if (L) { E.land = null; try { L.go(); } catch {} } };
@@ -39730,6 +39740,7 @@ function xoArrive() {
     else if (XO.pp && XO.pp.h === 'icarus') { const r = XO.M.takeReturn('icarus'); if (state === 'title') begin(); xoWhenPlay(() => { xoToSpace(r && r.f); toast('HOME AGAIN · ICARUS'); }); }
   } catch (e) { console.warn('[x] arrive', e); }
   if (XO.pp) { xoWhenPlay(() => setTimeout(uncover, 450)); setTimeout(uncover, 9000); } else uncover();   // (uncovered once they are in place: out in space, by the stadium)
+  if (XO.pp && E && E.warm) { const shown = (n = 0) => { if ((COSMOS.on && state === 'play') || n > 120) XO.M.gateIn(); else setTimeout(() => shown(n + 1), 150); }; xoWhenPlay(() => setTimeout(shown, 300)); }   // (in a frame behind their world: up over it now)
 }
 function xoVisitStart(first) {
   const n0 = cleanName(XO.pp.n), n = n0.replace(/ /g, '').length >= 2 && n0 !== 'SOMEONE' ? n0 : 'TRAVELLER';
@@ -39737,7 +39748,7 @@ function xoVisitStart(first) {
   if (state === 'title') begin();
   xoWhenPlay(() => { if (first) xoToSpace(XO.pp.f === 'man' ? 'man' : 'phoenix'); toast(`WELCOME TO ICARUS, ${n} · YOU KEEP YOUR OWN LOOK HERE`); });
 }
-function xoWhenPlay(fn, left = 40) { if (state === 'play') fn(); else if (left > 0) setTimeout(() => xoWhenPlay(fn, left - 1), 250); }   // (from the live title the bird takes a moment to be his)
+function xoWhenPlay(fn, left = 160) { if (state === 'play') fn(); else if (left > 0) setTimeout(() => xoWhenPlay(fn, left - 1), 250); }   // (from the live title the bird takes a moment to be his; a slow machine, up to 40 s)
 // out into space by the stadium, heading for the globe (and not straight back in: out of it first)
 function xoToSpace(f, tries = 4) {
   const p = player, C = COSMOS; cosmosInit(); xoStadium();
@@ -39876,6 +39887,7 @@ function xoDoor(dt) {
       const t = open ? `BURNING STUDIO MUSIC<br><small style="color:#bcbcbc">${d > R * 1.2 ? fmtDist(d - R * 0.5) + ' · ' : ''}${d < R * 2.2 ? 'FLY IN TO CROSS OVER' : 'ANOTHER WORLD'}</small>` : `BURNING STUDIO MUSIC<br><small style="color:#f87858">THE WAY IS CLOSED</small>`;
       if (T._t !== t) { T._t = t; T.innerHTML = t; } }
     else if (T.style.display !== 'none') T.style.display = 'none'; }
+  if (!XO.vis) XO.M.gateNear('brn', open && d < R * 7);   // (out here, the other world is loaded behind this one, so flying in is a fade and not a page load)
   // near it: the other world is fetched ahead, and he is told how; into it, and across he goes
   if (d < R * 2.2 && !XO.pre) { XO.pre = true; if (open) XO.M.prefetch('brn'); toast(open ? 'BURNING STUDIO MUSIC · FLY INTO ITS STADIUM TO CROSS OVER' : 'BURNING STUDIO MUSIC · THE WAY IS CLOSED'); }
   else if (d > R * 3.2) XO.pre = false;
@@ -39895,7 +39907,7 @@ async function xoCross(home) {
   const C = COSMOS, B = XO.B.toArray(), sp = C.on ? M.toShared(C.pos.toArray(), [0, 0, 0], B) : undefined, sd = C.on ? M.dirToShared(_xoF.set(0, 0, -1).applyQuaternion(C.q).toArray(), [0, 0, 0], B) : undefined;   // (where he went in, so over there he comes out in the same place)
   const r = await M.cross(X, 'brn', { f, pe: XO.vis ? XO.pet : '', ret: XO.vis ? null : { at: 'cosmos', f }, sp, sd });
   if (r && r.tk) return;
-  if (XO.vis) { await M.tear('ascii', 'px'); location.href = M.worldUrl('brn') + '/'; return; }   // (no ticket to be had, but nobody is kept from their own world)
+  if (XO.vis) { if (!M.hosted()) await M.tear('ascii', 'px'); M.goWorld('brn'); return; }   // (no ticket to be had, but nobody is kept from their own world; in a frame over it, home is just under)
   XO.going = false; XO.graceT = 3;
   toast(r && r.err === 'closed' ? 'THE WAY IS CLOSED · THE KEEPER HAS SHUT IT' : 'THE WAY WOULD NOT OPEN · TRY AGAIN IN A MOMENT');
 }
@@ -40068,6 +40080,7 @@ function xoTick(dt) {
     if ((XO.rtT -= dt) <= 0) { XO.rtT = 15; xoRt(); }
     xoKeeper(dt);
     if (!COSMOS.on && XO.looking) xoSkyOff();
+    if (!COSMOS.on && !XO.vis) XO.M.gateNear('brn', false);   // (home on the ground: the other world, loaded behind, is let go after a while)
     if (!COSMOS.on && XO.tag && XO.tag.style.display !== 'none') XO.tag.style.display = 'none';
   }
   if (XO.vis && !COSMOS.on) xoSelf(dt);   // (out in space it is done once he has been placed there: see xoCosmos)

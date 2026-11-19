@@ -38,7 +38,7 @@ export async function state() {
 }
 // should this page take part at all: the flag, a ticket in the address, or the way being live
 export async function wanted() {
-  if (flagged() || /^#x=[0-9a-f]{16}/.test(location.hash)) return { on: true, st: null };
+  if (WARM || flagged() || /^#x=[0-9a-f]{16}/.test(location.hash)) return { on: true, st: null };
   const st = await state(); return { on: !!st.live, st };
 }
 
@@ -64,8 +64,11 @@ export class Crossing {
   constructor({ home, world }) {
     this.home = home; this.world = world; this.id = null; this.people = new Map(); this.skyers = new Map();
     this.st = { open: 1, live: 0 }; this.ad = false; this.h = {}; this.q = []; this.mine = { h: home, w: world };
-    this.wait = new Map(); this.backoff = 1000; this.connect();
+    this.wait = new Map(); this.backoff = 1000;
+    if (WARM) gateTicket().then(() => this.connect()); else this.connect();   // (loaded ahead, behind the other world: not on the line, nor in anyone's list, till they fly in)
   }
+  pause() { this.paused = true; clearTimeout(this.rt); clearInterval(this.pinger); const ws = this.ws; this.ws = null; try { ws?.close(); } catch (e) {} }   // (their player is over in the other world, in the frame: this page is off the line till they're back)
+  resume() { if (!this.paused) return; this.paused = false; this.backoff = 1000; if (!this.ws) this.connect(); }
   on(k, f) { (this.h[k] ||= []).push(f); return () => { this.h[k] = this.h[k].filter(g => g !== f); }; }
   emit(k, v) { for (const f of this.h[k] || []) try { f(v); } catch (e) { console.warn('[x]', k, e); } }
   connect() {
@@ -73,7 +76,7 @@ export class Crossing {
     this.ws = ws;
     ws.onopen = () => { this.backoff = 1000; this.send({ t: 'hi', ...this.mine }); for (const m of this.q.splice(0)) this.send(m); if (this.tok) this.send({ t: 'adm', h: this.home, tok: this.tok }); this.emit('open'); };
     ws.onmessage = e => { if (e.data === 'pong') return; let m; try { m = JSON.parse(e.data); } catch (_) { return; } this.got(m); };
-    ws.onclose = () => { this.ws = null; this.id = null; this.people.clear(); this.skyers.clear(); this.emit('people', this.people); this.emit('close'); this.later(); };
+    ws.onclose = () => { if (this.ws === ws) this.ws = null; this.id = null; this.people.clear(); this.skyers.clear(); this.emit('people', this.people); this.emit('close'); if (!this.paused) this.later(); };
     clearInterval(this.pinger); this.pinger = setInterval(() => { if (this.ws?.readyState === 1) this.ws.send('ping'); }, 25e3);
   }
   later() { clearTimeout(this.rt); this.rt = setTimeout(() => this.connect(), this.backoff); this.backoff = Math.min(30e3, this.backoff * 2); }
@@ -112,9 +115,11 @@ export class Crossing {
   ask(kind, m, ms = 6000) { return new Promise(res => { this.wait.set(kind, res); this.sendq(m); setTimeout(() => { if (this.wait.get(kind) === res) { this.wait.delete(kind); res({ err: 'timeout' }); } }, ms); }); }
   async go(to, { pe = '', f, sp, sd } = {}) { return this.ask('tk', { t: 'go', to, pe, f, ...(sp && sd ? { sp, sd } : {}) }); }   // → { tk, vt } | { err }  (sp, sd: where they went across and which way, in the shared sky, so the other side has them come out there)
   async arrived() {   // the page was opened with #x=<ticket>: redeem it (once) for the passport
-    const k = /^#x=([0-9a-f]{16})/.exec(location.hash); if (!k) return null;
-    history.replaceState(null, '', location.pathname + location.search);   // (out of the address bar: it's spent either way)
-    const r = await this.ask('pp', { t: 'in', tk: k[1] }, 8000);
+    let k = /^#x=([0-9a-f]{16})/.exec(location.hash)?.[1];
+    if (k) history.replaceState(null, '', location.pathname + location.search);   // (out of the address bar: it's spent either way)
+    else if (WARM) k = await gateTicket();   // (loaded ahead, behind the other world: the ticket comes from that page when they fly in)
+    if (!k) return null;
+    const r = await this.ask('pp', { t: 'in', tk: k }, 8000);
     if (!r.pp) return null;
     const pp = r.pp;
     if (pp.h !== this.world && pp.vt) { this.mine.vt = pp.vt; try { sessionStorage.setItem('x-visit', JSON.stringify(pp)); } catch (e) {} }
@@ -131,10 +136,121 @@ export function saveReturn(world, data) { try { localStorage.setItem('x-ret:' + 
 export function takeReturn(world) { try { const s = localStorage.getItem('x-ret:' + world); localStorage.removeItem('x-ret:' + world); const r = s && JSON.parse(s); return r && Date.now() - r.at < 864e5 ? r : null; } catch (e) { return null; } }
 
 const pre = new Set();
-export function prefetch(to) {   // getting close to a door: fetch the other world's page ahead, so the tear has it ready
+export function prefetch(to) {
+  gateNear(to, true);   // getting close to a door: fetch the other world's page ahead, so the tear has it ready
   const u = worldUrl(to) + '/'; if (pre.has(u)) return; pre.add(u);
   const l = document.createElement('link'); l.rel = 'prefetch'; l.href = u; l.as = 'document'; document.head.appendChild(l);
 }
+
+// ---- the gate: the other world loaded behind this one as you come near its door, so going across is a fade, not a page load ----
+// The page you started on stays the page (the host); the other world runs in a frame over it (the guest), see-through and barely
+// ticking until you fly in. Then it's handed the ticket, puts you where you went in, and fades up over this one, which goes quiet
+// (as if its tab were put away: off its own lines, its sound paused, drawing once a second). Going home from there, the frame
+// fades away and this world, as you left it, picks you up where you came out. A phone that can't spare the memory for two worlds
+// at once, or a guest that isn't ready in time, goes across the old way: the tear and a page load.
+//   host: gateNear(to, near) as the door gets close or far · gateHooks({ home: m => … }) to be put back when they come home
+//   guest: gateReady() once it could take someone · gateIn() once they're placed · goWorld(to) instead of location.href
+const QS = (() => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(); } })();
+const FRAMED = (() => { try { return window.parent !== window; } catch (e) { return true; } })();
+export const WARM = FRAMED && QS.get('xw') === '1';
+const originOf = w => { try { return new URL(worldUrl(w)).origin; } catch (e) { return ''; } };
+const hereWorld = () => Object.keys(WORLDS).find(w => originOf(w) === location.origin) || '';
+const otherOf = w => (w === 'icarus' ? 'brn' : 'icarus');
+const hostOrigin = () => originOf(otherOf(hereWorld()));
+// frames, slowed: a page asleep behind the other world (or the guest, loaded ahead) draws a few times a second, not sixty
+const SLOW = { ms: 0 }, slowQ = new Map(); let slowN = 0;
+function slowFrames(ms) {
+  SLOW.ms = ms; if (globalThis.__xSlow) return; globalThis.__xSlow = 1;
+  const raf = window.requestAnimationFrame.bind(window), caf = window.cancelAnimationFrame.bind(window);
+  window.requestAnimationFrame = cb => { if (!SLOW.ms) return raf(cb); const id = -(++slowN); slowQ.set(id, setTimeout(() => { slowQ.delete(id); raf(cb); }, SLOW.ms)); return id; };
+  window.cancelAnimationFrame = id => { if (id < 0) { clearTimeout(slowQ.get(id)); slowQ.delete(id); } else caf(id); };
+}
+// the host, while its player is over in the frame: to its own code, as if the tab were put away
+const AWAY = { on: false, media: [] };
+function away(on) {
+  on = !!on; if (AWAY.on === on) return; AWAY.on = on; const d = document;
+  if (on) {
+    try { Object.defineProperty(d, 'hidden', { configurable: true, get: () => true }); Object.defineProperty(d, 'visibilityState', { configurable: true, get: () => 'hidden' }); } catch (e) {}
+    AWAY.media = [...d.querySelectorAll('audio,video')].filter(m => !m.paused); for (const m of AWAY.media) try { m.pause(); } catch (e) {}
+    slowFrames(1000);
+  } else {
+    try { delete d.hidden; delete d.visibilityState; } catch (e) {}
+    for (const m of AWAY.media) try { m.play()?.catch(() => {}); } catch (e) {} AWAY.media = []; SLOW.ms = 0;
+  }
+  try { d.dispatchEvent(new Event('visibilitychange')); } catch (e) {}
+}
+export const GATE = { f: null, to: '', ready: false, shown: false, going: false, coolT: 0, X: null, hooks: {}, got: null, inn: null };
+export function gateOk() {
+  if (FRAMED || QS.get('xgate') === '0') return false;
+  let touch = false; try { touch = matchMedia('(pointer: coarse)').matches; } catch (e) {}
+  return !touch || (navigator.deviceMemory || 0) >= 6 || QS.get('xgate') === '1';   // (two worlds at once is a lot for a phone: only the big ones)
+}
+export function gateHooks(h) { Object.assign(GATE.hooks, h); }
+export function gateNear(to, near) {
+  if (near) { clearTimeout(GATE.coolT); GATE.coolT = 0; gateWarm(to); return; }
+  if (GATE.f && !GATE.shown && !GATE.going && !GATE.coolT) GATE.coolT = setTimeout(() => { GATE.coolT = 0; if (!GATE.shown && !GATE.going) gateDrop(); }, 60000);   // (gone a long way from the door: let it go after a minute)
+}
+function gateWarm(to) {
+  if (GATE.f || !gateOk() || !WORLDS[to]) return;
+  const f = GATE.f = document.createElement('iframe'); GATE.to = to; GATE.ready = false; GATE.shown = false;
+  f.src = worldUrl(to) + '/?xw=1' + (LOCAL && RT_PORT !== '8787' ? '&xrt=' + RT_PORT : '');
+  f.allow = 'autoplay; fullscreen; microphone; camera; gamepad; pointer-lock; clipboard-write; xr-spatial-tracking; accelerometer; gyroscope';
+  f.setAttribute('allowfullscreen', ''); f.title = WORLDS[to].name; f.tabIndex = -1; f.setAttribute('aria-hidden', 'true');
+  f.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;margin:0;padding:0;z-index:2147483645;opacity:0;pointer-events:none;background:transparent;transition:opacity .75s ease;color-scheme:normal';
+  document.documentElement.appendChild(f);
+}
+export function gateDrop() { const f = GATE.f; GATE.f = null; GATE.ready = GATE.shown = GATE.going = false; GATE.got = GATE.inn = null; if (f) f.remove(); }
+addEventListener('message', e => {
+  const f = GATE.f, m = e.data; if (!f || e.source !== f.contentWindow || e.origin !== originOf(GATE.to) || !m || typeof m !== 'object') return;
+  if (m.t === 'x-warm') GATE.ready = true;
+  else if (m.t === 'x-got') GATE.got?.();
+  else if (m.t === 'x-in') GATE.inn?.();
+  else if (m.t === 'x-home') gateHome(m);
+});
+// handed over: the ticket to the frame, and once it has them placed, the frame up and this page asleep → true; or false (go the old way)
+async function gateGo(X, to, tk) {
+  const f = GATE.f; if (!f || GATE.to !== to) return false;
+  GATE.going = true; GATE.X = X; let got = false, inn = false;
+  const gotP = new Promise(r => { GATE.got = () => { got = true; r(); }; }), inP = new Promise(r => { GATE.inn = () => { inn = true; r(); }; });
+  const send = () => { try { f.contentWindow.postMessage({ t: 'x-go', tk }, originOf(to)); } catch (e) {} };
+  send(); const iv = setInterval(() => { if (!got) send(); }, 500);
+  let cover = null; const cv = setTimeout(() => { cover = tear(WORLDS[X.world].style, WORLDS[to].style, 900); }, GATE.ready ? 3500 : 600);   // (not up yet: cover, as the old way does, while it gets there)
+  await Promise.race([inP, new Promise(r => setTimeout(r, GATE.ready ? 60000 : 90000))]);   // (a slow machine can take twenty seconds and more from its title out into space)
+  clearInterval(iv); clearTimeout(cv);
+  if (!inn || GATE.f !== f) { GATE.going = false; if (!got) gateDrop(); return false; }
+  f.style.zIndex = '2147483647'; f.style.pointerEvents = 'auto'; f.style.opacity = '1'; f.removeAttribute('aria-hidden'); f.tabIndex = 0;
+  await new Promise(r => setTimeout(r, 800));
+  if (cover) { await cover; document.getElementById('x-tear')?.remove(); }
+  GATE.shown = true; GATE.going = false; away(true); X.pause(); takeReturn(X.home);
+  try { f.focus(); f.contentWindow.focus(); } catch (e) {}
+  return true;
+}
+// back from the frame: this world awake again, put where they came out, and the frame faded away
+function gateHome(m) {
+  if (!GATE.shown) return; const f = GATE.f;
+  away(false); GATE.X?.resume();
+  try { GATE.hooks.home?.({ sp: m.sp, sd: m.sd, pe: m.pe, f: m.f }); } catch (e) { console.warn('[x] home', e); }
+  f.style.pointerEvents = 'none'; f.style.opacity = '0'; try { f.blur(); window.focus(); } catch (e) {}
+  GATE.shown = false; setTimeout(() => { if (GATE.f === f && !GATE.shown) gateDrop(); }, 1000);
+}
+// the guest's side
+const G = { tk: null, wait: [], inSent: false };
+if (WARM) {
+  slowFrames(110);
+  addEventListener('message', e => {
+    const m = e.data; if (e.source !== window.parent || e.origin !== hostOrigin() || !m || m.t !== 'x-go' || !/^[0-9a-f]{16}$/.test(m.tk || '')) return;
+    try { window.parent.postMessage({ t: 'x-got' }, e.origin); } catch (_) {}
+    if (G.tk) return; G.tk = m.tk; SLOW.ms = 0;
+    const d = document; if (Object.prototype.hasOwnProperty.call(d, 'hidden')) { try { delete d.hidden; delete d.visibilityState; d.dispatchEvent(new Event('visibilitychange')); } catch (_) {} }   // (put away till now, by the page's own first lines: awake)
+    for (const f of G.wait.splice(0)) f(m.tk);
+  });
+}
+export const gateTicket = () => (G.tk ? Promise.resolve(G.tk) : new Promise(r => G.wait.push(r)));
+export const hosted = () => WARM && !!G.tk;   // (this page is the other world's guest, and they've flown in)
+export function gateReady() { if (WARM) try { window.parent.postMessage({ t: 'x-warm' }, hostOrigin()); } catch (e) {} }
+export function gateIn() { if (!WARM || !G.tk || G.inSent) return; G.inSent = true; try { window.parent.postMessage({ t: 'x-in' }, hostOrigin()); } catch (e) {} }
+function gateBack(m) { try { window.parent.postMessage({ t: 'x-home', ...m }, hostOrigin()); } catch (e) {} SLOW.ms = 1000; }
+export function goWorld(to) { if (hosted() && to === otherOf(hereWorld())) return gateBack({}); location.href = worldUrl(to) + '/'; }   // (to the other world's own page, with no ticket: in the frame, that's just home)
 
 // ---- the tear: the screen goes over from one world's style to the other's, cell by cell ----
 // ascii: letters, cool on black; px: chunky palette blocks with a dither. Leaving: the page's style breaks up into the other's
@@ -177,9 +293,15 @@ export function untear(style, ms = 1400) {   // on arrival: start covered in the
 }
 // the whole crossing, for a page: ticket, return point, tear, navigate
 export async function cross(X, to, { pe = '', f, ret, sp, sd } = {}) {
-  const r = await X.go(to, { pe, f, sp, sd });
+  if (hosted() && to === X.home) { X.pause(); gateBack({ sp, sd, pe, f }); return { tk: 'gate', gate: 1 }; }   // (in the frame, going home: the page under it is home, kept as they left it)
+  let r = await X.go(to, { pe, f, sp, sd });
   if (!r.tk) return r;   // (closed, or no line: the page says so)
   if (to !== X.home && ret) saveReturn(X.home, ret);
+  if (GATE.f && GATE.to === to) {   // (the other world's already loaded behind this one: a fade, no page load)
+    if (await gateGo(X, to, r.tk)) return { ...r, gate: 1 };
+    r = await X.go(to, { pe, f, sp, sd }); if (!r.tk) return r;   // (it didn't take them in time: a fresh ticket, the old way)
+  }
+  gateDrop();
   try { sessionStorage.setItem('x-tearfrom', WORLDS[X.world].style); } catch (e) {}
   await tear(WORLDS[X.world].style, WORLDS[to].style);
   location.href = worldUrl(to) + '/#x=' + r.tk;
