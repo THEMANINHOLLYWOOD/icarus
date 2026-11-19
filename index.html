@@ -38368,6 +38368,7 @@ async function authSession(s, ev) {
   if (!s) { AUTH.admin = false; MOD.admin = false; authUI(); return; }
   if (/[?&]code=/.test(location.search)) history.replaceState(null, '', location.pathname + location.search.replace(/([?&])code=[^&]*&?/, '$1').replace(/[?&]$/, ''));   // (the sign-in's own mark off the address)
   if (was && was.user?.id === s.user?.id && AUTH.linked) { authUI(); return; }
+  if (XO.vis) { authUI(); return; }   // (here from BURNING STUDIO MUSIC: the visit has a code of its own, and is never tied to the account or swapped for its journey: that swap reloads the page, and the visit comes back a visit, for ever)
   try {
     const r = await fetch('/api/hub?fn=account', { method: 'POST', headers: authH({ 'Content-Type': 'application/json' }), body: JSON.stringify({ op: 'link', code: WORLD.code, name: heroName }) });
     const j = await r.json().catch(() => ({}));
@@ -38405,6 +38406,8 @@ async function authDo(kind) {
 }
 // bring a traveller here by their code (the title's "come back with yours", and signing in)
 async function resumeCode(c, quiet) {
+  if (XO.vis) return;   // (a visit is never swapped for a journey)
+  try { if (sessionStorage.getItem('icarus.resumed') === c) return; sessionStorage.setItem('icarus.resumed', c); } catch {}   // (once a tab: if the journey brought still isn't the one asked for, a reload won't make it so)
   const j = await fetch('/api/world', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'resume', code: c }) }).then(r => r.ok ? r.json() : null).catch(() => null);
   try {
     localStorage.setItem('icarus.code', c);
