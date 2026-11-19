@@ -154,9 +154,10 @@ const QS = (() => { try { return new URLSearchParams(location.search); } catch (
 const FRAMED = (() => { try { return window.parent !== window; } catch (e) { return true; } })();
 export const WARM = FRAMED && QS.get('xw') === '1';
 const originOf = w => { try { return new URL(worldUrl(w)).origin; } catch (e) { return ''; } };
-const hereWorld = () => Object.keys(WORLDS).find(w => originOf(w) === location.origin) || '';
+const isWorld = (origin, w) => { const o = originOf(w); return !!o && (origin === o || origin === o.replace('://', '://www.')); };   // (either site answers on www too)
+const hereWorld = () => Object.keys(WORLDS).find(w => isWorld(location.origin, w)) || '';
 const otherOf = w => (w === 'icarus' ? 'brn' : 'icarus');
-const hostOrigin = () => originOf(otherOf(hereWorld()));
+const hostOrigin = () => { const want = otherOf(hereWorld()), xo = QS.get('xo'); return xo && isWorld(xo, want) ? xo : originOf(want); };   // (the page this one is behind, exactly: it says, in ?xo=, and it has to be the other world's)
 // frames, slowed: a page asleep behind the other world (or the guest, loaded ahead) draws a few times a second, not sixty
 const SLOW = { ms: 0 }, slowQ = new Map(); let slowN = 0;
 function slowFrames(ms) {
@@ -193,7 +194,7 @@ export function gateNear(to, near) {
 function gateWarm(to) {
   if (GATE.f || !gateOk() || !WORLDS[to]) return;
   const f = GATE.f = document.createElement('iframe'); GATE.to = to; GATE.ready = false; GATE.shown = false;
-  f.src = worldUrl(to) + '/?xw=1' + (LOCAL && RT_PORT !== '8787' ? '&xrt=' + RT_PORT : '');
+  f.src = worldUrl(to) + '/?xw=1&xo=' + encodeURIComponent(location.origin) + (LOCAL && RT_PORT !== '8787' ? '&xrt=' + RT_PORT : '');
   f.allow = 'autoplay; fullscreen; microphone; camera; gamepad; pointer-lock; clipboard-write; xr-spatial-tracking; accelerometer; gyroscope';
   f.setAttribute('allowfullscreen', ''); f.title = WORLDS[to].name; f.tabIndex = -1; f.setAttribute('aria-hidden', 'true');
   f.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;margin:0;padding:0;z-index:2147483645;opacity:0;pointer-events:none;background:transparent;transition:opacity .75s ease;color-scheme:normal';
@@ -201,7 +202,7 @@ function gateWarm(to) {
 }
 export function gateDrop() { const f = GATE.f; GATE.f = null; GATE.ready = GATE.shown = GATE.going = false; GATE.got = GATE.inn = null; if (f) f.remove(); }
 addEventListener('message', e => {
-  const f = GATE.f, m = e.data; if (!f || e.source !== f.contentWindow || e.origin !== originOf(GATE.to) || !m || typeof m !== 'object') return;
+  const f = GATE.f, m = e.data; if (!f || e.source !== f.contentWindow || !isWorld(e.origin, GATE.to) || !m || typeof m !== 'object') return;
   if (m.t === 'x-warm') GATE.ready = true;
   else if (m.t === 'x-got') GATE.got?.();
   else if (m.t === 'x-in') GATE.inn?.();
