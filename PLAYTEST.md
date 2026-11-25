@@ -116,6 +116,14 @@
 - [ ] **New, on a phone:** while a god is speaking, the chat's copy of the line and the lesson keep out of the way; the THE MAN / DIVE key stands above the words; markers are not drawn across them.
 - [ ] **New, the title and the sign-in:** every line stands on its own dark ground at the size of the picture's letters; buttons are in square brackets and turn gold under a finger. The sign-in fits a phone held sideways (scroll for the last line).
 - [ ] **Y** (plain picture): the cards there are square and solid too.
+- [ ] **New, choosing a god on a phone:** the twelve are all there to read and tap; the small map and the speed line step aside while you choose (they used to be typed across ZEUS and HERA).
+- [ ] **New, the photo camera on a phone:** its keys are square, in brackets, and the name of the lens stands above them.
+- [ ] **New, your father on Crete:** his questions and your three answers are on a square dark ground, each answer a key in brackets.
+- [ ] **New, a fight's lobby on a phone:** READY stands under the two lines that ask for it; SKIP INTRO, RESTART and END FIGHT are whole (the roll key steps down from under them); no marker is typed across the line at the top or between a key's brackets.
+
+## Speed and size
+- [ ] **New, loading:** the page that is sent is about a quarter smaller than it was (the same game, without its comments and spacing). The title should come up a little sooner, on a phone most of all.
+- [ ] **New, smoothness:** the game no longer makes the browser measure the page in the middle of every frame. If flying feels any different, it should only be smoother.
 
 ## Devices (never tested on real hardware, so worth a look)
 - [ ] **Phone:** touch and tilt, the one ICARUS menu button, two fingers to blow wind.

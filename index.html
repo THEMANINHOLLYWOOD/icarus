@@ -1026,6 +1026,25 @@
   #authBox input { font-size:16px !important; background:#0b0e16 !important; border:0 !important; border-bottom:2px solid rgba(255,180,90,.55) !important; color:#fff4e2 !important; } #authBox input:focus { border-bottom-color:#ffcf7a !important; outline:none; }
   #authBox .abx { font-size:calc(var(--tz) * 1.2) !important; color:#ffcf7a !important; min-width:44px; min-height:44px; }
   #album u { background:var(--plate) !important; border:0 !important; font-size:var(--tz) !important; padding:.4em 1ch !important; color:#ffe2a6 !important; text-decoration:none; }
+  /* the photo camera's row of keys, and the lens it names: typed like the rest, the lens above the keys where a thumb is not */
+  #photoBar { gap:1ch; } #photoBar button { position:relative; width:auto; min-width:44px; height:44px; padding:0 1.7ch; border-radius:0; border:0; background:var(--plate); color:#ffe2a6; font-family:var(--tf); font-size:var(--tz); font-weight:700; }
+  #photoBar button::before, #photoBar button::after { position:absolute; top:50%; transform:translateY(-50%); color:#ffb45a; } #photoBar button::before { content:'['; left:.35ch; } #photoBar button::after { content:']'; right:.35ch; }
+  #photoBar button:active, #photoBar button.on { background:#ffcf7a; color:#07090f; border:0; }
+  #photoLens { font-family:var(--tf); font-size:var(--tz); letter-spacing:0; color:#e8dfc8; background:var(--plate); padding:.15em 1ch; text-shadow:none; }
+  .touch #photoLens { bottom:calc(var(--sb) + 64px); }
+  /* his father's questions on Crete, and the answers offered: square and dark like the rest, each answer a key in brackets */
+  #proTalk { border-radius:0; box-shadow:none; background:var(--plate); } #ptWho { font-size:var(--tz); letter-spacing:0; font-weight:700; color:#ffb45a; }
+  #ptOpts button, #ptOwn button { position:relative; border-radius:0; border:0; background:rgba(244,234,210,.08); padding-left:2.4ch; padding-right:2.4ch; }
+  #ptOpts button::before, #ptOwn button::before, #ptOpts button::after, #ptOwn button::after { position:absolute; top:50%; transform:translateY(-50%); color:#ffb45a; font-weight:700; }
+  #ptOpts button::before, #ptOwn button::before { content:'['; left:.7ch; } #ptOpts button::after, #ptOwn button::after { content:']'; right:.7ch; }
+  #ptOpts button kbd { border:0; border-radius:0; color:#ffb45a; font-size:inherit; } #ptOwn button { color:#ffe2a6; font-weight:700; text-transform:uppercase; }
+  #ptOpts button:is(:hover, :focus-visible, :active), #ptOwn button:is(:hover, :focus-visible, :active) { background:#ffcf7a; color:#07090f; border:0; outline:none; }
+  #ptOpts button:is(:hover, :focus-visible, :active) :is(kbd, span), #ptOpts button:is(:hover, :focus-visible, :active)::before, #ptOpts button:is(:hover, :focus-visible, :active)::after, #ptOwn button:is(:hover, :focus-visible, :active)::before, #ptOwn button:is(:hover, :focus-visible, :active)::after { color:#07090f; }
+  #ptIn { border-radius:0; border:0; border-bottom:1px solid rgba(255,180,90,.6); background:rgba(0,0,0,.45); } #ptIn:focus { border-color:#ffcf7a; }
+  #ptJump, #proSkip { font-size:max(11px, calc(var(--tz) * .86)); letter-spacing:.06em; } #ptJump { color:#cfc6b2; } .pro #proSkip { opacity:.8; }
+  body:has(#proTalk.on) #tut { visibility:hidden; }
+  /* on a short screen the READY key goes under the two lines that ask for it, not across the second of them */
+  @media (max-height:480px) { #flyReady { bottom:auto; top:calc(66% + var(--ch, 14px) * 2.6); } body:has(#flyCtl.on) #flipBtn { bottom:calc(var(--sb, 0px) + 90px); } }   /* (and the roll key steps down from under END FIGHT) */
 </style>
 <script type="importmap">
   { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
@@ -1330,11 +1349,7 @@ const manFall = (vy, vT, dt) => { const k = (vy / vT) ** 2, g = PL.on ? GRAV * P
 // (the storyteller's lines and the thunder's were recorded once, like his own, and ship with the game)
 const N = (clip, text, o) => ({ text, voice: 'narrator', clip, title: '', ...o });
 const WAKE = [N('wake', 'The Labyrinth falling away. Your father shouting. The wax running down your arms. Then the sea.')];
-const THUNDER = [
-  { text: 'Get up.', say: '[booming, vast, from inside the thunder] Get up.', voice: 'zeus', clip: 'zeus1', title: 'the thunder', bolt: true },
-  { text: 'I caught you, boy. I will not do it every time.', say: '[low, rolling, unhurried] I caught you, boy. I will not do it every time.', voice: 'zeus', clip: 'zeus2', title: 'the thunder', bolt: true },
-  { text: 'Again.', say: '[tired, distant thunder] Again.', voice: 'zeus', clip: 'zeus3', title: 'the thunder', bolt: true },
-];
+
 const INTRO = [
   { text: 'Dad?', say: '[weak, just waking] Dad?', voice: 'hero', clip: 'dad', title: '' },
   { text: 'Why can\'t I do anything right?', say: '[quietly, bitter, to himself] Why can\'t I do anything right?', voice: 'hero', clip: 'right', title: '' },
@@ -1498,7 +1513,6 @@ const EDGE = { x: MOUNT.x - 3, z: MOUNT.z - 26 };   // the north lip of the summ
 // through, white and blue with small flowers. The shrines of the Twelve are at the back of it, past the needle; the front
 // is left open, a meadow running to the lip, and from the lip the north face drops sheer: the leap is a leap.
 const TABLE = { cz: 110, rx: 150, rz: 128 };   // (its middle, south of the peak; its half-width; its half-depth)
-const SANCT_G = { cz: 150, RX: 100, RZ: 55 };    // (the horseshoe of shrines, south of the needle, open to the north and to the Way)
 // the top of the mountain, where it is turf and not snow (h: the ground's height there)
 const meadK = (x, z, h) => { const dx = x - MOUNT.x, dz = z - MOUNT.z; return dx * dx + dz * dz > 320 * 320 ? 0 : smoothstep(SUMMIT - 34, SUMMIT - 10, h); };
 // where the table is paved (the Sacred Way, the ring through the shrines) or built on: no grass grows through it
@@ -3003,7 +3017,7 @@ const WAVE_DIR = Math.atan2(WIND.z, WIND.x);
 const WAVES = [[-1.15, 330, 1.3, 1], [-0.92, 215, 0.78, 1], [0, 150, 0.95], [0.5, 86, 0.6], [-0.4, 49, 0.36], [0.9, 28, 0.2], [-0.85, 16, 0.11], [1.35, 9, 0.06]]   // angle off the wind, length, height, (1: the swell from far off)
   .map(([a, L, A, far], i) => { const k = 6.2832 / L, w = Math.sqrt(9.8 * k) * 0.92, ga = WAVE_DIR + a + 0.33;
     return { dx: Math.cos(WAVE_DIR + a), dz: Math.sin(WAVE_DIR + a), L, A, k, w, far: !!far, grp: L >= 28, gx: Math.cos(ga) * k / 7, gz: Math.sin(ga) * k / 7, gw: w / 14, gp: i * 1.9 }; });
-const WAVE_SUM = WAVES.reduce((s, w) => s + w.A, 0), CREST_N = 2.28;
+const CREST_N = 2.28;
 const GUSTS = [[0, 0.0037, 0.035, 0, 0.5], [1.05, 0.0081, -0.052, 1.7, 0.33], [-0.7, 0.0019, 0.017, 4.1, 0.22]].map(([a, f, s, ph, A]) => ({ x: Math.cos(WAVE_DIR + a) * f, z: Math.sin(WAVE_DIR + a) * f, s, ph, A }));
 const CURRS = [[0.6, 900, 0.011, 0.4, 1.7], [2.1, 420, -0.017, 2.6, 1.0], [-1.2, 2300, 0.006, 5.0, 1.3]].map(([a, L, s, ph, v]) => ({ ex: Math.cos(a) * 6.2832 / L, ez: Math.sin(a) * 6.2832 / L, ux: Math.sin(a) * v, uz: -Math.cos(a) * v, s, ph }));
 // (and the weather on top of that: a storm or Poseidon's rising sea stands the whole of it up, a still dawn lays it flat;
@@ -5856,8 +5870,10 @@ const fitDpr = () => Math.max(1, Math.min(devicePixelRatio || 1, tier.dpr, DPRC,
 //    Rows are counted from the bottom of the screen, the way the picture counts them.
 const UIL = { nx: 0, ny: 0, cw: 9, ch: 14, buf: null, tex: null, used: false, was: false, on: false };
 const UIB = { nx: 0, ny: 0, buf: null, tex: null, used: false, was: false };
-// (a box on the page, remembered for a moment: reading one forces the browser to lay the page out, and these hardly move)
-const RECT = new WeakMap(); let rectGen = 0; addEventListener('resize', () => rectGen++);
+// (a box on the page, remembered for a moment: reading one forces the browser to lay the page out, and these hardly move.
+//  The window's own size is the same: VW and VH are asked for once, as a frame begins, and what is drawn every frame uses them)
+let VW = innerWidth, VH = innerHeight;
+const RECT = new WeakMap(); let rectGen = 0; addEventListener('resize', () => { rectGen++; VW = innerWidth; VH = innerHeight; });
 function rectOf(el, ms = 400) { const now = performance.now(), c = RECT.get(el); if (c && c.g === rectGen && now - c.t < ms) return c.r; const r = el.getBoundingClientRect(); RECT.set(el, { r, t: now, g: rectGen }); return r; }   // (the big sheet: one of its cells is four of the other's)
 function uibText(c, r, str, ci = 0, b = 255) { const B = UIB.buf, nx = UIB.nx; if (r < 0 || r >= UIB.ny) return; for (let k = 0; k < str.length; k++) { const x = c + k; if (x < 0 || x >= nx) continue; const cc = str.charCodeAt(k), i = (r * nx + x) * 4; B[i] = cc > 32 && cc < 128 ? cc : cc === 183 || cc === 8226 ? 127 : cc === 8217 || cc === 8216 ? 39 : cc === 8220 || cc === 8221 ? 34 : cc === 8212 || cc === 8211 ? 45 : cc === 8230 ? 46 : 32; B[i + 1] = ci; B[i + 2] = b; } UIB.used = true; }
 function uibPut(c, r, code, ci = 0, b = 255, a = -1) { if (c < 0 || r < 0 || c >= UIB.nx || r >= UIB.ny) return; const i = (r * UIB.nx + c) * 4, B = UIB.buf; B[i] = code; B[i + 1] = ci; B[i + 2] = b; if (a >= 0 && a > B[i + 3]) B[i + 3] = a; UIB.used = true; }
@@ -5867,7 +5883,7 @@ function uibPlate(c0, r0, c1, r1, a) { const B = UIB.buf, nx = UIB.nx; c0 = Math
 function barsTick(dt) {
   const cl = document.body.classList, want = (cl.contains('cinema') || cl.contains('pro')) && !cl.contains('photo') ? 1 : 0;
   UIL.bar = lerp(UIL.bar || 0, want, damp(want ? 3.2 : 5, dt)); if (UIL.bar < 0.02 && !want) UIL.bar = 0;
-  const dpr = renderer.getPixelRatio(), H = Math.max(innerHeight * 0.11, 48), U = postMat.uniforms.uBarPx;
+  const dpr = renderer.getPixelRatio(), H = Math.max(VH * 0.11, 48), U = postMat.uniforms.uBarPx;
   U.value = !UIL.bar ? 0 : asciiOn && UIL.ch ? Math.round(H / UIL.ch * UIL.bar) * UIL.ch * dpr : H * dpr * (1 - Math.pow(1 - UIL.bar, 3));
 }
 function uilSize(nx, ny, cw, ch) {
@@ -5881,7 +5897,7 @@ function uilSize(nx, ny, cw, ch) {
   x.fillStyle = '#000'; x.fillRect(0, 0, c.width, ch); x.fillStyle = '#fff'; x.font = 'bold 40px Menlo, Consolas, "DejaVu Sans Mono", monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
   for (let i = 0; i < 96; i++) x.fillText(i === 95 ? '·' : String.fromCharCode(32 + i), i * cw + cw / 2, ch / 2 + 2);   // (the last slot, unused by the keyboard, is the dot that parts one thing from the next)
   const t = new THREE.CanvasTexture(c); t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; postMat.uniforms.tChars.value = t; }
-const uilCol = x => Math.floor(x / UIL.cw), uilRow = y => Math.floor((innerHeight - y) / UIL.ch);   // (a place on the page → its cell)
+const uilCol = x => Math.floor(x / UIL.cw), uilRow = y => Math.floor((VH - y) / UIL.ch);   // (a place on the page → its cell)
 function uilPut(c, r, code, ci = 0, b = 255, a = -1) {
   if (c < 0 || r < 0 || c >= UIL.nx || r >= UIL.ny) return;
   const i = (r * UIL.nx + c) * 4, B = UIL.buf; B[i] = code; B[i + 1] = ci; B[i + 2] = b; if (a >= 0 && a > B[i + 3]) B[i + 3] = a; UIL.used = true;
@@ -6048,7 +6064,7 @@ function epochCheck() {
   let save = false;
   try { save = !!localStorage.getItem('icarus.save.v3'); for (const k of Object.keys(localStorage)) if (k.startsWith('icarus.') && !EPOCH_KEEP.has(k)) localStorage.removeItem(k); localStorage.setItem('icarus.epoch', String(ep)); } catch {}
   if (save && typeof state !== 'undefined' && state !== 'loading') { WIPE.on = true; location.reload(); }   // (already playing on the old save: start again, and keep nothing from it)
-  else if (typeof state !== 'undefined' && state === 'loading') { try { const ni = document.getElementById('nameInput'); if (ni) ni.value = ''; setName('', false); nameAsked = false; } catch {} }   // (not even the name)
+  else if (typeof state !== 'undefined' && state === 'loading') { try { const ni = document.getElementById('nameInput'); if (ni) ni.value = ''; setName('', false); } catch {} }   // (not even the name)
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // stage cues like [sighs] are for the voice actor; the screen shows the line without them
@@ -7041,7 +7057,7 @@ function updateRoll(dt) {
   const p = player;
   if (human.wings.visible) stowWings(dt);
   p.rollT -= dt;
-  const u = 1 - Math.max(0, p.rollT) / ROLL_T, e = u * u * (3 - 2 * u), s = Math.sin(u * Math.PI);
+  const u = 1 - Math.max(0, p.rollT) / ROLL_T;
   const drag = Math.pow(0.12, dt);
   p.vel.x *= drag; p.vel.z *= drag; p.vel.y = 0;
   p.pos.x += p.vel.x * dt; p.pos.z += p.vel.z * dt;
@@ -7276,7 +7292,7 @@ function humanDive() {
   return true;
 }
 function updateHumanDive(dt) {
-  const p = player, D = p.dive, H = human, R = H.rig, [ix, iz] = state === 'play' ? axes() : [0, 0];
+  const p = player, D = p.dive, H = human, [ix, iz] = state === 'play' ? axes() : [0, 0];
   D.t += dt;
   H.group.rotation.y -= ix * 1.5 * dt; if (!dragging) camYaw += wrapAngle(H.group.rotation.y - camYaw) * damp(2, dt);
   const M = D.mom, ms = M ? M.length() : 0, idle = Math.abs(iz) < 0.25, sink = iz < -0.25;
@@ -8088,7 +8104,7 @@ function jump() {
 // Out of the sea and into fire: he drives up out of the water in a column of spray (time slowing as he rises), and at the top of
 // the leap, with the sea still running off him, he catches: a burst of steam where the fire meets the water, and the bird.
 function leapFromWater() {
-  const p = player, hs = Math.hypot(p.vel.x, p.vel.z);
+  const p = player;
   p.grounded = false; p.swim = false; p.land = null; p.vel.y = 21.5 * HOP; p.vel.x *= 0.5; p.vel.z *= 0.5; p.jumpKind = 'stand';
   p.autoBurn = time; timeK = 0.55;
   audio.sfx.splash?.(true); audio.sfx.jump(); netFx('jump');
@@ -8837,7 +8853,7 @@ function updatePeers(dt) {
       const v3 = Math.hypot(P.s.vx, P.s.vy, P.s.vz);
       if (v3 > 25 && (P.wakeT = (P.wakeT || 0) - dt) <= 0) {
         P.wakeT = 0.025; const wc = P.patron ? pcol(P.patron) : [0.9, 0.95, 1], c = [0.7 + wc[0] * 0.9, 0.7 + wc[1] * 0.9, 0.7 + wc[2] * 0.9];
-        for (let i = 0; i < 3; i++) { const b = 2 + Math.random() * 4, sd = i ? 1 : -1; emit(P.pos.x - P.s.vx / v3 * b + rnd(2.2), P.pos.y - P.s.vy / v3 * b + rnd(1.4), P.pos.z - P.s.vz / v3 * b + rnd(2.2), P.s.vx * 0.05 + rnd(0.6), P.s.vy * 0.05, P.s.vz * 0.05 + rnd(0.6), 1.8 + Math.random() * 0.8, c, 0, 2.2); }
+        for (let i = 0; i < 3; i++) { const b = 2 + Math.random() * 4; emit(P.pos.x - P.s.vx / v3 * b + rnd(2.2), P.pos.y - P.s.vy / v3 * b + rnd(1.4), P.pos.z - P.s.vz / v3 * b + rnd(2.2), P.s.vx * 0.05 + rnd(0.6), P.s.vy * 0.05, P.s.vz * 0.05 + rnd(0.6), 1.8 + Math.random() * 0.8, c, 0, 2.2); }
       }
     } else animPeer(P, A.man, dt, sp);
     if ((tk > 0 || P.turned) && !P.rider) { const G = A.bird.group, M = A.man.group, wantB = PHX_S * (P.bk || bigName(P.name)) * (P.gm ? 1.12 : 1) * (P.sm ? SMALL.MIN : 1), k2 = tk * tk;
@@ -8861,10 +8877,10 @@ function placeWaypoint(P, d, said, bird) {
   let x = _v.x, y = _v.y;
   const behind = _v.z > 1;
   if (behind) { x = -x; y = -y; if (Math.abs(x) < 1e-3 && Math.abs(y) < 1e-3) y = -1; }
-  const mx = 1 - 46 / innerWidth * 2, my = 1 - 40 / innerHeight * 2, edge = behind || Math.abs(x) > mx || Math.abs(y) > my;
+  const mx = 1 - 46 / VW * 2, my = 1 - 40 / VH * 2, edge = behind || Math.abs(x) > mx || Math.abs(y) > my;
   if (edge) { const m = Math.max(Math.abs(x) / mx, Math.abs(y) / my, 1e-4); x /= m; y /= m; }
   if (el._d !== 1) { el._d = 1; el.style.display = ''; }
-  { const L = ((x * 0.5 + 0.5) * innerWidth).toFixed(1) + 'px', Tp = ((-y * 0.5 + 0.5) * innerHeight).toFixed(1) + 'px'; if (el._l !== L) { el._l = L; el.style.left = L; } if (el._t !== Tp) { el._t = Tp; el.style.top = Tp; } }
+  { const L = ((x * 0.5 + 0.5) * VW).toFixed(1) + 'px', Tp = ((-y * 0.5 + 0.5) * VH).toFixed(1) + 'px'; if (el._l !== L) { el._l = L; el.style.left = L; } if (el._t !== Tp) { el._t = Tp; el.style.top = Tp; } }
   const trk = TRACK.id === P.id, aim = TRACK.aim === P && !trk, dy = P.pos.y - player.pos.y;
   { const cn = 'mk peer wp' + (edge ? ' edge' : '') + (d > 900 && !said && !trk ? ' far' : '') + (said || P.talking ? ' lit' : '') + (trk ? ' trk' : aim ? ' aim' : ''); if (el._c !== cn) { el._c = cn; el.className = cn; } }
   const glyph = edge ? WP_ARROWS[(Math.round(Math.atan2(y, x) / (Math.PI / 4)) + 8) % 8] : said ? '“' : P.talking ? '◉' : trk ? '◎' : FRIENDS.has(P.name) ? '♦' : '◆';
@@ -9131,7 +9147,7 @@ async function gotRtc(m) {
 // every frame: who should be joined, how loud each voice is and from which side, and who is talking
 function vcUpdate(dt) {
   if (!VC.ok || !AC) return;
-  const me = netMe(), now = performance.now();
+  const now = performance.now();
   if ((VC.t -= dt) <= 0) {
     VC.t = 0.6;
     for (const P of NET.peers.values()) {
@@ -9481,7 +9497,7 @@ function worldTitle(big, small = '', ms = 1900, col = null, opt = null) {
 function auiTitle(dt) {
   if (!WT.on) return;
   WT.t += dt / Math.max(timeK, 0.05); if (WT.t > WT.life) { WT.on = false; return; }
-  const cam = camera, W = innerWidth, H = innerHeight, nx = UIL.nx, ny = UIL.ny, cw = UIL.cw, ch = UIL.ch, T = WT.t, D = WT.D || 64;
+  const cam = camera, W = VW, H = VH, nx = UIL.nx, ny = UIL.ny, cw = UIL.cw, ch = UIL.ch, T = WT.t, D = WT.D || 64;
   // where it wants to stand: ahead of him, above the middle, as wide as about two thirds of what he sees
   const tv = Math.tan(cam.fov * Math.PI / 360), th = tv * cam.aspect, wide = D * th * 2 * (cam.aspect < 1 ? 0.84 : 0.62), px = Math.min(wide / WT.cols, D * tv * 2 * 0.5 / WT.rows);
   const e = cam.matrixWorld.elements, rx = WT.v.set(e[0], e[1], e[2]), up = WT.w.set(e[4], e[5], e[6]);
@@ -9689,7 +9705,7 @@ function drawAsciiUi(dt) {
     const p = player, d = Math.max(0.5, camera.position.distanceTo(p.pos)), ppm = innerHeight / (2 * d * Math.tan(camera.fov * Math.PI / 360));
     const raw = p.form === 'human' ? clamp(0.7 * MAN_SCALE * ppm / CELLS[cellIdx][0], 2, 12) : 2, u = postMat.uniforms.uNameW;
     if (Math.abs(raw - u.value) > 0.8) u.value = Math.round(raw); }
-  if (on !== UIL.on) { UIL.on = on; cl.toggle('asciiui', on); for (const R of AUID.roots) R.dirty = true; if (!on) for (const id of ['czBar', 'keyCard', 'explain', 'tut']) { const e = $(id); if (e) e.style.top = ''; } }
+  if (on !== UIL.on) { UIL.on = on; cl.toggle('asciiui', on); for (const R of AUID.roots) R.dirty = true; if (!on) stkSig = ''; if (!on) for (const id of ['czBar', 'keyCard', 'explain', 'tut']) { const e = $(id); if (e) e.style.top = ''; } }
   if (STV.on) statsFrame(dt);
   { const u = postMat.uniforms.uGlitch; if (state !== 'dead') GLITCH.want = 0; u.value = Math.abs(GLITCH.want - u.value) < 0.004 ? GLITCH.want : lerp(u.value, GLITCH.want, damp(GLITCH.want > u.value ? 10 : 2.6, dt)); }
   if (UIL.used || UIL.was) UIL.buf.fill(0);
@@ -9700,11 +9716,11 @@ function drawAsciiUi(dt) {
     const now = performance.now(); if (now - AF.t > 58) { AF.t = now; if (AF.strip && (MENU.open || AF.strip.heat > 0.03)) afStep(AF.strip); if (AF.mark && shown) afStep(AF.mark); }
     if (state !== 'map') auiTitle(dt);   // (the names written on the sky belong to the world, not to the map of it)
     if (state === 'title' && DREAM.on) dreamInk();   // (the game's own name, over the daydream)
+    if (state === 'play' && !cl.contains('pro') && !MENU.open) auiMarks();   // (the marks go in first: whatever has words of its own is typed over them, never they over it)
     inkDraw(state !== 'map');   // (and whatever else has words of its own to put in the picture: see INKW)
     if (TOMB.say && shown) { const S = TOMB.say; uilPlate(S.c - (S.t1.length >> 1) - 1, S.r - (S.t2 ? 1 : 0), S.c + ((S.t1.length + 1) >> 1), S.r, 150); uilText(S.c - (S.t1.length >> 1), S.r, S.t1, 0, 235); if (S.t2) uilText(S.c - (S.t2.length >> 1), S.r - 1, S.t2, 1, 200); }
     if (state === 'stats' || STV.map) auiStats(dt);
     if (state === 'map' && mapV.open && M3.on) auiMapChrome();   // (lying flat it has its own, drawn on the sheet: see the CSS for #map:not(.m3))
-    if (state === 'play' && !cl.contains('pro') && !MENU.open) auiMarks();
     if (state === 'play' && PILOT.k > 0.35 && !cl.contains('pro')) auiPilot();
     if (state === 'play' && (HY.c > 0.01 || HY.on && time - HY.onT < 1.4) && !cl.contains('pro')) auiHyper();
     if (state !== 'title' && state !== 'stats' && !cl.contains('pro') && !cl.contains('photo')) { auiStack(); auiDom(); auiArea(dt); } else if (state === 'title' && AGC.open) auiDom('agentCard');
@@ -9888,7 +9904,7 @@ function auiStats(dt) {
 }
 // the map page: the map is the map; over it, only which page this is and the two ways off it
 function auiStatsMap() {
-  const nx = UIL.nx, ny = UIL.ny, t = TOUCH ? 'DRAG TO MOVE · PINCH · TWO FINGERS TURN' : 'DRAG TO MOVE · RIGHT-DRAG TURNS · [ BACK TO THE SKY · ESC FLY ON';
+  const nx = UIL.nx, t = TOUCH ? 'DRAG TO MOVE · PINCH · TWO FINGERS TURN' : 'DRAG TO MOVE · RIGHT-DRAG TURNS · [ BACK TO THE SKY · ESC FLY ON';
   uilPlate(0, 0, nx - 1, 1, 200); if (t.length < nx - 2) uilText((nx - t.length) >> 1, 0, t, 0, 130);
   const G = { K: 1, put: uilPut, text: uilText, plate: uilPlate }; stvKey($('stvBack'), '< THE SKY', 1, 1, G); stvKey($('stvX'), 'X FLY ON', nx - 13, 1, G);
 }
@@ -10013,14 +10029,21 @@ function auidScan(R) {
 //    under another, below the strip, the name of the place and whatever is being told there, so no two of them are ever
 //    typed across each other, on a phone least of all.
 const STK = [['czBar', e => e.classList.contains('on')], ['keyCard', e => e.classList.contains('show')], ['explain', e => !!e.querySelector('.panel.on')], ['tut', e => e.classList.contains('on')]];
+let stkSig = '', stkT = 0;
 function auiStack() {
+  // (the page is measured only when what is shown has changed, and a few times a second besides: measuring it every frame
+  //  made the browser lay the whole page out in the middle of each one)
+  const now = performance.now(), toast = now < TOAST.until && TOAST.msg && TOAST.low != null, bar = AREA.barA > 0.05 && AREA.barRow && !document.body.classList.contains('cosmos'), on = [];
+  let sig = UIL.ny + ':' + UIL.ch + (MENU.open ? 'm' : '') + (bar ? 'b' + AREA.barRow : '') + (toast ? 't' + TOAST.low : '');
+  for (const [id, shown] of STK) { const el = $(id); if (el && shown(el)) { on.push(el); sig += id; } }
+  if (sig === stkSig && now < stkT) return; stkSig = sig; stkT = now + 250;
   const ch = UIL.ch; let free = UIL.ny - 3;
   if (MENU.open) free = Math.min(free, uilRow(rectOf($('menu'), 250).bottom) - 2);
-  if (AREA.barA > 0.05 && AREA.barRow && !document.body.classList.contains('cosmos')) free = Math.min(free, AREA.barRow - (document.querySelector('#areaBar.acts') ? 5 : 3));
-  if (performance.now() < TOAST.until && TOAST.msg && TOAST.low != null) free = Math.min(free, TOAST.low - 2);
-  for (const [id, on] of STK) { const el = $(id); if (!el || !on(el) || !el.offsetHeight) continue;
-    const top = Math.round(innerHeight - (free + 1) * ch) + 'px'; if (el.style.top !== top) el.style.top = top;
-    free -= Math.ceil(el.offsetHeight / ch) + 1; }
+  if (bar) free = Math.min(free, AREA.barRow - (document.querySelector('#areaBar.acts') ? 5 : 3));
+  if (toast) free = Math.min(free, TOAST.low - 2);
+  for (const el of on) { const h = el.offsetHeight; if (!h) continue;
+    const top = Math.round(VH - (free + 1) * ch) + 'px'; if (el.style.top !== top) el.style.top = top;
+    free -= Math.ceil(h / ch) + 1; }
 }
 function auiDom(only) {
   if (!AUID.roots.length) auidInit();
@@ -10028,6 +10051,7 @@ function auiDom(only) {
   for (const R of AUID.roots) { if (only && R.el.id !== only) continue;
     if (R.dirty && now - R.t > 120 || now - R.t > 260) auidScan(R);   // (a panel that changes every frame is still only read a few times a second)
     if (R.box && R.items.length) { const [c0, r0, c1, r1, a] = R.box; uilPlate(c0, r0, c1, r1, 205 * a | 0); uilClear(c0, r0, c1, r1); }   // (nothing of the world's own lettering shows through a panel)
+    else for (const it of R.items) { if (it.brk) uilClear(it.brk[0], it.r, it.brk[1], it.r); else if (!it.inp) uilClear(it.c - 1, it.r, it.c + it.s.length, it.r); }   // (nor between a key's brackets, nor in the gaps of a line)
     for (const it of R.items) {
       if (it.inp) { const v = uiAsc(it.inp.value), focus = document.activeElement === it.inp, t = v ? (v.length > it.w - 1 ? v.slice(v.length - it.w + 1) : v) : uiAsc(it.inp.placeholder);
         uilPlate(it.c - 1, it.r, it.c + Math.max(t.length, 8) + 1, it.r, (focus ? 225 : 185) * it.a | 0); uilText(it.c, it.r, t, 0, v ? 245 : 120);
@@ -10074,7 +10098,7 @@ function auiMarks() {
   for (const el of box.children) {
     if (el.style.display === 'none' || el.hidden) continue;
     const x = parseFloat(el.style.left), y = parseFloat(el.style.top); if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    if (UIB.h && y > innerHeight - UIB.h) continue;   // (nothing is marked across what is being said to him)
+    if (UIB.h && y > VH - UIB.h) continue;   // (nothing is marked across what is being said to him)
     const cl = el.classList, wp = cl.contains('wp'), peer = cl.contains('peer') || cl.contains('friend'), edge = cl.contains('edge'), lit = cl.contains('lit');
     const g = el.firstChild?.textContent || '', label = uiAsc(el.lastChild?.textContent || '').toUpperCase(), op = (el.style.opacity !== '' ? +el.style.opacity : 1) * (cl.contains('dim') || cl.contains('far') ? 0.55 : 1); if (op < 0.05) continue;
     const ink = el.style.color ? mkInk(el.style.color) : lit ? 2 : 13, br = 255 * Math.min(1, op) | 0, ph = time + (x * 0.013 + y * 0.007);
@@ -10275,7 +10299,7 @@ function miniSet(m, say) {
 const miniCycle = () => miniSet(MINI.mode === 'turn' ? 'north' : MINI.mode === 'north' ? 'off' : 'turn', true);
 function miniShown() {
   const cl = document.body.classList;
-  return MINI.mode !== 'off' && UIL.on && state === 'play' && !cl.contains('photo') && !cl.contains('pro') && !cl.contains('cinema') && !MENU.open && !who.open && !QL.open && !GUIDE.open && !CTL.open && !STV.on
+  return MINI.mode !== 'off' && UIL.on && state === 'play' && !PATRON.picking && !cl.contains('photo') && !cl.contains('pro') && !cl.contains('cinema') && !MENU.open && !who.open && !QL.open && !GUIDE.open && !CTL.open && !STV.on
     && !miniCrossed($('keyCard'), !!KEYC.s) && !miniCrossed($('tut'), $('tut').classList.contains('on'));   // (a key being taught, where it would cross the corner, has the place to itself)
 }
 function miniCrossed(el, on) { if (!on || !el) return false; const r = rectOf(el, 300), w = (MINI.c1 > 0 ? MINI.c1 + 2 : 26) * UIL.cw, h = MINI.c1 > 0 ? innerHeight - MINI.bottom * UIL.ch : innerHeight * 0.4; return r.width > 0 && r.left < w && r.top < h; }
@@ -10762,8 +10786,6 @@ function gotFx(m) {
   const x = num(m.x, -1e6, 1e6), y = num(m.y, -2000, 20000), z = num(m.z, -1e6, 1e6), d = Math.hypot(x - player.pos.x, y - player.pos.y, z - player.pos.z);
   const far = m.c === 1 && P.crete;   // (someone in the opening, watched from the air: heard from much further off)
   if (d > (far ? 1700 : 170)) return;
-  const dx = x - camera.position.x, dz = z - camera.position.z, l = Math.hypot(dx, dz) || 1;
-  camera.getWorldDirection(_n); const rx = -_n.z, rz = _n.x, rl = Math.hypot(rx, rz) || 1;
   audio.at3(x, y, z, FX_KINDS[m.k], far ? { vol: 1.3, ref: 150, max: 2200 } : { ref: 16, max: 220 });   // (heard from where it happened)
 }
 
@@ -10888,7 +10910,6 @@ const CMD_HELP = [
 //    channel to the one it names, whose page shows it back to the server before doing anything, so nobody can forge one.
 //    And for himself alone, with no server in it: /noclip (through everything), /speed N, /spawn GOD (right in front of
 //    him, to talk to). Anyone else typing these is told they are not theirs.
-const isAndres = () => cleanName(heroName) === 'ANDRES';
 async function modStatus() {
   try { const r = await fetch('/api/hub?fn=admin', { method: 'POST', headers: authH({ 'Content-Type': 'application/json' }), body: JSON.stringify({ op: 'status', code: WORLD.code, name: heroName }) });
     if (!r.ok) return; const j = await r.json(); MOD.admin = !!j.admin; if (j.banned) modBanned(); } catch {}
@@ -11049,7 +11070,7 @@ function chatCommand(text) {
     case 'stop': case 'end': case 'cancel': case 'quit': stopCmd(arg); return true;
     case 'burn': case 'nova': case 'fire': run('nova'); return true;
     case 'clear': $('chatLog').textContent = ''; return true;
-    case 'land': case 'perch': case 'glide': case 'dive': case 'bird': case 'human': case 'face': case 'wide': case 'closer': case 'further': case 'objective': case 'snap': case 'album': case 'map': case 'map3d': case 'map2d': case 'players': case 'bolt': case 'blow': case 'watch': case 'jump': case 'climb': case 'faster': case 'slower': case 'hover':
+    case 'land': case 'perch': case 'glide': case 'dive': case 'human': case 'face': case 'wide': case 'closer': case 'further': case 'objective': case 'snap': case 'album': case 'map': case 'map3d': case 'map2d': case 'players': case 'bolt': case 'blow': case 'watch': case 'jump': case 'climb': case 'faster': case 'slower': case 'hover':
       run(c); return true;
   }
   const acts = voiceParse((c + ' ' + arg).trim().toLowerCase());   // (anything else a voice could have asked for)
@@ -12464,7 +12485,6 @@ function pieceWhy(k, cx, cz, r) {   // why it cannot go there, or ''
   let tree = false; treesNear(x, z, 8, (g, ck, i, t) => { if (!t.fell && Math.abs(t.x - x) < 2.3 && Math.abs(t.z - z) < 2.3) tree = true; }); if (tree) return 'A TREE IS IN THE WAY · CHOP IT FIRST';
   if (PLANT.list.some(P => Math.abs(P.x - x) < 2 && Math.abs(P.z - z) < 2)) return 'A SAPLING IS GROWING THERE';
   for (const R of ROCK.list.values()) if (Math.abs(R.x - x) < 1.5 + R.s && Math.abs(R.z - z) < 1.5 + R.s) return 'A ROCK IS IN THE WAY · MINE IT FIRST';
-  if (Math.hypot(player.pos.x - x, player.pos.z - z) < 1.2 && k !== 'floor' && k !== 'roof' && S.lv === 0 && false) return 'STAND BACK A LITTLE';
   return '';
 }
 function pieceMake(b) {   // a piece in the world: drawn, and solid where it should be
@@ -15275,7 +15295,7 @@ function eagleFly(f, dt) {
 function updateBirds(dt) {
   dt = Math.min(dt, 0.05); const P = player.pos, L = birdFliers(dt), fr = ++BIRDS.fr, cam = camera.position, night = dayName() === 'night';
   const foot = player.form !== 'phoenix' && state === 'play' && !player.gone;   // (a man walking up to a flock on the ground puts it up too)
-  const heat = birdHeatR(), hot = (b, S) => heat > 0 && (b.x - P.x) ** 2 + (b.y - P.y) ** 2 + (b.z - P.z) ** 2 < (heat + S.s * 0.4) ** 2;   // (near enough to the phoenix to catch fire)
+  const heat = birdHeatR();   // (near enough to the phoenix to catch fire)
   BLOD.nk = 0; BLOD.n = 0;
   for (let fi = 0; fi < flocks.length; fi++) { const f = flocks[fi];
     if (f.eagle) { const b = f.birds[0];
@@ -17452,7 +17472,7 @@ function hadesLayout() {
 }
 // what is drawn of it that is not ground (the ground is in the squares of the country, like everywhere else)
 function hadesBuild() {
-  const grp = HL.group = new THREE.Group(), H = UNDER.hades, flows = [], lakes = [];
+  const grp = HL.group = new THREE.Group(), flows = [], lakes = [];
   grp.visible = realm === 'under';
   for (const f of HL.falls) {
     if (f.roof) { const len = f.tip + 3 - f.foot, n = Math.ceil(len / 12);
@@ -19437,7 +19457,6 @@ const LAVA_LAKE = lavaMat(false), LAVA_FLOW = lavaMat(true), LAVA_RED = lavaMat(
 const lavaLight = new THREE.PointLight(0x3d8dff, 0, 560, 0); scene.add(lavaLight);
 const BLUEFIRE = [[0.25, 0.6, 2.2], [0.5, 0.9, 2.4], [0.9, 1.4, 2.6], [0.15, 0.35, 1.8]];
 // a strip of flowing lava along a path, `side` across it; widths along the way
-function lavaRibbon(pts, side, wid, mat) { const m = new THREE.Mesh(lavaGeo(pts, side, wid), mat); m.frustumCulled = false; return m; }
 function lavaGeo(pts, side, wid) {
   const n = pts.length, pos = new Float32Array(n * 6), uv = new Float32Array(n * 4), idx = [];
   let len = 0;
@@ -21561,14 +21580,6 @@ function paintMountainRock(x, y, z, ny, m) {
   if (steep && noise2(x / 23 + z / 29, y / 160) > 0.45) k *= 0.8;   // (streaks where water runs down)
   return [_pc[0] * k, _pc[1] * k, _pc[2] * k];
 }
-function paintSandstone(x, y, z, ny, m) {
-  const band = SANDST[((Math.floor(y / 8 + noise2(x / 40, z / 40) * 1.5) % 4) + 4) % 4];
-  let r = band[0], g = band[1], b = band[2], k = clamp((m - 0.94) * 2.6 + 0.9, 0.7, 1.1);
-  if (ny > 0.55) { const mo = smoothstep(0.55, 0.85, ny) * 0.7; r = lerp(r, 0.3, mo); g = lerp(g, 0.42, mo); b = lerp(b, 0.22, mo); }   // (moss and grass on what is level)
-  if (ny < -0.2) k *= 0.62;
-  if (ny < 0.5 && noise2(x / 19 + z / 23, y / 120) > 0.42) k *= 0.76;   // (where the rain runs down)
-  return [r * k, g * k, b * k];
-}
 // ── A rock of the monasteries, drawn finely. Its face is one rule, `towerShape`: how far out the stone stands at each
 //    bearing and height. The plan of it is not round (two or three great buttresses, turning a little as they rise); it
 //    swells or draws in at the waist; water has cut flutes down it from top to bottom; the beds of the stone show as
@@ -21628,7 +21639,7 @@ function buildMeteora(S, acc) {
   for (let i = 0; i < n; i++) {
     const a = r() * 6.283, d = i ? 55 + r() * 120 : 0, px = S.x + Math.cos(a) * d, pz = S.z + Math.sin(a) * d, g = overHeight(px, pz); if (g < WATER + 2) continue;
     if (tops.some(t => Math.hypot(t.x - px, t.z - pz) < t.R + 34)) continue;
-    const H = 105 + r() * 135 - i * 9, R = 20 + r() * 17 - i * 1.5, top = g + H, N = 8;
+    const H = 105 + r() * 135 - i * 9, R = 20 + r() * 17 - i * 1.5, top = g + H;
     const face = towerShape(R, g - 12, top, S.seed % 997 + i * 13); r(); r();   // (two numbers the old drawing took: what follows stays where it was)
     rockTower(acc, px, pz, g - 12, top, face);   // the rock: one stone, rooted
     { const q = mulberry32(S.seed * 31 + i * 7 + 5);   // what grows in its cracks, hanging out over the drop
@@ -22224,7 +22235,7 @@ function terraceHalfGeo() {
   { const t = new THREE.BufferGeometry(), y = -2.6 / r0; t.setAttribute('position', new THREE.Float32BufferAttribute([0, y, -0.8, 0, y - 1.5, 0, 0, y, 0.8], 3)); t.computeVertexNormals(); M(t, 0, 0, 0, 1, 1, 1, 0, sun); }
   return accToGeo(acc);
 }
-const _lm = new THREE.Matrix4(), _lq = new THREE.Quaternion(), _lp = new THREE.Vector3(), _ls = new THREE.Vector3(), _lc = new THREE.Color(), _UPY = new THREE.Vector3(0, 1, 0), _le = new THREE.Euler(0, 0, 0, 'YXZ');
+const _lm = new THREE.Matrix4(), _lq = new THREE.Quaternion(), _lp = new THREE.Vector3(), _ls = new THREE.Vector3(), _lc = new THREE.Color(), _le = new THREE.Euler(0, 0, 0, 'YXZ');
 const SUNLIT = new THREE.Color(1.2, 0.95, 0.55);
 // where every piece of one structure stands this frame
 function livingPose(G) {
@@ -22408,7 +22419,7 @@ function buildCrown(acc, grp, ids) {
 //    his patron is Zeus, the sky over the mountain turns to storm and throws lightning for as long as he stays.
 const _c1 = new THREE.Color();
 function pylonFx(P, k, mine, yF, dt) {
-  const n = dt * (3.5 + k * 44 + mine * 70), c = P.c, a0 = time + P.i, px = P.x, pz = P.z, sn = Math.sin(P.th), cs = Math.cos(P.th), E = emit, pl = player.pos;
+  const n = dt * (3.5 + k * 44 + mine * 70), a0 = time + P.i, px = P.x, pz = P.z, sn = Math.sin(P.th), cs = Math.cos(P.th), E = emit, pl = player.pos;
   const some = (q, f) => { for (let j = Math.floor(n * q + Math.random()); j > 0; j--) f(); };
   const yAny = () => k > 0.15 ? yF + rnd(26) : P.g + P.H * (0.25 + Math.random() * 0.75), ring = (r, y, f) => { const a = Math.random() * 6.283; f(px + Math.cos(a) * r, y, pz + Math.sin(a) * r, Math.cos(a), Math.sin(a)); };
   switch (P.id) {
@@ -22970,7 +22981,7 @@ function buildPalace(grp) {
     }
     // string courses and eaves, so the storeys read from far off
     if (L >= 3) { const e = 0.35; vis(AE(L), -T.u - e, T.u + e, T.f - e, T.f + 0.1, y0 - 0.05, y0 + 0.3, tr); for (const sd of [-1, 1]) vis(AE(L), sd * T.u - 0.1 * sd, sd * (T.u + e), T.f - e, T.e + e, y0 - 0.05, y0 + 0.3, tr); }
-    if (L === 6 || L === 7) { const T2 = palTier(L + 1), y = Yl(L + 1), ov = 1.5;   // tiled eaves, hung out
+    if (L === 6 || L === 7) { const y = Yl(L + 1);   // tiled eaves, hung out
       box(AE(L), 2 * T.u + 3, 0.3, 2.6, X(0), y - 0.5, Z(T.f - 0.8), TILE, 0.42, 0, 0); for (const sd of [-1, 1]) box(AE(L), 2.6, 0.3, T.e - T.f + 3, X(sd * (T.u + 0.8)), y - 0.5, Z((T.f + T.e) / 2), TILE, 0, 0, sd * -0.42); }
   }
   // the terraces the set-backs leave, each with its parapet
@@ -23311,7 +23322,7 @@ function buildPantheon() {
   if (PANTHEON.group || realm !== 'over') return;
   const grp = PANTHEON.group = new THREE.Group(); grp.userData = { islands: [], falls: [] };
   buildPalace(grp);
-  let acc = fastAcc(); const main = acc, ids = Object.keys(PATRONS), cx = MOUNT.x, cz = MOUNT.z + 6, R = 19;
+  let acc = fastAcc(); const main = acc, ids = Object.keys(PATRONS);
   const gold = GOLDLEAF, marble = MARBLEF, bronze = BRONZE, glow = c => { const k = new THREE.Color(c); return [k.r * 2.2, k.g * 2.2, k.b * 2.2]; };
   // one seat, its vigil and its shrine, facing the middle (local -z), at (x, y, z) turned by ry
   const seat = (id, x, y, z, ry, big, dark) => {
@@ -23739,7 +23750,7 @@ const CRAG_SET = [   // (where round the mountain: φ from north, π is the way 
 ];
 function cragsBuild() {
   CRAGS.built = true; scene.add(CRAGS.group);
-  const acc = newAcc(), gacc = newAcc(); acc.sway = []; const rk = new THREE.IcosahedronGeometry(1, 0).toNonIndexed(), step = tierIdx === 0 ? 20 : 14, cap = new THREE.IcosahedronGeometry(1, 0).toNonIndexed(), xtal = new THREE.OctahedronGeometry(1, 0).toNonIndexed();
+  const acc = newAcc(), gacc = newAcc(); acc.sway = []; const rk = new THREE.IcosahedronGeometry(1, 0).toNonIndexed(), cap = new THREE.IcosahedronGeometry(1, 0).toNonIndexed(), xtal = new THREE.OctahedronGeometry(1, 0).toNonIndexed();
   const S = CRAGS, hsh = (i, k) => { const v = Math.sin(i * 91.3 + k * 47.1) * 43758.5453; return v - Math.floor(v); };
   const stone = (y, i) => { const b = 0.42 + 0.06 * Math.sin(y * 0.11 + i) + 0.04 * Math.sin(y * 0.37); return [b * 1.08, b * 0.98, b * 0.86]; };   // (bands in the rock: it was laid down, once)
   CRAG_SET.forEach((D, i) => {
@@ -23849,7 +23860,7 @@ function houseLeave(id) {
 //    throne, small rings stacked like bracelets, one for each course. A course held with another house is half in each
 //    colour. When a house wins one, its new ring grows into place where everyone can see it.
 const SHR = { mesh: null, big: null, told: '', disp: {}, seenT: {}, list: {}, listT: -9 };
-const _q2 = new THREE.Quaternion(), _ZAX = new THREE.Vector3(0, 0, 1), _qPI = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI), _c2 = new THREE.Color();
+const _q2 = new THREE.Quaternion(), _qPI = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI);
 function houseRings(id) {
   if (time - SHR.listT > 1) { SHR.listT = time; SHR.list = {};
     const W = {}; for (const [k, c] of ARENA.claims) { if (k.startsWith('torch') || !c.pats) continue; for (const a of c.pats) for (const b of c.pats) if (a !== b) ((W[a] ||= {})[b] = (W[a][b] || 0) + 1); }
@@ -24119,7 +24130,7 @@ function updateFlies(dt) {
 const AP = { q: [], kind: '', t0: 0, until: 0, tx: 0, ty: 0, tb: false, run: false, ax: 0, ay: 0, boost: false, nextT: 0, wp: null, flyT: -9, askT: -9 };
 AP.el = (() => { const el = document.createElement('div'); el.className = 'mk'; el.innerHTML = '<b>✦</b><span></span>'; el.style.display = 'none'; $('markers').appendChild(el); return el; })();
 AP.beam = (() => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 700, 8, 1, true).translate(0, 350, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.15, 0.5), transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); m.visible = false; m.frustumCulled = false; scene.add(m); return m; })();
-const V_SAY = 'SAY: FLY · LAND · GLIDE · BIRD · DIVE · CLIMB · FASTER · BLOW · LEFT · WALK · STOP · GO THERE · MAP · CAMERA · CINEMATIC · PLAYERS · MENU · HANDS ON · BECOME A WHALE';
+
 function apClear() { AP.kind = ''; AP.until = 0; AP.tx = AP.ty = 0; AP.tb = false; AP.thenLand = false; }
 addEventListener('keydown', e => { if (!e.repeat && AP.kind && AP.kind !== 'go' && AP.kind !== 'catch' && /^(Key[WASD]|Arrow(Up|Down|Left|Right))$/.test(e.code) && down(e.code)) apClear(); }, true);   // (a word that set him going, a dive or a landing, said or misheard: steering again, he has it)
 function apTimed(x, y, secs, boost = false) { AP.kind = 'timed'; AP.tx = x; AP.ty = y; AP.tb = boost; AP.until = time + secs; }
@@ -26527,10 +26538,7 @@ function overheard(text) {
     if (words.length < 3) return;
     const theirs = new Set(talk.text.toLowerCase().match(/[a-z']+/g) || []);
     if (words.filter(w => theirs.has(w)).length / words.length < 0.4) { talk.barged = talk.text; stopVoice(); mic.quietUntil = 0; talk.shown = talk.text.length; }
-  } else if (false && !voiceSrc && !talk.busy && words.length > 30 && performance.now() > talk.cutUntil) {   // (no god cuts him off for going on: he is let finish)
-    talk.cutUntil = performance.now() + 7000;
-    godSay(text.slice(0, 300), { cut: true });
-  }
+  }   // (no god cuts him off for going on: he is let finish)
 }
 $('talkInput').addEventListener('keydown', e => {
   e.stopPropagation(); talk.idle = 0;
@@ -26776,14 +26784,7 @@ function spoke(text) {
     }
     if (who) return hail(who, text);
   }
-  if (false && performance.now() - ear.voicedAt > 3500 && API.tts && !voiceSrc) {   // (in plain play his words are no longer said back in his voice: only in a conversation, see uttered)
-    const loud = ear.loud;
-    fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice: 'hero', text: text.slice(0, 220), flash: true }) })
-      .then(r => r.ok ? r.arrayBuffer() : null).then(raw => {
-        netSay(text, loud);
-        if (raw) AC.decodeAudioData(raw, b => { if (b && !voiceSrc && state === 'play') heroSpeaks(b, loud); }, () => {});
-      }).catch(() => netSay(text, loud));
-  } else netSay(text, ear.loud);
+  netSay(text, ear.loud);   // (in plain play his words are not said back in his voice: only in a conversation, see uttered)
   if (words >= 2 && time - ear.toldT > 50) { ear.toldT = time; witness(`${ear.loud > 0.55 ? 'shouted' : 'said'} “${text.slice(0, 90)}” out loud, to nobody, ${realm === 'under' ? 'among the dead' : p.form === 'phoenix' ? 'in mid-air' : 'alone on a hillside'}`, true); }
 }
 // they heard him: they are in front of him (gods do not walk when called), and they answer what he said
@@ -26943,7 +26944,7 @@ function makeTemple(seed, dark, style, o = {}) {
   const brazier = (x, z, s = 1) => { box(acc, 0.5 * s, 1.1 * s, 0.5 * s, x, 0.55 * s, z, shade); blob(acc, 0.6 * s, 0.26 * s, 0.6 * s, x, 1.25 * s, z, trim); fires.push({ x, y: 1.5 * s, z }); cols.push({ x, z, r: 0.5 * s }); };
   const cypress = (x, z, s) => { box(acc, 0.3, 2.4, 0.3, x, 0.2, z, COL.trunk); _mat.compose(_p.set(x, -2.2 * s, z), _q.identity(), _s.set(s * 0.42, s * 1.5, s * 0.42)); addGeo(acc, G.pine, _mat, dark ? UCOL.dead : COL.pine2); };
   if (style === 3) {
-    const R = o.R || 11 + Math.floor(r() * 3), n = 10 + Math.floor(r() * 2) * 2, rc = R - 1.3, top = 0; hw = hd = R + 0.5; H = 8.5 + r() * 2.5; round = true;
+    const R = o.R || 11 + Math.floor(r() * 3), n = 10 + Math.floor(r() * 2) * 2, rc = R - 1.3; hw = hd = R + 0.5; H = 8.5 + r() * 2.5; round = true;
     // three terraces under it, each a step wider, and stairs down the front
     disc(R + 1.4, 0.5, -0.25, marble); discAt(0, 0, R + 3.2, 0.6, -0.8, shade); discAt(0, 0, R + 5.2, 0.7, -1.45, marble); discAt(0, 0, R + 5.2, 7, -5.3, shade);
     disc(R - 3.2, 0.07, 0.035, shade); disc(R - 4, 0.08, 0.04, marble);
@@ -27868,7 +27869,7 @@ function sagaStart(g, S) {
   sagaStep(false); witness(`was drawn into a story by ${g.name}: "${story.saga.title}"`); saveSoon(); return true;
 }
 function sagaStep(announce = true) {
-  const S = story.saga; if (!S) return; const st = S.steps[S.i], g = godById[S.god] || { id: S.god, name: S.name };
+  const S = story.saga; if (!S) return; const st = S.steps[S.i];
   const n = RANGE[st.kind] ? clamp(st.n || RANGE[st.kind][0], RANGE[st.kind][0], RANGE[st.kind][1]) : 1;
   const old = quests.indexOf(questOf(S.god)); if (old >= 0) quests.splice(old, 1);
   const q = { id: S.god, name: S.name, kind: st.kind, n, reward: S.reward, v: 0, done: false, a: 0, sg: 1, to: st.to };
@@ -29383,7 +29384,7 @@ function updateMap(dt) {
   asRealm(V.vr, () => mapPaint(dt));
 }
 function mapPaint(dt) {
-  const V = mapV, mine = realm === V.real, both = V.both, other = realm === 'over' ? 'under' : 'over';   // (mine: the world shown is the one he is in)
+  const V = mapV, mine = realm === V.real, both = V.both;   // (mine: the world shown is the one he is in)
   const k = damp(9, dt), x = mapX, dpr = mapCv.width / innerWidth, W = innerWidth, H = innerHeight, R3 = !!V.relief;
   V.s = lerp(V.s, V.ts, damp(5, dt)); V.x = lerp(V.x, V.tx, k); V.z = lerp(V.z, V.tz, k);
   { const ty = R3 ? V.yaw3 : Math.round(V.yaw / TAU_) * TAU_, tT = R3 ? V.T3 : 1;
@@ -29689,15 +29690,15 @@ function placeMarker(el, x, y, z, show, glyph, label, lit) {
   if (_v.z > 1 || Math.abs(_v.x) > 1.1 || Math.abs(_v.y) > 1.1) { if (el.style.display !== 'none') el.style.display = 'none'; return; }
   if (el.style.display) el.style.display = '';   // (the page is written to only where something has changed)
   el._wx = x; el._wy = y; el._wz = z;
-  const px = (_v.x * 0.5 + 0.5) * innerWidth, Lx = px.toFixed(1) + 'px', Ty = ((-_v.y * 0.5 + 0.5) * innerHeight).toFixed(1) + 'px';
+  const px = (_v.x * 0.5 + 0.5) * VW, Lx = px.toFixed(1) + 'px', Ty = ((-_v.y * 0.5 + 0.5) * VH).toFixed(1) + 'px';
   if (el._l !== Lx) { el._l = Lx; el.style.left = Lx; } if (el._t !== Ty) { el._t = Ty; el.style.top = Ty; }
   if (el._lit !== !!lit) { el._lit = !!lit; el.classList.toggle('lit', !!lit); } if (el._g !== glyph) { el._g = glyph; el.firstChild.textContent = glyph; }
   const L = el.lastChild; if (L.textContent !== label) L.textContent = label;
   // a long label near the edge of the screen slides back onto it (the mark itself stays on the place)
   if (el._ll !== label.length) { el._ll = label.length; el._lw = L.offsetWidth; }
-  const h = el._lw / 2 + 8, sh = h * 2 >= innerWidth ? 0 : Math.round(clamp(px, h, innerWidth - h) - px);
+  const h = el._lw / 2 + 8, sh = h * 2 >= VW ? 0 : Math.round(clamp(px, h, VW - h) - px);
   if (el._sh !== sh) { el._sh = sh; L.style.transform = sh ? `translateX(${sh}px)` : ''; }
-  { const under = (UIB.h || 0) > 0 && (-_v.y * 0.5 + 0.5) * innerHeight > innerHeight - UIB.h - 26; if (el._u !== under) { el._u = under; el.classList.toggle('dim', under); } }   // (under what is being said: faint, not on top of it)
+  { const under = (UIB.h || 0) > 0 && (-_v.y * 0.5 + 0.5) * VH > VH - UIB.h - 26; if (el._u !== under) { el._u = under; el.classList.toggle('dim', under); } }   // (under what is being said: faint, not on top of it)
 }
 function updateTiltUI() {
   const h = $('horizon'); if (!h) return;
@@ -29930,7 +29931,7 @@ function updateCamera(dt) {
     { const Tin = temples.find(T => Math.abs(p.pos.x - T.x) < T.hw + 1 && Math.abs(p.pos.z - T.z) < T.hd + 1 && Math.abs(p.pos.y - T.y) < 4);
       if (Tin) camWant.y = Math.min(camWant.y, Tin.y + Tin.H - 0.7); }   // inside a temple the lens stays under the beams
     { const Rm = roomAt(p.pos.x, p.pos.y, p.pos.z);   // inside a chapel: the lens stays inside its walls and under its roof
-      const [plx, plz] = Rm ? rotXZ(p.pos.x - Rm.x, p.pos.z - Rm.z, -Rm.ry) : [0, 0];
+      const [, plz] = Rm ? rotXZ(p.pos.x - Rm.x, p.pos.z - Rm.z, -Rm.ry) : [0, 0];
       if (Rm && plz < Rm.hd - 0.8) {   // (in the doorway the lens can still be outside, looking in)
         let [lx, lz] = rotXZ(camWant.x - Rm.x, camWant.z - Rm.z, -Rm.ry); lx = clamp(lx, -Rm.hw + 0.3, Rm.hw - 0.3); lz = clamp(lz, -Rm.hd + 0.3, Rm.hd - 0.3);
         const [ox, oz] = rotXZ(lx, lz, Rm.ry); camWant.x = Rm.x + ox; camWant.z = Rm.z + oz; camWant.y = clamp(camWant.y, Rm.y + 1.2, Math.min(Rm.y + 2.9, Rm.y + Rm.h - 0.6)); } }
@@ -30181,7 +30182,7 @@ function buildCrete(world = false) {
   const disc = add(new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({ color: new THREE.Color(3.4, 3.0, 2.2), depthWrite: false, fog: false }))); disc.renderOrder = -1;
   // the sea
   const seaU = { uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uSun: { value: PRO_SUN }, uDeep: { value: new THREE.Color('#0f4a86') }, uShal: { value: new THREE.Color('#2f86c2') }, uHaze: { value: haze } };
-  const sea = add(new THREE.Mesh(new THREE.PlaneGeometry(60000, 60000).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: seaU,
+  add(new THREE.Mesh(new THREE.PlaneGeometry(60000, 60000).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: seaU,
     vertexShader: `varying vec3 vW; void main(){ vW = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0); }`,
     fragmentShader: `varying vec3 vW; uniform vec3 uCam, uSun, uDeep, uShal, uHaze; uniform float uTime;
       void main(){
@@ -30746,8 +30747,8 @@ function cnTowerTop(F) {
 //    a shrine of three bays; the north portico up its steps; the store rooms with their great jars; the steps where people
 //    sat to watch; a paved road to the Labyrinth; banners. (Where the far palace is: it replaces it as you come in.)
 function cnPalace(N, PM) {
-  const Y = 60, pz = PRO_C.z + 285, r = mulberry32(2207);
-  const PL = col('#ece0c4'), PL2 = col('#e2d3b2'), GYP = [0.93, 0.91, 0.86], RED = col('#a8301f'), BLK = col('#22201e'), DARK = [0.06, 0.05, 0.05], STN = [0.86, 0.82, 0.72], WOOD = col('#5a4030'), EARTH = col('#7a6a52'), OCH = col('#c99a4a'), BLUE = col('#3b5f93');
+  const Y = 60, r = mulberry32(2207);
+  const PL = col('#ece0c4'), PL2 = col('#e2d3b2'), GYP = [0.93, 0.91, 0.86], RED = col('#a8301f'), DARK = [0.06, 0.05, 0.05], STN = [0.86, 0.82, 0.72], WOOD = col('#5a4030'), EARTH = col('#7a6a52'), OCH = col('#c99a4a'), BLUE = col('#3b5f93');
   const blocks = [[-85, -32, 404, 466, 0, 16, PL], [32, 85, 404, 466, 0, 16, PL], [-32, 32, 404, 420, 0, 12, PL2], [-32, 32, 450, 466, 0, 12, PL2], [-68, -38, 412, 460, 16, 27, PL], [36, 64, 414, 444, 16, 26, [0.92, 0.88, 0.78]]];
   const outer = (b, f) => f === 0 ? b[0] === -85 : f === 1 ? b[1] === 85 : f === 2 ? b[2] === 404 : b[3] === 466;
   for (const b of blocks) {
@@ -30882,7 +30883,7 @@ function cnGreen(cn, N, GM, space) {
     else N.i('cyp', t.x, Y - 0.3, t.z, 2.9, 9 + t.h / 2, 2.9, t.i, [k, k, k]);
   }
   // the terraces: four of them, stepping down away from the palace, walled with dry stone, planted
-  const EARTH = col('#8a6e4a'), EARTH2 = col('#6e563a'), STN = [0.78, 0.74, 0.64], VINE = col('#4f7a2c'), WOOD = col('#5a4030');
+  const EARTH = col('#8a6e4a'), EARTH2 = col('#6e563a'), STN = [0.78, 0.74, 0.64], WOOD = col('#5a4030');
   for (let i = 0; i < 4; i++) {
     const h = 1.2 - i * 0.4 + 0.06, z0 = 472 + i * 12, zc = z0 + 6;
     box(N.acc, 140, h, 12, 0, Y + h / 2, zc, EARTH); box(N.st, 140.4, h + 0.35, 0.7, 0, Y + (h + 0.35) / 2, z0 + 12, STN);
@@ -30929,8 +30930,8 @@ function cnShore(N, SM, world, space) {
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('fq', new THREE.Float32BufferAttribute(fq, 2)); geo.computeVertexNormals();
     N.foam = geo; }
   if (!world) return;
-  const cs = Math.cos(HA), sn = Math.sin(HA), rad = cnRad(HA), d0 = rad * 1.22, at = (d, o) => [cs * d - sn * o, 215 + sn * d + cs * o], yaw = -HA;
-  const STN = [0.82, 0.78, 0.68], STN2 = [0.72, 0.68, 0.6], WOOD = col('#5a4030'), WOODL = col('#8a6a46'), DARK = [0.06, 0.05, 0.05], LINEN = col('#ece4cf'), RED = col('#a8301f'), BLUE = col('#3b5f93');
+  const cs = Math.cos(HA), sn = Math.sin(HA), rad = cnRad(HA), at = (d, o) => [cs * d - sn * o, 215 + sn * d + cs * o], yaw = -HA;
+  const STN = [0.82, 0.78, 0.68], STN2 = [0.72, 0.68, 0.6], WOOD = col('#5a4030'), WOODL = col('#8a6a46'), DARK = [0.06, 0.05, 0.05], LINEN = col('#ece4cf'), RED = col('#a8301f');
   const B = (acc, dl, h, ol, d, o, y, c, ry = 0, rz = 0) => { const [x, z] = at(d, o); box(acc, dl, h, ol, x, y, z, c, 0, yaw + ry, rz); };
   // the quay along the foot of the cliff, and the ship sheds cut back under it
   B(N.st, 14, 8, 78, 539.5, -8, -2.2, STN);
@@ -31293,7 +31294,7 @@ function creteBegin(forced) {
   const p = player;
   if (LIVE.on) { const H = LIVE.home; titleEnd(); LIVE.on = false; LIVE.leave = null; heroOff(); const T = $('title'); T.classList.remove('live', 'leaving'); $('liveRow').classList.add('hidden'); $('liveCap').classList.add('hidden'); phoenix.group.rotation.order = 'XYZ'; if (H.realm !== realm) setRealm(H.realm, H.pos.x, H.pos.z); }
   else if (titleFly.on) titleEnd();
-  if (state === 'title') { nameAsked = true; nameInput.blur(); $('title').classList.add('hidden'); initAudio(); flags.beganAt = time; setTimeout(warmPrograms, 60); startMic(); }
+  if (state === 'title') { nameInput.blur(); $('title').classList.add('hidden'); initAudio(); flags.beganAt = time; setTimeout(warmPrograms, 60); startMic(); }
   if (GFLY.on) gflyEnd(true); if (CHAT.open) closeChat(); if (MENU.open) menuShow(false); if (state === 'map') closeMap(); if (GODM.on) godMode(false, true);
   pro.back = { pos: p.pos.clone(), realm, form: p.form, grounded: p.grounded, yaw: p.yaw, hy: human.group.rotation.y, forced: !!forced, tour: !!forced };
   startPrologue(); pro.waitMic = false;
@@ -31793,7 +31794,7 @@ function titleEnd() {
 function titlePress(down) {
   if (!titleFly.on) return;
   if (DREAM.on) { if (down) { initAudio(); dreamSkip(); } return; }   // (the daydream: a press anywhere is only "go on")
-  if (LIVE.on) { if (down) { nameAsked = true; menuGo('fly'); } return; }   // (the film of his own flight: a press anywhere on it and the bird is his, there and then)
+  if (LIVE.on) { if (down) { menuGo('fly'); } return; }   // (the film of his own flight: a press anywhere on it and the bird is his, there and then)
   titleFly.held = !!down;
   if (!down) return;
   initAudio(); goFull();
@@ -32044,7 +32045,7 @@ function updateMenu(dt) {
 }
 // ── the menu's lens: a run of shots, each a few seconds, cut or swung between; a trick gets the shot that shows it best
 const SHOT_K = ['chase', 'side', 'front', 'low', 'orbit', 'flyby', 'wide', 'high'];
-const _mf = new THREE.Vector3(), _mr = new THREE.Vector3(), _mw = new THREE.Vector3(), _ml = new THREE.Vector3();
+const _mw = new THREE.Vector3(), _ml = new THREE.Vector3();
 function menuShot(kind, cut) {
   const M = LIVE, P = player.pos, K = birdK(), D = 30 * K, fx = -Math.sin(M.yaw), fz = -Math.cos(M.yaw), rx = Math.cos(M.yaw), rz = -Math.sin(M.yaw), s = Math.random() < 0.5 ? 1 : -1;
   const S = M.shot = { k: kind, t: 0, T: 5.5 + Math.random() * 3.5, s, a0: Math.random() * 6.283, from: cut ? null : M.cp.clone(), fromL: cut ? null : M.cl.clone(), blend: 1.3 };
@@ -32120,7 +32121,7 @@ function menuCaption(dt) {
 function menuGo(kind) {
   const M = LIVE; if (!M.on || M.leave) return;
   if (state === 'title' && needName()) return;
-  if (creteDue()) { nameAsked = true; creteBegin(true); return; }   // (see creteBegin)
+  if (creteDue()) { creteBegin(true); return; }   // (see creteBegin)
   initAudio(); goFull(); nameInput.blur();
   if (kind === 'back') { if (!M.song) menuSong(); M.leave = { kind, t: 0, T: 0.8 }; }
   else {
@@ -32400,7 +32401,6 @@ function proWake() { pro.wake = true; pro.t = PRO_TALK_AT; pro.talk.t = 2.1; pro
 const TUT = { q: [], cur: null, t: 0, gap: 0, done: 0, cineOpen: false, walk0: null, moved: 0 };
 try { TUT.done = +(localStorage.getItem('icarus.tut') || 0); } catch {}
 TUT.cineOpen = TUT.done >= 2;
-const K = (desk, touch) => TOUCH ? touch : desk;
 // The first time through, the game is walked: each thing he can do, said by the voice in his head when it matters, with
 // what to say (or press) written up top, and it waits until he has done it. Everything can be said out loud.
 const voiced = a => (TUT.voiced?.[a] ?? -1e9) > (TUT.cur?.t0 ?? 1e9);   // (said since this lesson came up)
@@ -32526,18 +32526,17 @@ if (FS.scroll) {
 const nameInput = $('nameInput');
 try { nameInput.value = localStorage.getItem('icarus.name') || ''; } catch {}
 setName(nameInput.value, false);
-let nameAsked = !!nameInput.value;
 nameInput.addEventListener('input', () => { setName(nameInput.value); if (nameOk()) $('nameAsk').classList.remove('need'); });
 // a name of his own (two letters at least) before he flies where the others can see him: asked for, not chosen for him
 const nameOk = () => nameInput.value.replace(/[^A-Za-z0-9]/g, '').length >= 2;
 function needName() {
   if (nameOk()) return false;
-  nameAsked = true; titleAsk(); const a = $('nameAsk'); a.textContent = 'name yourself to fly'; a.classList.remove('need'); void a.offsetWidth; a.classList.add('need');
+  titleAsk(); const a = $('nameAsk'); a.textContent = 'name yourself to fly'; a.classList.remove('need'); void a.offsetWidth; a.classList.add('need');
   $('title').classList.add('asked'); try { nameInput.focus({ preventScroll: true }); } catch {} audio.sfx.ui?.(); return true;
 }
 nameInput.addEventListener('keydown', e => {
   e.stopPropagation();
-  if (e.key === 'Enter') { nameAsked = true; nameInput.blur(); begin(); }
+  if (e.key === 'Enter') { nameInput.blur(); begin(); }
   else if (e.key === 'Escape' && DREAM.on) dreamSkip();
   else if (e.code === 'Space' && !nameInput.value.trim()) { e.preventDefault(); if (!e.repeat) titlePress(true); }
 });
@@ -32548,7 +32547,7 @@ function begin() {
   if (MOD.banned) { modBanned(); return; }
   if (needName()) return;
   if (creteDue()) { creteBegin(true); return; }   // (the opening has changed since he last came: Crete once more, and then the new first flight)
-  if (LIVE.on) { nameAsked = true; menuGo('fly'); return; }   // (the live menu: the bird is taken where it is)
+  if (LIVE.on) { menuGo('fly'); return; }   // (the live menu: the bird is taken where it is)
   if (needName()) return;   // (nobody flies with the others without a name of their own)
   if (DREAM.on) { if (!resumed) return dreamSnap(); dreamEnd(); }   // (the daydream: he snaps out of it, and is on Crete. Anyone shown it with ?dream goes on as they were)
   nameInput.blur();
@@ -32610,8 +32609,8 @@ function firstNight(seen) {
 // the title: a press anywhere is a wingbeat (held, it keeps beating); the button, or Enter, begins
 $('title').addEventListener('pointerdown', e => { if (e.target.closest('#nameRow, .foot, #liveRow')) return; e.preventDefault(); titlePress(true); });
 for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) $('title').addEventListener(ev, () => titlePress(false));
-$('goBtn').addEventListener('click', e => { e.stopPropagation(); nameAsked = true; begin(); });
-$('flyBtn').addEventListener('click', e => { e.stopPropagation(); nameAsked = true; begin(); });
+$('goBtn').addEventListener('click', e => { e.stopPropagation(); begin(); });
+$('flyBtn').addEventListener('click', e => { e.stopPropagation(); begin(); });
 $('matchAsk').addEventListener('click', e => { e.stopPropagation(); if (MATCH.inv && !MATCH.inv.mine) matchAnswer(true); else if (MATCH.againUntil) matchAgain(); });
 for (const ev of ['pointerdown', 'pointerup', 'touchstart']) $('matchAsk').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 $('signRow').addEventListener('click', e => { e.stopPropagation(); authShow(true); });
@@ -32624,7 +32623,7 @@ $('authUp').addEventListener('click', () => authDo('up'));
 $('authLink').addEventListener('click', () => authDo('link'));
 $('authOut').addEventListener('click', () => authDo('out'));
 $('authStats').addEventListener('click', () => { authShow(false); statsOpen(); });   // (the record is in the game now; /stats/ still works for whoever is sent a link to it)
-$('backBtn').addEventListener('click', e => { e.stopPropagation(); nameAsked = true; menuGo('back'); });
+$('backBtn').addEventListener('click', e => { e.stopPropagation(); menuGo('back'); });
 const isPlus = e => e.key === '+' || e.key === '=' || e.code === 'NumpadAdd';
 addEventListener('keydown', e => {
   if (e.target instanceof HTMLInputElement) return;
@@ -32632,15 +32631,15 @@ addEventListener('keydown', e => {
   if (state === 'title') {
     if (DREAM.on) {   // (the daydream: Esc or Space shows everything at once, Enter begins, and anything typed is his name)
       if (e.code === 'Escape' || e.code === 'Space') { if (!e.repeat) { initAudio(); dreamSkip(); } return; }
-      if (e.code === 'Enter') { nameAsked = true; return begin(); }
+      if (e.code === 'Enter') { return begin(); }
       if (/^(Key[A-Z]|Digit\d)$/.test(e.code) && !e.metaKey && !e.ctrlKey && !DREAM.snap) { dreamSkip(); nameInput.focus({ preventScroll: true }); }
       return;
     }
     if (e.code === 'KeyN' && resumed) return newGame();
     // (come back to a bird already in the air: any key he would fly with takes it, where it is)
-    if (LIVE.on && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && e.target !== nameInput && ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) { nameAsked = true; return menuGo('fly'); }
+    if (LIVE.on && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && e.target !== nameInput && ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) { return menuGo('fly'); }
     if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { if (!e.repeat) titlePress(true); return; }
-    if (e.code === 'Enter') { nameAsked = true; if (LIVE.on && e.shiftKey) return menuGo('back'); return begin(); }
+    if (e.code === 'Enter') { if (LIVE.on && e.shiftKey) return menuGo('back'); return begin(); }
     if (titleFly.asked && /^(Key[A-Z]|Digit\d)$/.test(e.code) && !e.metaKey && !e.ctrlKey) nameInput.focus({ preventScroll: true });   // (typing goes to the name)
     return;
   }
@@ -32903,7 +32902,7 @@ if (navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSuppo
   XR.supported = true; document.documentElement.classList.add('xrdev');
   $('xrRow').classList.remove('hidden');
 }).catch(() => {});
-$('xrRow').addEventListener('click', e => { e.stopPropagation(); XR.wanted = true; if (state === 'title') { nameAsked = true; begin(); } xrEnter(); });
+$('xrRow').addEventListener('click', e => { e.stopPropagation(); XR.wanted = true; if (state === 'title') { begin(); } xrEnter(); });
 async function xrEnter() {
   if (XR.on || XR.starting || !navigator.xr) return;
   XR.starting = true;
@@ -33685,6 +33684,7 @@ function xrHud(dt, sc) {
 function frame() {
   requestAnimationFrame(frame);
   if (XR.on) return;   // (the headset is calling the frames)
+  VW = innerWidth; VH = innerHeight;
   const raw = clock.getDelta();
   HEALTH.frames++; if (raw > HEALTH.worst) HEALTH.worst = raw;
   adaptQuality(raw);
@@ -34349,7 +34349,7 @@ function updateGfly(dt) {
   // the first flight: Hermes comes for him (anyone who had flown before is given it once more after Crete again — see creteReturn; /tour asks for it any time)
   if (!GFLY.on && !CZG.on && flags.morphed && !flags.toured && state === 'play' && realm === 'over' && p.form === 'phoenix' && !p.cine && !p.perch && !p.sub && !MATCH.phase && !LIVE.on) { GFLY.wait = (GFLY.wait || 0) + dt; if (GFLY.wait > 3.2) { GFLY.wait = 0; tourStart(); } }
   if (!GFLY.on) return;
-  const B = GFLY.B, g = GFLY.g; GFLY.t += dt;
+  const B = GFLY.B; GFLY.t += dt;
   if (realm !== 'over' || MATCH.phase || state === 'dead' || state === 'title' || p.sub && GFLY.t > 1) { gflyEnd(true); return; }
   const flying = p.form === 'phoenix' && !p.perch, fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
   if (p.mount) {
@@ -34464,7 +34464,6 @@ function tronTrail(id, name, col) {
   T = { id, name, mesh, geo: g, mat, pts: new Float32Array(CAP * 3), at: new Float32Array(CAP), gap: new Uint8Array(CAP), n: 0, start: 0, base: 0, len: 0, match: '', h: tronH(name) };
   TRON.trails.set(id, T); return T;
 }
-const tronKey = (x, z) => Math.floor(x / TRON.CELL) * 73856093 ^ Math.floor(z / TRON.CELL) * 19349663;
 function tronGrid(T, i) {   // the piece between point i-1 and i, filed under every square it lies in
   const P = T.pts, a = (i - 1) * 3, b = i * 3, C = TRON.CELL, x0 = Math.floor(Math.min(P[a], P[b]) / C), x1 = Math.floor(Math.max(P[a], P[b]) / C), z0 = Math.floor(Math.min(P[a + 2], P[b + 2]) / C), z1 = Math.floor(Math.max(P[a + 2], P[b + 2]) / C);
   for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { const k = x * 73856093 ^ z * 19349663; let L = TRON.grid.get(k); if (!L) TRON.grid.set(k, L = []); L.push(T, T.base + i); }
@@ -34756,7 +34755,7 @@ function agHall(B, G, W, F, f, wl) {   // the hall of the twelve: a long woven h
 }
 // where each thing in the list stands (u, v), by its place in the list
 function agPlan(H) {
-  if (H.plan) return H.plan; const P = [], n = H.agents.length; let home = 0, post = 0;
+  if (H.plan) return H.plan; const P = []; let home = 0, post = 0;
   for (const [w] of AG_WORKS) { if (w === 'woodpile') P.push([0, 3]); else if (w === 'home') P.push(AG_HOMES[home++ % AG_HOMES.length]); else if (w === 'shrine') P.push([0, -30]); else if (w === 'tower') P.push([-62, 6]); else if (w === 'hall') P.push([0, -72]);
     else { const a = post++ / 12 * 6.2832 + 0.26; P.push([Math.sin(a) * 12.5, -30 + Math.cos(a) * 12.5]); } }
   return (H.plan = P);
@@ -35198,7 +35197,7 @@ function agmIM() {
 }
 const agmPut = (k, M, c) => { const m = AGM.im[k], n = AGM.cnt[k] || 0; if (n >= m.instanceMatrix.count) return; m.setMatrixAt(n, M); if (c && m.instanceColor) m.setColorAt(n, c); AGM.cnt[k] = n + 1; };
 function agmEnd() { if (!AGM.im) return; for (const k in AGM.im) { const m = AGM.im[k], n = AGM.cnt[k] || 0; if (m.count || n) { m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; } AGM.cnt[k] = 0; } }
-const _gmB = new THREE.Matrix4(), _gmA = new THREE.Matrix4(), _gmT = new THREE.Matrix4(), _gmX = new THREE.Matrix4(), _gmE = new THREE.Euler(), _gmQ = new THREE.Quaternion(), _gmV = new THREE.Vector3(), _gmS = new THREE.Vector3(), _gmC = new THREE.Color();
+const _gmB = new THREE.Matrix4(), _gmA = new THREE.Matrix4(), _gmT = new THREE.Matrix4(), _gmX = new THREE.Matrix4(), _gmE = new THREE.Euler(), _gmQ = new THREE.Quaternion(), _gmV = new THREE.Vector3(), _gmS = new THREE.Vector3();
 const agmM = (out, x, y, z, rx, ry, rz, sx, sy = sx, sz = sx) => out.compose(_gmV.set(x, y, z), _gmQ.setFromEuler(_gmE.set(rx, ry, rz, 'YXZ')), _gmS.set(sx, sy, sz));
 const agmMR = (out, R, lx, ly, lz, rx, sx, sy = sx, sz = sx) => { const [x, z] = agmW(R, lx, lz); return agmM(out, x, R.top + ly, z, rx, R.ry, 0, sx, sy, sz); };   // (on a rock's top, turned about its own x)
 const AGM_ROBE = new THREE.Color(0.1, 0.09, 0.09), AGM_NOV = new THREE.Color(0.38, 0.27, 0.17), AGM_STONEC = new THREE.Color(0.78, 0.7, 0.56);
@@ -35975,7 +35974,7 @@ const MATCH = { id: '', kind: '', phase: '', t0: 0, lock: 0, over: 0, roster: ne
 // How a fight is set, by whoever calls it (and sent with the call, so it is the same fight for everyone in it): how long the
 // ring takes to close, how fast everything flies, how wide the ring is when it starts and when it has closed.
 const WAR_DEF = { close: 40, speed: 1, ring: 460, floor: 110, time: 45, warm: 8 },   // (short and close: a small ring that closes in under a minute)
-     WAR_DEF_OLD = null, WAR_LIM = { close: [40, 900], speed: [0.6, 2], ring: [400, 3200], floor: [120, 1200], time: [40, 600], warm: [0, 90] };
+  WAR_LIM = { close: [40, 900], speed: [0.6, 2], ring: [400, 3200], floor: [120, 1200], time: [40, 600], warm: [0, 90] };
 const warCfg = c => { const o = {}; for (const k in WAR_DEF) { const v = c && c[k] != null ? +c[k] : NaN; o[k] = Number.isFinite(v) ? clamp(v, WAR_LIM[k][0], WAR_LIM[k][1]) : WAR_DEF[k]; } o.floor = Math.min(o.floor, o.ring * 0.8); return o; };
 MATCH.cfg = warCfg((() => { try { return JSON.parse(localStorage.getItem('icarus.warcfg') || 'null'); } catch { return null; } })());
 Object.assign(MATCH, { spd: 1, hostId: '', lastOut: null, fin: null, overFor: 6500, againUntil: 0, last: null, kills: 0, liveAt: 0, game: 'tron', base: SUMMIT - 300, lo: 0, dur: 150, home: null,
@@ -37337,7 +37336,7 @@ function inkKey(b, lab, ci, quiet = false) {
   if (b._iw !== w) { b._iw = w; b.style.width = w + 'px'; b.style.height = h + 'px'; RECT.delete(b); }
   const r = rectOf(b, 150); if (r.width < 2) return;
   const hot = b.matches(':hover') || document.activeElement === b, row = uilRow(r.top + r.height / 2), c0 = uilCol(r.left + r.width / 2) - ((lab.length + 4) >> 1), br = quiet ? 0.6 + 0.4 * Math.sin(time * 4.4) : 1;
-  uilPlate(c0, row, c0 + lab.length + 3, row, hot ? 235 : 205); uilPut(c0, row, 91, hot ? 2 : 1, 255 * br | 0); uilPut(c0 + lab.length + 3, row, 93, hot ? 2 : 1, 255 * br | 0); uilText(c0 + 2, row, lab, hot ? 2 : ci, (hot ? 255 : 240 * br) | 0);
+  uilPlate(c0, row, c0 + lab.length + 3, row, hot ? 235 : 205); uilClear(c0, row, c0 + lab.length + 3, row); uilPut(c0, row, 91, hot ? 2 : 1, 255 * br | 0); uilPut(c0 + lab.length + 3, row, 93, hot ? 2 : 1, 255 * br | 0); uilText(c0 + 2, row, lab, hot ? 2 : ci, (hot ? 255 : 240 * br) | 0);
   if (hot) { uilPut(c0 - 2, row, 62, 2, 230); uilPut(c0 + lab.length + 5, row, 60, 2, 230); }
 }
 function matchInk(now) {
@@ -37527,7 +37526,7 @@ function updatePylonBlaze(dt) {
     if ((P.shockT -= dt) <= 0 && k > 0.3) { P.shockT = 2.4; shock(P.x, P.top + 4, P.z, new THREE.Color(P.hex).getHex(), 110, 1.3, false); } }
 }
 function matchLeave() {
-  const p = player, wasIn = MATCH.me.in, ghost = MATCH.ghost, over = MATCH.phase === 'over'; ringsClear(); pwClear(); if (MD.cam) mdCamOff(); MD.plan = null; MD.id = ''; mdReadyBtn(false); if (MATCH.phase === 'count') aresHush();
+  const wasIn = MATCH.me.in, ghost = MATCH.ghost, over = MATCH.phase === 'over'; ringsClear(); pwClear(); if (MD.cam) mdCamOff(); MD.plan = null; MD.id = ''; mdReadyBtn(false); if (MATCH.phase === 'count') aresHush();
   for (const id of MATCH.roster.keys()) { const T = TRON.trails.get(id); if (!T) continue; if (T.sign && MATCH.win === id) { T.match = ''; T.signAt = time; continue; } tronClear(T); T.match = ''; T.sign = false; }   // (what the winner wrote on the sky is left there)
   for (const C of MATCH.cpus) { cpuShow(C, false); const P = NET.peers.get(C.id); if (P) { P.seen = false; dropPeer(C.id, P); NET.peers.delete(C.id); } tronDrop(C.id); }
   if (MATCH.ring) MATCH.ring.visible = false;
@@ -37578,7 +37577,7 @@ function cpuShow(C, on) {
   if (first) { P.pos.copy(C.pos); P.yaw = C.yaw; } if (P.patron !== C.pat) { P.patron = C.pat; if (P.av) paintPeer(P); }
 }
 function cpuFly(C, dt) {
-  const M = MATCH, K = 1;
+  const M = MATCH;
   if (C.reAt) { if (time < C.reAt) return; cpuBack(C); }   // (a practice hit in the warm-up: a beat, then back on its line)
   fbCpu(C, dt);   // (it throws fire too, now and then, and has its wind)
   if (fshCpu(C, dt)) { cpuShow(C, true); const Pf = NET.peers.get(C.id); if (Pf) Pf.form = 't'; return; }   // (dropping under a wall as a man: see fshCpu)
@@ -38137,7 +38136,7 @@ MODES.possess = { name: 'POSSESSION', words: ['possess', 'possession', 'swap', '
   bar(el) { return [`POSSESSION · ${moClock(moLeft(el))}`, `you ${Math.round(MO.sc.get(NET.id) || 0)} · ${moBoard(3) || 'knock one out to take their bird'}`]; },
 };
 function psSnap(id) {   // (where one is, how fast, which way: his own, a house's bird, anyone else as seen)
-  const M = MATCH, p = player, C = moCpu(id), P = !C && id !== NET.id ? NET.peers.get(id) : null;
+  const p = player, C = moCpu(id), P = !C && id !== NET.id ? NET.peers.get(id) : null;
   if (id === NET.id) return { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.form === 'phoenix' ? p.yaw : human.group.rotation.y, sp: p.form === 'phoenix' ? p.speed : p.vel.length() };
   if (C) return { x: C.pos.x, y: C.pos.y, z: C.pos.z, yaw: C.yaw, sp: C.speed };
   return P && P.s ? { x: P.pos.x, y: P.pos.y, z: P.pos.z, yaw: P.yaw || 0, sp: Math.hypot(P.s.vx, P.s.vy, P.s.vz) } : null;
@@ -38149,7 +38148,7 @@ function psPut(id, S) {   // (his own bird, or a house's he flies, to where anot
   else if (C && M.host) { C.pos.set(S.x, S.y, S.z); C.prev.copy(C.pos); C.yaw = S.yaw; C.pitch = 0; C.speed = clamp(S.sp, 50, 300); C.imm = time + 1.5; C.tgtT = 0; cpuShow(C, true); }
 }
 function psDo(victim, killer, V, K, mine) {
-  const M = MATCH; psPut(victim, K); psPut(killer, V);   // (each where the other was)
+  psPut(victim, K); psPut(killer, V);   // (each where the other was)
   for (const id of [victim, killer]) { const T = TRON.trails.get(id); if (T) tronClear(T); }
   moAdd(killer); MO.dirty = true;
   for (const S of [V, K]) if (camera.position.distanceToSquared(_v.set(S.x, S.y, S.z)) < 1800 * 1800) { shock(S.x, S.y, S.z, 0xd0a0ff, 46, 0.7, true); burst(S.x, S.y, S.z, TOUCH ? 30 : 80, 24, 0.9); }
@@ -38751,7 +38750,7 @@ function lzJudge(by, id, n, S, d, L, local) {
 }
 // cut, decided here: said to everyone with where it was and how it was turned and going; shown; and out for a moment
 function lzCut(by, id, n, S, d) {
-  const M = MATCH, C = moCpu(id), me = id === NET.id, p = player, man = me ? p.form !== 'phoenix' : !!C?.fsh, X = me ? p.pos : C.pos;
+  const C = moCpu(id), me = id === NET.id, p = player, man = me ? p.form !== 'phoenix' : !!C?.fsh, X = me ? p.pos : C.pos;
   const yaw = me ? (man ? human.group.rotation.y : p.yaw) : C.yaw, pitch = man ? 0 : me ? p.pitch : C.pitch, bank = man ? 0 : me ? p.bank : C.bank, K = me ? (man ? 1 : birdK()) : moK(id) || 1;
   lzVel(id, _lzW); const r2 = v => Math.round(v * 100) / 100, r1 = v => Math.round(v * 10) / 10;
   moSay('cut', { n, by, who: me ? undefined : id, x: r1(X.x), y: r1(X.y), z: r1(X.z), v: [r1(_lzW.x), r1(_lzW.y), r1(_lzW.z)], q: [r2(yaw), r2(pitch), r2(bank)], f: man ? 1 : undefined, s: K, p: [r1(S.x), r1(S.y), r1(S.z)], d: [d.x, d.y, d.z].map(v => Math.round(v * 1000) / 1000) });
@@ -40296,7 +40295,7 @@ function czSlide(n) { const f = _czf.set(0, 0, -1).applyQuaternion(COSMOS.q), in
 function cosmosBeat() { const C = COSMOS; C.brakeT = 0; if (C.beatT > 0.45) return; C.beatT = 0.9; C.v *= player.form === 'human' ? 1.18 : 1.25; WR.beat = 1; CZS.ring = 1; audio.sfx.flap?.(1); }   // (one stroke at a time: a long one, out here)
 // the frame in space: the worlds moved on, the eye placed, everything put where the eye sees it
 function cosmosFrame(dt) {
-  const C = COSMOS, p = player, t = Date.now() / 1000; C.uT.value = time;
+  const C = COSMOS, t = Date.now() / 1000; C.uT.value = time;
   czGlobeStep(TOUCH ? 1 : 1.6);
   if (!C.tex.job && performance.now() - C.tex.at > 120000 && Math.abs(mapCells.over.size + WORLD.cells.over.size - C.tex.n) > 4) czGlobeStart();   // (refreshed now and then, if more has been charted)
   czCells();
@@ -40743,7 +40742,7 @@ function xoArrive() {
 }
 function xoVisitStart(first) {
   const n0 = cleanName(XO.pp.n), n = n0.replace(/ /g, '').length >= 2 && n0 !== 'SOMEONE' ? n0 : 'TRAVELLER';
-  nameInput.value = n; setName(n, false); nameAsked = true;
+  nameInput.value = n; setName(n, false); 
   if (state === 'title') begin();
   xoWhenPlay(() => { if (first) xoToOlympus(); toast(`WELCOME TO ICARUS, ${n} · YOU'RE THE PHOENIX HERE · OUT IN SPACE, BURNING STUDIO MUSIC TAKES YOU HOME`); });
 }
@@ -41635,7 +41634,7 @@ function cznItem(id, x, y, z, fx, fy, fz, ux, uy, uz, col, rest, sp) {
 }
 // where each of them is now, from the shared clock
 function cznWhere() {
-  const C = COSMOS, t = Date.now() / 1000, W = czdWays(); CZN.n = 0;
+  const t = Date.now() / 1000, W = czdWays(); CZN.n = 0;
   const flock = (id, def, x, y, z, f, u, sp) => { const s = _cd2.crossVectors(f, u); for (let m = 0; m < def.n; m++) { const b = m * 16, sd = m ? (m % 2 ? 1 : -1) * Math.ceil(m / 2) * 11 : 0, h = Math.sin(t * 0.9 + m * 1.7) * 3;
     cznItem(id * 8 + m, x - f.x * b + s.x * sd + u.x * h, y - f.y * b + s.y * sd + u.y * h, z - f.z * b + s.z * sd + u.z * h, f.x, f.y, f.z, u.x, u.y, u.z, def.col, false, sp); } };
   cznDefs().forEach((def, i) => {
@@ -43230,8 +43229,7 @@ setTimeout(() => xoHold(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { keyCard, toast, AEON, AEON_K, aeonBolt, cosmosEnter, COSMOS, aeonVisit, aeonPath, aeonInit, updateAeons, aeonCosmos, PAL, palGround, palHit, palIn, TRK, palTrinket, palTrinketNear, PAL_TRINKETS, palLift, palPadNear, palLife, PRUN, palSleep, palBedNear, palStationNear, palGame, updatePalace, mapCross, czGo, cosmosMap, voiceParse, COSMOS, HY, mapCv: typeof mapCv !== 'undefined' ? mapCv : null, OSTAR, SANCT, TABLE, ostarAt, ostarGive, gotOly, pillarLight, perchLook, ROCK, ROCKK, rockSpot, rockFixed, rockFront, rockMake, rockBreak, mineSwing, gotMine, DROP, dropAdd, GATHER, gatherAct, errandNear, axeCheck, axeHeph, atForge, RECIPES, CRAFT, craftRows, craftRowDo, craftMake, bldList, invHas, DREAM, dreamSkip, topAt, surfAt, structHit, roostFind, camera, dir3, MOUSE, turnForm, turnMan, turnBird, wingsOut, armsOut, TURNC, MOUNT, updatePerch, get camYaw() { return camYaw; }, get time() { return time; }, agBuild, agWeb, agReach, agSpans, agWool, agStill, agNear, AGM, agmRocks, agmIgnite, agmGround, agmPieces, agmBurnAt, agDeck, agmAct, FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
-    camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, RR, rrJoin, rrMine, rrFetch, rrPlace, rrLayout, gotRjoin, get RING_DONE() { return RING_DONE; }, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { keyCard, toast, AEON, AEON_K, aeonBolt, cosmosEnter, aeonVisit, aeonPath, aeonInit, updateAeons, aeonCosmos, PAL, palGround, palHit, palIn, TRK, palTrinket, palTrinketNear, PAL_TRINKETS, palLift, palPadNear, palLife, PRUN, palSleep, palBedNear, palStationNear, palGame, updatePalace, mapCross, czGo, cosmosMap, COSMOS, HY, mapCv: typeof mapCv !== 'undefined' ? mapCv : null, OSTAR, SANCT, TABLE, ostarAt, ostarGive, gotOly, pillarLight, perchLook, ROCK, ROCKK, rockSpot, rockFixed, rockFront, rockMake, rockBreak, mineSwing, gotMine, DROP, dropAdd, GATHER, gatherAct, errandNear, axeCheck, axeHeph, atForge, RECIPES, CRAFT, craftRows, craftRowDo, craftMake, bldList, invHas, DREAM, dreamSkip, topAt, surfAt, structHit, roostFind, dir3, MOUSE, turnForm, turnMan, turnBird, wingsOut, armsOut, TURNC, updatePerch, get camYaw() { return camYaw; }, get time() { return time; }, agBuild, agWeb, agReach, agSpans, agWool, agStill, agNear, AGM, agmRocks, agmIgnite, agmGround, agmPieces, agmBurnAt, agDeck, agmAct, FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, WRE, wreathFound, wreathPass, gotWreath, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, PRO_C, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, BIG, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, partShift, AG, agTake, agSite, agCommand, agStanding, TOAST, ALPS, alpAt, MINTRO, matchSetOut, matchLeave, matchCpu, xrMode, xrRein, xrHear, RIDER, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, DP, dpHear, dpParse, dpExit, PART, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, DEEP, BIRDS, seaGust, currentAt, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PV, XALB, xalbOpen, xalbGo, gotCrater, godPresence, PRES, showForm, birdK, birdPow, PLACE, placeNow, updatePlaces, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, xmapPinch, lookWear, sagaStart, sagaAdvance, questEvent, GLITCH, PHX_S, godSound, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, leaveTalk, stick, keys, A3, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrStep, torchLight, audienceBegin, audienceEnd, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, otherById, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, terrainAt, updateSkim, tsunamis, PERCH, perchSeek, perchGo, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, RELIEF, mapMode, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, SIZ, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, landPose, SHOTS, photoCycle, biomeAt, biomeW, buildHadesHall, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic, camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, RR, rrJoin, rrMine, rrFetch, rrPlace, rrLayout, gotRjoin, get RING_DONE() { return RING_DONE; }, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { cpusCmd, MOD, die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AG, agTake, AGX, agxPoll, agxSend, agxDraw, agxTab, agxAt, agxHear, agxCommand, CH, chShow, sendChat, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { FLY, flyDrag, airLift });
   if (window.__icarus) Object.assign(window.__icarus, { XO, xoToSpace, xoCross, xoAdmin, xoPeer, xoSkyGot, xoWrite, xoStadium, gotState, COSMOS, czForm, PL });   // (tests: the crossing)

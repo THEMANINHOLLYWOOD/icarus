@@ -8,8 +8,8 @@ share the world with everyone else who is playing.
 
 ## Run it yourself
 
-The whole game is one page, `index.html` (Three.js from a CDN, no build step), plus
-`audio.js`, `xr.js` and a few serverless routes in `api/`.
+The whole game is one page, `index.html` (Three.js from a CDN, nothing to build to
+run it), plus `audio.js`, `xr.js` and a few serverless routes in `api/`.
 
 ```bash
 node dev-server.mjs
@@ -27,6 +27,10 @@ scripted gods and no shared world. To turn the rest on, put keys in `.env.local`
 | `SUPABASE_SECRET_KEY` | saving marks in the shared world (server only) |
 
 The database schema is in `supabase/world.sql`.
+
+What is deployed is the same code with its comments and spacing taken out, which is
+about a quarter less to download: `node tools/build.mjs <folder>` does that to a copy
+(it needs `esbuild`; nothing is renamed or rewritten, and the files here stay as written).
 
 ## Controls
 
