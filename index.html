@@ -6883,7 +6883,7 @@ function updateCine(dt) {
   p.pos.y = Math.max(p.pos.y, floorAt() + 5);
   if (k >= 1) {
     p.cine = null; p.scale = 1; fireLight.intensity = 0;
-    if (!flags.morphed) { torchStart(); flags.wideT = 7; witness('threw himself off the mountain top, burned alive in mid-air, and came out of the fire as a phoenix'); TUT.later = ['flight', 3, time + 9]; }   // his first sight of himself: very wide, then in behind him
+    if (!flags.morphed) { torchStart(); flags.wideT = 7; aeonVisit(PATRON.id || 'zeus', true); witness('threw himself off the mountain top, burned alive in mid-air, and came out of the fire as a phoenix'); TUT.later = ['flight', 3, time + 9]; }   // his first sight of himself: very wide, then in behind him
     if (story.phase === 'leap' || story.phase === 'summit') { story.phase = 'gods'; say(GODS_INTRO, '', true); flags.flapHintT = 16; if (!story.titans) startTitans(); saveSoon(); }
     else if (!flags.morphed) flags.flapHintT = 10;
     flags.morphed = true;
@@ -10922,6 +10922,7 @@ function chatCommand(text) {
     case 'cpus': case 'npcs': cpusCmd(low); return true;
     case 'cpu': case 'npc': case 'bots': if (/^(off|none|0|remove|away|no|on|back|normal|all)$/.test(low)) { cpusCmd(low); return true; } if (MATCH.phase === 'count' && MATCH.host) matchCpu(parseInt(arg) || 3); else if (!MATCH.phase) matchWar(clamp(parseInt(arg) || 3, 1, 12)); else sys('ONLY BEFORE IT STARTS'); return true;
     case 'hamlet': case 'cabin': case 'cabins': agCommand(arg); return true;
+    case 'greatbird': case 'greatbirds': case 'godbird': case 'godbirds': { const id = AEON_K[low] ? low : PATRON.id || 'zeus'; sys(aeonVisit(id) ? `THE GREAT BIRD OF ${id.toUpperCase()} IS COMING OVER · LOOK UP` : 'ONE OF THEM IS ALREADY ON ITS WAY TO YOU'); return true; }
     case 'circle': case 'orbit': circleStart(); return true;
     case 'message': case 'msg': case 'm': case 'dm': case 'w': case 'whisper': case 'tell': messageCmd(arg); return true;
     case 'note': case 'vn': case 'voicenote': xfNoteCmd(arg); return true; case 'file': case 'sendfile': xfFileCmd(arg); return true; case 'files': case 'post': case 'inbox': xfFilesCmd(low); return true;
@@ -33676,7 +33677,7 @@ function tick(dt) {
   updateCamera(dt);
   if (dbgCam.on) { camera.position.copy(dbgCam.p); camera.up.set(0, 1, 0); camera.lookAt(dbgCam.l); camera.fov = dbgCam.fov; camera.updateProjectionMatrix(); }   // (a fixed lens, for tests)
   updatePalette(dt);
-  updateClouds(dt);
+  updateClouds(dt); updateAeons(dt);
   updateSea(dt); updateSkim(dt); skimParts(dt); updateCaves(dt); updateFish(dt); updateDeep(dt); statsTick(dt); updateAreas(dt); updateGod(dt); globalThis.DAIMON?.update(dt); updateTron(dt); updateMatch(dt); updateGfly(dt); updateShore(); updateRivers(dt); updateStone(dt); updatePlaces(dt); updateDrift(dt); updateTear(dt); updatePools(dt);
   updateRings(dt); updateHouseBooms(dt);
   updateWorldLife(dt); updateLeaves(dt); updateLava(dt); updateEruptions(dt); updateCraters(dt); updateArena(dt); updateGrass(dt); updateFlowers(dt); updateWeather(dt); updateTwisters(dt); updateFire(dt); updateFlies(dt); updateFriends(dt); updatePantheon(dt); updateGusts(dt); updateHigh(dt);
@@ -39294,6 +39295,268 @@ function areaFc(P, t) {
   return false;
 }
 
+// ───────────────────────── the great birds of the gods ─────────────────────────
+// ── Thirteen phoenixes, one for each of the Twelve and one for Hades, a hundred times the size of his own: a kilometre and
+//    more from wingtip to wingtip, with tails as long again. They are drawn as plainly as anything here (a body, two long
+//    swept wings, a few streamers) and every movement of them is a slow wave in the vertex shader: a wingbeat takes ten
+//    seconds and runs out along the wing from the shoulder, and the streamers follow. Their colours are their god's, with
+//    stars in them; by night they are their own light.
+//    Where they are comes off the shared clock (aeonPath: a wide round of Olympus with a smaller one turning on it), so
+//    everyone sees the same bird over the same hill. One that is past the end of the picture is drawn nearer and smaller
+//    in proportion, so it is still there on the horizon. Now and then one leaves its round and crosses the sky over
+//    whoever is playing (aeonVisit): the first time he flies, it is his own god's. Out in space they go round the globe
+//    below the rings, bigger again (aeonCosmos).
+//    What goes with them: under any of them the air is full of its colour. Zeus's carries a thunderstorm and throws
+//    lightning out of itself; under Poseidon's the sea stands up in a hill and goes over the low ground, and great waves
+//    run out from it; to Hades's the dead fly up out of the ground in a turning column. Apollo's brings golden light,
+//    Artemis's mist, Hera's a clear sky; under Demeter's the ground flowers.
+const AEON_K = {
+  zeus: { S: 800, beat: 11, amp: 0.4, wx: 'thunder', r: 2100, say: 'THUNDER GOES WITH HIM' },
+  hera: { S: 660, beat: 12, amp: 0.36, wx: 'calm', r: 1500, say: 'THE SKY CLEARS FOR HER' },
+  poseidon: { S: 760, beat: 13, amp: 0.44, wx: 'waves', r: 2100, say: 'THE SEA RISES UNDER HIM' },
+  demeter: { S: 620, beat: 12, amp: 0.38, wx: '', r: 1500, say: 'THE GROUND FLOWERS UNDER HER' },
+  athena: { S: 640, beat: 10, amp: 0.34, wx: '', r: 1500, say: 'GREY, AND WITHOUT A SOUND' },
+  apollo: { S: 680, beat: 9, amp: 0.4, wx: 'gold', r: 1900, say: 'GOLDEN LIGHT GOES WITH HIM' },
+  artemis: { S: 600, beat: 8.5, amp: 0.42, wx: 'mist', r: 1500, say: 'SILVER MIST GOES WITH HER' },
+  ares: { S: 700, beat: 9.5, amp: 0.46, wx: '', r: 1500, say: 'EMBERS FALL FROM HIM' },
+  aphrodite: { S: 580, beat: 11, amp: 0.38, wx: '', r: 1500, say: 'PETALS FALL FROM HER' },
+  hephaestus: { S: 700, beat: 12.5, amp: 0.4, wx: '', r: 1500, say: 'SPARKS FALL FROM HIS FORGE' },
+  hermes: { S: 540, beat: 7, amp: 0.44, wx: '', r: 1400, v: 1.5, say: 'QUICKER THAN THE REST' },
+  dionysus: { S: 600, beat: 10.5, amp: 0.4, wx: '', r: 1500, say: 'VINE LEAVES FALL FROM HIM' },
+  hades: { S: 780, beat: 14, amp: 0.36, wx: 'grey', r: 1900, say: 'THE DEAD FLY UP TO HIM', hex: ['#4a5cff', '#b8d0ff', '#8a5cff', '#06061a'] } };
+const AEON = { list: [], sp: null, geo: null, uT: { value: 0 }, uSun: { value: new THREE.Vector3(0, 1, 0) }, uHaze: { value: new THREE.Color() }, uNight: { value: 0 }, uFar: { value: 11000 },
+  visit: null, nextT: 150, bolt: null, boltT: [0, 0], boltN: 0, dome: null, wr: null, gy: WATER, gyT: 0, thruT: 0, seen: 0 };
+const AEON_VS = `attribute float aS, aK, aD, aC; uniform float uTime, uBeat, uPh, uAmp; varying float vS, vK, vD, vC; varying vec3 vW;
+  float wa(float s, float t, float A){ return A * sin(t - 1.3 * s) * (0.28 + 0.72 * s) + 0.1; }   // (how far up the wing is at each point along it: the stroke runs out from the shoulder)
+  void main(){
+    vec3 p = position; float t = uTime * 6.2831853 / uBeat + uPh;
+    float A = uAmp * (0.6 + 0.4 * smoothstep(-0.3, 0.5, sin(uTime * 0.043 + uPh * 2.0)));   // (some of the time it only glides)
+    if (aK > 2.5) { p.y += 0.02 * aS * aS * sin(t * 1.7 - 3.0 * aS + aD); }
+    else if (aK > 1.5) { float s = aS, ph = aD * 1.3;
+      p.y += (0.1 * s * s + 0.015 * s) * sin(t * 1.7 - 4.6 * s + ph) - 0.05 * s * s;
+      p.x += 0.045 * s * s * sin(t * 1.15 - 3.2 * s + ph * 1.9); }
+    else if (aK > 0.5) { float s = aS, span = abs(position.x) - 0.05, a = mix(wa(s * 0.5, t, A), wa(s, t, A), 0.45);
+      p.x = aD * (0.05 + span * cos(a)); p.y += span * sin(a);
+      p.y += (aC - 0.35) * 0.1 * (1.0 - 0.6 * s) * cos(t - 1.3 * s) * A * 1.5;   // (the trailing edge comes after the leading: the wing twists through the stroke)
+      p.z += 0.08 * s * s * sin(t - 2.0) * A; }
+    else p.y += 0.012 * (1.0 - aS) * sin(t + 1.0);
+    p.y -= 0.03 * A * sin(t - 0.4);   // (and the whole of it rides up as the wings come down)
+    vS = aS; vK = aK; vD = aD; vC = aC;
+    vec4 w = modelMatrix * vec4(p, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w;
+  }`;
+const AEON_FS = `uniform vec3 uA, uB, uC, uDp, uSun, uHaze; uniform float uTime, uNight, uHazeK, uFlash, uVis, uFar; varying float vS, vK, vD, vC; varying vec3 vW;
+  float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  void main(){
+    if (uVis < 0.995 && h21(floor(gl_FragCoord.xy * 0.5)) > uVis) discard;   // (it comes and goes a grain at a time)
+    vec3 n = normalize(cross(dFdx(vW), dFdy(vW))), v = normalize(cameraPosition - vW); if (dot(n, v) < 0.0) n = -n;
+    float lit = 0.5 + 0.5 * dot(n, uSun), rim = pow(1.0 - max(dot(n, v), 0.0), 2.0);
+    vec3 c;
+    if (vK < 0.5) c = mix(uB, uA, smoothstep(0.1, 0.75, vS));
+    else if (vK < 1.5) { c = mix(uB, uA, smoothstep(0.0, 0.3, vS)); c = mix(c, uDp, smoothstep(0.4, 1.0, vS) * 0.85); c = mix(c, uC, 0.6 * smoothstep(0.5, 1.0, vC) * (1.0 - 0.4 * vS));
+      c += uC * 0.35 * pow(0.5 + 0.5 * sin(vS * 8.0 - uTime * 0.6), 8.0); }   // (a light that runs out along the wing)
+    else { c = mix(uA, uC, smoothstep(0.0, 0.65, vS)); c = mix(c, uB, smoothstep(0.76, 1.0, vS)); }
+    vec2 g = vec2(vS * 44.0, vC * 8.0 + vK * 17.0 + vD * 5.0), id = floor(g); float h = h21(id);
+    float star = step(0.84, h) * smoothstep(0.34, 0.0, length(fract(g) - 0.5)) * max(0.0, 0.45 + 0.55 * sin(uTime * (0.8 + h * 2.5) + h * 40.0));
+    vec3 col = c * (0.78 + 0.4 * lit) * mix(1.05, 1.7, uNight) + uB * rim * 0.25 + vec3(1.0, 0.97, 0.9) * star * (0.5 + 1.5 * uNight)
+      + vec3(0.8, 0.9, 1.3) * uFlash * (0.4 + 0.6 * h21(id + floor(uTime * 20.0)));
+    col = mix(col, uHaze, uHazeK * (1.0 - 0.6 * uNight) * smoothstep(1800.0, uFar, length(cameraPosition - vW)));   // (far off it takes the colour of the air it is seen through)
+    gl_FragColor = vec4(col, 1.0);
+  }`;
+// the one shape they all are, half a wingspan to the unit, flying toward -z. Each point says which part it is of (aK: body,
+// wing, tail streamer, crest), how far along that part (aS), which wing or which streamer (aD) and where across it (aC)
+function aeonGeo() {
+  const pos = [], aS = [], aK = [], aD = [], aC = [], idx = [];
+  const V = (x, y, z, s, k, d, c) => { pos.push(x, y, z); aS.push(s); aK.push(k); aD.push(d); aC.push(c); };
+  const grid = (n, m, base) => { for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) { const a = base + i * (m + 1) + j, b = a + m + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); } };
+  { const NS = 30, NC = 6;   // the wings: long, swept back to a point
+    for (const side of [-1, 1]) { const base = pos.length / 3;
+      for (let i = 0; i <= NS; i++) { const s = i / NS, zl = -0.2 + 0.66 * Math.pow(s, 1.75), ch = 0.38 * Math.pow(1 - s, 0.6) * (1 - 0.18 * Math.sin(Math.PI * Math.min(1, s * 1.6))) + 0.006;
+        for (let j = 0; j <= NC; j++) { const c = j / NC; V(side * (0.05 + 0.95 * s), 0.03 * Math.sin(Math.PI * c) * (1 - s), zl + ch * c, s, 1, side, c); } }
+      grid(NS, NC, base); } }
+  { const P = [[-0.56, 0.001, 0.03], [-0.5, 0.012, 0.035], [-0.45, 0.04, 0.04], [-0.39, 0.048, 0.035], [-0.33, 0.032, 0.02], [-0.22, 0.05, 0.005], [-0.08, 0.08, 0], [0.08, 0.085, 0], [0.22, 0.06, 0], [0.33, 0.03, 0.005], [0.4, 0.006, 0.01]], NB = 10, base = pos.length / 3;
+    P.forEach(([z, r, y], i) => { for (let j = 0; j <= NB; j++) { const a = j / NB * Math.PI * 2; V(Math.cos(a) * r, y + Math.sin(a) * r * 0.8, z, i / (P.length - 1), 0, 0, j / NB); } });   // the body: beak, head, a long neck, breast, rump
+    grid(P.length - 1, NB, base); }
+  const ribbon = (x0, y0, z0, dx, dy, dz, L, w, N, k, d, spoon) => { const base = pos.length / 3, l = Math.hypot(dx, dz) || 1, cx = dz / l, cz = -dx / l;
+    for (let i = 0; i <= N; i++) { const t = i / N, e = (t - 0.78) / 0.22, half = w * (!spoon ? 1 - 0.85 * t : t < 0.78 ? 0.5 + 0.3 * t : (0.74 + Math.sin(e * Math.PI) * 1.5) * (1 - e * e * e));
+      V(x0 + dx * L * t - cx * half, y0 + dy * L * t, z0 + dz * L * t - cz * half, t, k, d, 0); V(x0 + dx * L * t + cx * half, y0 + dy * L * t, z0 + dz * L * t + cz * half, t, k, d, 1); }
+    grid(N, 1, base); };
+  for (let k = 0; k < 7; k++) { const a = (k - 3) * 0.15; ribbon(0, 0, 0.34, Math.sin(a), 0, Math.cos(a), [0.95, 1.2, 1.5, 1.85, 1.5, 1.2, 0.95][k], [0.035, 0.04, 0.045, 0.055, 0.045, 0.04, 0.035][k], 26, 2, k, true); }   // seven streamers, each ending in a spoon
+  for (let k = 0; k < 3; k++) { const a = (k - 1) * 0.5, l = Math.hypot(Math.sin(a) * 0.3, 0.45, 0.85); ribbon(0, 0.08, -0.43, Math.sin(a) * 0.3 / l, 0.45 / l, 0.85 / l, 0.24 + (k === 1 ? 0.08 : 0), 0.014, 8, 3, k * 2.1, false); }   // a crest thrown back off the head
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  for (const [n, a] of [['aS', aS], ['aK', aK], ['aD', aD], ['aC', aC]]) g.setAttribute(n, new THREE.Float32BufferAttribute(a, 1));
+  g.setIndex(idx); return g;
+}
+function aeonMat(A, space) {
+  const E = AEON, P = A.pal;
+  return new THREE.ShaderMaterial({ side: THREE.DoubleSide, fog: false, vertexShader: AEON_VS, fragmentShader: AEON_FS, uniforms: {
+    uTime: E.uT, uBeat: { value: A.K.beat }, uPh: { value: A.i * 1.7 }, uAmp: { value: A.K.amp }, uA: { value: P[0] }, uB: { value: P[1] }, uC: { value: P[2] }, uDp: { value: P[3] },
+    uSun: space ? { value: CZ_SUN } : E.uSun, uHaze: E.uHaze, uNight: space ? { value: 1 } : E.uNight, uHazeK: { value: space ? 0 : 0.55 }, uFlash: { value: 0 }, uVis: { value: 1 }, uFar: E.uFar } });
+}
+function aeonInit() {
+  const E = AEON; if (E.list.length) return; E.geo = aeonGeo();
+  Object.keys(AEON_K).forEach((id, i) => { const K = AEON_K[id], r = mulberry32(9001 + i * 77), hex = K.hex || HB_HEX[id], R1 = 2200 + r() * 7800;
+    const A = { id, i, K, S: K.S, name: id.toUpperCase(), pal: hex.map(h => new THREE.Color(h)), mote: col3(hex[0]), pos: new THREE.Vector3(), q: new THREE.Quaternion(), vis: 1, flash: 0, cd: 2 + r() * 4, mT: 0, toldT: -1e9, wxq: null, bloomT: 0, d: 1e9,
+      R1, w1: (r() < 0.5 ? -1 : 1) * (55 + r() * 35) * (K.v || 1) / R1, p1: r() * 6.283, R2: R1 * (0.18 + r() * 0.12), w2k: 1.8 + r() * 0.6, p2: r() * 6.283, y0: 2900 + r() * 450, ya: 250 + r() * 350, p3: r() * 6.283 };
+    A.mat = aeonMat(A, false); A.mesh = new THREE.Mesh(E.geo, A.mat); A.mesh.frustumCulled = false; A.mesh.visible = false; scene.add(A.mesh); E.list.push(A); });
+  E.bolt = makeRibbons(2, 16); E.bolt.mesh.material.fog = false;   // (seen from kilometres off: the haze does not take it)
+}
+// where one is on its round at a moment of the shared clock: a wide circle about Olympus with a smaller one turning on it
+// (never so much smaller-and-faster that it stops and doubles back), rising and sinking, and higher where it goes by the mountain
+function aeonPath(A, t, o) {
+  const a = A.p1 + t * A.w1, b = A.p2 + t * A.w1 * A.w2k;
+  o.x = MOUNT.x + A.R1 * Math.cos(a) + A.R2 * Math.cos(b); o.z = MOUNT.z + A.R1 * Math.sin(a) + A.R2 * Math.sin(b);
+  o.y = A.y0 + A.ya * Math.sin(A.p3 + t * A.w1 * 1.9) + 420 * smoothstep(3600, 1400, Math.hypot(o.x - MOUNT.x, o.z - MOUNT.z));
+  return o;
+}
+const _gbE = new THREE.Euler(0, 0, 0, 'YXZ'), _gbA = new THREE.Vector3(), _gbB = new THREE.Vector3(), _gbC = new THREE.Vector3();
+// the one that has come over to him: a wide figure of eight laid on his sky, its crossing right over his head (twice in
+// the two and a half minutes it stays), the whole figure going with him as he flies
+function aeonLoop(V, t, o) { const a = 6.283 / 150 * (t + 15), x = 2600 * Math.cos(a), z = -1560 * Math.sin(2 * a); o.x = V.cx + V.fx * x - V.fz * z; o.z = V.cz + V.fz * x + V.fx * z; o.y = V.y + 110 * Math.sin(t * 0.06); return o; }
+function aeonPose(A, tc) {
+  const V = AEON.visit, vis = V && V.A === A && V.sw, t = vis ? V.t : tc, F = vis ? (u, o) => aeonLoop(V, u, o) : (u, o) => aeonPath(A, u, o);
+  F(t - 0.6, _gbA); F(t + 0.6, _gbB); F(t, A.pos);
+  const vx = _gbB.x - _gbA.x, vy = _gbB.y - _gbA.y, vz = _gbB.z - _gbA.z;
+  F(t - 4, _gbA); F(t - 2.8, _gbC); const h0 = Math.atan2(-(_gbC.x - _gbA.x), -(_gbC.z - _gbA.z));
+  F(t + 2.8, _gbA); F(t + 4, _gbC); const h1 = Math.atan2(-(_gbC.x - _gbA.x), -(_gbC.z - _gbA.z));
+  const dh = Math.atan2(Math.sin(h1 - h0), Math.cos(h1 - h0));   // (it leans into the turn it is making)
+  _gbE.set(Math.atan2(vy, Math.hypot(vx, vz)), Math.atan2(-vx, -vz), clamp(dh / 6.8 * 26, -0.55, 0.55)); A.q.setFromEuler(_gbE);
+}
+// one of them leaves its round and comes over him: in ahead of where he is looking, and over his head
+function aeonVisit(id, first = false) {
+  const E = AEON; aeonInit(); if (E.visit || realm !== 'over' || PL.on || COSMOS.on) return false;
+  const A = E.list.find(a => a.id === id) || E.list[0], p = player;
+  camera.getWorldDirection(_gbA); let fx = _gbA.x, fz = _gbA.z; const l = Math.hypot(fx, fz); if (l < 0.05) { fx = -Math.sin(p.yaw); fz = -Math.cos(p.yaw); } else { fx /= l; fz /= l; }
+  const V = E.visit = { A, t: 0, T: 150, sw: false, told: false, first, y: 0, y0: clamp(p.pos.y + 1000, 1400, 3250), yT: 0, cx: p.pos.x, cz: p.pos.z, fx, fz };
+  let top = 0; for (let i = 0; i < 16; i++) { aeonLoop(V, i * 9.4, _gbC); top = Math.max(top, terrainAt(_gbC.x, _gbC.z)); }   // (over whatever stands in its way)
+  V.y = V.yW = Math.max(V.y0, top + 560);
+  return true;
+}
+function aeonVisitStep(dt) {
+  const E = AEON, V = E.visit, play = state === 'play';
+  for (const A of E.list) if (!V || V.A !== A) A.vis = Math.min(1, A.vis + dt / 5);
+  if (!V) {
+    if (play && flags.morphed && !player.cine && realm === 'over' && (E.nextT -= dt) < 0) {
+      const near = E.list.some(A => A.d < 6000); E.nextT = near ? 120 : 320 + Math.random() * 400;
+      if (!near) { const far = E.list.filter(A => A.d > 9000), own = far.find(A => A.id === PATRON.id), A = own && Math.random() < 0.5 ? own : far.length ? pick(far) : null; if (A) aeonVisit(A.id); }
+    }
+    return;
+  }
+  const A = V.A;
+  if (!V.sw) { A.vis = A.d > 9000 ? 0 : Math.max(0, A.vis - dt / 2.2); if (A.vis <= 0) V.sw = true; return; }   // (it goes out where it was, and comes in over him)
+  V.t += dt; { const p = player.pos, k = damp(0.25, dt); V.cx = lerp(V.cx, p.x, k); V.cz = lerp(V.cz, p.z, k); }
+  if ((V.yT -= dt) < 0) { V.yT = 1.5; aeonLoop(V, V.t + 8, _gbC); V.yW = Math.max(V.y0, terrainAt(_gbC.x, _gbC.z) + 560); } V.y = lerp(V.y, V.yW, damp(0.4, dt));
+  if (V.t < V.T) A.vis = Math.min(1, A.vis + dt / 5);
+  else { A.vis = Math.max(0, A.vis - dt / 4); if (A.vis <= 0) { E.visit = null; return; } }
+  if (!V.told && V.t > 3 && play) { V.told = true; toast(`LOOK UP · THE GREAT BIRD OF ${A.name}`); A.toldT = time;
+    if (V.first) witness(`looked up on his first flight and saw the great bird of ${cap(A.id)}, a kilometre across, go over the whole sky above him`, true); }
+}
+// lightning out of Zeus's bird itself, from its breast to the ground under it
+function aeonBolt(A, big) {
+  const E = AEON, x = A.pos.x + rnd(A.S * 0.95), z = A.pos.z + rnd(A.S * 0.95), gy = Math.max(terrainAt(x, z), WATER), k = E.boltN++ % 2;
+  const sx = A.pos.x + rnd(A.S * 0.3), sz = A.pos.z + rnd(A.S * 0.3), sy = A.pos.y - 12;
+  E.bolt.clear(k); for (let i = 16; i >= 0; i--) { const t = i / 16, w = Math.sin(Math.PI * t) * 120; E.bolt.lead(k, lerp(sx, x, t) + rnd(w), lerp(sy, gy, t), lerp(sz, z, t) + rnd(w), 0); }
+  E.boltT[k] = 0.3; A.flash = 1;
+  const d = Math.hypot(x - camera.position.x, z - camera.position.z);
+  skyFlash = Math.max(skyFlash, (0.45 + big * 0.5) * smoothstep(7000, 500, d)); flash = Math.max(flash, (0.1 + big * 0.2) * smoothstep(4500, 300, d)); postMat.uniforms.uFlashCol.value.setRGB(0.75, 0.85, 1.1);
+  camShake = Math.max(camShake, big * 0.6 * smoothstep(900, 80, d));
+  if (d < 5000) setTimeout(() => { audio.sfx.thunder?.(); if (d < 900) audio.sfx.crack?.(); }, Math.min(5000, d / 0.34));
+  if (d < 2200) for (let i = 0; i < 16; i++) emit(x + rnd(3), gy + 1, z + rnd(3), rnd(14), 4 + Math.random() * 16, rnd(14), 0.5 + Math.random() * 0.5, [1.0, 1.2, 2.0], 0);
+}
+// the hill of water that goes with Poseidon's: a wide low dome on the sea, with rings of foam on it, that covers whatever of the shore it passes over
+function aeonDome() {
+  const NR = 20, NA = 72, pos = [], col = [], idx = [];
+  for (let i = 0; i <= NR; i++) { const r = i / NR, y = Math.pow(0.5 + 0.5 * Math.cos(Math.PI * r), 1.3), foam = i % 4 === 2;
+    for (let j = 0; j <= NA; j++) { const a = j / NA * Math.PI * 2; pos.push(Math.cos(a) * r, y, Math.sin(a) * r); col.push(foam ? 0.72 : lerp(0.1, 0.04, r), foam ? 0.9 : lerp(0.46, 0.2, r), foam ? 0.94 : lerp(0.56, 0.36, r)); } }
+  for (let i = 0; i < NR; i++) for (let j = 0; j < NA; j++) { const a = i * (NA + 1) + j, b = a + NA + 1; idx.push(a, a + 1, b, b, a + 1, b + 1); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })); m.frustumCulled = false; m.visible = false; scene.add(m); return m;
+}
+// the dead that fly up to Hades's: dark winged things, a few pale, each on its own turn of the column
+function aeonWraiths() {
+  const N = TOUCH ? 70 : 150, g = new THREE.BufferGeometry(), r = mulberry32(666), P = [], c = new THREE.Color();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -0.55, -1, 0.06, 0.4, 0, 0, 0.05, 0, 0, -0.55, 0, 0, 0.05, 1, 0.06, 0.4, -0.18, 0, 0.1, 0.18, 0, 0.1, 0, 0, 0.75], 3));
+  const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }), N); m.frustumCulled = false; m.visible = false; scene.add(m);
+  for (let i = 0; i < N; i++) { P.push({ ph: r(), T: 34 + r() * 40, r0: 160 + r() * 900, a0: r() * 6.283, sz: 14 + r() * 30, tw: (1.5 + r() * 3) * (r() < 0.5 ? -1 : 1) });
+    m.setColorAt(i, r() < 0.15 ? c.setRGB(0.55, 0.7, 1.0) : c.setRGB(0.05 + r() * 0.06, 0.05 + r() * 0.05, 0.12 + r() * 0.12)); }
+  m.instanceColor.needsUpdate = true; return { m, P };
+}
+// what one of them does to the world under it (d: how far the eye is from it)
+function aeonPower(A, dt) {
+  const E = AEON, p = player, K = A.K, play = state === 'play', hd = Math.hypot(A.pos.x - p.pos.x, A.pos.z - p.pos.z), k = A.vis > 0.5 ? smoothstep(K.r, K.r * 0.35, hd) : 0, here = A.vis > 0.5 && A.d < 9000;
+  // the weather it carries: a place in the sky that goes where it goes
+  if (K.wx && A.vis > 0.5 && hd < 9000) {
+    if (!A.wxq || !WX.god.includes(A.wxq)) { A.wxq = { x: 0, z: 0, r: K.r, kind: K.wx, t0: time, until: 0 }; WX.god.push(A.wxq); }
+    A.wxq.x = A.pos.x; A.wxq.z = A.pos.z; A.wxq.until = time + 12;
+  }
+  // its colour coming down through the air round him, and its name, once as it comes over
+  if (play && k > 0.05) {
+    A.mT += dt * k * (TOUCH ? 8 : 16);
+    while (A.mT > 1) { A.mT--; const a = Math.random() * 6.283, r = 6 + Math.random() * 70, lx = p.form === 'phoenix' ? dir3.x * p.speed * 1.2 : 0, lz = p.form === 'phoenix' ? dir3.z * p.speed * 1.2 : 0;
+      emit(p.pos.x + lx + Math.cos(a) * r, p.pos.y + 10 + Math.random() * 44, p.pos.z + lz + Math.sin(a) * r, WIND.x * 3 + rnd(1.5), -(2 + Math.random() * 5), WIND.z * 3 + rnd(1.5), 3 + Math.random() * 2.5, A.mote, -1, 0.8 + Math.random() * 0.9); }
+    if (k > 0.35 && time - A.toldT > 240) { A.toldT = time; toast(`THE GREAT BIRD OF ${A.name} · ${K.say}`); if (!E.seen++) witness(`flew under the great bird of ${cap(A.id)} and saw what goes with it`, true); }
+  }
+  A.flash = Math.max(0, A.flash - dt * 4); A.mat.uniforms.uFlash.value = A.flash;
+  if (A.id === 'zeus') {
+    if (here && hd < 6500 && (A.cd -= dt) <= 0) { A.cd = lerp(0.9, 3.6, smoothstep(1500, 6000, hd)) * (0.6 + Math.random() * 0.9); if (state !== 'title' && state !== 'loading') aeonBolt(A, 0.5 + Math.random() * 0.5); else A.flash = 1; }
+  } else if (A.id === 'poseidon') {
+    const D = E.dome ||= aeonDome(); D.visible = here;
+    if (here) { D.position.set(A.pos.x, WATER - 0.6, A.pos.z); D.scale.set(1500, 150 * A.vis * (0.88 + 0.12 * Math.sin(time * 0.3)), 1500); D.rotation.y = time * 0.015;
+      if (play && hd < 4500 && (A.cd -= dt) <= 0) { A.cd = 5 + Math.random() * 6; const x = A.pos.x + rnd(800), z = A.pos.z + rnd(800); if (height(x, z) < WATER - 6) tsunami(x, z, 0.9 + Math.random() * 0.9); } }
+  } else if (A.id === 'hades') {
+    const W = E.wr ||= aeonWraiths(); W.m.visible = here;
+    if (here) {
+      if ((E.gyT -= dt) < 0) { E.gyT = 0.7; E.gyW = Math.max(terrainAt(A.pos.x, A.pos.z), WATER); } E.gy = lerp(E.gy, E.gyW, damp(0.8, dt));
+      for (let i = 0; i < W.P.length; i++) { const w = W.P[i], u = (time / w.T + w.ph) % 1, ang = w.a0 + u * w.tw * 6.283, rr = w.r0 * Math.pow(1 - u, 0.8) + 100 + 50 * Math.sin(u * 19 + i), dir = Math.sign(w.tw);
+        const sc = w.sz * smoothstep(0, 0.05, u) * smoothstep(1, 0.92, u) * A.vis;
+        _p.set(A.pos.x + Math.cos(ang) * rr, lerp(E.gy, A.pos.y - 50, Math.pow(u, 0.72)), A.pos.z + Math.sin(ang) * rr);
+        _gbE.set(0.45, Math.atan2(Math.sin(ang) * dir, -Math.cos(ang) * dir), Math.sin(time * 2 + i) * 0.4); _q.setFromEuler(_gbE);
+        _s.set(sc * (0.45 + 0.55 * Math.abs(Math.sin(time * 5.5 + i * 1.7))), sc, sc); _mat.compose(_p, _q, _s); W.m.setMatrixAt(i, _mat); }
+      W.m.instanceMatrix.needsUpdate = true;
+      if (play && hd < 1300 && Math.random() < dt * 7) { const a = Math.random() * 6.283, r = 20 + Math.random() * 260, x = p.pos.x + Math.cos(a) * r, z = p.pos.z + Math.sin(a) * r, gy = terrainAt(x, z);   // (where they come out of the ground near him)
+        if (gy > WATER) for (let i = 0; i < 9; i++) emit(x + rnd(1.5), gy + 0.3, z + rnd(1.5), rnd(2), 5 + Math.random() * 9, rnd(2), 1.2 + Math.random(), [0.2, 0.26, 0.6], 2, 1.4); }
+    }
+  } else if (A.id === 'demeter') {
+    if (play && k > 0.5 && time - A.bloomT > 25 && p.pos.y - groundAt(p.pos.x, p.pos.z, p.pos.y) < 40) { A.bloomT = time;
+      FLOWERS.bloom.push({ x: p.pos.x, z: p.pos.z, r: 34, col: A.mote, until: time + 600 }); if (FLOWERS.bloom.length > 6) FLOWERS.bloom.shift(); grassRetile(p.pos.x, p.pos.z, 44); }
+  }
+  // and whoever gets up as high as one and goes through it comes out with his fire full
+  if (play && p.form === 'phoenix' && A.vis > 0.9 && A.d < A.S * 2.6 && time > E.thruT) {
+    _gbA.copy(p.pos).sub(A.pos).applyQuaternion(_q.copy(A.q).invert()).divideScalar(A.S);
+    if (Math.abs(_gbA.x) < 1 && _gbA.z > -0.5 && _gbA.z < 0.45 && Math.abs(_gbA.y) < 0.12 + 0.3 * Math.abs(_gbA.x)) { E.thruT = time + 30; p.flame = 1; p.burnout = false; toast(`THROUGH THE WING OF ${A.name} · YOUR FIRE IS FULL`);
+      for (let i = 0; i < 70; i++) emit(p.pos.x + rnd(6), p.pos.y + rnd(6), p.pos.z + rnd(6), rnd(12), rnd(12), rnd(12), 1 + Math.random() * 1.5, A.mote, 0, 1.2); }
+  }
+}
+// every frame, in the world
+function updateAeons(dt) {
+  const E = AEON; if (!E.list.length) { if (state === 'loading') return; aeonInit(); }
+  E.uT.value = time;
+  if (realm !== 'over' || COSMOS.on || PL.on) { for (const A of E.list) { A.mesh.visible = false; A.d = 1e9; } if (E.dome) E.dome.visible = false; if (E.wr) E.wr.m.visible = false; for (let k = 0; k < 2; k++) { E.boltT[k] = 0; E.bolt.write(k, 0, 0, 0, 0, true); } E.bolt.commit(); return; }
+  const t = Date.now() / 1000, cam = camera.position, far = camera.far * 0.8;
+  E.uSun.value.copy(sunDir); E.uNight.value = clamp(pal.stars, 0, 1); E.uHaze.value.copy(scene.fog.color); E.uFar.value = far;
+  aeonVisitStep(dt);
+  for (const A of E.list) {
+    aeonPose(A, t); const d = A.d = A.pos.distanceTo(cam), k = d > far ? far / d : 1;   // (past the end of the picture: nearer and smaller in proportion)
+    A.mesh.position.copy(cam).addScaledVector(_gbA.subVectors(A.pos, cam), k); A.mesh.scale.setScalar(A.S * k); A.mesh.quaternion.copy(A.q);
+    A.mesh.visible = A.vis > 0.01; A.mat.uniforms.uVis.value = A.vis;
+    aeonPower(A, dt);
+  }
+  for (let k = 0; k < 2; k++) { if (E.boltT[k] > 0) { E.boltT[k] -= dt / Math.max(timeK, 0.05); const f = Math.max(0, E.boltT[k] / 0.3) * (Math.random() < 0.8 ? 1 : 0.3); E.bolt.write(k, 11, 3.2 * f, 3.6 * f, 5.2 * f, true); if (E.boltT[k] <= 0) E.bolt.clear(k); } else E.bolt.write(k, 0, 0, 0, 0, true); }
+  E.bolt.commit();
+}
+// and out in the dark: each on its own way round the globe, under the rings, its belly to the world
+function aeonCosmos(dt) {
+  const E = AEON, C = COSMOS; aeonInit(); E.uT.value = time;
+  if (!E.sp) E.sp = E.list.map((A, i) => { const r = mulberry32(5200 + i * 31), mat = aeonMat(A, true), m = new THREE.Mesh(E.geo, mat); m.frustumCulled = false; C.scene.add(m);
+    return { A, m, mat, S: A.S * 4.2, pos: new THREE.Vector3(), o: czOrbitOf(CZ_RG * (1.2 + i * 0.019), (r() - 0.5) * 2.4, r() * 6.283, r() * 6.283, (r() < 0.5 ? -1 : 1) * 6.283 / (420 + r() * 330)) }; });
+  const t = Date.now() / 1000;
+  for (const B of E.sp) { const O = B.o, a = O.ph + t * O.w, ca = Math.cos(a), sa = Math.sin(a);
+    B.pos.copy(O.e1).multiplyScalar(ca * O.r).addScaledVector(O.e2, sa * O.r);
+    _czf.copy(O.e1).multiplyScalar(-sa).addScaledVector(O.e2, ca).multiplyScalar(Math.sign(O.w)); _czu.copy(B.pos).normalize();
+    czPlace(B.m, B.pos, B.S, B.S); czLook(B.m.quaternion, _czf, _czu);
+    if (B.A.id === 'zeus') { B.fl = Math.max(0, (B.fl || 0) - dt * 4); if (Math.random() < dt * 0.7) B.fl = 1; B.mat.uniforms.uFlash.value = B.fl; }
+  }
+}
+
 // ───────────────────────── space ─────────────────────────
 // ── For now the keeper's alone (MOD.admin, as the server vouches for him), and only with the god in him. Past the sky limit
 //    the sun does not take his wings, and climbing on, the blue goes out of the sky, the stars come through by day and the
@@ -40289,7 +40552,7 @@ function cosmosPlace(dt) {
   // him
   czPlaceBody(false); czMorphStep(dt); if (player.form === 'human') czManPose(dt); else czBirdWings(dt); _czv.subVectors(C.pos, C.camPos);
   C.me.visible = M; if (M) { const d = _czv.length(), k = czK(d); C.me.position.copy(_czv).multiplyScalar(k); C.me.scale.setScalar(d * k * 0.018); C.me.quaternion.copy(C.q); }
-  czTrail(dt); czRocks(); czdDraw(dt); cznStep(dt); xoCosmos(dt);   // (and the way to BURNING STUDIO MUSIC, and whoever is out here from either world)
+  czTrail(dt); czRocks(); czdDraw(dt); cznStep(dt); aeonCosmos(dt); xoCosmos(dt);   // (and the way to BURNING STUDIO MUSIC, and whoever is out here from either world)
 }
 const t0z = () => (Date.now() / 1000) % 100000;   // (the rings go round by the shared clock too)
 // sparks off him, left hanging where he passed
@@ -42933,7 +43196,7 @@ setTimeout(() => xoHold(() => {
   state = 'title';
   titleStart();
   warmPrograms();
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { PAL, palGround, palHit, palIn, TRK, palTrinket, palTrinketNear, PAL_TRINKETS, palLift, palPadNear, palLife, PRUN, palSleep, palBedNear, palStationNear, palGame, updatePalace, mapCross, czGo, cosmosMap, voiceParse, COSMOS, HY, mapCv: typeof mapCv !== 'undefined' ? mapCv : null, OSTAR, SANCT, TABLE, ostarAt, ostarGive, gotOly, pillarLight, perchLook, ROCK, ROCKK, rockSpot, rockFixed, rockFront, rockMake, rockBreak, mineSwing, gotMine, DROP, dropAdd, GATHER, gatherAct, errandNear, axeCheck, axeHeph, atForge, RECIPES, CRAFT, craftRows, craftRowDo, craftMake, bldList, invHas, DREAM, dreamSkip, topAt, surfAt, structHit, roostFind, camera, dir3, MOUSE, turnForm, turnMan, turnBird, wingsOut, armsOut, TURNC, MOUNT, updatePerch, get camYaw() { return camYaw; }, get time() { return time; }, agBuild, agWeb, agReach, agSpans, agWool, agStill, agNear, AGM, agmRocks, agmIgnite, agmGround, agmPieces, agmBurnAt, agDeck, agmAct, FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.__icarus = { AEON, AEON_K, aeonBolt, cosmosEnter, COSMOS, aeonVisit, aeonPath, aeonInit, updateAeons, aeonCosmos, PAL, palGround, palHit, palIn, TRK, palTrinket, palTrinketNear, PAL_TRINKETS, palLift, palPadNear, palLife, PRUN, palSleep, palBedNear, palStationNear, palGame, updatePalace, mapCross, czGo, cosmosMap, voiceParse, COSMOS, HY, mapCv: typeof mapCv !== 'undefined' ? mapCv : null, OSTAR, SANCT, TABLE, ostarAt, ostarGive, gotOly, pillarLight, perchLook, ROCK, ROCKK, rockSpot, rockFixed, rockFront, rockMake, rockBreak, mineSwing, gotMine, DROP, dropAdd, GATHER, gatherAct, errandNear, axeCheck, axeHeph, atForge, RECIPES, CRAFT, craftRows, craftRowDo, craftMake, bldList, invHas, DREAM, dreamSkip, topAt, surfAt, structHit, roostFind, camera, dir3, MOUSE, turnForm, turnMan, turnBird, wingsOut, armsOut, TURNC, MOUNT, updatePerch, get camYaw() { return camYaw; }, get time() { return time; }, agBuild, agWeb, agReach, agSpans, agWool, agStill, agNear, AGM, agmRocks, agmIgnite, agmGround, agmPieces, agmBurnAt, agDeck, agmAct, FSH, fshTo, fshOn, fshNow, fshK, fshHeard, fshCpu, fbCpuHit, cpuPractice, MO, MODES, MOV, GP, SD, sdAtk, sdAlt, sdDo, sdEnd, CF, cfAt, cfBase, cfDo, cfHas, LG, lgPass, TR, trKey, LD, ldStep, ldCell: (x, z) => gpCell(x, z), gpAt, ldPct, kingZone, kingIn, tagPass, tagBurn, zbTurn, psSnap, psDo, jgSet, jgHit, moKey, moList, moCall, moStart, moWin, moKO, moRevive, moSay, moGot, moStep, moBoard, moBest, hgTake, hgY, svAdd, FB, fbFire, fbWind, fbSteer, fbMake, fbBlow, fbHeard, gotFb, teamOf, sameSide, INKW, MD, mdShotAt, mdEval, mdHeard, mdReady, mdCamOn, ARES_L, PW, matchSlot, mdK, xrayStep, HL, UVOLC, hadesWhere, hlWhat, hadesLand, underBase, lavaLight, REEF, SEALOOK, SEAK, reefK, reefSite, agentsMenu, AGW, landable, apClear, DIR, dirAdjust, dirAuto, dirFind, dirParse, dirPlace, dirPose, dirSay, dirStart, dpAnswer, qlGo, qlWhere, qlActive, qlTracked, QL, FLIP, flipTo, flyAsk, flyLocal, flyCompile, flyRun, LIVE, WRE, wreathFound, wreathPass, gotWreath, AREA, areaEnter, DECREE, decree, gotDecree, decreeDo, keeperAct, regReport, regNote, REG, RWAVE, waveAdd, waveTarget, waveRaise, gotWave, proWaveWarn, pro, PRO_C, CRETE, startPrologue, CHUNK, INV, FELL, CHOP, PLANT, BLD, PIECES, FORGE, treeFront, chopSwing, chopHit, fellStart, plantHere, plantAdd, bagShow, bldMode, bldPlace, bldTake, bldAim, pieceWhy, gotBld, gotFell, axeBegin, axeGot, axeForge, axeObj, invSave, invLoad, spaceAction, XF, NOTE, hushed, gotXf, xfOffer, xfAnswer, xfKey, xfEnd, xfStop, xfName, xfKind, xfShort, xfSdpOk, xfTrim, xfKnown, xfWho, xfTarget, xfCant, xfGone, xfShun, xfRekey, xfChoose, xfConfirm, xfNoteCmd, xfFileCmd, xfFilesCmd, xfList, xfSave, xfForget, xfRecStart, xfRecEnd, xfPack, xfPlay, xfNoteStop, xfWav, muEnc, muDec, xfCardDraw, xfAllOff, vcTrack, courierRelease, dropPeer, quiet, flood, mic, VC, audio, shardShift, updatePart, NPCS, NPC_N, npcWho, npcHandle, npcStyle, npcCtx, npcThem, npcSees, npcAsk, npcAt, npcOn, npcHost, npcNoticed, npcHeard, npcSay, npcDm, updateNpcs, symSeal, symOpen, VK, eyeRead, gotEye, CH, FAC, EYES, facKeep, chList, chNext, chShow, sendCh, gotDm, gotFc, gotFi, gotGod, factionCmd, messageCmd, courier, COUR, keeperLook, peerLook, birdDetail, wingGeos, KEEPER, bigName, SMALL, small, updateSmall, smallV, DAD, proAnswer, proTalkEnd, proTalkStep, CAMB, camBlendFrom, MGROUPS, menuGroup, menuDrawer, swimWings, SWIMT, stoneParts, stoneHit, renameSelf, MORPH, BIG, birdK, DIS, get heroName() { return heroName; }, warmPrograms, finishPrograms, WARM, get tierIdx() { return tierIdx; }, becomeHuman, pressSpace, get renderer() { return renderer; }, get scene() { return scene; }, RG, AIM, ringsCmd, arenaFor, SAFE_R, updateAim, riseFromDeep, CIRC, circleStart, circleAim, cretePeer, creteWorld, watchCrete, updateNewcomer, matchCmd, matchStop, matchAgain, matchEnd, pylonBlaze, warStat, ringBlaze, perchClear, TAILS, tailPose, resetPose, toHumanTest: () => { const p = player; p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; p.climb = null; p.vel.set(0, 0, 0); resetPose(); }, CARRY, PART, ROCKS, partShift, meteoraAt, AG, agTake, agSite, agCommand, agStanding, WORLD, TOAST, ALPS, alpAt, RIV, MINTRO, matchSetOut, matchLeave, matchCpu, groundAt, flags, xrMode, xrRein, xrHear, RIDER, xrBody, xrEye, xmapShow, xmapStep, BIRD, birdHear, birdAuto, birdPet, birdTrick, birdRings, AP, DP, dpHear, dpParse, dpExit, cinema, PART, ROCKS, human, GFLY, gflyStart, gflyEnd, gflyMount, gflyLeap, gflyLand, tourStart, airSay, godById, DEEP, flocks, BIRDS, SEA, UNDER, seaGust, currentAt, enterSea, MATCH, matchWar, matchChallenge, gotMatch, matchOut, matchBoom, updateMatch, GODM, godMode, godDash, TRON, tronHit, tronTake, M3, mapV, openMap, closeMap, mapMode, mapZoom, mapTurn, STATS, AUTH, AREA, areaEnter, areaName, statsTick, statsSend, agentAsk, authShow, worldTitle, LIVE, menuGo, menuTap, MORPH, DIS, updateAsh, heard, overheard, VFAST, chatCommand, MOD, get heroName() { return heroName; }, FAR, YIELDS, QL, qlShow, qlUpdate, itemMake, grantItem, questFinished, gotQshare, IS, setQuest, setCamYaw: v => { camYaw = v; }, wingLeap, startClimbStone, LIVING, ringPass, torchBurst, STOOP, stoopPull, CRAGS, cragsBuild, FOLDW, BIRDI, phxAlive, updateTakeoff, perchLand, TORCH, torchStart, houseJoin, houseLeave, houseRings, myHouses, PATRON, PC, PT, PV, body, XALB, xalbOpen, xalbGo, gotCrater, ARENA, SHR, heldBy, godPresence, PRES, showForm, respawnTop, warp, birdK, birdPow, PLACE, placeNow, updatePlaces, WT, titleCard, pro, proPress, proDrown, PRO_CLIMB, PRO_FAIL, gotLook, gotTear, gotKick, peerOf, xmapPinch, lookWear, ALBUM, sagaStart, sagaAdvance, quests, questEvent, GLITCH, die, death, featherFx, phoenix, PHX_S, voiceParse, voiceDo, godSound, applyAct, LOOK, LOOK_SETS, lookApply, lookShow, lookAsk, lookCode, lookFrom, POOL, CRATERS, crater, obsidianAt, updatePools, DRIFT, driftAdd, driftBlast, TEAR, treesNear, leaveTalk, startTalk, talk, godSay, talkChips, stick, keys, A3, XR, XM, XMAP, xmapShow, xmapStep, xrMenuShow, xrMenuStep, xrMenuAt, xrMenuDo, handsToggle, xrMove, xrInput, xrStart, xrFrame, xrStep, fakeHand, cam, torchLight, audienceBegin, audienceEnd, seatNear, startPrayer, CAVE, caveSite, caveHang, underRoof, caveDown, caveUp, ROCKS, meteoraAt, parthenonAt, stoneBuild, updateStone, TOMB, placeTombs, WORLD, MEMO, REC, recStart, recStop, memoGo, momentNow, albumView, SNOW, WP, wpAdd, wpSelect, wpCycle, wpMarkHere, wpShare, guideWind, gotGuide, GUST, AP, SHR, heldBy, UIL, WT, worldTitle, renameSelf, titleCard, CROWN, crownHit, updateCrownLife, FISH, fishCook, fishThrow, boilWater, VULT, vultSpawn, vultKill, airNova, MENU, GUIDE, guideShow, guideAsk, guideWhere, godTheme, THEME, MFX, INAPP, playUpright, startPlunge, divePose, CAMS, camClear, proBeat, buildCrete, TRACK, trackPeer, followPeer, aimPeer, peerNear, befriend, unfriend, FASK, gotFriend, gotTrail, trailAdopt, trailJoin, netTrail, updateCurrents, arenaPeerAt, GREAT, greatBegin, greatDone, greatFor, updateGreat, throwBolt, rankOf, might, learnSelf, raceBuild, raceEnd, isleOf, zeusHearth, findPrometheus, perks, quests, otherById, godById, temples, BEACONS, NEWC, watchCrete, gotWarp, RBEAM, remoteBeam, WATER, SCORCH, scorch, groundAt, terrainAt, skim, updateSkim, tsunamis, PERCH, perchSeek, perchGo, spaceAction, pressSpace, SESSION, FALLS, waterfalls, updateFalls, gotState, warpToPeer, mapP, mapTurn, mapNorth, mapPick, mapBirdAt, mapSX, mapSY, mapZoom, FACE, faceApply, faceCode, faceDecode, human, CRETE, creteWorld, aloneNow, proNet, CRATERS, crater, floodAt, launchBomb, VOLCANOES, erupt, RELIEF, mapMode, mapV, mapCells, HALO, paintSelf, capeFx, HEAVEN, stars, starMat, skyMat, TW, twisterSpawn, updateTwisters, DUNE, duneK, DUST, dustAt, dustFront, SQ, squallAt, squallsNear, VM, WC, wxGround, updateAir, WX, SIZ, wxAt, humanDive, overHeight, SHUN, shun, peerNamed, chatSay, ALBUM, albumAdd, albumShow, photoLive, death, landPose, placeNamed, cinema, SHOTS, newShot, photo, photoPreset, photoCycle, biomeAt, biomeW, skyIslands, buildHadesHall, UNDER, PANTHEON, perchLand, perchUp, setRealm, HEALTH, healthShow, healthDraw, healthLevel, updateHealth, voiceParse, voiceDo, heard, setName, QUIET, applyQuiet, vcSeal, vcOpen, vcKey, VK, vcNear, voiceOn, SLIP, slipstream, peerOf, ARENA, arenaCourse, arenaPass, arenaFinish, arenaClaim, gotArena, arenaMerge, hermesSendsOn, questOf, leapFromWater, spaceAction, ERUPT, erupt, launchBomb, RIV, riverNear, toBird, setLetters: v => { asciiOn = !!v; resize(); }, menuRefresh, talkChips, get GMORPH() { return GMORPH; }, startMorph, sampleShape, toneNow, xrGestures, XRG, meant, godFire, godBloom, godWind, godQuake, godTime, QUAKE, TSHIFT, MENU, menuShow, menuItems, TAPAT, gazePoint, HIGH, HIGHT, buildHigh, FLOWERS, flowerAt, flowerCol, scorchFlowers, GRASS, groundKind, footfall, SLOPE, cellRT, cellRT2, cellMat, glyphs, TITLE_SYNC, titleBurn, songHold, get VOCAL_AT() { return VOCAL_AT; }, PRAY, startPrayer, seatNear, seatOf, choosePatron, prayPose, updatePrayPrompt, EXPLAIN, showExplainer, GUST, gustBlow, gustFinish, gustAt, gustMake, gotWind, gustSend, updateGusts, STYX, styxAt, FERRY, startFerry, ferryStep, UD, udSpawn, udClear, udKill, nova, updateUndead, updateStyx, placeStyx, placeFixed, placeNamed, FOOT_SHOTS, PANTHEON, buildPantheon, PATRON, PATRONS, setPatron, showPatron, FRIENDS, befriend, ringPassed, gotRing, updateFriends, perchLand, perchUp, FLIES, updateFlies, AP, voiceParse, voiceDo, voiceRun, updateAuto, gazePoint, apMark, SH, SHAPES, shapeshift, shiftWord, startShift, endShift, builtinShape, xrLeave, xrCull, fakeHand, xrStart, xrFP, xrEye, xrArms, xrBody, xrFollow, xrHint, BLAZE, ignite, igniteNear, treesNear, WX, wxAt, godWeather, joinStorm, updateWeather, VOLCANOES, GRASS, inLava, updateLava, buildVolcano, CLOTH, animateCape, CHAT, chatLine, openChat, closeChat, sendChat, gotChat, snapPhoto, newShot, quad, divine, LOOKS, roomAt, chapel, impactPose, TUT, teach, LESSONS, cloudStorm, VC, vcCall, vcNew, gotRtc, gotFx, netFx, setMicMuted, FS, fsCheck, goFull, WR, flyWings, featherFx, respawnTop, setManWingsLR, inkOutline, who, whoList, updateWho, hoops, trail, spawnTrail, passHoop, nextHoop, hoopMat, godSay, fallbackNext, titleFly, titlePress, titleAsk, proPress, zeusSpeaks, zeusAt, death, phoenix, emit, burst, sunDir, setWings, setBurn, worldFx, scene, renderer, get flash() { return flash; }, set flash(v) { flash = v; }, makeFireMat, fireMat, peerOf, avatarOf, paintPeer, peerHue, XR, xrFrame, xrMove, xrInput, xrHud, xrHudMake, WORLD, worldLook, worldSync, worldFlush, worldMark, placeShrines, saveData, postMat, pro, startPrologue, endPrologue, proSkip, placeTemple, setJet, applyAct, grantPerk, startTitans, strike, scare, setQuest, setDay: v => { dayT = v; }, get dayT() { return dayT; }, get storm() { return storm; }, titans, perks, others, temples, jet, hoops, photo, openPhoto, closePhoto, photoPreset, mapV, quests, startWarp, openMap, closeMap, warp, godById, player, BEACONS, gods, story, cinema, get state() { return state; }, get realm() { return realm; }, UNDER, hades, audio, NET, netSay, knocked, chunks, hitTest, dbgCam, setCamYaw: v => { camYaw = v; }, cam, body, PT, PC, jump, startClimb, startTrip, setCurl, applyMirror, meant, startCam, stopCam, ending, get endReady() { return endReady; }, dlg, human, setStorm: v => { storm = v; }, ear, noise, spoke, hail, heard, sendOn, chainInfo, nextUnmet, get order() { return GOD_ORDER; }, flocks, souls, SPECIES_ALL: SPECIES, API, spawnBolt, CLOUD_SEA, cloudKinds, cloudTrail, get rain() { return rainAmt; }, forestAt, buildChunk, enterSea, tsunami, ripple, SEA, SHORE, skim, waterMat, waterY, setRealm, startEnding, talk, flags, pyres, pillars, pressSpace, becomeHuman, kindle, groundAt, heard, voiceCommand, saveGame, TEMPLE, MYKONOS, stats, mic,
     camera, startTalk, endTalk, applyTier, spawnGod, die, skyIslands, windmills, SPECIES, nearAnimal, SUMMIT, EDGE, MOUNT, SKY_LIMIT, START, SMOKE, SOOT, smokePuff, sootWet, paintFire, growTreeA, accToGeo, decoMat, SKID, skidAt, skidFrom, skidHeat, updateSkid, FAN, fanAt, fanBlaze, fanFlap, fanPass, gotFan, RR, rrJoin, rrMine, rrFetch, rrPlace, rrLayout, gotRjoin, get RING_DONE() { return RING_DONE; }, step: n => { for (let i = 0; i < n; i++) tick(1 / 60); } };
   if (window.__icarus) Object.assign(window.__icarus, { cpusCmd, MOD, die, deathLine, deathTell, gotDied, chatCommand, stopCmd, PANTHEON, AG, agTake, AGX, agxPoll, agxSend, agxDraw, agxTab, agxAt, agxHear, agxCommand, CH, chShow, sendChat, AGC, agCardOpen, agCardClose, agCardAct, areaBar, auiQuest, axeObj, chatLine, openChat, closeChat, chatFilter, STV, statsOpen, statsClose, statsGo, statsPages, statsMapOut, UISZ, uiSizeSet, AUID, auiDom, auiMarks, UIB, toast });
   if (window.__icarus) Object.assign(window.__icarus, { FLY, flyDrag, airLift });
