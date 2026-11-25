@@ -110,6 +110,13 @@
 - [ ] **New:** on the flat map the **3D** button (top right), the title and the place names are clearly visible. **R** or the button switches between flat and 3D, both ways, on desktop and phone.
 - [ ] **F**, outside a fight, opens the photo camera. Photos go to the album.
 
+## The interface, all in letters
+- [ ] **New:** nothing on screen is a rounded, see-through card any more. The key to press ("[T] TALK TO ZEUS…"), the lessons at the start, and the line about space with its MAP and SLOW keys are typed into the picture like the names of places, on a dark ground.
+- [ ] **New, nothing typed across anything else:** the place name, the message under it, the space line, the key to press, a lesson and a hint each get their own rows, one under another. Try it on a phone in space with a god talking.
+- [ ] **New, on a phone:** while a god is speaking, the chat's copy of the line and the lesson keep out of the way; the THE MAN / DIVE key stands above the words; markers are not drawn across them.
+- [ ] **New, the title and the sign-in:** every line stands on its own dark ground at the size of the picture's letters; buttons are in square brackets and turn gold under a finger. The sign-in fits a phone held sideways (scroll for the last line).
+- [ ] **Y** (plain picture): the cards there are square and solid too.
+
 ## Devices (never tested on real hardware, so worth a look)
 - [ ] **Phone:** touch and tilt, the one ICARUS menu button, two fingers to blow wind.
 - [ ] **New, phone sharpness:** letters are drawn on the phone's own pixels (3x on most phones), so everything should look crisper. If it gets choppy, it drops back to 2x by itself.
