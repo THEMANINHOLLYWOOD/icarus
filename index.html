@@ -9187,7 +9187,6 @@ function menuItems() {
     { g: 'C', ic: 'album', label: 'album', f: () => albumShow(true) },
     { g: 'A', ic: 'map', label: 'map', key: 'M', f: () => { if (state === 'play') openMap(); } },
     ...(COSMOS.on ? [{ g: 'A', ic: 'map', label: 'to earth', f: () => cosmosLeave(false) }] : []),   // (out in space: the way home)
-    ...(XO.on && XO.X && XO.X.st.open && state === 'play' ? [{ g: 'A', ic: 'map', label: XO.vis ? 'home · brn music' : 'to brn music', f: () => xoCross(false, 'hole') }] : []),   // (THE CROSSING: through the wormhole, from wherever he is)
     ...(PL.on ? [{ g: 'A', ic: 'map', label: 'to space', f: plUp }] : []),   // (on a world out there: up out of its air)
     { g: 'A', ic: 'map', label: MINI.mode === 'off' ? 'minimap off' : MINI.mode === 'north' ? 'minimap north' : 'minimap', on: MINI.mode !== 'off', keep: true, f: miniCycle },
     { g: 'A', ic: 'who', label: 'players', key: 'Tab', badge: String(flyers), on: who.pinned, f: () => { who.pinned = !who.pinned; who.open = who.pinned; } },
@@ -40338,7 +40337,7 @@ function czRocks() {
 const XO_LAYER = 7, XO_PETS = ['murph', 'odie', 'batman', 'cali'], XO_LOOK = /^b[0-9a-f]{25}$/;
 Object.assign(XO, { on: false, M: null, K: null, kitP: null, X: null, pp: null, ppDone: false, booted: false, arrived: false, pet: '', lk: '',
   B: new THREE.Vector3(24000, 18000, -16000).setLength(52000), q: new THREE.Quaternion(), k: 1, RI: 9500, /* (B: COSMIC's middle, out past the rings so nothing of ours stands in front of it) */ shipS: 1, sur: null, plT: 0, tags: [], stadLoading: false, stad: null, sg: null, paintT: 0, pre: false, inside: false, graceT: 0, going: false, last: new THREE.Vector3(), lastOk: false,
-  meT: 0, meK: '', rtT: 4, hole: null, holeR: null, holeEl: null, holeP: null, holeD: 1e9, holeUntil: 0, holeAt: 0, admT: 0, panel: null, looking: false, skyT: 0, sky: new Map(), skyPx: 0, pxN: 0, me: null, tag: null, t: 0, hint: '' });
+  meT: 0, meK: '', rtT: 4, olyAt: 0, admT: 0, panel: null, looking: false, skyT: 0, sky: new Map(), skyPx: 0, pxN: 0, me: null, tag: null, t: 0, hint: '' });
 const _xoV = new THREE.Vector3(), _xoW = new THREE.Vector3(), _xoU = new THREE.Vector3(), _xoF = new THREE.Vector3(), _xoQ = new THREE.Quaternion(), _xoM = new THREE.Matrix4();
 function xoKit() {   // (the bodies: only fetched when someone is to be drawn in them)
   if (!XO.kitP) XO.kitP = import('/crossover/kit.js?v=2').then(K => { XO.K = K; return K; }).catch(e => { console.warn('[x] kit', e); XO.kitP = null; return null; });
@@ -40382,7 +40381,7 @@ async function xoStart() {
   XO.on = true; xoWire(X); xoKit();
   M.gateHooks({ home: m => {   // (back from BURNING STUDIO MUSIC in the frame over this page: out of its world's sky here, where he flew out of theirs)
     XO.going = false; XO.pp = { h: 'icarus', sp: m.sp, sd: m.sd, at: m.at };
-    xoWhenPlay(() => { if (m.at === 'hole') xoToHole(); else xoToSpace(m.f === 'man' ? 'man' : 'phoenix'); toast('HOME AGAIN · ICARUS'); });
+    xoWhenPlay(() => { xoToOlympus(); toast('HOME AGAIN · ICARUS'); });
   } });
   let pp = null;
   if (E.ticket) pp = await X.arrived(); else if (E.visit) pp = X.visit();
@@ -40414,55 +40413,31 @@ function xoArrive() {
   const E = XO.E, uncover = () => { const L = E && E.land; if (L) { E.land = null; try { L.go(); } catch {} } };
   try {
     if (XO.vis && XO.pp) xoVisitStart(!!(E && E.ticket));
-    else if (XO.pp && XO.pp.h === 'icarus') { const r = XO.M.takeReturn('icarus'); if (state === 'title') begin(); xoWhenPlay(() => { if (XO.pp.at === 'hole' || (!XO.pp.sp && r && r.at === 'hole')) xoToHole(); else xoToSpace(r && r.f); toast('HOME AGAIN · ICARUS'); }); }
+    else if (XO.pp && XO.pp.h === 'icarus') { XO.M.takeReturn('icarus'); if (state === 'title') begin(); xoWhenPlay(() => { xoToOlympus(); toast('HOME AGAIN · ICARUS'); }); }
   } catch (e) { console.warn('[x] arrive', e); }
   if (XO.pp) { xoWhenPlay(() => setTimeout(uncover, 450)); setTimeout(uncover, 9000); } else uncover();   // (uncovered once they are in place: out in space, by the stadium)
-  if (XO.pp && E && E.warm) { const shown = (n = 0) => { if (((COSMOS.on || XO.pp.at === 'hole' && XO.holeAt > 0) && state === 'play') || n > 120) XO.M.gateIn(); else setTimeout(() => shown(n + 1), 150); }; xoWhenPlay(() => setTimeout(shown, 300)); }   // (in a frame behind their world: up over it now)
+  if (XO.pp && E && E.warm) { const shown = (n = 0) => { if ((XO.olyAt > 0 && state === 'play') || n > 120) XO.M.gateIn(); else setTimeout(() => shown(n + 1), 150); }; xoWhenPlay(() => setTimeout(shown, 300)); }   // (in a frame behind their world: up over it now)
 }
 function xoVisitStart(first) {
   const n0 = cleanName(XO.pp.n), n = n0.replace(/ /g, '').length >= 2 && n0 !== 'SOMEONE' ? n0 : 'TRAVELLER';
   nameInput.value = n; setName(n, false); nameAsked = true;
   if (state === 'title') begin();
-  xoWhenPlay(() => { if (first) { if (XO.pp.at === 'hole') xoToHole(); else xoToSpace(XO.pp.f === 'man' ? 'man' : 'phoenix'); } toast(`WELCOME TO ICARUS, ${n} · YOU KEEP YOUR OWN LOOK HERE${XO.pp.at === 'hole' ? ' · THE WORMHOLE TAKES YOU HOME' : ''}`); });
+  xoWhenPlay(() => { if (first) xoToOlympus(); toast(`WELCOME TO ICARUS, ${n} · YOU'RE THE PHOENIX HERE · OUT IN SPACE, BURNING STUDIO MUSIC TAKES YOU HOME`); });
 }
 function xoWhenPlay(fn, left = 160) { if (state === 'play') fn(); else if (left > 0) setTimeout(() => xoWhenPlay(fn, left - 1), 250); }   // (from the live title the bird takes a moment to be his; a slow machine, up to 40 s)
-// ── THE WORMHOLE: on the summit, by where everyone starts. Walk (or fly) into it and you're in BURNING STUDIO MUSIC, by its own wormhole
-//    in the lobby; come back through that one and you're here, beside this. The long way round, through space, is still there.
-const XO_HOLE = { x: MOUNT.x + 16, z: MOUNT.z + 2 };
-function xoHolePos() { if (!XO.holeP) { const R = PAL.gate, g = R ? R.y + 0.35 : groundAt(XO_HOLE.x, XO_HOLE.z, SUMMIT + 60); XO.holeP = new THREE.Vector3(R ? R.x : XO_HOLE.x, g + 3.9, R ? R.z : XO_HOLE.z); } return XO.holeP; }   // (in the GATE ROOM of the house of the Twelve, east wing, second floor: on its dais)
-function xoHoleBuild() {
-  const P = xoHolePos(), G = new THREE.Group(); G.position.copy(P); G.rotation.y = PAL.gate ? Math.PI / 2 : Math.atan2(START.x - P.x, START.z - P.z);   // (its face down the room, to the door)
-  const ring = (r, t, c) => { const m = new THREE.Mesh(new THREE.TorusGeometry(r, t, 10, 56), new THREE.MeshBasicMaterial({ color: c, fog: false })); G.add(m); return m; };
-  XO.holeR = [ring(3.3, 0.34, '#ff8a3d'), ring(2.6, 0.2, '#ff4fa3'), ring(1.9, 0.14, '#ffd27a'), ring(1.2, 0.1, '#b48cff')];
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(3.15, 48), new THREE.MeshBasicMaterial({ color: '#2a0f45', transparent: true, opacity: 0.88, side: THREE.DoubleSide, depthWrite: false, fog: false })); G.add(disc);
-  const el = document.createElement('div'); el.className = 'mk'; el.innerHTML = '<b>◎</b><span></span>'; el.style.display = 'none'; el.style.color = '#ffb46a'; $('markers').appendChild(el); XO.holeEl = el;
-  scene.add(G); XO.hole = G;
-}
-function xoHole(dt) {
-  const p = player; if (realm !== 'over' || PL.on) { if (XO.hole) XO.hole.visible = false; if (XO.holeEl) XO.holeEl.style.display = 'none'; XO.holeD = 1e9; return; }
-  const P = xoHolePos(), d = Math.hypot(p.pos.x - P.x, p.pos.z - P.z), dy = p.pos.y - (P.y - 3.9); XO.holeD = Math.hypot(d, dy);
-  if (XO.holeD > 2500 && !XO.hole) return;
-  if (!XO.hole) xoHoleBuild();
-  const on = !COSMOS.on; XO.hole.visible = on;
-  XO.holeR.forEach((m, i) => { m.rotation.z += dt * (i % 2 ? -1 : 1) * (0.6 + i * 0.5); m.scale.setScalar(1 + Math.sin(XO.t * 2 + i) * 0.03); });
-  if (on && XO.holeD < 900 && Math.random() < dt * 30) { const a = Math.random() * TAU_, r = 3.4 + Math.random() * 1.2, f = _xoV.set(Math.cos(a) * r, Math.sin(a) * r, 0).applyQuaternion(XO.hole.quaternion);   // (sparks drawn in, round and down into it)
-    emit(P.x + f.x, P.y + f.y, P.z + f.z, -f.x * 0.9, -f.y * 0.9, -f.z * 0.9, 0.5 + Math.random() * 0.5, Math.random() < 0.5 ? [1.6, 0.6, 0.25] : [1.4, 0.35, 0.9]); }
-  const open = !!(XO.X && XO.X.st.open);
-  placeMarker(XO.holeEl, P.x, P.y + 5.2, P.z, on && state === 'play' && XO.holeD < 34, '◎', open ? `${XO.vis ? 'HOME · ' : ''}BURNING STUDIO MUSIC · WALK IN${XO.holeD > 30 ? ' · ' + fmtDist(XO.holeD) : ''}` : 'THE WORMHOLE · CLOSED BY THE KEEPER', true);
-  // in: on foot through its middle, or flying through it
-  if (on && state === 'play' && !XO.going && performance.now() > XO.holeUntil && d < 2.8 && p.pos.y - P.y > -4.8 && p.pos.y - P.y < 3.4) {   // (feet on the ground under its middle, or flying through it)
-    if (open || XO.X?.ad) { XO.holeUntil = performance.now() + 3000; for (let i = 0; i < 40; i++) emit(P.x + rnd(2), P.y + rnd(2), P.z + rnd(2), rnd(6), rnd(6), rnd(6), 0.8, [1.6, 0.5, 0.9]); xoCross(false, 'hole'); }
-    else if (performance.now() - (XO.shutT || 0) > 4000) { XO.shutT = performance.now(); toast('THE WORMHOLE IS CLOSED · THE KEEPER HAS SHUT IT'); }
-  }
-}
-// come through from BURNING STUDIO MUSIC's wormhole: on the summit, on his feet, beside this one, facing away from it
-function xoToHole() {
+// ── IN THROUGH THE GLOBE: BURNING STUDIO MUSIC's globe of this world is the one door. Whoever flies into it comes out here as the
+//    phoenix (the ship they flew in burns into the bird on the way through), flying in over Mount Olympus towards the House of the Twelve.
+function xoToOlympus() {
   const p = player; if (COSMOS.on) cosmosLeave(true); if (PL.on) plOff('home'); if (realm !== 'over') setRealm('over', START.x, START.z);
-  const P = xoHolePos(), R = PAL.gate, a = R ? Math.PI / 2 : Math.atan2(START.x - P.x, START.z - P.z), x = R ? R.lx : P.x + Math.sin(a) * 7, z = R ? R.lz : P.z + Math.cos(a) * 7, gy = R ? R.y : groundAt(x, z, SUMMIT + 60);   // (on the gate room's floor, his back to it)
-  p.form = 'human'; p.cine = null; p.scale = 1; p.wings = false; p.perch = false; p.takeoff = null; p.tumble = false; p.sub = null; fireLight.intensity = 0; phoenix.tails.forEach(tl => tl.ok = false); resetPose(); setBurn(0);
-  p.pos.set(x, gy, z); p.vel.set(0, 0, 0); p.grounded = true; p.fallTop = gy; p.fallCause = ''; human.group.rotation.y = a; camYaw = a;
-  for (let i = 0; i < 50; i++) emit(x + rnd(1), gy + Math.random() * 2.2, z + rnd(1), rnd(2.5), 1 + Math.random() * 3.5, rnd(2.5), 0.6 + Math.random() * 0.6, Math.random() < 0.5 ? [1.6, 0.6, 0.25] : [1.4, 0.35, 0.9]);
-  XO.holeUntil = performance.now() + 4000; XO.holeAt = performance.now(); XO.going = false;   // (real seconds, not the game's: a slow machine's clock runs slow)
+  toBird();
+  const ang = 0.35, R = 420, x = MOUNT.x + Math.sin(ang) * R, z = MOUNT.z + Math.cos(ang) * R, y = Math.max(SUMMIT + 170, groundAt(x, z, SUMMIT + 400) + 60);
+  const yaw = Math.atan2(x - MOUNT.x, z - MOUNT.z);   // (nose on the summit: forward is (−sin yaw, −cos yaw))
+  p.cine = null; p.sub = null; p.perch = false; p.grounded = false; p.takeoff = null; p.tumble = false;
+  p.pos.set(x, y, z); p.vel.set(0, 0, 0); p.yaw = yaw; p.pitch = -0.12; p.speed = 90; p.vy = 0; p.turn = 0; p.bank = 0; p.flame = 1; p.skyT = 0; p.fallTop = y;
+  dir3.set(-Math.sin(yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(yaw) * Math.cos(p.pitch));
+  camera.position.set(x + Math.sin(yaw) * phxDist, y + phxDist * 0.5, z + Math.cos(yaw) * phxDist); camYawOff = 0;
+  for (let i = 0; i < 80; i++) emit(x + rnd(3), y + rnd(3), z + rnd(3), rnd(9), rnd(9), rnd(9), 0.7 + Math.random() * 0.7, Math.random() < 0.5 ? [1.6, 0.6, 0.25] : [1.4, 0.35, 0.9]);   // (the ship, gone up in fire: the bird out of it)
+  audio.sfx.whoosh?.(false); XO.olyAt = performance.now(); XO.going = false;
 }
 // out into space by the stadium, heading for the globe (and not straight back in: out of it first)
 function xoToSpace(f, tries = 4) {
@@ -40796,8 +40771,7 @@ function xoTick(dt) {
     if ((XO.rtT -= dt) <= 0) { XO.rtT = 15; xoRt(); }
     xoKeeper(dt);
     if (!COSMOS.on && XO.looking) xoSkyOff();
-    xoHole(dt);
-    if (!COSMOS.on && !XO.vis) XO.M.gateNear('brn', !!XO.X.st.open && realm === 'over' && XO.holeD < 45, 'hole');   // (on the ground: by the wormhole, the other world is loaded behind this one; away from it, let go after a while)
+    if (!COSMOS.on && !XO.vis) XO.M.gateNear('brn', false);   // (home on the ground: the other world, loaded behind, is let go after a while)
     if (!COSMOS.on && XO.tag && XO.tag.style.display !== 'none') XO.tag.style.display = 'none';
   }
   if (XO.vis && !COSMOS.on) xoSelf(dt);   // (out in space it is done once he has been placed there: see xoCosmos)
