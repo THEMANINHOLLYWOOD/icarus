@@ -118,6 +118,7 @@
 - [ ] **Y** (plain picture): the cards there are square and solid too.
 - [ ] **New, choosing a god on a phone:** the twelve are all there to read and tap; the small map and the speed line step aside while you choose (they used to be typed across ZEUS and HERA).
 - [ ] **New, the photo camera on a phone:** its keys are square, in brackets, and the name of the lens stands above them.
+- [ ] **New, the whole opening over Crete is in letters:** the key to press, the line of keys under it ("SPACE - BEAT YOUR WINGS…"), what Daedalus and you shout (big, at the foot of the screen), ESC - SKIP, and his questions with your answers ([1] [2] [3] with keys; three keys in a row on a phone). Start as a brand-new player to see it: none of it should be a page box or a rounded pill.
 - [ ] **New, your father on Crete:** his questions and your three answers are on a square dark ground, each answer a key in brackets.
 - [ ] **New, a fight's lobby on a phone:** READY stands under the two lines that ask for it; SKIP INTRO, RESTART and END FIGHT are whole (the roll key steps down from under them); no marker is typed across the line at the top or between a key's brackets.
 
