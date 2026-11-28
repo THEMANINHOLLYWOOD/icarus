@@ -14,8 +14,9 @@ GitHub (`THEMANINHOLLYWOOD/icarus`) is the only place they meet, so look there f
 
 ## Where work goes
 
-- `review/whole-game` is the game: what is live is built from it. `main` is behind
-  on purpose until the user says to bring it up.
+- `review/whole-game` is the game: what is live is built from it. `main` is brought
+  up to it only when the user says (last done 2026-11-28), by fast-forward, never
+  by committing on `main` itself.
 - New work goes on a branch of your own, cut from the latest
   `origin/review/whole-game`, named `<this Mac's short name>/<topic>`
   (`hostname -s` gives the name). Push that branch; do not push anyone else's.
